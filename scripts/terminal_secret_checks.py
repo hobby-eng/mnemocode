@@ -37,6 +37,7 @@ from terminal_answers import (
     HIDDEN_RECORD,
     JOINED_UNICODE,
     LAST_WORD,
+    LAST_WORD_FORGOTTEN,
     LEGACY_VALID_WORD_NUMBERS,
     MASKED_WORD_NUMBERS,
     MASK_DATE,
@@ -92,7 +93,7 @@ def check_candidate_passphrase_roles():
             session.wait_for(
                 "Seed phrase or text file path, ? for each forgotten word:"
             )
-            session.type("abandon " * 11 + "?" + ENTER)
+            session.type(LAST_WORD_FORGOTTEN + ENTER)
             session.wait_for("list")
             first = role_visible(session)
             start = len(session.output)
@@ -590,8 +591,10 @@ def check_decode_dates_asked_again():
         answer_fingerprint(session)
         session.wait_for("found 1 match.")
         session.wait_for(MASK_DATE)
-        session.wait_for(TEST_PHRASE)
         session.wait_for(CLEAR_PROMPT)
+        # The match's phrase is wrapped at its spaces (CORE-36): it is read
+        # whole on the screen.
+        assert_private_result_visible(session, (TEST_PHRASE,))
         session.type(ENTER)
         session.wait_for(MENU_SHOWN)
         session.type(ESCAPE)
@@ -772,8 +775,12 @@ def check_file_or_text_input():
                 if kind != "words":
                     session.wait_for(DATES_WITH_MARKS)
                     session.type(MASK_DATE + ENTER)
-                session.wait_for(TEST_PHRASE)
+                    session.wait_for(TEST_PHRASE)
                 session.wait_for(CLEAR_PROMPT)
+                if kind == "words":
+                    # A candidate's phrase is wrapped at its spaces
+                    # (CORE-36): it is read whole on the screen.
+                    assert_private_result_visible(session, (TEST_PHRASE,))
                 session.type(ENTER)
                 assert session.wait_for_exit() == 0
                 assert_kept_private(

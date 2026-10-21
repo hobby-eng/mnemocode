@@ -180,7 +180,10 @@ export class EncodedBackup extends Redacted {
    * is replaced by one with a valid checksum, and the record then names the mode that keeps it
    * (seedshift-legacy-valid); a last word that already fits is kept, and the record stays the
    * Original Seedshift's. The command line and a page encode through it, so that both write the
-   * same codes and the same record.
+   * same codes and the same record. Refuses what assertEncodable refuses, a count of dates the mode
+   * does not take (Masking.assertDateCount: core.masking.assert-date-count-refused,
+   * assert-takes-dates-refused), what Masking.encode refuses of the phrase and the dates, and a
+   * format that names none (core.encoded-form.unsupported-encoded-format).
    */
   static encode(
     mnemonic: string,
@@ -290,7 +293,10 @@ export class EncodedBackup extends Redacted {
     return defined(Masking.of(this.#mode).undo(this.indexes, dates)[0]);
   }
 
-  /** Every phrase that the codes and the complete `dates` may give: one unless givesSeveral. */
+  /**
+   * Every phrase that the codes and the complete `dates` may give: one unless givesSeveral. What
+   * Masking.undo refuses of the dates passes on.
+   */
   candidates(dates: readonly DateShiftDate[]): DecodedResult[] {
     return Masking.of(this.#mode).undo(this.indexes, dates);
   }

@@ -1,6 +1,5 @@
 // The host-neutral wallet check of src/core/wallet-evidence.ts, built as a browser page builds it:
 // with a PBKDF2 function of its own. Published test vectors of the public test phrase only.
-import { pbkdf2Sync } from "node:crypto";
 import { afterEach, describe, expect, it, vi, type MockResult } from "vitest";
 import { pbkdf2 } from "@noble/hashes/pbkdf2.js";
 import { sha512 } from "@noble/hashes/sha2.js";
@@ -27,9 +26,10 @@ import {
   masterFingerprint,
   matchBitcoinEvidence,
   assertBitcoinEvidence,
+  nodePbkdf2HmacSha512,
 } from "../src/bitcoin-evidence.js";
 import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { TEST_ADDRESS, TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** The pure JavaScript PBKDF2 that @scure/bip39 uses, as a page passes it. */
 const noblePbkdf2 = ((password, salt, rounds, bytes) =>
@@ -42,7 +42,7 @@ const BIP84 = {
     "zpub6jftahH18ngZxLmXaKw3GSZzZsszmt9WqedkyZdezFtWRFBZqsQH5hyUmb4pCEeZGmVfQuP5bedXTB8is6fTv19U1GQRyQUKQGUTzyHACMF",
   accountZpub:
     "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs",
-  firstReceiving: "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
+  firstReceiving: TEST_ADDRESS,
   firstReceivingPublicKey: "0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c",
   firstReceivingWif: "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d",
   firstChange: "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el",
@@ -122,7 +122,7 @@ function recordingHost() {
 const cases: readonly [string, BitcoinEvidence, EvidenceMatch][] = [
   [
     "a master fingerprint",
-    { kind: "master-fingerprint", value: "73C5DA0A", network: "mainnet" },
+    { kind: "master-fingerprint", value: TEST_FINGERPRINT.toUpperCase(), network: "mainnet" },
     {
       matched: true,
       kind: "master-fingerprint",
@@ -357,7 +357,7 @@ describe("the host's PBKDF2", () => {
         },
       ],
       [
-        { kind: "master-fingerprint", value: "73c5da0", network: "mainnet" },
+        { kind: "master-fingerprint", value: TEST_FINGERPRINT.slice(0, -1), network: "mainnet" },
         { code: "core.wallet-check.master-fingerprint-eight-hexadecimal-characters" },
       ],
       [
@@ -409,11 +409,7 @@ describe("the host's PBKDF2", () => {
   });
 
   it("can be node:crypto's, with the same result", () => {
-    const node = new WalletEvidenceCheck(
-      (password, salt, rounds, bytes) =>
-        Uint8Array.from(pbkdf2Sync(password, salt, rounds, bytes, "sha512")),
-      [BITCOIN],
-    );
+    const node = new WalletEvidenceCheck(nodePbkdf2HmacSha512, [BITCOIN]);
     for (const passphrase of ["", "TREZOR", "😀 two words"])
       expect(node.fingerprint(TEST_PHRASE, passphrase)).toBe(
         browserCheck.fingerprint(TEST_PHRASE, passphrase),
@@ -476,8 +472,8 @@ describe("a PBKDF2 that answers later, as WebCrypto's does", () => {
 
 describe("the validators, which need no phrase", () => {
   it("read a master fingerprint as typed", () => {
-    expect(parseMasterFingerprint(" 73C5DA0A ")).toBe("73c5da0a");
-    expect(() => parseMasterFingerprint("73c5da0g")).toThrow(
+    expect(parseMasterFingerprint(` ${TEST_FINGERPRINT.toUpperCase()} `)).toBe(TEST_FINGERPRINT);
+    expect(() => parseMasterFingerprint(`${TEST_FINGERPRINT.slice(0, -1)}g`)).toThrow(
       "A master fingerprint must be eight hexadecimal characters.",
     );
   });
@@ -509,17 +505,26 @@ describe("the validators, which need no phrase", () => {
   });
 
   it("accept every kind that a wallet can match", () => {
-    expect(() =>
-      assertBitcoinEvidence({ kind: "master-xpub", value: BIP84.rootZpub, network: "mainnet" }),
-    ).not.toThrow();
-    expect(() =>
-      assertBitcoinEvidence(located("wif", BIP84.firstReceivingWif, ["native-segwit"])),
-    ).not.toThrow();
-    expect(() =>
-      assertBitcoinEvidence(
-        located("account-xpub", BIP49_TESTNET.accountUpub, ["nested-segwit"], TESTNET_LOCATION),
-      ),
-    ).not.toThrow();
+    const matchable: readonly WalletEvidence[] = [
+      { kind: "master-fingerprint", value: TEST_FINGERPRINT, network: "mainnet" },
+      { kind: "master-xpub", value: BIP84.rootZpub, network: "mainnet" },
+      located("account-xpub", BIP49_TESTNET.accountUpub, ["nested-segwit"], TESTNET_LOCATION),
+      located("address", BIP84.firstReceiving, ["native-segwit"]),
+      located("compressed-public-key", BIP84.firstReceivingPublicKey, ["native-segwit"]),
+      located("wif", BIP84.firstReceivingWif, ["native-segwit"]),
+      {
+        kind: "coin-address",
+        coin: "bitcoin",
+        value: BIP84.firstReceiving,
+        location: { account: 0, branch: 0, index: 0 },
+      },
+    ];
+    // One of each kind that a line about a match names.
+    expect(matchable.map(({ kind }) => kind).sort()).toEqual(
+      Object.keys(EVIDENCE_MATCHED_BY).sort(),
+    );
+    for (const evidence of matchable)
+      expect(() => assertBitcoinEvidence(evidence), evidence.kind).not.toThrow();
   });
 });
 
@@ -628,7 +633,7 @@ describe("several addresses in a row, from the location's index on", () => {
 
   it("refuses a count on evidence that names no address, and trims as the coin checks do", () => {
     const counted = [
-      { kind: "master-fingerprint", value: "73c5da0a", network: "mainnet", addresses: 0 },
+      { kind: "master-fingerprint", value: TEST_FINGERPRINT, network: "mainnet", addresses: 0 },
       { kind: "master-xpub", value: BIP84.rootZpub, network: "mainnet", addresses: 2 },
       { ...located("account-xpub", BIP84.accountZpub, ["native-segwit"]), addresses: 1 },
     ];

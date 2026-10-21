@@ -11,7 +11,6 @@ import { writtenAsAnAddress } from "../src/core/coins/other-forms.js";
 import { NO_DATE } from "../src/core/dates.js";
 import { DatesAnswer, DateSearch, type WalletCheck } from "../src/core/date-search.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
-import { zeroEntropyPhrase } from "../src/core/english-words.js";
 import { formatConflictOf, modeConflictOf } from "../src/core/backup-reading.js";
 import { DATE_COUNT_WORDS, Masking } from "../src/core/masking.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
@@ -19,15 +18,22 @@ import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import type { MaskingMode } from "../src/core/types.js";
 import { MALFORMED_WALLET_ANSWER, type WalletMatch } from "../src/core/wallet-check.js";
 import { withHoles } from "./helpers/holes.js";
+import {
+  DATE,
+  LAST_WORD_FORGOTTEN,
+  MASKED_INDEXES,
+  MASKED_WORDS,
+  replacedAt,
+  TEST_INDEXES,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 
 // AUD-014 remediation of the core: the public reproductions of the audit's findings, each with
 // its well-formed controls, and the checks of the consolidated rules (recommendations 1 to 9).
 // Public test data only: the all-zero-entropy phrase and a synthetic date.
 
-const PHRASE = zeroEntropyPhrase(12);
-const DATE = parseDate("23-09-2026");
-/** The phrase masked with MnemoCode Seedshift and DATE, as BIP39 indexes. */
-const MASKED = encodeMnemonic(PHRASE, [DATE]).shiftedIndexes;
+/** DATE as the maskings read it. */
+const PARSED_DATE = parseDate(DATE);
 
 /** What a faulty JavaScript host's wallet check may answer, typed as a WalletCheck would be. */
 function answering(answer: unknown): WalletCheck {
@@ -48,8 +54,8 @@ const MALFORMED_ANSWERS: readonly [string, unknown][] = [
 describe("AUD-014-API001: a wallet check's answer must be a WalletMatch", () => {
   function dateSearch(walletCheck?: WalletCheck): DateSearch {
     return new DateSearch({
-      indexes: MASKED,
-      dates: DatesAnswer.of([DATE]),
+      indexes: MASKED_INDEXES,
+      dates: DatesAnswer.of([PARSED_DATE]),
       mode: "seedshift",
       keep: 1,
       ...(walletCheck === undefined ? {} : { walletCheck }),
@@ -67,10 +73,10 @@ describe("AUD-014-API001: a wallet check's answer must be a WalletMatch", () => 
     expect((await dateSearch(async () => ({ matched: true })).run()).matchCount).toBe(1);
     const listed = await dateSearch().run();
     expect(listed.matchCount).toBe(1);
-    expect(listed.shown[0]?.mnemonic).toBe(PHRASE);
+    expect(listed.shown[0]?.mnemonic).toBe(TEST_PHRASE);
   });
 
-  const wordSearch = () => WordCandidateSearch.parse(`${"abandon ".repeat(11)}?`, "unknown-words");
+  const wordSearch = () => WordCandidateSearch.parse(LAST_WORD_FORGOTTEN, "unknown-words");
 
   it.each(MALFORMED_ANSWERS)("the word search refuses %s", async (_, answer) => {
     await expect(wordSearch().run({ walletCheck: answering(answer) })).rejects.toThrow(
@@ -79,7 +85,7 @@ describe("AUD-014-API001: a wallet check's answer must be a WalletMatch", () => 
   });
 
   it("the word search counts only matched === true", async () => {
-    const byPhrase: WalletCheck = (mnemonic) => ({ matched: mnemonic === PHRASE });
+    const byPhrase: WalletCheck = (mnemonic) => ({ matched: mnemonic === TEST_PHRASE });
     const result = await wordSearch().run({ walletCheck: byPhrase });
     expect(result.count).toBe(128);
     expect(result.matched).toBe(1);
@@ -92,7 +98,7 @@ describe("AUD-014-API001: a wallet check's answer must be a WalletMatch", () => 
   /** The marked codes of the phrase without Seedshift, its last code unread. */
   const markedSearch = () =>
     new MissingCodesSearch(
-      MissingCodes.read(`${"abandon ".repeat(11)}?`, "english", "direct"),
+      MissingCodes.read(LAST_WORD_FORGOTTEN, "english", "direct"),
       () => "00000000",
     );
 
@@ -103,10 +109,10 @@ describe("AUD-014-API001: a wallet check's answer must be a WalletMatch", () => 
   });
 
   it("the search of marked codes finds only the codes that matched === true", async () => {
-    const byPhrase: WalletCheck = (mnemonic) => ({ matched: mnemonic === PHRASE });
+    const byPhrase: WalletCheck = (mnemonic) => ({ matched: mnemonic === TEST_PHRASE });
     const found = await markedSearch().byWallet(byPhrase).run();
     expect(found.kind).toBe("found");
-    if (found.kind === "found") expect(found.backup.text()).toBe(PHRASE);
+    if (found.kind === "found") expect(found.backup.text()).toBe(TEST_PHRASE);
     expect(
       (
         await markedSearch()
@@ -120,52 +126,50 @@ describe("AUD-014-API001: a wallet check's answer must be a WalletMatch", () => 
 describe("AUD-014-API005: dates without Seedshift are refused, never dropped", () => {
   it("refuses dates in Masking.encode and undo, and in EncodedBackup.decode, without Seedshift", () => {
     const direct = Masking.of("direct");
-    expect(() => direct.encode(PHRASE, [DATE])).toThrow(DATE_COUNT_WORDS.codes.direct);
-    expect(() => direct.undo(MASKED, [DATE])).toThrow(DATE_COUNT_WORDS.codes.direct);
-    expect(() => direct.held(PHRASE, [DATE])).toThrow(DATE_COUNT_WORDS.codes.direct);
-    const backup = EncodedBackup.read(PHRASE, "english", "direct");
-    expect(() => backup.decode([DATE])).toThrow(DATE_COUNT_WORDS.codes.direct);
-    expect(() => backup.candidates([DATE])).toThrow(DATE_COUNT_WORDS.codes.direct);
+    expect(() => direct.encode(TEST_PHRASE, [PARSED_DATE])).toThrow(DATE_COUNT_WORDS.codes.direct);
+    expect(() => direct.undo(MASKED_INDEXES, [PARSED_DATE])).toThrow(DATE_COUNT_WORDS.codes.direct);
+    expect(() => direct.held(TEST_PHRASE, [PARSED_DATE])).toThrow(DATE_COUNT_WORDS.codes.direct);
+    const backup = EncodedBackup.read(TEST_PHRASE, "english", "direct");
+    expect(() => backup.decode([PARSED_DATE])).toThrow(DATE_COUNT_WORDS.codes.direct);
+    expect(() => backup.candidates([PARSED_DATE])).toThrow(DATE_COUNT_WORDS.codes.direct);
   });
 
   it("keeps the well-formed calls and the refusal of a masking without dates", () => {
     const direct = Masking.of("direct");
-    expect(direct.encode(PHRASE, []).shiftedEnglish.join(" ")).toBe(PHRASE);
-    expect(EncodedBackup.read(PHRASE, "english", "direct").decode([]).recoveredMnemonic).toBe(
-      PHRASE,
+    expect(direct.encode(TEST_PHRASE, []).shiftedEnglish.join(" ")).toBe(TEST_PHRASE);
+    expect(EncodedBackup.read(TEST_PHRASE, "english", "direct").decode([]).recoveredMnemonic).toBe(
+      TEST_PHRASE,
     );
     const seedshift = Masking.of("seedshift");
-    expect(seedshift.encode(PHRASE, [DATE]).shiftedIndexes).toEqual(MASKED);
-    expect(seedshift.undo(MASKED, [DATE])[0]?.recoveredMnemonic).toBe(PHRASE);
+    expect(seedshift.encode(TEST_PHRASE, [PARSED_DATE]).shiftedIndexes).toEqual(MASKED_INDEXES);
+    expect(seedshift.undo(MASKED_INDEXES, [PARSED_DATE])[0]?.recoveredMnemonic).toBe(TEST_PHRASE);
     // The shifts refuse a masking without dates in their own words, as before.
-    expect(() => seedshift.encode(PHRASE, [])).toThrow(NO_DATE);
-    expect(() => seedshift.undo(MASKED, [])).toThrow(NO_DATE);
+    expect(() => seedshift.encode(TEST_PHRASE, [])).toThrow(NO_DATE);
+    expect(() => seedshift.undo(MASKED_INDEXES, [])).toThrow(NO_DATE);
   });
 });
 
 describe("AUD-014-API006: MissingCodes refuses a mode that names none when it is built", () => {
-  const marked = `${"abandon ".repeat(11)}?`;
-
   it("refuses an unknown mode in read and in withMode", () => {
     // A mode that no type allows, fed on purpose as a JavaScript host could.
-    expect(() => MissingCodes.read(marked, "english", "unknown" as MaskingMode)).toThrow(
-      "Unsupported Seedshift mode.",
-    );
-    const codes = MissingCodes.read(marked, "english", "direct");
+    expect(() =>
+      MissingCodes.read(LAST_WORD_FORGOTTEN, "english", "unknown" as MaskingMode),
+    ).toThrow("Unsupported Seedshift mode.");
+    const codes = MissingCodes.read(LAST_WORD_FORGOTTEN, "english", "direct");
     // The same mode, fed on purpose again.
     expect(() => codes.withMode("unknown" as MaskingMode)).toThrow("Unsupported Seedshift mode.");
   });
 
   it("keeps every mode that names one, and the guards of the places", () => {
     for (const mode of Masking.MODES)
-      expect(MissingCodes.read(marked, "english", mode).mode).toBe(mode);
-    expect(() => MissingCodes.read(PHRASE, "english", "direct")).toThrow(/No code is marked/u);
+      expect(MissingCodes.read(LAST_WORD_FORGOTTEN, "english", mode).mode).toBe(mode);
+    expect(() => MissingCodes.read(TEST_PHRASE, "english", "direct")).toThrow(/No code is marked/u);
   });
 });
 
 describe("AUD-014-API007: JSON writes every form from the indexes", () => {
   it("writes the same words and Unicode codes as the text forms, whatever is stored", () => {
-    const raw = representMnemonic(PHRASE);
+    const raw = representMnemonic(TEST_PHRASE);
     const stale = { ...raw, shiftedEnglish: ["zoo"], unicodeCodePoints: ["0000"] };
     const json: unknown = JSON.parse(formatEncoded(stale, "json"));
     const english = formatEncoded(stale, "english").split(" ");
@@ -174,7 +178,7 @@ describe("AUD-014-API007: JSON writes every form from the indexes", () => {
   });
 
   it("keeps the JSON of a healthy result, its fields and its dates", () => {
-    const result = encodeMnemonic(PHRASE, [DATE]);
+    const result = encodeMnemonic(TEST_PHRASE, [PARSED_DATE]);
     const json: unknown = JSON.parse(formatEncoded(result, "json"));
     if (typeof json !== "object" || json === null) throw new Error("Expected a JSON object.");
     expect(Object.keys(json)).toEqual([
@@ -188,7 +192,7 @@ describe("AUD-014-API007: JSON writes every form from the indexes", () => {
     expect(json).toMatchObject({
       english: result.shiftedEnglish,
       unicodeCodePoints: result.unicodeCodePoints.join(""),
-      dates: ["23-09-2026"],
+      dates: [DATE],
       shifts: result.shifts,
     });
   });
@@ -204,8 +208,8 @@ describe("AUD-014 recommendations 1 and 2: one rule for index lists and counts",
   });
 
   it("keeps the refusals of a candidate and of a missing-word search in their own words", () => {
-    const words = [...Array<number>(11).fill(0), 3];
-    expect(new WordCandidate(1, words).phrase).toBe(PHRASE);
+    const words = [...TEST_INDEXES];
+    expect(new WordCandidate(1, words).phrase).toBe(TEST_PHRASE);
     expect(() => new WordCandidate(0, words)).toThrow(
       expect.objectContaining({
         name: "RangeError",
@@ -231,8 +235,8 @@ describe("AUD-014 recommendations 1 and 2: one rule for index lists and counts",
 
   it("refuses a progress step below 1 with its message", async () => {
     const search = new DateSearch({
-      indexes: MASKED,
-      dates: DatesAnswer.of([DATE]),
+      indexes: MASKED_INDEXES,
+      dates: DatesAnswer.of([PARSED_DATE]),
       mode: "seedshift",
     });
     await expect(search.run({ progressEvery: 0 })).rejects.toThrow(
@@ -315,27 +319,22 @@ describe("AUD-014 recommendations 7 and 9: counts kept once, one match kept", ()
   });
 
   /** The masked codes with their third code unread, and the day of the date forgotten. */
-  const markedWithDates = () => {
-    const words = encodeMnemonic(PHRASE, [DATE]).shiftedEnglish.map((word, index) =>
-      index === 2 ? "?" : word,
-    );
-    return {
-      search: new MissingCodesSearch(
-        MissingCodes.read(words.join(" "), "english", "seedshift"),
-        () => "00000000",
-      ),
-      dates: DatesAnswer.parse("2?-09-2026", { wordCount: 12, patterns: true }),
-    };
-  };
+  const markedWithDates = () => ({
+    search: new MissingCodesSearch(
+      MissingCodes.read(replacedAt(MASKED_WORDS, { 3: "?" }), "english", "seedshift"),
+      () => "00000000",
+    ),
+    dates: DatesAnswer.parse("2?-09-2026", { wordCount: 12, patterns: true }),
+  });
 
   it("gives the one set that matched with its dates, and only a count for several", async () => {
     const { search, dates } = markedWithDates();
-    const byPhrase: WalletCheck = (mnemonic) => ({ matched: mnemonic === PHRASE });
+    const byPhrase: WalletCheck = (mnemonic) => ({ matched: mnemonic === TEST_PHRASE });
     const found = await search.byWallet(byPhrase, dates).run();
     expect(found.kind).toBe("found");
     if (found.kind === "found") {
-      expect(found.backup.indexes).toEqual(MASKED);
-      expect(found.foundDates).toBe("23-09-2026");
+      expect(found.backup.indexes).toEqual(MASKED_INDEXES);
+      expect(found.foundDates).toBe(DATE);
     }
     const several = await search.byWallet(answering({ matched: true }), dates).run();
     expect(several.kind).toBe("several");
@@ -359,8 +358,8 @@ describe("AUD-014 observations: a stop during the host's answer, and the checksu
     const controller = new AbortController();
     const published: string[] = [];
     const search = new DateSearch({
-      indexes: MASKED,
-      dates: DatesAnswer.of([DATE]),
+      indexes: MASKED_INDEXES,
+      dates: DatesAnswer.of([PARSED_DATE]),
       mode: "seedshift",
       keep: 1,
       walletCheck: stoppingCheck(controller),
@@ -376,13 +375,14 @@ describe("AUD-014 observations: a stop during the host's answer, and the checksu
 
   it("stops the word search and the search of marked codes the same way", async () => {
     const words = new AbortController();
-    const found = await WordCandidateSearch.parse(`${"abandon ".repeat(11)}?`, "unknown-words").run(
-      { walletCheck: stoppingCheck(words), signal: words.signal },
-    );
+    const found = await WordCandidateSearch.parse(LAST_WORD_FORGOTTEN, "unknown-words").run({
+      walletCheck: stoppingCheck(words),
+      signal: words.signal,
+    });
     expect(found).toMatchObject({ stopped: true, count: 0, matched: 0, shown: [], entropies: [] });
     const codes = new AbortController();
     const result = await new MissingCodesSearch(
-      MissingCodes.read(`${"abandon ".repeat(11)}?`, "english", "direct"),
+      MissingCodes.read(LAST_WORD_FORGOTTEN, "english", "direct"),
       () => "00000000",
     )
       .byWallet(stoppingCheck(codes))
@@ -391,7 +391,7 @@ describe("AUD-014 observations: a stop during the host's answer, and the checksu
   });
 
   it("refuses an index that names no word instead of answering for its checksum", () => {
-    const words = [...Array<number>(11).fill(0), 3];
+    const words = [...TEST_INDEXES];
     expect(checksumValid(words)).toBe(true);
     const outOfRange = [2048, ...words.slice(1)];
     expect(() => checksumValid(outOfRange)).toThrow("Every BIP39 index");

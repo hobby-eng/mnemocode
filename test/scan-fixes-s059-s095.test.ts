@@ -55,6 +55,7 @@ import {
 import { optionLabel } from "../src/cli/option-copy.js";
 import { TypedShares } from "../src/cli/share-repair.js";
 import { SHARE_ANSWER_HINT, addMoreShares } from "../src/cli/share-repair.js";
+import { heirSheetText } from "../src/cli/heir-sheet.js";
 import { ShareSplit } from "../src/sskr/split.js";
 import { nodeSharePlatform, nodeFillRandom } from "../src/sskr/share-platform-node.js";
 import { combineSskrShares } from "../src/sskr/shares.js";
@@ -103,7 +104,14 @@ import { entryAt, absentPath } from "../src/export/private-file.js";
 import { ValidCharacters, characterLength, isContinuation } from "../src/cli/utf8.js";
 import { characterSize } from "../src/cli/terminal-geometry.js";
 import { assertColorCards } from "../src/export/card-content.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  ENCODED_FINGERPRINT,
+  TEST_ADDRESS,
+  TEST_FINGERPRINT,
+  TEST_PHRASE,
+  TEST_WORDS,
+} from "./helpers/test-phrase.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
@@ -111,17 +119,17 @@ describe("S059: the menu's wallet answer is the command line that gives the same
   it("reads back every way of the wallet question, and a place that is not the first", () => {
     const first = { ...FIRST_RECEIVING_LOCATION };
     const cases: WalletEvidence[] = [
-      { kind: "master-fingerprint", value: "73c5da0a", network: "mainnet" },
+      { kind: "master-fingerprint", value: TEST_FINGERPRINT, network: "mainnet" },
       {
         kind: "address",
-        value: "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
+        value: TEST_ADDRESS,
         profiles: BITCOIN_PROFILES,
         location: first,
         addresses: 20,
       },
       {
         kind: "address",
-        value: "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
+        value: TEST_ADDRESS,
         profiles: ["native-segwit"],
         location: { ...first, account: 1, index: 3 },
         addresses: 2,
@@ -183,10 +191,10 @@ describe("S069: one reader of the wallet options", () => {
     expect(() => givenWallet({ network: "testnet" })).toThrow(
       "--network applies to a wallet given as an option",
     );
-    const wallet = givenWallet({ "master-fingerprint": "73c5da0a" });
+    const wallet = givenWallet({ "master-fingerprint": TEST_FINGERPRINT });
     expect(wallet.evidence).toEqual({
       kind: "master-fingerprint",
-      value: "73c5da0a",
+      value: TEST_FINGERPRINT,
       network: "mainnet",
     });
     expect(wallet.place.location).toEqual(FIRST_RECEIVING_LOCATION);
@@ -202,7 +210,7 @@ describe("S069: one reader of the wallet options", () => {
       const path = join(directory, "passphrase.txt");
       await writeFile(path, "TREZOR\n");
       const wallet = givenWallet({
-        "master-fingerprint": "73c5da0a",
+        "master-fingerprint": TEST_FINGERPRINT,
         "bip39-passphrase-file": path,
       });
       expect(wallet.passphrase).toBe("TREZOR");
@@ -264,7 +272,7 @@ describe("S071: every option list is typed once", () => {
       ].sort(),
     );
     expect(() =>
-      givenWallet({ "master-fingerprint": "73c5da0a", "bitcoin-profile": "bip84" }),
+      givenWallet({ "master-fingerprint": TEST_FINGERPRINT, "bitcoin-profile": "bip84" }),
     ).toThrow("--bitcoin-profile places an address, a key or a WIF; a master key has no place.");
     expect(() =>
       givenWallet({ coin: "litecoin", "coin-address": "x", "bitcoin-profile": "bip84" }),
@@ -287,7 +295,7 @@ describe("S072: a share file reads as a typed answer does", () => {
       const read = await TypedShares.given({ "share-file": [joined, wrapped] });
       expect(read.list.map((share) => share.text)).toEqual([first, second, third]);
       const phrase = join(directory, "phrase.txt");
-      await writeFile(phrase, `${"abandon\n".repeat(11)}about\n`);
+      await writeFile(phrase, `${TEST_WORDS.join("\n")}\n`);
       await expect(TypedShares.given({ "share-file": phrase })).rejects.toThrow(
         "The file holds a seed phrase in words, not a Shamir share",
       );
@@ -303,9 +311,17 @@ describe("S072: a share file reads as a typed answer does", () => {
 });
 
 describe("S073: the share separator is one constant", () => {
-  it("names the separator in the prompts, the heir sheet and the too-few refusal", () => {
+  it("names the separator in the hint of the share prompts and on the heir sheet, and splits shares at it", () => {
     expect(SHARE_ANSWER_HINT).toBe(
       `separate shares with ${SHARE_SEPARATOR}, ? for each unreadable code or digit`,
+    );
+    const sheet = heirSheetText({
+      backup: { kind: "shares", format: "words", threshold: 2, count: 3 },
+      mode: "direct",
+      dates: 0,
+    });
+    expect(sheet.steps).toContain(
+      `Type any 2 shares, separated by "${SHARE_SEPARATOR}". MnemoCode shows the seed phrase.`,
     );
     const input = new ShareInput({ decodeEntry: "Decode" });
     expect(input.sharesOfText(`a${SHARE_SEPARATOR}b\nc`)).toEqual(["a", "b", "c"]);
@@ -314,7 +330,7 @@ describe("S073: the share separator is one constant", () => {
 
 describe("S075: one library split of a backup", () => {
   const phrase = TEST_PHRASE;
-  const dated = [parseDate("23-09-2026")];
+  const dated = [parseDate(DATE)];
 
   it("splits the phrase that the mode holds, and refuses a mode without shares", async () => {
     const split = new ShareSplit(nodeSharePlatform, nodeFillRandom);
@@ -353,7 +369,7 @@ describe("S075: one library split of a backup", () => {
 describe("S076: Encode keeps the library's encoding", () => {
   it("says whether the last word was replaced", () => {
     const phrase = TEST_PHRASE;
-    const dated = [parseDate("23-09-2026")];
+    const dated = [parseDate(DATE)];
     const kept = EncodedBackup.encode(phrase, dated, "indexes", "seedshift-legacy");
     const asked = EncodedBackup.encode(phrase, dated, "indexes", "seedshift-legacy", {
       validLastWord: true,
@@ -388,7 +404,7 @@ describe("S078: the rules of printable cards have one owner", () => {
     expect(() => assertSheetQr({ kind: "sskr", pageSize: "business", cardQr: true })).not.toThrow();
   });
 
-  it("draws the dry run with the longest sample phrase in the form of the codes", () => {
+  it("takes BIP39's longest phrase as the longest sample, and builds sample cards in the form of the codes but never in word numbers", () => {
     expect(LONGEST_SAMPLE_WORDS).toBe(Math.max(...SAMPLE_WORD_COUNTS));
     expect(() => new CardPreviewClass(nodeCardRenderer, { colorForm: "indexes" })).toThrow(
       "Colour cards are not written as indexes.",
@@ -493,11 +509,11 @@ describe("S083: each option of Encode belongs to one of its modes", () => {
 
 describe("S084: one source of the fingerprint lines", () => {
   it("builds the plain lines and notes from FINGERPRINT_NOTE and PHRASE_WORDS", () => {
-    expect(plainFingerprintLine("original", "73c5da0a")).toBe(
-      "Original BIP32 master fingerprint (empty BIP39 passphrase): 73c5da0a",
+    expect(plainFingerprintLine("original", TEST_FINGERPRINT)).toBe(
+      `Original BIP32 master fingerprint (empty BIP39 passphrase): ${TEST_FINGERPRINT}`,
     );
-    expect(plainFingerprintLine("encoded", "0d05289e", true)).toBe(
-      "Encoded BIP32 master fingerprint of the masked phrase (empty BIP39 passphrase): 0d05289e",
+    expect(plainFingerprintLine("encoded", ENCODED_FINGERPRINT, true)).toBe(
+      `Encoded BIP32 master fingerprint of the masked phrase (empty BIP39 passphrase): ${ENCODED_FINGERPRINT}`,
     );
     expect(FINGERPRINT_HINT).toBe("Fingerprint uses an empty BIP39 passphrase.");
     expect(PHRASE_WORDS.encodedFingerprint).toBe("Encoded fingerprint (of the masked phrase)");
@@ -506,7 +522,7 @@ describe("S084: one source of the fingerprint lines", () => {
 });
 
 describe("S085: one Stop that cancels, one question and one answer for more shares", () => {
-  it("leaves the Stop that cancels to askOrCancel", () => {
+  it('has no module that cancels at a "stop" answer of its own, and words the question as What now? and the answer as Add more shares', () => {
     const stops = readdirSync("src", { recursive: true, encoding: "utf8" })
       .filter((file) => file.endsWith(".ts"))
       .filter((file) =>

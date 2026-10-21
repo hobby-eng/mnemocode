@@ -7,6 +7,19 @@ import {
   type NextByte,
 } from "../src/cli/terminal-keys.js";
 import { rowsOfOutputLine } from "../src/cli/terminal-geometry.js";
+import {
+  BACKSPACE,
+  CTRL_A,
+  CTRL_C,
+  CTRL_D,
+  CTRL_U,
+  END,
+  ESCAPE,
+  HOME,
+  LEFT,
+  RIGHT,
+  UP,
+} from "./helpers/keys.js";
 
 /** The bytes of `text` as a terminal in raw mode delivers them, then the end of the input. */
 function typed(text: string): NextByte {
@@ -63,7 +76,7 @@ describe("terminal keys", () => {
   });
 
   it("reads Ctrl+C as a cancellation key", async () => {
-    expect(await TerminalKeys.readKey(typed("\x03"))).toEqual({ kind: "cancel" });
+    expect(await TerminalKeys.readKey(typed(CTRL_C))).toEqual({ kind: "cancel" });
   });
 
   it("reads an escape sequence with parameters to its end, so that Ctrl+Up is no digit 5", async () => {
@@ -71,7 +84,7 @@ describe("terminal keys", () => {
   });
 
   it.each([
-    ["Ctrl+D", "\x04"],
+    ["Ctrl+D", CTRL_D],
     ["the end of the input", ""],
   ])("goes back on %s", async (_, text) => {
     expect(await keys(text)).toEqual(["back"]);
@@ -144,20 +157,20 @@ describe("hidden line", () => {
   });
 
   it("edits with Backspace, Delete and Ctrl+U, also over a character of several bytes", async () => {
-    expect(await readLine(typed("abc\x7fd\r"), { echo: false })).toBe("abd");
+    expect(await readLine(typed(`abc${BACKSPACE}d\r`), { echo: false })).toBe("abd");
     expect(await readLine(typed("ab€\x08c\r"), { echo: false })).toBe("abc");
-    expect(await readLine(typed("wrong\x15right\n"), { echo: false })).toBe("right");
+    expect(await readLine(typed(`wrong${CTRL_U}right\n`), { echo: false })).toBe("right");
   });
 
   it("ends with Ctrl+D or the end of the input only when nothing was typed", async () => {
-    expect(await readLine(typed("\x04"), { echo: false })).toBeUndefined();
+    expect(await readLine(typed(CTRL_D), { echo: false })).toBeUndefined();
     expect(await readLine(typed(""), { echo: false })).toBeUndefined();
     expect(await readLine(typed("partial"), { echo: false })).toBe("partial");
-    expect(await readLine(typed("a\x04b\r"), { echo: false })).toBe("a\x04b");
+    expect(await readLine(typed(`a${CTRL_D}b\r`), { echo: false })).toBe(`a${CTRL_D}b`);
   });
 
   it("is cancelled by Ctrl+C", async () => {
-    expect(await readLine(typed("secret\x03"), { echo: false })).toBe(CANCELLED);
+    expect(await readLine(typed(`secret${CTRL_C}`), { echo: false })).toBe(CANCELLED);
   });
 
   it("refuses an answer longer than its limit and text that is not UTF-8, each by its code", async () => {
@@ -174,6 +187,10 @@ describe("hidden line", () => {
       message: "The answer is not valid UTF-8 text.",
     });
   });
+});
+
+describe("visible line", () => {
+  restoreMocksAfterEach();
 
   it("shows a visible answer as it is typed, without control keys and escape sequences", async () => {
     const shown: string[] = [];
@@ -182,8 +199,8 @@ describe("hidden line", () => {
       return true;
     });
     // Up is no editing key; Ctrl+A goes to the start, where x goes in and Backspace takes it out.
-    expect(await readLine(typed("ab\x1b[Ac\x01x\x7f\r"), { echo: true })).toBe("abc");
-    expect(shown.join("")).not.toContain("\x1b[A");
+    expect(await readLine(typed(`ab${UP}c${CTRL_A}x${BACKSPACE}\r`), { echo: true })).toBe("abc");
+    expect(shown.join("")).not.toContain(UP);
     // A pasted Tab between words counts and shows as a space.
     shown.length = 0;
     expect(await readLine(typed("abandon\tabout\r"), { echo: true })).toBe("abandon about");
@@ -192,14 +209,14 @@ describe("hidden line", () => {
 
   it("edits a visible answer at the cursor, as a shell does", async () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const LEFT = "\x1b[D";
-    const RIGHT = "\x1b[C";
     // Left twice, then a character goes in before the last two.
     expect(await readLine(typed(`abcd${LEFT}${LEFT}X\r`), { echo: true })).toBe("abXcd");
     // Backspace deletes before the cursor, Delete under it.
-    expect(await readLine(typed(`abcd${LEFT}${LEFT}\x7f\x1b[3~\r`), { echo: true })).toBe("ad");
+    expect(await readLine(typed(`abcd${LEFT}${LEFT}${BACKSPACE}\x1b[3~\r`), { echo: true })).toBe(
+      "ad",
+    );
     // Home and End, also as Ctrl+A and Ctrl+E, and the O forms of application mode.
-    expect(await readLine(typed(`bc\x1b[Ha\x1b[Fd\r`), { echo: true })).toBe("abcd");
+    expect(await readLine(typed(`bc${HOME}a${END}d\r`), { echo: true })).toBe("abcd");
     expect(await readLine(typed(`bc\x1bOHa\x05d\r`), { echo: true })).toBe("abcd");
     // Ctrl+Left and Ctrl+Right move by words; Ctrl+W deletes the word before the cursor.
     expect(
@@ -208,18 +225,16 @@ describe("hidden line", () => {
     expect(await readLine(typed(`one two three\x17\x17four\r`), { echo: true })).toBe("one four");
     // Ctrl+U deletes what is before the cursor, Ctrl+K what follows it.
     expect(
-      await readLine(typed(`wrong right${LEFT}${LEFT}${LEFT}${LEFT}${LEFT}\x15\r`), { echo: true }),
+      await readLine(typed(`wrong right${LEFT}${LEFT}${LEFT}${LEFT}${LEFT}${CTRL_U}\r`), {
+        echo: true,
+      }),
     ).toBe("right");
     expect(await readLine(typed(`keep cut${LEFT}${LEFT}${LEFT}\x0b\r`), { echo: true })).toBe(
       "keep ",
     );
     // A character of several bytes moves and deletes as one.
-    expect(await readLine(typed(`a€b${LEFT}${LEFT}\x7f\r`), { echo: true })).toBe("€b");
+    expect(await readLine(typed(`a€b${LEFT}${LEFT}${BACKSPACE}\r`), { echo: true })).toBe("€b");
   });
-});
-
-describe("hidden line", () => {
-  restoreMocksAfterEach();
 
   it("ignores Escape alone in a secret prompt and goes back with it in the menu", async () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -236,9 +251,9 @@ describe("hidden line", () => {
         },
       };
     };
-    const secret = lone("\x1babc\r");
+    const secret = lone(`${ESCAPE}abc\r`);
     expect(await readLine(secret.next, { echo: true, moreWithin: secret.moreWithin })).toBe("abc");
-    const menu = lone("\x1babc\r");
+    const menu = lone(`${ESCAPE}abc\r`);
     expect(
       await readLine(menu.next, { echo: true, moreWithin: menu.moreWithin, escapeGoesBack: true }),
     ).toBeUndefined();
@@ -322,7 +337,7 @@ describe("failures while a line is read", () => {
       moreWithin: async () => false,
       onBack: failing,
     };
-    await expect(readLine(typed("ab\x1b"), options)).rejects.toThrow(
+    await expect(readLine(typed(`ab${ESCAPE}`), options)).rejects.toThrow(
       "Synthetic fault of the host.",
     );
   });

@@ -240,7 +240,7 @@ export const BACKUP_CHECK: HelpOption = {
   value: "yes|no",
   summary: "Answer whether to check the written-down backup on the private screen",
   details: [
-    "After the result, --ask-secrets offers to type the backup again from what you wrote down, with the dates, and says whether it restores the same phrase. yes starts that check at once; no leaves it out. Without the option it is asked.",
+    "After the result, the private screen offers to type the backup again from what you wrote down, with the dates, and says whether it restores the same phrase. yes starts that check at once; no leaves it out. Without the option it is asked. It needs a terminal, where the private screen shows.",
   ],
 };
 

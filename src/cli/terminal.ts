@@ -208,7 +208,16 @@ export function terminalPart(
   strong: boolean = false,
   channel: Channel = "stdout",
 ): void {
-  terminalLine(channel, `\n${terminalPaint(channel, strong ? STYLE.strong : STYLE.muted, label)}`);
+  terminalLine(channel, partLine(label, strong, channel));
+}
+
+/** The line that terminalPart writes, its blank line first. */
+export function partLine(
+  label: string,
+  strong: boolean = false,
+  channel: Channel = "stdout",
+): string {
+  return `\n${terminalPaint(channel, strong ? STYLE.strong : STYLE.muted, label)}`;
 }
 
 /** The number before an item of a numbered row, such as " 12.", with the space after it. */
@@ -270,18 +279,21 @@ function joinedCodeLines(codes: readonly string[], joined: string): string[] {
   ];
 }
 
-/** The exact lines printCodes writes, including the separated and joined terminal views. */
+/**
+ * The exact lines printCodes writes: on a terminal the codes of a form that writes them joined
+ * apart beside the joined text (joinedCodeLines), and the codes of every other form, which are
+ * separated by spaces, wrapped at those spaces (CORE-36), as the terminal would otherwise break a
+ * long line inside a code; for a file, a pipe or TERM=dumb the text as written, on one line.
+ */
 export function codeLines(text: string, format: EncodedFormat): string[] {
+  if (!terminalLayout("stdout")) return [text];
   const apart = EncodedForm.of(format).apartCodes(text);
-  return apart === undefined || !terminalLayout("stdout")
-    ? [text]
-    : joinedCodeLines(apart, compactCode(text));
+  return apart === undefined ? wrapText(text) : joinedCodeLines(apart, compactCode(text));
 }
 
 /**
- * `text`, codes written in `format`, on standard output: on a terminal, where the form writes its
- * codes joined, apart beside the joined text (codeLines, joinedCodeLines); as written otherwise,
- * and always for a file or a pipe, which keep one plain line.
+ * `text`, codes written in `format`, on standard output, as codeLines lays them out: Encode's
+ * result, and the codes of a phrase restored from shares.
  */
 export function printCodes(text: string, format: EncodedFormat): void {
   for (const line of codeLines(text, format)) console.log(line);
@@ -402,6 +414,29 @@ export function terminalWarningWithMore(message: string, anchor: string): void {
 /** The line of terminalMore, grey; not wrapped: a link must stay whole to be clicked or copied. */
 export function moreLine(anchor: string): string {
   return terminalPaint("stderr", STYLE.muted, `More: ${readmeLink(anchor)}`);
+}
+
+/**
+ * A line after a result: a notice of its kind, a warning that still holds once the command has
+ * ended ("lasting", terminalLastingWarning), or a link to a README section (terminalMore).
+ */
+export type ResultNote =
+  { readonly text: string; readonly kind: NoticeKind | "lasting" } | { readonly more: string };
+
+/**
+ * Writes `note` as its kind says, so that a warning stays above the step that follows on the
+ * private screen (PrivateSteps.remember, CORE-39), and a lasting one in the summary too.
+ */
+export function terminalResultNote(note: ResultNote): void {
+  if ("more" in note) terminalMore(note.more);
+  else if (note.kind === "lasting") terminalLastingWarning(note.text);
+  else terminalNotice(note.text, note.kind);
+}
+
+/** The lines that terminalResultNote writes, for a check of the room on the screen. */
+export function resultNoteLines(note: ResultNote): string[] {
+  if ("more" in note) return [moreLine(note.more)];
+  return noticeLines(note.text, note.kind === "lasting" ? "warning" : note.kind);
 }
 
 /** An error message after a red "✗ Error:", as `mhfe` writes it. */

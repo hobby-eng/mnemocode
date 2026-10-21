@@ -5,13 +5,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { MAX_SHOWN_CANDIDATES, WordCandidateSearch } from "../src/core/candidates.js";
 import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
+import { LAST_WORD_FORGOTTEN, replacedAt, TEST_PHRASE } from "./helpers/test-phrase.js";
 
-const ELEVEN = "abandon ".repeat(11);
-const TEST_PHRASE = `${ELEVEN}about`;
 /** The last word forgotten: 128 checksum-valid candidates, the test phrase among them. */
-const LAST = WordCandidateSearch.parse(`${ELEVEN}?`, "unknown-words");
+const LAST = WordCandidateSearch.parse(LAST_WORD_FORGOTTEN, "unknown-words");
 /** The first and the last word forgotten: 262,144 candidates, more than MAX_SHOWN_CANDIDATES. */
-const FIRST_AND_LAST = WordCandidateSearch.parse(`? ${"abandon ".repeat(10)}?`, "unknown-words");
+const FIRST_AND_LAST = WordCandidateSearch.parse(
+  replacedAt(TEST_PHRASE, { 1: "?", 12: "?" }),
+  "unknown-words",
+);
 
 describe("WordCandidateSearch.run", () => {
   it("keeps every candidate of a small search, each with its number, and no entropy", async () => {

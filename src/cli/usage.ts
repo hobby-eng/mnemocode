@@ -16,6 +16,7 @@ import { TEST_PHRASE, TEST_PHRASE_VARIABLE } from "./help-options.js";
 import { COMMAND_HELP, TOPIC_HELP } from "./help-pages.js";
 import type { HelpOption, HelpRow, TopicHelp } from "./help-types.js";
 import { STYLE, terminalPaint, wrapText } from "./terminal.js";
+import { STYLE_CODES } from "./terminal-style.js";
 import { defined } from "../core/defined.js";
 
 /** Width of the help texts, as in `mhfe --help`: an 80-column terminal, also in a wider one. */
@@ -64,9 +65,9 @@ function flagLabel(option: HelpOption): string {
   return `${shortFormGap(option)}${paint(STYLE.accent, option.flag)}${value}`;
 }
 
+/** The columns that the label of `option` takes (flagLabel): its text without its colours. */
 function optionWidth(option: HelpOption): number {
-  const value = option.value === undefined ? 0 : option.value.length + 3;
-  return shortFormGap(option).length + option.flag.length + value;
+  return flagLabel(option).replace(STYLE_CODES, "").length;
 }
 
 function shortFormGap(option: HelpOption): string {

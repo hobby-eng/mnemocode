@@ -8,9 +8,8 @@
 //
 // The masked codes are those of vectors/mnemocode-v1.json (checksum-valid-seedshift-12), as
 // backup-reading-self-test.ts reads them; the Original Seedshift's codes are the record of the
-// original program in the help of decode. The Unicode codes come from the published BIP39
-// Chinese list (bitcoin/bips bip-0039/chinese_simplified.txt): word 1, abandon, is 的 (U+7684),
-// word 4, about, is 在 (U+5728). Public test data only.
+// original program in the help of decode. The public phrase's Unicode codes come from the
+// published BIP39 Chinese list (self-test-vectors.ts). Public test data only.
 //
 // Host-neutral: it imports only other core modules.
 
@@ -30,6 +29,7 @@ import {
   MASKED_NUMBERS,
   PUBLIC_FINGERPRINT,
   PUBLIC_MNEMONIC,
+  PUBLIC_UNICODE,
 } from "./self-test-vectors.js";
 
 /** The public phrase masked with the Original Seedshift and 23-09-2026, as Unicode codes. */
@@ -37,8 +37,6 @@ const LEGACY_UNICODE = "8F44901950118F44901950118F44901950118F4490194F5C";
 const RIGHT_DATE = parseDate(MASKED_DATE);
 /** A day later: MnemoCode Seedshift still gives a valid phrase, the Original Seedshift does not. */
 const WRONG_DATE = parseDate("24-09-2026");
-/** The public phrase without Seedshift as Unicode codes, written joined as encode writes them. */
-const PUBLIC_UNICODE = `${"7684".repeat(11)}5728`;
 
 /** A wallet that has the public phrase's address, and one that has none of these phrases'. */
 const PUBLIC_WALLET: WalletCheck = (mnemonic) => ({

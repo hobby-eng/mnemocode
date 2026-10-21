@@ -2,24 +2,27 @@ import { expect, it, vi } from "vitest";
 import { serializeRecord } from "../src/record.js";
 import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { runBuiltCliSync } from "./helpers/built-cli.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  LEGACY_VALID_MASKED,
+  replacedAt,
+  TEST_FINGERPRINT,
+  TEST_NUMBERS,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 import { terminalFingerprint } from "../src/cli/terminal.js";
 
-const DIRECT = serializeRecord("direct", "indexes", `${"1 ".repeat(11)}4`);
-const LEGACY = serializeRecord(
-  "seedshift-legacy-valid",
-  "indexes",
-  "2027 10 24 2027 10 24 2027 10 24 2027 10 23",
-);
+const DIRECT = serializeRecord("direct", "indexes", TEST_NUMBERS);
+const LEGACY = serializeRecord("seedshift-legacy-valid", "indexes", LEGACY_VALID_MASKED);
 
 it.each([
   ["encoding", ["encode", "--mnemonic", TEST_PHRASE, "--mode", "direct", "--format", "1"]],
   ["decoding", ["decode", "--input", DIRECT]],
   [
     "a shorter-prefix warning",
-    ["decode", "--input", serializeRecord("direct", "indexes", `${"1 ".repeat(11)}4 2048 6 10`)],
+    ["decode", "--input", serializeRecord("direct", "indexes", `${TEST_NUMBERS} 2048 6 10`)],
   ],
-  ["legacy decoding", ["decode", "--input", LEGACY, "--date", "23-09-2026"]],
+  ["legacy decoding", ["decode", "--input", LEGACY, "--date", DATE]],
   [
     "share restoration",
     ["sskr-combine", ...SSKR_SET_VECTOR.shares.slice(0, 2).flatMap((share) => ["--share", share])],
@@ -36,7 +39,9 @@ it.each([
       const rows = result.stdout.trimEnd().split("\n");
       expect(rows).toHaveLength(128);
       expect(rows[0]).toMatch(new RegExp(`^1\\t${TEST_PHRASE}\\t[0-9a-f]{8}$`, "u"));
-      expect(rows[127]).toMatch(/^128\tabandon(?: abandon){10} wrap\t[0-9a-f]{8}$/u);
+      expect(rows[127]).toMatch(
+        new RegExp(`^128\\t${replacedAt(TEST_PHRASE, { 12: "wrap" })}\\t[0-9a-f]{8}$`, "u"),
+      );
     }
   },
 );
@@ -53,7 +58,7 @@ it.each(["stdout", "stderr"] as const)(
     try {
       terminalFingerprint(
         "Original BIP32 master fingerprint",
-        "73c5da0a",
+        TEST_FINGERPRINT,
         "empty BIP39 passphrase",
         channel,
       );

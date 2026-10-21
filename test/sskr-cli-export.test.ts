@@ -10,7 +10,7 @@ import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { type ShareFormat } from "../src/sskr/transport.js";
 import { markUnits } from "./helpers/shares.js";
 import { sskrVectors } from "./helpers/vectors.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { runBuiltCliSync as cli } from "./helpers/built-cli.js";
 import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
@@ -38,11 +38,20 @@ describe("integrated SSKR CLI", () => {
   it("exports a repaired share without changing the other shares", () => {
     const vector = sskrVectors().deterministic[0]!;
     const damaged = markUnits(vector.shares[0]!, "colors", [4]);
-    const result = cli(["sskr-export", "--share", damaged, "--format", "indexes"]);
+    const result = cli([
+      "sskr-export",
+      "--share",
+      damaged,
+      "--share",
+      vector.shares[1]!,
+      "--format",
+      "indexes",
+    ]);
     expect(result.status, result.stderr).toBe(0);
     expect(result.stderr).toMatch(/Share 1: element \d+ is \S+\./u);
-    const line = result.stdout.split("\n").find((line) => /^\d+(?: \d+)+$/u.test(line))!;
-    expect(readRepairableShare(line).ur).toBe(vector.shares[0]!);
+    // The repaired share, then the complete one as it was given, each written in word numbers.
+    const lines = result.stdout.split("\n").filter((line) => /^\d+(?: \d+)+$/u.test(line));
+    expect(lines.map((line) => readRepairableShare(line).ur)).toEqual(vector.shares.slice(0, 2));
   });
 
   it("shares transformed entropy once and reverses the dates with a quorum", () => {
@@ -55,7 +64,7 @@ describe("integrated SSKR CLI", () => {
         "--mnemonic",
         TEST_PHRASE,
         "--dates",
-        "23-09-2026",
+        DATE,
         "--format",
         "3",
         "--share-format",
@@ -84,7 +93,7 @@ describe("integrated SSKR CLI", () => {
         "--share",
         records[2]!,
         "--dates",
-        "23-09-2026",
+        DATE,
       ]);
       expect(restored.status, restored.stderr).toBe(0);
       expect(restored.stdout).toContain(TEST_PHRASE);
@@ -252,14 +261,13 @@ describe("integrated SSKR CLI", () => {
     const dir = mkdtempSync(join(tmpdir(), "mnc-unicode-"));
     try {
       const path = join(dir, "shares.txt");
-      const date = "23-09-2026";
       const split = cli([
         "encode",
         "--sskr",
         "--mnemonic",
         TEST_PHRASE,
         "--dates",
-        date,
+        DATE,
         "--threshold",
         "2",
         "--shares",
@@ -274,7 +282,7 @@ describe("integrated SSKR CLI", () => {
       expect(split.stdout).not.toContain("Unicode code points of");
       const records = readFileSync(path, "utf8").trim().split("\n");
       for (const record of records) expect(record).toMatch(/^[0-9A-F]{4}( [0-9A-F]{4})+$/u);
-      const masked = formatEncoded(encodeMnemonic(TEST_PHRASE, [parseDate(date)]), "unicode");
+      const masked = formatEncoded(encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]), "unicode");
       const restored = cli([
         "sskr-combine",
         "--share",
@@ -282,7 +290,7 @@ describe("integrated SSKR CLI", () => {
         "--share",
         records[2]!,
         "--dates",
-        date,
+        DATE,
       ]);
       expect(restored.status, restored.stderr).toBe(0);
       expect(restored.stdout).toContain(masked);

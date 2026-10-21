@@ -78,8 +78,10 @@ interface RenderContext {
 /**
  * Draws the business cards of `content` in `style` as a PDF: the sheet of the whole collection, or
  * with `individualIndex` that one separate card; `styleOffset` turns the mixed design's styles
- * further for each card. Refuses content that is not color cards and a page size that does not
- * exist.
+ * further for each card. Refuses content as assertColorCards refuses it, a page size as
+ * parsePageSize refuses it (export.card-settings.page-size), and an index as separateCardIndex
+ * refuses it (export.card-codes.there-no-card-cards-1); what fit refuses of the person's texts
+ * and what BusinessArtwork.recoloured refuses of the artwork pass on.
  */
 export async function renderBusinessCards(
   drawing: BusinessDrawing,

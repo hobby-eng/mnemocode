@@ -95,7 +95,7 @@ export function textInput(
         ? "The mnemonic file"
         : key === "last-word"
           ? "The original final-word file"
-          : "The encoded input file",
+          : ENCODED_INPUT_FILE,
     )
   );
 }
@@ -117,6 +117,8 @@ export const ENCODED_SECRET_OPTIONS = Object.freeze(["input"] as const);
 export const PHRASE_SECRET_OPTIONS = Object.freeze(["mnemonic", "mnemonic-file"] as const);
 /** The option that gives dates, which --ask-secrets asks for on the private screen too. */
 export const DATES_OPTION = "date";
+/** What a refusal of a file of the encoded seed phrase names it by. */
+export const ENCODED_INPUT_FILE = "The encoded input file";
 
 /** Refuses a QR image together with encoded text or a text file: only one source is read. */
 export function assertOneEncodedSource(arguments_: ParsedArguments): void {

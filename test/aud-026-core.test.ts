@@ -8,9 +8,7 @@ import { isPlacedKind, isScannedKind, parseBitcoinAddress } from "../src/core/wa
 import { encodeCandidateList, OpenedCandidateList } from "../src/core/candidate-list.js";
 import { resolveTemplateId } from "../src/export/template-catalog.js";
 import { readRenderAsset } from "../src/export/platform.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
-
-const ADDRESS = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
+import { TEST_ADDRESS, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("AUD-026 selector privacy and owned address locations", () => {
   it("refuses selectors without repeating or coercing supplied text", async () => {
@@ -20,7 +18,7 @@ describe("AUD-026 selector privacy and owned address locations", () => {
       [() => coinById(TEST_PHRASE), "core.coins.coin.unknown-coin-coins"],
       // A network that no type allows, fed on purpose.
       [
-        () => parseBitcoinAddress(ADDRESS, TEST_PHRASE as never),
+        () => parseBitcoinAddress(TEST_ADDRESS, TEST_PHRASE as never),
         "core.wallet-evidence.bitcoin-network",
       ],
       [
@@ -71,7 +69,9 @@ describe("AUD-026 selector privacy and owned address locations", () => {
         return reads++ === 0 ? 0 : 2 ** 31;
       },
     };
-    expect(coinById("bitcoin").parse(ADDRESS).pathsAt(location)).toEqual(["m/84'/0'/0'/0/0"]);
+    expect(coinById("bitcoin").parse(TEST_ADDRESS).branchPathsAt(location)).toEqual([
+      "m/84'/0'/0'/0",
+    ]);
     expect(reads).toBe(1);
   });
 
@@ -88,7 +88,7 @@ describe("AUD-026 selector privacy and owned address locations", () => {
       () =>
         new CoinAddressComparison({
           coin: coinById("bitcoin"),
-          value: ADDRESS,
+          value: TEST_ADDRESS,
           location,
           addresses: 2,
         }),
@@ -99,8 +99,8 @@ describe("AUD-026 selector privacy and owned address locations", () => {
   it("refuses an invalid first reading of a location", () => {
     expect(() =>
       coinById("bitcoin")
-        .parse(ADDRESS)
-        .pathsAt({ account: 0, branch: 0, index: 2 ** 31 }),
+        .parse(TEST_ADDRESS)
+        .branchPathsAt({ account: 0, branch: 0, index: 2 ** 31 }),
     ).toThrow("index");
   });
 
@@ -140,7 +140,7 @@ describe("AUD-026 attached byte arrays and terminal candidate disposal", () => {
   });
 
   it.each([false, true])(
-    "keeps Unicode passphrases before disposal and refuses all later access (%s)",
+    "keeps Unicode passphrases before disposal and refuses its candidates after it (passphrase per record: %s)",
     (perRecord) => {
       const passphrase = "\ufeffpublic é password";
       const list = OpenedCandidateList.fromBytes(

@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readLine, type LineOptions } from "../src/cli/terminal-input.js";
 import { WordList } from "../src/core/word-hints.js";
 import { answerEndRow, rowsOfText, terminalColumns } from "../src/cli/terminal-geometry.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { BACKSPACE, CTRL_A, END, ESCAPE, HOME, LEFT, RIGHT } from "./helpers/keys.js";
+import { TEST_PHRASE, TEST_WORDS } from "./helpers/test-phrase.js";
 import type { Cancelled } from "../src/cli/terminal-keys.js";
 import { TypedAnswer } from "../src/cli/typed-answer.js";
 
@@ -11,11 +12,6 @@ import { TypedAnswer } from "../src/cli/typed-answer.js";
  * grow with the answer ends in about a second, one that counted the whole answer again took minutes.
  */
 const LINEAR_ECHO_TIME_LIMIT_MS = 20_000;
-const LEFT = "\x1b[D";
-const HOME = "\x1b[H";
-const END = "\x1b[F";
-const ESCAPE = "\x1b";
-const BACKSPACE = "\x7f";
 
 /**
  * The bytes of `text` as a terminal in raw mode delivers them, then the end of the input. Read by
@@ -373,7 +369,7 @@ describe("visible answer on the terminal", () => {
   it("leaves the cursor after the end of the answer, as End does, at Enter and at Escape", async () => {
     // Nothing more is drawn when the cursor is at the end already.
     expect((await showTyping("abandon about\r", 6)).screen).toBe("abando\r\nn abou\r\nt");
-    for (const moved of [HOME, `${LEFT}${LEFT}`, "\x01", `${LEFT}\x1b[1;5D`]) {
+    for (const moved of [HOME, `${LEFT}${LEFT}`, CTRL_A, `${LEFT}\x1b[1;5D`]) {
       const entered = await showTyping(`abandon about${moved}\r`, 6);
       const ended = await showTyping(`abandon about${moved}${END}\r`, 6);
       expect(entered).toEqual(ended);
@@ -590,7 +586,7 @@ describe("hints below a visible answer, as in mhfe", () => {
 
   it("hints the word before the cursor inside a long answer, below its last row", async () => {
     const { after } = await typeWithHints(
-      [...Array.from("abandon abandon abandon ab"), HOME, ...Array<string>(8).fill("\x1b[C"), LEFT],
+      [...Array.from("abandon abandon abandon ab"), HOME, ...Array<string>(8).fill(RIGHT), LEFT],
       30,
     );
     // 6 + 26 columns: two rows, the hint below the second, two words to a row.
@@ -638,7 +634,7 @@ describe("hints below a visible answer, as in mhfe", () => {
     expect(answer).toBe(phrase);
     const most = Math.max(...seen.map((line) => line.trim().split(/\s+/u).length));
     expect(most).toBe(4);
-    expect(seen.at(-1)).toBe("abandon abandon abandon about");
+    expect(seen.at(-1)).toBe(TEST_WORDS.slice(-4).join(" "));
   });
 
   it("shows no hint where the terminal is too narrow or the answer hidden", async () => {

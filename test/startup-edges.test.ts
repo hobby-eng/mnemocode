@@ -27,7 +27,7 @@ vi.mock("../src/core/representations.js", async (original) => {
       args[1] === fault.write ? "wrong public fixture" : actual.formatEncoded(...args),
     parseInput: (...args: Parameters<typeof actual.parseInput>) =>
       fault.acceptZero && args[1] === "indexes" && args[0].startsWith("0 ")
-        ? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3]
+        ? [...TEST_INDEXES]
         : actual.parseInput(...args),
   };
 });
@@ -76,6 +76,7 @@ import {
   SSKR_VECTOR,
 } from "../src/sskr/known-answers.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
+import { TEST_INDEXES } from "./helpers/test-phrase.js";
 import { mnemocodeVectors, sskrVectors, type MnemocodeVector } from "./helpers/vectors.js";
 
 afterEach(() => {

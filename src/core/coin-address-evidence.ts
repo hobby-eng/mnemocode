@@ -104,14 +104,22 @@ export class CoinAddressCheck {
     this.#seed = new Bip39Seed(pbkdf2);
   }
 
-  /** Compares a phrase with `evidence`; evidence no wallet can match is refused before the seed. */
+  /**
+   * Compares a phrase with `evidence`; evidence no wallet can match is refused before the seed, as
+   * CoinAddressComparison refuses it. The phrase and the host's answer are refused as Bip39Seed.now
+   * refuses them (core.master-fingerprint.invalid-mnemonic and the others it names).
+   */
   match(mnemonic: string, evidence: CoinAddressEvidence, passphrase = ""): CoinAddressMatch {
     const comparison = new CoinAddressComparison(evidence);
     // A root's version bytes do not enter an address: BIP32's default ones serve every coin.
     return this.#seed.withRoot(mnemonic, passphrase, (root) => comparison.compare(root));
   }
 
-  /** The same as match, with a PBKDF2 that may answer later. */
+  /**
+   * The same as match, with a PBKDF2 that may answer later: the phrase and the host's answer are
+   * refused as Bip39Seed.later refuses them (core.master-fingerprint.invalid-mnemonic and the
+   * others it names).
+   */
   async matchAsync(
     mnemonic: string,
     evidence: CoinAddressEvidence,

@@ -47,6 +47,10 @@ It checks that
 - a result longer than the screen, a share set with its heading, notices
   and fingerprints, is read whole by pages before the question or prompt
   under it, at 80x24 and 32x12;
+- recover-word asks what comes next under its result, which stays on
+  the screen with every warning it gave, when no candidate matched the
+  wallet and when the candidates are too many to show; a short list of
+  candidates taller than the screen is read whole by pages;
 - Re-encode keeps the heading and the notices of its confirmation on the
   screens of the new backup, the wallet warning once, and a refusal
   above the questions asked again, also after a chosen answer; the
@@ -90,6 +94,8 @@ from terminal_export_checks import (
 from terminal_result_checks import (
     check_private_result_pages,
     check_share_pages,
+    check_word_candidate_pages,
+    check_word_result_under_question,
 )
 from terminal_menu_checks import (
     check_back_from_entry,
@@ -164,6 +170,8 @@ def main():
     check_restore_share_asked_again()
     check_private_result_pages()
     check_share_pages()
+    check_word_result_under_question()
+    check_word_candidate_pages()
     check_candidate_passphrase_roles()
     check_ctrl_c()
     check_ctrl_c_during_image_export()

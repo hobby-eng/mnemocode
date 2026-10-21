@@ -92,6 +92,8 @@ function readDateParts<T>(
 
 /** The one month whose days depend on the year, and a year of each kind, for counting by month. */
 const FEBRUARY = 2;
+/** The months of 30 days in the Gregorian calendar: April, June, September and November. */
+const THIRTY_DAY_MONTHS: readonly number[] = [4, 6, 9, 11];
 const LEAP_YEAR = 2000;
 const COMMON_YEAR = 2001;
 
@@ -106,8 +108,10 @@ export function isLeapYear(year: number): boolean {
  */
 export function daysInMonth(year: number, month: number): number {
   if (!inWholeRange(month, DATE_PARTS.month)) throw ERRORS.create("there-no-month", []);
+  // The Gregorian calendar: February has 29 days in a leap year and 28 in another, the months of
+  // THIRTY_DAY_MONTHS 30, and the others 31.
   if (month === FEBRUARY) return isLeapYear(year) ? 29 : 28;
-  return [4, 6, 9, 11].includes(month) ? 30 : 31;
+  return THIRTY_DAY_MONTHS.includes(month) ? 30 : 31;
 }
 
 /** The years in words, each with its four digits: "0001 through 9999". */

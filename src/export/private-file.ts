@@ -3,7 +3,7 @@ import type { Stats } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
 import { afterFailure, errorCode, failureClause } from "../core/refusal.js";
-import { ExportFileName } from "./file-name.js";
+import { checkedExportFileName } from "./file-name.js";
 import { sameFolder, TemporaryFolders } from "./temporary-folders.js";
 
 const ERRORS = new ErrorCatalog("export.private-file", {
@@ -21,7 +21,7 @@ const PRIVATE_FOLDER_MODE = 0o700;
  * (export.file-name.invalid-component).
  */
 export function privateChildPath(folder: string, name: string): string {
-  return join(folder, ExportFileName.checked(name));
+  return join(folder, checkedExportFileName(name));
 }
 
 /**

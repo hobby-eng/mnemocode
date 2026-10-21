@@ -50,8 +50,10 @@ async function repaired(
 
 /**
  * Two sets that fit, as a repair restores them where a share is marked: those of SSKR_SET_VECTOR
- * and of TEST_PHRASE. No two sets of real shares pass both the CRC-32 and the digest, so no repair
- * of real shares gives them; the steps that decide what a repair gives take them as they are.
+ * and of TEST_PHRASE. Typed shares give a second set only where a wrong combination of their
+ * marked units passes the 32-bit digest by chance (src/sskr/joint-repair.ts: about once in 2^32
+ * combinations), which no test can search for; so the steps that decide what a repair gives are
+ * given the two sets as data.
  */
 async function twoSets(): Promise<RepairedSet[]> {
   return [
@@ -65,9 +67,10 @@ async function twoSets(): Promise<RepairedSet[]> {
 }
 
 /**
- * What a repair decides for `sets` with `walletCheck`, or with none: each phrase that the wallet
- * matched (ShareRestore.phrases), whether they are shown as variants (exportDecision), and the
- * warnings that come with them (matchWarnings), as ShareRestore.repair composes them.
+ * What the steps of a repair decide for `sets` with `walletCheck`, or with none: each phrase that
+ * the wallet matched (ShareRestore.phrases), whether they are shown as variants (exportDecision),
+ * and the warnings that come with them (matchWarnings), taken in the order ShareRestore.repair
+ * takes them.
  */
 async function decided(sets: readonly RepairedSet[], walletCheck?: WalletCheck) {
   const unmasking = new ShareUnmasking({ mode: "direct", walletCheck });
@@ -90,8 +93,10 @@ describe("a repair of shares with a wallet", () => {
     expect(outcome.kind).toBe("shares");
     expect(outcome).not.toHaveProperty("warning");
   });
+});
 
-  it("gives every set that the wallet matched with its warning, said once", async () => {
+describe("the steps of a repair, given two sets that fit", () => {
+  it("give every set that the wallet matched as variants, with its warning said once", async () => {
     const wallet = walletOf({ [SSKR_SET_VECTOR.phrase]: WARNING, [TEST_PHRASE]: WARNING });
     expect(await decided(await twoSets(), wallet)).toEqual({
       kind: "variants",
@@ -99,7 +104,7 @@ describe("a repair of shares with a wallet", () => {
     });
   });
 
-  it("gives each of two warnings once, in the order of the sets", async () => {
+  it("give each of two warnings once, in the order of the sets", async () => {
     const wallet = walletOf({
       [SSKR_SET_VECTOR.phrase]: "First warning.",
       [TEST_PHRASE]: "Second warning.",
@@ -110,12 +115,12 @@ describe("a repair of shares with a wallet", () => {
     });
   });
 
-  it("gives only the set that the wallet matched, with its warning", async () => {
+  it("give only the set that the wallet matched, with its warning", async () => {
     const wallet = walletOf({ [TEST_PHRASE]: WARNING });
     expect(await decided(await twoSets(), wallet)).toEqual({ kind: "set", warnings: [WARNING] });
   });
 
-  it("gives the sets that no wallet told apart without a warning", async () => {
+  it("give both sets as variants, without a warning, when no wallet is given", async () => {
     expect(await decided(await twoSets())).toEqual({ kind: "variants", warnings: [] });
   });
 });

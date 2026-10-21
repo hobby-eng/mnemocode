@@ -10,16 +10,13 @@
 // so this module imports no module that a test replaces, and loads cut-notes.ts, which measures
 // with the questions' own module, only once they run.
 
-import { KEY } from "../../src/cli/terminal-keys.js";
 import { keysOfAnswer, type DrawnList } from "./drawn-list.js";
 import { drawnQuestion, recordLabel, type DrawnQuestion } from "./drawn-question.js";
+import { ENTER } from "./keys.js";
 import { keyedTerminalKeys } from "./raw-mode-keys.js";
 
 type ImageExport = typeof import("../../src/export/image-export.js");
 type TerminalInput = typeof import("../../src/cli/terminal-input.js");
-
-/** The key that ends a typed answer. */
-const ENTER = String.fromCharCode(KEY.CARRIAGE_RETURN);
 
 /** What the script answers, and what the questions asked. */
 interface MenuScript {
@@ -104,8 +101,10 @@ export function replacedTerminalInput(actual: TerminalInput): TerminalInput {
 export function replacedImageExport(actual: ImageExport): ImageExport {
   return {
     ...actual,
-    assertImageRenderer: async () => {
-      if (script.noImages) throw new Error("pdftocairo is missing");
+    ImageRenderer: class extends actual.ImageRenderer {
+      static override async assert(): Promise<void> {
+        if (script.noImages) throw new Error("pdftocairo is missing");
+      }
     },
   };
 }

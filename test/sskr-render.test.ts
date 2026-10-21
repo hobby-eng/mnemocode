@@ -1,10 +1,11 @@
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { referencePlacement } from "../src/export/business-cards.js";
-import { ownShareCards, ShareCardSet } from "../src/export/sskr-render.js";
-import { readShare, shareToColors, writeShare } from "../src/sskr/transport.js";
+import { CardRenderer } from "../src/export/card-renderer.js";
+import { ownShareCards, shareCardFace, ShareCardSet } from "../src/export/sskr-render.js";
+import { readShare, Share, shareToColors, writeShare } from "../src/sskr/transport.js";
 // The tests pass the Node.js card renderer, which supplies the fonts and the random choices.
-import { nodeCardRenderer } from "../src/export/platform-node.js";
+import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
 import { sskrVectors } from "./helpers/vectors.js";
 
 // Public test vectors only: SSKR shares of a public test entropy, made with a test-only seed.
@@ -71,6 +72,13 @@ describe("cards of a share set, for any host", () => {
     expect(printed.slice(0, codes.length)).toEqual(codes);
     expect(printed.length).toBeGreaterThan(codes.length);
     for (const decoy of printed.slice(codes.length)) expect(decoy).toMatch(/^[0-9A-F]{4}$/u);
+    // The cards of its codes, in their colors: the same color for the same code, and another
+    // color for each other code.
+    const face = shareCardFace(Share.read(SHARES[0]!), "unicode");
+    expect(face.labels).toEqual(codes);
+    const colorOf = new Map(codes.map((code, place) => [code, face.colors[place]]));
+    expect(face.colors).toEqual(codes.map((code) => colorOf.get(code)));
+    expect(new Set(colorOf.values()).size).toBe(colorOf.size);
     // The QR code holds the share alone.
     expect(cards.qrCodes[0]!.payload).toBe(codes.join(" "));
     expect(readShare(cards.qrCodes[0]!.payload).ur).toBe(SHARES[0]);
@@ -127,24 +135,35 @@ describe("cards of a share set, for any host", () => {
     );
   });
 
-  it("checks the layout, the style and the shares before anything is rendered", async () => {
+  it("refuses a layout or a style of no card, sheets of business size and a share given twice, before it draws anything", async () => {
+    // A platform that refuses to draw: a refusal that came after drawing would be its own.
+    const refuse = (): never => {
+      throw new Error("Nothing may be drawn before the checks.");
+    };
+    const undrawn = new CardRenderer({
+      ...nodeRenderPlatform,
+      readAsset: refuse,
+      decodePng: refuse,
+      encodePng: refuse,
+      qrModules: refuse,
+    });
     // A layout that no card has, given on purpose as a JavaScript host could.
     await expect(
-      ShareCardSet.create(nodeCardRenderer, SHARES, { style: "it", layout: "bad" as never }),
+      ShareCardSet.create(undrawn, SHARES, { style: "it", layout: "bad" as never }),
     ).rejects.toThrow("The card layout must be one of: qr, collection, individual.");
     // A style that no card has, given on purpose too.
     await expect(
-      ShareCardSet.create(nodeCardRenderer, SHARES, { style: "nonsense" as never }),
+      ShareCardSet.create(undrawn, SHARES, { style: "nonsense" as never }),
     ).rejects.toThrow("Unsupported SSKR card style.");
     await expect(
-      ShareCardSet.create(nodeCardRenderer, SHARES, {
+      ShareCardSet.create(undrawn, SHARES, {
         style: "it",
         pageSize: "business",
         layout: "collection",
       }),
     ).rejects.toThrow("The business page size gives separate cards.");
     await expect(
-      ShareCardSet.create(nodeCardRenderer, [SHARES[0]!, SHARES[0]!], { style: "it" }),
+      ShareCardSet.create(undrawn, [SHARES[0]!, SHARES[0]!], { style: "it" }),
     ).rejects.toThrow("The same SSKR member was supplied more than once.");
   });
 });

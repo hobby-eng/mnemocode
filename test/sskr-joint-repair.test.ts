@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
+import { TURN_MILLISECONDS } from "../src/core/search-turns.js";
 import { planJointRepair, searchOnce } from "../src/sskr/joint-repair.js";
 import { SSKR_LONG_VECTOR, SSKR_SET_VECTOR, SSKR_VECTOR } from "../src/sskr/known-answers.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
@@ -370,7 +371,7 @@ describe("Joint repair with digits read in part", () => {
   });
 
   it(
-    "tries words only within a bound, so that even many partly read codes are assessed in seconds",
+    "tries words only within a bound of work, so that even many partly read codes are assessed",
     async () => {
       // Three missing digits of six codes on each share: about 200 words fit each code.
       const typed = vector.shares
@@ -379,11 +380,13 @@ describe("Joint repair with digits read in part", () => {
       const plan = await planJointRepair(typed, { platform: nodeSharePlatform });
       expect(plan.assessment.verdict).not.toBe("no-fit");
       // The first sixteen codes of all three shares of a 24-word set, each missing its last digit,
-      // took minutes when every word was tried (AUD review of the digit marks).
+      // took minutes when every word was tried (AUD review of the digit marks). The assessment
+      // reads the run's clock once for each choice it solves, whether a turn is due or not; the
+      // choices of the words tried each spend at least one of the 2^19 evaluations that trying
+      // words may do (TRIAL_WORK, src/sskr/joint-repair.ts). The reads count that work the same
+      // on every computer, where a time would change with its speed.
       const long = vectors.deterministic[4]!;
-      // Measured as the processor time of this process, which the load of the machine leaves as it
-      // is, where the time on the clock grows with every other test that runs beside it.
-      const started = process.cpuUsage();
+      let reads = 0;
       const many = await planJointRepair(
         long.shares.map((share) =>
           markSameDigits(
@@ -393,10 +396,10 @@ describe("Joint repair with digits read in part", () => {
             [3],
           ),
         ),
-        { platform: nodeSharePlatform },
+        { platform: nodeSharePlatform, now: () => reads++ },
       );
-      const used = process.cpuUsage(started);
-      expect((used.user + used.system) / 1000).toBeLessThan(15_000);
+      expect(reads).toBeGreaterThan(0);
+      expect(reads).toBeLessThan(2 ** 19);
       expect(many.assessment.verdict).not.toBe("no-fit");
     },
     LONG_TEST_TIME_LIMIT_MS,
@@ -414,8 +417,7 @@ describe("Joint repair with digits read in part", () => {
     );
   });
 
-  it("hears a stop between the shares and between the choices of member numbers", async () => {
-    const stop = new AbortController();
+  it("hears a stop given at once, between the shares and between the choices of member numbers", async () => {
     const typed = vector.shares.map((share) =>
       markSameDigits(
         share,
@@ -424,12 +426,34 @@ describe("Joint repair with digits read in part", () => {
         [3],
       ),
     );
-    const planned = planJointRepair(typed, { platform: nodeSharePlatform, signal: stop.signal });
-    stop.abort(new Error("stopped"));
-    // A stop is a result, not an error (CORE-22): the assessment plans nothing, and its search is
-    // a stopped one (AUD-037-API003).
-    const plan = await planned;
-    expect(plan.assessment.verdict).toBe("stopped");
-    expect(await searchOnce(plan)).toEqual({ sets: [], stopped: true });
+    // The three shares give the host a turn before each is read, then before the words of each
+    // are tried, then at each choice of member numbers whose turn is due: with a clock that moves
+    // a turn's time at each reading, every one. The host stops at turn `stopAt`, or before any.
+    const planned = (stopAt: number) => {
+      const stop = new AbortController();
+      let turns = 0;
+      let milliseconds = 0;
+      const turn = async () => {
+        turns += 1;
+        if (turns === stopAt) stop.abort(new Error("stopped"));
+      };
+      const now = () => (milliseconds += TURN_MILLISECONDS);
+      const plan = planJointRepair(typed, {
+        platform: nodeSharePlatform,
+        signal: stop.signal,
+        turn,
+        now,
+      });
+      if (stopAt === 0) stop.abort(new Error("stopped"));
+      return plan;
+    };
+    expect((await planned(Number.POSITIVE_INFINITY)).assessment.verdict).toBe("search");
+    for (const stopAt of [0, 2, 7]) {
+      // A stop is a result, not an error (CORE-22): the assessment plans nothing, and its search
+      // is a stopped one (AUD-037-API003).
+      const plan = await planned(stopAt);
+      expect(plan.assessment.verdict, `stop at turn ${stopAt}`).toBe("stopped");
+      expect(await searchOnce(plan)).toEqual({ sets: [], stopped: true });
+    }
   });
 });

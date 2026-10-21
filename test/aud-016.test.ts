@@ -2,30 +2,35 @@
 // test data only: the all-zero-entropy phrase, a published BIP39 phrase, a synthetic date and the
 // published SSKR vector.
 
+import { entropyToMnemonic } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { describe, expect, it } from "vitest";
 import { allWiped, madeArrays } from "./helpers/made-arrays.js";
-import { encodeMnemonic, parseDate } from "../src/core.js";
+import { parseDate } from "../src/core.js";
 import { WordCandidateSearch } from "../src/core/candidates.js";
 import { DatesAnswer, DateSearch, type WalletCheck } from "../src/core/date-search.js";
-import { zeroEntropyPhrase } from "../src/core/english-words.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import { MALFORMED_WALLET_ANSWER, type WalletMatch } from "../src/core/wallet-check.js";
 import { nodeFillRandom, nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { ShareSplit } from "../src/sskr/split.js";
 import { bytewordsToUr, urToBytewords, urToTransport } from "../src/sskr/transport.js";
-import { sskrVectors } from "./helpers/vectors.js";
+import {
+  DATE,
+  LAST_WORD_FORGOTTEN,
+  MASKED_INDEXES,
+  OTHER_PHRASE,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
+import { publicShare } from "./helpers/vectors.js";
 
-const PHRASE = zeroEntropyPhrase(12);
-const OTHER_PHRASE = "legal winner thank year wave sausage worth useful legal winner thank yellow";
-const DATE = parseDate("23-09-2026");
-const SHARE: string = sskrVectors().deterministic[0]!.shares[0]!;
+const SHARE = publicShare();
 
-/** The date search of PHRASE masked with DATE, asking `walletCheck`. */
+/** The date search of TEST_PHRASE masked with DATE, asking `walletCheck`. */
 function dateSearch(walletCheck: WalletCheck): DateSearch {
   return new DateSearch({
-    indexes: encodeMnemonic(PHRASE, [DATE]).shiftedIndexes,
-    dates: DatesAnswer.of([DATE]),
+    indexes: MASKED_INDEXES,
+    dates: DatesAnswer.of([parseDate(DATE)]),
     mode: "seedshift",
     keep: 1,
     walletCheck,
@@ -63,9 +68,9 @@ describe("AUD-016-API001: a wallet answer is read field by field, whatever its k
         return true;
       }
     }
-    const search = WordCandidateSearch.parse(`${"abandon ".repeat(11)}?`, "unknown-words");
+    const search = WordCandidateSearch.parse(LAST_WORD_FORGOTTEN, "unknown-words");
     const byPhrase = (mnemonic: string) =>
-      mnemonic === PHRASE ? new AddressAnswer() : { matched: false };
+      mnemonic === TEST_PHRASE ? new AddressAnswer() : { matched: false };
     const result = await search.run({ walletCheck: byPhrase });
     const shown = result.shown.find((entry) => entry.match?.matched === true);
     expect(shown?.match).toMatchObject({ derived: "bc1qpublicfixture" });
@@ -108,10 +113,18 @@ describe("AUD-015-API001 (AUD-016): a list of codes is not handed out after a st
   });
 
   it("lists every candidate when nothing stops it", async () => {
+    // The last word holds the last three bits of the entropy, the other bits are zero: 8 phrases.
+    const phrases = Array.from({ length: 8 }, (_, last) =>
+      entropyToMnemonic(
+        Uint8Array.from({ length: 32 }, (_, index) => (index === 31 ? last : 0)),
+        wordlist,
+      ),
+    );
     const search = new MissingCodesSearch(codes(), async () => "00000000");
-    const result = await search.listed([]).run({ signal: new AbortController().signal });
-    expect(result.kind).toBe("list");
-    if (result.kind === "list") expect(result.rows.length).toBeGreaterThan(0);
+    expect(await search.listed([]).run({ signal: new AbortController().signal })).toEqual({
+      kind: "list",
+      rows: phrases.map((phrase) => ({ codes: phrase, phrase, fingerprint: "00000000" })),
+    });
   });
 });
 
@@ -148,7 +161,7 @@ describe("AUD-016 observation: a split reads each field of its request once", ()
     let reads = 0;
     const request = {
       get mnemonic() {
-        return reads++ === 0 ? PHRASE : OTHER_PHRASE;
+        return reads++ === 0 ? TEST_PHRASE : OTHER_PHRASE;
       },
       mode: "direct" as const,
       dates: [],
@@ -157,7 +170,7 @@ describe("AUD-016 observation: a split reads each field of its request once", ()
     };
     const split = await new ShareSplit(nodeSharePlatform, nodeFillRandom).splitBackup(request);
     expect(reads).toBe(1);
-    expect(split.original).toBe(PHRASE);
-    expect(split.held).toBe(PHRASE);
+    expect(split.original).toBe(TEST_PHRASE);
+    expect(split.held).toBe(TEST_PHRASE);
   });
 });

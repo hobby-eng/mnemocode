@@ -18,6 +18,7 @@ import {
 } from "../src/core/dates.js";
 import { Masking } from "../src/core/masking.js";
 import type { DatePattern, DateShiftDate } from "../src/core/types.js";
+import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const WORDS = 2048;
 const MODES: readonly SeedshiftMode[] = ["seedshift", "seedshift-legacy", "seedshift-legacy-valid"];
@@ -144,14 +145,15 @@ describe("date recovery tries each effective shift once (AUD-010-FUN001)", () =>
 
 describe("patterns that a host builds itself", () => {
   it("are taken with each value once and in order, so that no phrase comes twice", () => {
-    const phrase = zeroPhrase(12);
     const known = dates(3, 2001).map(parseDate);
-    const masked = Masking.of("seedshift").encode(phrase, [...known, parseDate("23-09-2026")]);
+    const masked = Masking.of("seedshift").encode(TEST_PHRASE, [...known, parseDate(DATE)]);
     // A value given twice, and values out of order, as a host might build them.
     const built = { key: "built", years: [2030, 2026, 2026], months: [9], days: [23] };
     const yielded = searched(masked.shiftedIndexes, known, [built], "seedshift");
-    expect(yielded.flat().filter((mnemonic) => mnemonic === phrase)).toHaveLength(1);
+    expect(yielded.flat().filter((mnemonic) => mnemonic === TEST_PHRASE)).toHaveLength(1);
     expect(yielded).toHaveLength(2);
+    // In ascending order: 2026, which gives the phrase, before 2030.
+    expect(yielded[0]).toEqual([TEST_PHRASE]);
   });
 });
 
@@ -172,7 +174,7 @@ describe("date recovery keeps nothing for each combination (AUD-010-FUN002)", ()
       return process.memoryUsage().heapUsed;
     };
     const known = [parseDate("07-03-2004")];
-    const masked = Masking.of("seedshift-legacy").encode(zeroPhrase(12), [
+    const masked = Masking.of("seedshift-legacy").encode(TEST_PHRASE, [
       ...known,
       parseDate("15-06-1975"),
       parseDate("05-05-2005"),

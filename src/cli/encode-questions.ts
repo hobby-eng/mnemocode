@@ -29,7 +29,7 @@ import {
   HEIR_SHEET_SIZES,
   type HeirSheetSize,
 } from "../export/heir-sheet.js";
-import { askOutputFile } from "./output-questions.js";
+import { askOutputFile, FILE_NAME_QUESTIONS } from "./output-questions.js";
 import { askCards } from "./card-questions.js";
 import { assertColorCardsFit, assertShareCardsFit } from "./cards-fit.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
@@ -189,6 +189,12 @@ export async function askSeedshift(
   });
 }
 
+/** The answer of a question where a result goes that keeps it on the screen alone. */
+const SCREEN_ONLY: Choice<"screen"> = { label: "Only on this screen", value: "screen" };
+
+/** The label of the answer of a question where a result goes that saves it as cards too. */
+const AS_CARDS = "Also as printable cards";
+
 /**
  * The answer of a question where a result goes that takes every place it offers, `places`, as
  * well as the screen (owner, 2026-10-13): the result is shown there in any case.
@@ -215,14 +221,14 @@ async function eachAsked(
 
 /** The record file of a result: --output and its name. */
 async function askRecordFile(): Promise<string[] | undefined | Cancelled> {
-  const path = await askOutputFile("Record file name", RECORD_FILE);
+  const path = await askOutputFile(FILE_NAME_QUESTIONS.record, RECORD_FILE);
   if (path === undefined || path === CANCELLED) return path;
   return ["--output", path];
 }
 
 /** The QR code image of a result: --qr and its name. */
 async function askQrFile(): Promise<string[] | undefined | Cancelled> {
-  const path = await askOutputFile("QR code file name", QR_FILE);
+  const path = await askOutputFile(FILE_NAME_QUESTIONS.qr, QR_FILE);
   if (path === undefined || path === CANCELLED) return path;
   return ["--qr", path];
 }
@@ -237,13 +243,13 @@ async function askResultDestination(
 ): Promise<string[] | undefined | Cancelled> {
   const withCards = EncodedForm.of(form).cardKind !== undefined;
   const choices: Choice<"screen" | "record" | "qr" | "cards" | "all">[] = [
-    { label: "Only on this screen", value: "screen" },
+    SCREEN_ONLY,
     { label: "Also in a record file", note: "text that Decode reads back", value: "record" },
     { label: "Also as a QR code image", note: "a PNG file that Decode reads back", value: "qr" },
   ];
   if (withCards)
     choices.push({
-      label: "Also as printable cards",
+      label: AS_CARDS,
       note: "a PDF or images in a card design",
       value: "cards",
     });
@@ -390,7 +396,7 @@ export async function askHeirSheet(mode: Mode): Promise<string[] | undefined | C
   );
   if (size === undefined || size === CANCELLED) return size;
   if (size === "") return [];
-  const path = await askOutputFile("PDF file name", HEIR_SHEET_FILE);
+  const path = await askOutputFile(FILE_NAME_QUESTIONS.pdf, HEIR_SHEET_FILE);
   if (path === undefined || path === CANCELLED) return path;
   return ["--heir-sheet", path, "--heir-sheet-size", size];
 }
@@ -457,7 +463,7 @@ export async function askShares(
   const options = ["--threshold", String(set.threshold), "--shares", String(set.count)];
   options.push("--share-format", shareFormat);
   const destinations: Choice<"screen" | "file" | "cards" | "all">[] = [
-    { label: "Only on this screen", value: "screen" },
+    SCREEN_ONLY,
     { label: "Also in a text file", note: "one share per line", value: "file" },
   ];
   // Cards print each share in its form: its colors, or its codes beside colors that only decorate.
@@ -465,7 +471,7 @@ export async function askShares(
   if (withCards)
     destinations.push(
       {
-        label: "Also as printable cards",
+        label: AS_CARDS,
         note: isColorShareFormat(shareFormat)
           ? "disguised, one sheet per share"
           : "its codes on cards, one sheet per share",
@@ -479,7 +485,7 @@ export async function askShares(
   });
   if (destination === undefined || destination === CANCELLED) return destination;
   const file = async (): Promise<string[] | undefined | Cancelled> => {
-    const path = await askOutputFile("Text file name", "mnemocode-shares.txt");
+    const path = await askOutputFile(FILE_NAME_QUESTIONS.text, "mnemocode-shares.txt");
     if (path === undefined || path === CANCELLED) return path;
     return ["--output", path];
   };

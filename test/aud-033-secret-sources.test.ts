@@ -17,6 +17,7 @@ import {
 } from "../src/cli/input.js";
 import { MAX_TEXT_INPUT_BYTES } from "../src/cli/bounded-read.js";
 import { validateOutputPaths } from "../src/cli/output-paths.js";
+import { DATE, TEST_FINGERPRINT } from "./helpers/test-phrase.js";
 
 let folder: string;
 beforeEach(async () => {
@@ -35,18 +36,15 @@ it.each([
   "--old-date",
   "--old-dates",
   "--last-word",
-])(
-  "refuses %s at the actual dispatcher before protection or material reads without echo",
-  async (flag) => {
-    const marker = "PUBLIC_SYNTHETIC_WRONG_FIELD_SENTINEL";
-    const failure: unknown = await runCommandLine(["encode", flag, marker]).then(
-      () => undefined,
-      (error: unknown) => error,
-    );
-    expect(failure).toHaveProperty("code", "cli.arguments.private-material-argv");
-    expect(String(failure)).not.toContain(marker);
-  },
-);
+])("refuses %s at the command line's dispatcher without echoing its value", async (flag) => {
+  const marker = "PUBLIC_SYNTHETIC_WRONG_FIELD_SENTINEL";
+  const failure: unknown = await runCommandLine(["encode", flag, marker]).then(
+    () => undefined,
+    (error: unknown) => error,
+  );
+  expect(failure).toHaveProperty("code", "cli.arguments.private-material-argv");
+  expect(String(failure)).not.toContain(marker);
+});
 
 it("preserves non-secret selectors, public references and safe file/stdin option names", () => {
   expect(() =>
@@ -72,7 +70,7 @@ it("preserves non-secret selectors, public references and safe file/stdin option
       "--last-word-file",
       "public-word.txt",
       "--master-fingerprint",
-      "73c5da0a",
+      TEST_FINGERPRINT,
       "--candidates-key",
       "public-recipient",
     ]),
@@ -100,7 +98,7 @@ it.each(["dates-file", "old-dates-file", "last-word-file"])(
 
 it("reads complete UTF-8 file dates and infers masking without putting dates in argv", async () => {
   const path = join(folder, "public-dates.txt");
-  await writeFile(path, "\ufeff23-09-2026\n", "utf8");
+  await writeFile(path, `\ufeff${DATE}\n`, "utf8");
   const args = parseArguments(["--dates-file", path]);
   expect(transformMode(args)).toBe("seedshift");
   expect(dates(args)).toEqual([{ year: 2026, month: 9, day: 23 }]);
@@ -127,9 +125,7 @@ it("keeps final-word file text and refuses mixed in-process sources before readi
   expect(() =>
     textInput({ "last-word": "about", "last-word-file": "must-not-be-read" }, "last-word"),
   ).toThrow("but not both");
-  expect(() => dates({ date: "23-09-2026", "dates-file": "must-not-be-read" })).toThrow(
-    "but not both",
-  );
+  expect(() => dates({ date: DATE, "dates-file": "must-not-be-read" })).toThrow("but not both");
 });
 
 it("refuses oversized and malformed UTF-8 date files through the common input boundary", async () => {

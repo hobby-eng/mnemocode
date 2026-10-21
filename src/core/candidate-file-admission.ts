@@ -5,7 +5,11 @@
 import { base64nopad } from "@scure/base";
 import { wipeAll } from "./bits.js";
 import { MAX_CANDIDATE_LIST_BYTES, OpenedCandidateList } from "./candidate-list.js";
-import { assertCandidateFileSize, CandidateFileRefusedError } from "./candidate-file-refusal.js";
+import {
+  assertCandidateFileSize,
+  CandidateFileRefusedError,
+  type CandidateFileRefusal,
+} from "./candidate-file-refusal.js";
 import { defined } from "./defined.js";
 import { ErrorCatalog } from "./error-catalog.js";
 
@@ -32,19 +36,56 @@ export const SCRYPT_LOG_N = 18;
 const AGE_FIRST_LINE = "age-encryption.org/v1";
 const MAC_LINE_START = "--- ";
 const STANZA_LINE_START = "-> ";
-const LOCK_STANZAS = Object.freeze({ key: "X25519", passphrase: "scrypt" });
-/** How an encrypted list file is locked: with an age key (X25519) or with a passphrase (scrypt). */
-export type ListFileLock = keyof typeof LOCK_STANZAS;
 /**
  * age v1 recipient stanzas, as their fields after "-> ": `X25519 <share>` and
  * `scrypt <salt> <log2 N>`. The places of the fields, counted from 0.
  */
 const STANZA_FIELD = Object.freeze({ type: 0, shareOrSalt: 1, workFactor: 2 });
-/** The fields of each lock's stanza, its type included: up to its last field. */
-const STANZA_FIELD_COUNTS = Object.freeze({
-  key: STANZA_FIELD.shareOrSalt + 1,
-  passphrase: STANZA_FIELD.workFactor + 1,
-}) satisfies Readonly<Record<ListFileLock, number>>;
+
+/** Every rule of one way to lock a list file that the file, the cipher or its gate depends on. */
+interface ListFileLockRules {
+  /** The type of its age stanza, the first field after "-> ". */
+  readonly stanza: string;
+  /** The fields of its stanza, its type included: up to its last field. */
+  readonly fieldCount: number;
+  /** The bytes of its stanza's second field, decoded: the X25519 share or the scrypt salt. */
+  readonly shareOrSaltBytes: number;
+  /** The log2 work factor that its stanza must name; undefined where it names none. */
+  readonly workFactor: number | undefined;
+  /** Whether it uses X25519, which needs WebCrypto and the X25519 known answers. */
+  readonly x25519: boolean;
+  /** The refusal of a key of its kind that does not open the file. */
+  readonly doesNotOpen: Extract<
+    CandidateFileRefusal,
+    "scanner-key-does-not-open" | "passphrase-does-not-open"
+  >;
+}
+
+/**
+ * The ways to lock an encrypted list file: to an age key (X25519) or under a passphrase (scrypt),
+ * each with every rule that depends on it, so that the admission, the cipher and its gate ask the
+ * lock and a new lock is one more entry whose rules the compiler asks for (CORE-06).
+ */
+export const LIST_FILE_LOCKS = Object.freeze({
+  key: Object.freeze({
+    stanza: "X25519",
+    fieldCount: STANZA_FIELD.shareOrSalt + 1,
+    shareOrSaltBytes: X25519_KEY_BYTES,
+    workFactor: undefined,
+    x25519: true,
+    doesNotOpen: "scanner-key-does-not-open",
+  }),
+  passphrase: Object.freeze({
+    stanza: "scrypt",
+    fieldCount: STANZA_FIELD.workFactor + 1,
+    shareOrSaltBytes: SCRYPT_SALT_BYTES,
+    workFactor: SCRYPT_LOG_N,
+    x25519: false,
+    doesNotOpen: "passphrase-does-not-open",
+  }),
+}) satisfies Readonly<Record<string, ListFileLockRules>>;
+/** How an encrypted list file is locked: with an age key (X25519) or with a passphrase (scrypt). */
+export type ListFileLock = keyof typeof LIST_FILE_LOCKS;
 /** The form of a candidate file: the plain list, or the list encrypted with age. */
 export type CandidateFileForm = "plaintext" | "age";
 
@@ -65,7 +106,7 @@ export type CandidatePrefixReader = (length: number) => Promise<Uint8Array>;
 export class CandidateFileAdmission {
   /** Whether `value` names a lock (ListFileLock); a JavaScript host may pass anything. */
   static isLock(value: unknown): value is ListFileLock {
-    return typeof value === "string" && Object.hasOwn(LOCK_STANZAS, value);
+    return typeof value === "string" && Object.hasOwn(LIST_FILE_LOCKS, value);
   }
 
   /** Shared immutable limits for the header, plaintext and ciphertext, all in bytes. */
@@ -127,7 +168,9 @@ export class CandidateFileAdmission {
    */
   static assertLock(file: Uint8Array, given: ListFileLock): void {
     if (this.lock(file) !== given)
-      throw CandidateFileRefusedError.create("recipient-of-another-key", [LOCK_STANZAS[given]]);
+      throw CandidateFileRefusedError.create("recipient-of-another-key", [
+        LIST_FILE_LOCKS[given].stanza,
+      ]);
   }
 
   /**
@@ -178,32 +221,35 @@ export class CandidateFileAdmission {
       .filter((line) => line.startsWith(STANZA_LINE_START))
       .map((line) => line.slice(STANZA_LINE_START.length).split(" "));
     const type = stanzas[0]?.[STANZA_FIELD.type];
-    const lock = Object.keys(LOCK_STANZAS).find(
+    const lock = Object.keys(LIST_FILE_LOCKS).find(
       (kind): kind is ListFileLock =>
-        CandidateFileAdmission.isLock(kind) && LOCK_STANZAS[kind] === type,
+        CandidateFileAdmission.isLock(kind) && LIST_FILE_LOCKS[kind].stanza === type,
     );
     if (lock === undefined)
       throw CandidateFileRefusedError.create("recipient-unsupported", [
-        Object.values(LOCK_STANZAS).join(" or "),
+        Object.values(LIST_FILE_LOCKS)
+          .map((rules) => rules.stanza)
+          .join(" or "),
       ]);
+    const rules: ListFileLockRules = LIST_FILE_LOCKS[lock];
     if (stanzas.length !== 1)
-      throw CandidateFileRefusedError.create("several-recipients", [LOCK_STANZAS[lock]]);
+      throw CandidateFileRefusedError.create("several-recipients", [rules.stanza]);
+    // A lock with a work factor takes only the one that its rules name, the one the cipher writes.
     if (
-      lock === "passphrase" &&
-      defined(stanzas[0])[STANZA_FIELD.workFactor] !== String(SCRYPT_LOG_N)
+      rules.workFactor !== undefined &&
+      defined(stanzas[0])[STANZA_FIELD.workFactor] !== String(rules.workFactor)
     )
-      throw CandidateFileRefusedError.create("scrypt-work-factor-unsupported", [SCRYPT_LOG_N]);
+      throw CandidateFileRefusedError.create("scrypt-work-factor-unsupported", [rules.workFactor]);
     // These recipients wrap a 16-byte file key with a 16-byte tag: one 32-byte body line.
     // Checking that shape also keeps a false MAC marker from hiding a later, unbounded header.
     try {
       const stanza = defined(stanzas[0]);
-      const passphrase = lock === "passphrase";
       if (
         end !== MAC_LINE_INDEX ||
         !defined(lines[1]).startsWith(STANZA_LINE_START) ||
-        stanza.length !== STANZA_FIELD_COUNTS[lock] ||
+        stanza.length !== rules.fieldCount ||
         base64nopad.decode(defined(stanza[STANZA_FIELD.shareOrSalt])).length !==
-          (passphrase ? SCRYPT_SALT_BYTES : X25519_KEY_BYTES) ||
+          rules.shareOrSaltBytes ||
         base64nopad.decode(defined(lines[2])).length !== WRAPPED_KEY_BYTES ||
         base64nopad.decode(defined(lines[end]).slice(MAC_LINE_START.length)).length !==
           HEADER_MAC_BYTES

@@ -135,25 +135,13 @@ export interface SearchOptions extends SearchRun {
 
 /**
  * A planned joint repair of marked shares: what was assessed, the search over what is open, and the
- * wipe of what it keeps of the secret.
+ * wipe of what it keeps of the secret. It owns the selected branches and their unique spaces until
+ * its caller wipes or disposes it; plain search results transfer to the caller. Only its type is
+ * exported: a host gets a plan from planJointRepair or JointRepair.plan, and a JavaScript host
+ * cannot build one around branches of its own (AUD-009-API002).
  */
-export interface JointPlan {
+class JointPlan implements Disposable {
   /** What the shares were assessed as; its verdict tells whether `search` searches. */
-  readonly assessment: JointAssessment;
-  /**
-   * Tries every open combination; resolves with every phrase that passes, possibly none, and
-   * whether the host stopped the search. Refused with sskr.joint-repair.plan-wiped after wipe,
-   * including when the plan ends while a host confirmation or turn is awaited. A plan whose
-   * assessment the host stopped gives a stopped search; one that refused for another reason is
-   * refused with that reason (sskr.joint-repair.plan-not-searchable), never searched as empty.
-   */
-  readonly search: (options?: SearchOptions) => Promise<RepairSearch>;
-  /** Wipes what the search keeps of the shares' secret; the plan searches no more after it. */
-  readonly wipe: () => void;
-}
-
-/** Owns selected branches and unique spaces; plain search results transfer to the caller. */
-class OwnedJointPlan implements JointPlan, Disposable {
   readonly assessment: JointAssessment;
   readonly #branches: readonly Branch[];
   readonly #platform: ShareRepairPlatform | undefined;
@@ -161,6 +149,10 @@ class OwnedJointPlan implements JointPlan, Disposable {
   readonly #active = new Set<() => void>();
   #wiped = false;
 
+  /**
+   * The plan of `assessment`, which owns `branches` from now on and searches them with `platform`;
+   * a plan without a platform searches nothing (search).
+   */
   constructor(
     assessment: JointAssessment,
     branches: readonly Branch[] = [],
@@ -173,6 +165,14 @@ class OwnedJointPlan implements JointPlan, Disposable {
     this.#secrets.addSpaces(branches.flatMap((branch) => branch.spaces));
   }
 
+  // search and wipe are bound fields, not methods, so that a host may pass them on alone.
+  /**
+   * Tries every open combination; resolves with every phrase that passes, possibly none, and
+   * whether the host stopped the search. Refused with sskr.joint-repair.plan-wiped after wipe,
+   * including when the plan ends while a host confirmation or turn is awaited. A plan whose
+   * assessment the host stopped gives a stopped search; one that refused for another reason is
+   * refused with that reason (sskr.joint-repair.plan-not-searchable), never searched as empty.
+   */
   readonly search = async (options?: SearchOptions): Promise<RepairSearch> => {
     this.#assertLive();
     if (this.#platform === undefined) {
@@ -195,6 +195,7 @@ class OwnedJointPlan implements JointPlan, Disposable {
     }
   };
 
+  /** Wipes what the search keeps of the shares' secret; the plan searches no more after it. */
   readonly wipe = (): void => {
     if (this.#wiped) return;
     this.#wiped = true;
@@ -203,6 +204,7 @@ class OwnedJointPlan implements JointPlan, Disposable {
     this.#secrets.wipe();
   };
 
+  /** Ends the plan with its `using` scope, as wipe does. */
   [Symbol.dispose](): void {
     this.wipe();
   }
@@ -211,6 +213,8 @@ class OwnedJointPlan implements JointPlan, Disposable {
     if (this.#wiped) throw ERRORS.create("plan-wiped", []);
   }
 }
+
+export type { JointPlan };
 
 /** The phrases of `plan`'s one search; what the plan kept of the secret is wiped after it. */
 export async function searchOnce(plan: JointPlan, options?: SearchOptions): Promise<RepairSearch> {
@@ -298,7 +302,7 @@ function refusal(
   reason: string,
   noFit?: NoFit,
 ): JointPlan {
-  return new OwnedJointPlan({
+  return new JointPlan({
     shares,
     branches: 0,
     openBits: 0,
@@ -666,7 +670,7 @@ async function planOf(
         }
       : {}),
   };
-  return new OwnedJointPlan(assessment, tooOpen ? [] : branches, tooOpen ? undefined : platform);
+  return new JointPlan(assessment, tooOpen ? [] : branches, tooOpen ? undefined : platform);
 }
 
 /**

@@ -5,11 +5,12 @@ import { MissingCodes } from "../src/core/missing-codes.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import type { WalletCheck } from "../src/core/wallet-check.js";
 import { parseDate } from "../src/core/dates.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
-
-const ONE = "2027 10 2? 2027 10 24 2027 10 24 2027 10 377";
-const FEW = "2027 1? 2? 2027 10 24 2027 10 24 2027 10 377";
-const DATE = "23-09-2026";
+import {
+  DATE,
+  MASKED_ONE_DIGIT_FORGOTTEN,
+  MASKED_TWO_DIGITS_FORGOTTEN,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -17,7 +18,7 @@ describe("The lifetime of a prepared marked-code search", () => {
   it.each(["encoded", "wallet", "patterns", "list"] as const)(
     "ends the %s way without disposing borrowed codes or incomplete dates",
     async (kind) => {
-      using codes = MissingCodes.read(ONE, "indexes", "seedshift");
+      using codes = MissingCodes.read(MASKED_ONE_DIGIT_FORGOTTEN, "indexes", "seedshift");
       using dates = DatesAnswer.parse("23-09-202?", { patterns: true, wordCount: 12 });
       const search = new MissingCodesSearch(codes, () => "00000000");
       const way =
@@ -41,7 +42,7 @@ describe("The lifetime of a prepared marked-code search", () => {
   );
 
   it("owns complete dates independently and releases that snapshot with the way", () => {
-    using codes = MissingCodes.read(ONE, "indexes", "seedshift");
+    using codes = MissingCodes.read(MASKED_ONE_DIGIT_FORGOTTEN, "indexes", "seedshift");
     using dates = DatesAnswer.of([parseDate(DATE)]);
     const made = vi.spyOn(DatesAnswer, "of");
     const way = new MissingCodesSearch(codes, () => "00000000").byWallet(
@@ -59,7 +60,7 @@ describe("The lifetime of a prepared marked-code search", () => {
   it.each(["plan", "run"] as const)(
     "refuses a wallet %s completed after the prepared way was disposed",
     async (phase) => {
-      using codes = MissingCodes.read(ONE, "indexes", "seedshift");
+      using codes = MissingCodes.read(MASKED_ONE_DIGIT_FORGOTTEN, "indexes", "seedshift");
       using dates = DatesAnswer.of([parseDate(DATE)]);
       let finish: (() => void) | undefined;
       const wallet: WalletCheck = async () => {
@@ -82,7 +83,7 @@ describe("Results of an owned marked-code search", () => {
   it.each(["several", "stopped"] as const)(
     "releases every kept backup when the wallet result is %s",
     async (outcome) => {
-      using codes = MissingCodes.read(FEW, "indexes", "seedshift");
+      using codes = MissingCodes.read(MASKED_TWO_DIGITS_FORGOTTEN, "indexes", "seedshift");
       using dates = DatesAnswer.of([parseDate(DATE)]);
       const made = vi.spyOn(EncodedBackup, "of");
       const stop = new AbortController();
@@ -114,7 +115,7 @@ describe("Results of an owned marked-code search", () => {
   it.each(["encoded", "wallet", "patterns"] as const)(
     "hears cancellation between the final search await and %s result transfer",
     async (kind) => {
-      using codes = MissingCodes.read(ONE, "indexes", "seedshift");
+      using codes = MissingCodes.read(MASKED_ONE_DIGIT_FORGOTTEN, "indexes", "seedshift");
       using dates = DatesAnswer.parse("23-09-202?", { patterns: true, wordCount: 12 });
       using known = DatesAnswer.of([parseDate(DATE)]);
       const search = new MissingCodesSearch(codes, () => "00000000");
@@ -162,7 +163,7 @@ describe("Results of an owned marked-code search", () => {
   );
 
   it("transfers the only matching backup so that it survives disposal of the way", async () => {
-    using codes = MissingCodes.read(ONE, "indexes", "seedshift");
+    using codes = MissingCodes.read(MASKED_ONE_DIGIT_FORGOTTEN, "indexes", "seedshift");
     using dates = DatesAnswer.of([parseDate(DATE)]);
     const way = new MissingCodesSearch(codes, () => "00000000").byWallet(
       (phrase) => ({ matched: phrase === TEST_PHRASE }),

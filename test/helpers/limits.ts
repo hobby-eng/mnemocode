@@ -20,11 +20,24 @@ export const TEST_TIME_LIMIT_MS = 60_000;
 export const LONG_TEST_TIME_LIMIT_MS = 2 * TEST_TIME_LIMIT_MS;
 
 /**
- * The limit of a test that draws every design with its real fonts and artwork, runs the whole
- * self-test of a build, or searches every mode, length and forgotten part: three times
+ * The limit of a test that draws a design with its real fonts and artwork, runs the whole
+ * self-test, or searches every mode, length and forgotten part: three times TEST_TIME_LIMIT_MS.
+ * The full self-test draws cards; with every other test running beside it, it takes longer than
  * TEST_TIME_LIMIT_MS.
  */
 export const LONGEST_TEST_TIME_LIMIT_MS = 3 * TEST_TIME_LIMIT_MS;
+
+/**
+ * The limit of a test that renders and reads back the cards of every design or of every family,
+ * which takes minutes on a loaded machine or a hosted CI runner: five times TEST_TIME_LIMIT_MS.
+ */
+export const DRAWING_TEST_TIME_LIMIT_MS = 5 * TEST_TIME_LIMIT_MS;
+
+/**
+ * Vitest's limit for every test in a coverage run (`vitest run --coverage`, vitest.config.ts),
+ * whose instrumentation slows every test down: three times TEST_TIME_LIMIT_MS.
+ */
+export const COVERAGE_TEST_TIME_LIMIT_MS = 3 * TEST_TIME_LIMIT_MS;
 
 /**
  * The most a program that a test starts may write to each of its pipes before the run fails:

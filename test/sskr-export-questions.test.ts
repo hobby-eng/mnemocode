@@ -1,29 +1,19 @@
 // sskr-export and sskr-split on the private screen, with the terminal replaced
 // (test/helpers/question-terminal.ts). A save may be made to fail first (`terminal.saveFailures`).
-// Public test data only: the "abandon … about" phrase, its fingerprint 73c5da0a, and
-// vectors/sskr-v1.json.
+// Public test data only: the "abandon … about" phrase, its fingerprint, and vectors/sskr-v1.json.
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { runSskrExport } from "../src/cli/sskr-export-command.js";
 import { runSskrSplit } from "../src/cli/sskr-split-command.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
-import { ShareRestore, variantsMessage } from "../src/sskr/share-restore.js";
 import { writeShare } from "../src/sskr/transport.js";
+import { ESCAPE } from "./helpers/keys.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
-import { testPhraseSet } from "./helpers/shares.js";
-import {
-  marked,
-  OTHER_SET_SHARE,
-  PHRASE,
-  promptsShown,
-  SHARES,
-  SHARES_PROMPT,
-} from "./helpers/share-questions.js";
+import { OTHER_SET_SHARE, promptsShown, SHARES, SHARES_PROMPT } from "./helpers/share-questions.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
@@ -94,31 +84,11 @@ describe("shares on the private screen", () => {
       expect(seen.out.at(-1)).toBe(writeShare(SHARES[0], "indexes"));
     });
 
-    it("shows each set that fits with its fingerprint when no wallet tells them apart", async () => {
-      // A second set beside the one the search finds: public shares of the test phrase.
-      const other = await testPhraseSet();
-      const phrases = ShareRestore.phrases.bind(ShareRestore);
-      // Fault: the phrase step finds a second set, which no shares typed can give: no two sets of
-      // real shares pass both the CRC-32 and the digest.
-      vi.spyOn(ShareRestore, "phrases").mockImplementation(async (...args) => {
-        const found = await phrases(...args);
-        if (found.kind !== "phrases") return found;
-        const extra = { set: other, mnemonic: TEST_PHRASE, held: TEST_PHRASE, repairs: [] };
-        return { ...found, phrases: [...found.phrases, extra], sets: [...found.sets, other] };
-      });
-      terminal.answers = [`${SHARES[0]};${marked([5])}\r`];
-      // "It cannot" at the wallet that would tell the right set.
-      terminal.choices = ["It cannot"];
-      await runSskrExport({ "ask-secrets": true, format: "ur" });
-      expect(seen.notices).toContain(variantsMessage(2, false));
-      expect(seen.out).toContain(
-        `Variant 1 of 2, original fingerprint ${masterFingerprint(PHRASE)}:`,
-      );
-      expect(seen.out).toContain(`Variant 2 of 2, original fingerprint ${TEST_FINGERPRINT}:`);
-      const shown = seen.out.join("\n");
-      for (const share of [SHARES[0], SHARES[1], ...other.shares.map(({ ur }) => ur)])
-        expect(shown).toContain(share);
-    });
+    // Several sets that fit a repair are not reached here: typed shares give a second set only
+    // where a wrong combination of their marked units passes the 32-bit digest by chance, about
+    // once in 2^32 combinations, which no test can search for. What a repair decides for such sets
+    // is tested on the steps that take the sets as data: the library's
+    // (share-repair-warning.test.ts) and the command's (sskr-several-sets.test.ts).
   });
 });
 
@@ -216,7 +186,7 @@ describe("shares on the private screen", () => {
       terminal.saveFailures = 1;
       terminal.choices = ["Another file name", "Skip"];
       // Escape at the new name.
-      terminal.answers = ["\x1b"];
+      terminal.answers = [ESCAPE];
       await split(output);
       expect(seen.screen).toContain("New name for the file of the shares:");
       expect(seen.notices).toContain(

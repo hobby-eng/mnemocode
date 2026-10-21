@@ -2,10 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { MissingCodes } from "../src/core/missing-codes.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import { recoverLegacyValidLastWords } from "../src/core/words.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, replacedAt, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { parseDate } from "../src/core/dates.js";
 
-const PREFIX = "abandon ".repeat(11);
 const ENDINGS = recoverLegacyValidLastWords(TEST_PHRASE).map(({ word }) => word);
 
 describe("Actual candidate-list size after an underestimated search plan", () => {
@@ -14,7 +13,7 @@ describe("Actual candidate-list size after an underestimated search plan", () =>
     async (count) => {
       expect(ENDINGS).toHaveLength(128);
       const codes = MissingCodes.read(
-        PREFIX + ENDINGS.slice(0, count).join("|"),
+        replacedAt(TEST_PHRASE, { 12: ENDINGS.slice(0, count).join("|") }),
         "english",
         "direct",
       );
@@ -32,11 +31,17 @@ describe("Actual candidate-list size after an underestimated search plan", () =>
 
   it("returns every candidate when the actual number equals the list limit", async () => {
     const endings = ENDINGS.slice(0, MissingCodesSearch.MAX_LISTED);
-    const codes = MissingCodes.read(PREFIX + endings.join("|"), "english", "direct");
+    const codes = MissingCodes.read(
+      replacedAt(TEST_PHRASE, { 12: endings.join("|") }),
+      "english",
+      "direct",
+    );
     const listed = await new MissingCodesSearch(codes, () => "00000000").listed([]).run();
     expect(listed.kind).toBe("list");
     if (listed.kind !== "list") throw new Error("The boundary control must list its candidates.");
-    expect(listed.rows.map(({ phrase }) => phrase)).toEqual(endings.map((word) => PREFIX + word));
+    expect(listed.rows.map(({ phrase }) => phrase)).toEqual(
+      endings.map((word) => replacedAt(TEST_PHRASE, { 12: word })),
+    );
   });
 
   it("also bounds multiple phrases decoded from one set of legacy valid-last-word codes", async () => {
@@ -52,7 +57,7 @@ describe("Actual candidate-list size after an underestimated search plan", () =>
     const fingerprint = vi.fn(() => "00000000");
     const search = new MissingCodesSearch(codes, fingerprint);
     expect(search.fits("list")).toBe(true);
-    await expect(search.listed([parseDate("23-09-2026")]).run()).rejects.toMatchObject({
+    await expect(search.listed([parseDate(DATE)]).run()).rejects.toMatchObject({
       code: "core.missing-codes-search.list-overflow",
     });
     expect(fingerprint).toHaveBeenCalledTimes(MissingCodesSearch.MAX_LISTED);
@@ -60,19 +65,23 @@ describe("Actual candidate-list size after an underestimated search plan", () =>
 
   it("offers no list where one set of codes gives more phrases than it holds (AUD-037-FUN002)", () => {
     const codes = MissingCodes.read(
-      PREFIX + ENDINGS.slice(0, 2).join("|"),
+      replacedAt(TEST_PHRASE, { 12: ENDINGS.slice(0, 2).join("|") }),
       "english",
       "seedshift-legacy-valid",
     );
     const search = new MissingCodesSearch(codes, () => "00000000");
     expect(search.fits("list")).toBe(false);
-    expect(() => search.listed([parseDate("23-09-2026")])).toThrow(
+    expect(() => search.listed([parseDate(DATE)])).toThrow(
       expect.objectContaining({ code: "core.missing-codes-search.operation-refused" }),
     );
   });
 
   it("returns stopped when the host cancels during a fingerprint before a list overflows", async () => {
-    const codes = MissingCodes.read(PREFIX + ENDINGS.slice(0, 16).join("|"), "english", "direct");
+    const codes = MissingCodes.read(
+      replacedAt(TEST_PHRASE, { 12: ENDINGS.slice(0, 16).join("|") }),
+      "english",
+      "direct",
+    );
     const stop = new AbortController();
     const fingerprint = vi.fn(() => {
       stop.abort();

@@ -9,8 +9,12 @@
 // The menu checks each of its own answers at once, none of which is a secret: a file name, a
 // fingerprint, an address, a key or a lookup that the command would refuse is explained in one
 // line and asked again, with the earlier answers kept (askLine). Nothing is read from the files,
-// and the menu writes nothing (dropForMenu); the command checks everything again, since a file
-// may change in between.
+// and the menu writes nothing (ProcessProtection.dropForMenu); the command checks everything
+// again, since a file may change in between.
+//
+// Its questions do not each get a screen of their own: CORE-39 makes the start menu its exception,
+// since they build a command. They stand under the menu's heading with the record of the answers
+// given so far (AnswerRecord) as their summary, which the command line the menu prints closes.
 
 import { Masking, type SplitMode } from "../core/masking.js";
 import { UNICODE_CODE_HINT, WordTable, type WordTableLookup } from "../core/word-table.js";
@@ -35,7 +39,7 @@ import {
 } from "./menu-entries.js";
 import { PRIVATE_SCREEN_COMMANDS } from "./command-line.js";
 import { CANCELLED_EXIT_CODE, privateScreenAvailable } from "./private-screen.js";
-import { assertProtected, dropForMenu } from "./protection.js";
+import { ProcessProtection } from "./protection.js";
 import { assertCoreSelfTest } from "./self-test.js";
 import {
   AnswerRecord,
@@ -88,9 +92,11 @@ import { askDesign } from "./card-questions.js";
 import {
   askNewFolder,
   askOutputFile,
+  FILE_NAME_QUESTIONS,
   forgetClaimedOutputs,
   inputFile,
 } from "./output-questions.js";
+import { optionLabel } from "./option-copy.js";
 import { defined } from "../core/defined.js";
 
 /** The menu reads keys from a terminal and draws on one; anything else gets the help instead. */
@@ -198,11 +204,11 @@ async function askSource(): Promise<{ readonly options: string[] } | undefined |
   }
   const path =
     source === "record"
-      ? await askLine("Record file name", "File", {
+      ? await askLine(FILE_NAME_QUESTIONS.record, "File", {
           fallback: RECORD_FILE,
           check: (answer) => inputFile(answer, MAX_TEXT_INPUT_BYTES),
         })
-      : await askLine("QR code file name", "File", {
+      : await askLine(FILE_NAME_QUESTIONS.qr, "File", {
           fallback: QR_FILE,
           check: (answer) => inputFile(answer, MAX_PNG_BYTES),
         });
@@ -433,7 +439,7 @@ async function wordRecoveryAction(): Promise<Action> {
   if (protection === undefined || protection === CANCELLED) return protection;
   const key =
     protection === "key"
-      ? await askLine("Scanner key", "Key", {
+      ? await askLine(optionLabel("candidates-key"), "Key", {
           what: "the age1 key that the Scanner shows",
           check: parseRecipient,
         })
@@ -508,7 +514,7 @@ const MENU_ASKER: WalletValueAsker = {
 async function previewAction(): Promise<Action> {
   const design = await askDesign(true);
   if (design === undefined || design === CANCELLED) return design;
-  const path = await askOutputFile("PDF file name", `${SAMPLE_FILE_BASE}.pdf`);
+  const path = await askOutputFile(FILE_NAME_QUESTIONS.pdf, `${SAMPLE_FILE_BASE}.pdf`);
   if (path === undefined || path === CANCELLED) return path;
   return {
     run: ["preview", ...(design === "" ? ["--all"] : ["--template", design]), "--pdf", path],
@@ -591,7 +597,7 @@ async function tableExportAction(): Promise<Action> {
     return { run: ["table", "--word-lists-dir", folder] };
   }
   const path = await askOutputFile(
-    "Text file name",
+    FILE_NAME_QUESTIONS.text,
     format === "guide" ? "mnemocode-manual-recovery.md" : `bip39-${format}.txt`,
   );
   if (path === undefined || path === CANCELLED) return path;
@@ -697,9 +703,9 @@ function featuresClosed(reason: string): Closure {
  * The entries closed at the start, or undefined when every entry is offered: after a failed core
  * self-test (assertCoreSelfTest), whose known answers are those of every feature, all but the
  * entries that run none; where only this process could not switch off core dumps
- * (assertProtected), the entries that ask for a secret, while the public ones work without it.
- * Each command checks both again before it starts and would stop at once, so the menu checks them
- * before its first question.
+ * (ProcessProtection.assert), the entries that ask for a secret, while the public ones work
+ * without it. Each command checks both again before it starts and would stop at once, so the menu
+ * checks them before its first question.
  */
 function closedAtStart(): Closure | undefined {
   try {
@@ -708,7 +714,7 @@ function closedAtStart(): Closure | undefined {
     return featuresClosed(describeError(error));
   }
   try {
-    assertProtected();
+    ProcessProtection.assert();
     return undefined;
   } catch (error) {
     return {
@@ -745,7 +751,7 @@ function writeHeading(closure: Closure | undefined): void {
 export async function runMenu(): Promise<Cancelled | undefined> {
   // Each command runs in a process of its own, which gives up what it does not need; the menu
   // itself saves nothing.
-  dropForMenu();
+  ProcessProtection.dropForMenu();
   let closure = closedAtStart();
   writeHeading(closure);
   // Drawn again, as it is then, where going back draws the whole screen anew.

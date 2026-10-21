@@ -1,10 +1,10 @@
 /** Manual public-data comparison of two card builds; not part of normal CLI startup or CI. */
 // Compares the pixels of every PDF of two folders, page by page at a fixed resolution, so that the
-// dates and other metadata of a PDF play no part. The fixtures are what business-goldens.mjs
+// dates and other metadata of a PDF play no part. The fixtures are what business-renders.mjs
 // wrote, so a new fixture needs no list here, and a file found in only one folder is a failure.
 // Poppler's pdftoppm draws the pages (card-fixtures.mjs).
 //
-// Usage: node scripts/compare-business-goldens.mjs <before> <after>
+// Usage: node scripts/compare-business-renders.mjs <before> <after>
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -18,7 +18,7 @@ const PDF = ".pdf";
 /** The exit code of a call without its two folders, as for any other wrong usage. */
 const USAGE_EXIT = 2;
 /** The start of the name of the temporary folder that the page images are drawn into. */
-const SCRATCH_PREFIX = "mnemocode-golden-";
+const SCRATCH_PREFIX = "mnemocode-render-";
 
 /** The names of the PDF fixtures in `folder`, without their extension. */
 async function fixtureNames(folder) {
@@ -71,7 +71,7 @@ async function fixtureFailures(name, before, after, scratch) {
 
 const folders = process.argv.slice(2);
 if (folders.length !== 2) {
-  console.error("Usage: node scripts/compare-business-goldens.mjs <before> <after>");
+  console.error("Usage: node scripts/compare-business-renders.mjs <before> <after>");
   process.exit(USAGE_EXIT);
 }
 const [before, after] = folders;

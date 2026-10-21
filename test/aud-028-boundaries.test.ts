@@ -10,8 +10,8 @@ import type { RepairedSet } from "../src/sskr/joint-results.js";
 import { droppedPath } from "../src/cli/text-file.js";
 import { typedLine } from "../src/cli/shell-command.js";
 import { deferred } from "./helpers/deferred.js";
+import { DATE, OTHER_PHRASE } from "./helpers/test-phrase.js";
 
-const OTHER_PHRASE = "legal winner thank year wave sausage worth useful legal winner thank yellow";
 const publicSet = (): RepairedSet => ({
   mnemonic: SSKR_SET_VECTOR.phrase,
   shares: [],
@@ -83,13 +83,11 @@ describe("AUD-028 restored phrase ownership", () => {
 
   it("refuses dates in direct mode with the canonical masking rule", () => {
     expect(
-      () =>
-        new ShareUnmasking({ mode: "direct", dates: DatesAnswer.of([parseDate("23-09-2026")]) }),
+      () => new ShareUnmasking({ mode: "direct", dates: DatesAnswer.of([parseDate(DATE)]) }),
     ).toThrow(expect.objectContaining({ code: "core.masking.assert-takes-dates-refused" }));
     expect(() => new ShareUnmasking({ mode: "direct" })).not.toThrow();
     expect(
-      () =>
-        new ShareUnmasking({ mode: "seedshift", dates: DatesAnswer.of([parseDate("23-09-2026")]) }),
+      () => new ShareUnmasking({ mode: "seedshift", dates: DatesAnswer.of([parseDate(DATE)]) }),
     ).not.toThrow();
   });
 });

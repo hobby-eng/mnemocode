@@ -120,7 +120,8 @@ describe("ShareSet", () => {
     expect(set.secretBytes).toBe(16);
     expect(set.wordCount).toBe(12);
     expect(set.shares.map((share) => share.format)).toEqual(["ur", "indexes"]);
-    expect(set.backupForm).toBe("english");
+    // Shown again in the form of its first share, a UR: English words.
+    expect(set.backup(TEST_PHRASE)).toEqual({ form: "english", text: PHRASE });
     for (const shown of [String(set), JSON.stringify({ set }), inspect(set)])
       expect(shown).not.toContain(PHRASE.split(" ")[0]);
     expect(set.fingerprint((mnemonic) => `fingerprint of ${mnemonic.length} letters`)).toBe(
@@ -181,7 +182,7 @@ describe("ShareSet", () => {
     const set = await ShareSet.combine([SHARES[0], marked([5])], nodeSharePlatform);
     expect(set.mnemonic).toBe(PHRASE);
     expect(set.shares[1]!.repaired).toBe(true);
-    expect(set.backupForm).toBe("english");
+    expect(set.backup(TEST_PHRASE)).toEqual({ form: "english", text: PHRASE });
     const plan = await planJointRepair([SHARES[0], marked([5])], { platform: nodeSharePlatform });
     const [found] = (await plan.search()).sets;
     const taken = ShareSet.of(found!);
@@ -310,7 +311,14 @@ describe("ShareExport", () => {
   });
 
   it("names every share form", () => {
-    expect(SHARE_FORMAT_NAMES.colors).toBe("RGB hexadecimal codes (ordered)");
+    expect(SHARE_FORMAT_NAMES).toEqual({
+      ur: "Compact UR",
+      words: "Bytewords",
+      indexes: "BIP39 word numbers (1-2048)",
+      unicode: "Unicode codes",
+      colors: "RGB hexadecimal codes (ordered)",
+      "colors-unicode": "Colors as Unicode codes",
+    });
   });
 });
 
@@ -420,18 +428,17 @@ describe("ShareInput", () => {
         message: "One share is not enough: this set needs 2.",
       },
     });
-    expect(
-      ShareInput.looseSetTrouble([
-        { place: 1, ur: SHARES[0] },
-        { place: 2, ur: SHARES[0] },
-        { place: 3, ur: OTHER_SET_SHARE },
-        { place: 4, ur: SHARES[1] },
-      ]),
-    ).toEqual({
-      kind: "odd",
-      code: "share-of-another-set",
-      place: 3,
-      message: "Share 3 is of another set than share 1.",
+    // Shares written again need no quorum; a copy is no problem, a share of another set is.
+    const loose = new ShareInput(TEXTS);
+    loose.add([SHARES[0], SHARES[0], OTHER_SET_SHARE, SHARES[1]]);
+    expect(loose.rewritten()).toEqual({
+      kind: "trouble",
+      trouble: {
+        kind: "odd",
+        code: "share-of-another-set",
+        place: 3,
+        message: "Share 3 is of another set than share 1.",
+      },
     });
   });
 
@@ -544,8 +551,8 @@ describe("RepairReport", () => {
     const dates = { combinations: 10, secondsEach: 6 };
     // The dates for the right phrase and for those expected by chance, a hundred-thousandth here.
     expect(report.seconds(dates)).toBeCloseTo(61, 2);
-    expect(report.searchSize(dates)).toBe(
-      "65,536 share combinations, then 10 date combinations for each phrase found",
+    expect(report.searchQuestion(dates)).toBe(
+      "Search 65,536 share combinations, then 10 date combinations for each phrase found, about 1 minute?",
     );
     expect(report.searchQuestion()).toBe("Search 65,536 combinations, about 1 second?");
     expect(report.searchNotice(dates)).toBe(

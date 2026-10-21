@@ -18,6 +18,8 @@ import {
   warningsAt,
 } from "./helpers/menu-paths.js";
 import { script } from "./helpers/menu-script.js";
+import { FINGERPRINT_PROMPT } from "./helpers/prompts.js";
+import { TEST_ADDRESS, TEST_FINGERPRINT } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/menu-script.js"));
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
@@ -64,16 +66,13 @@ describe("start menu", () => {
   describe("typed answers are checked at once and asked again", () => {
     it("asks the fingerprint and the address again until a wallet can have them", async () => {
       const fingerprint = await runOf(ENTRY.recover, [...DATE_WALLET, 0], {
-        "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.)":
-          ["", "73c5da0", "73C5DA0A"],
+        [FINGERPRINT_PROMPT]: ["", TEST_FINGERPRINT.slice(0, -1), TEST_FINGERPRINT.toUpperCase()],
       });
-      expect(fingerprint).toEqual(expect.arrayContaining(["--master-fingerprint", "73c5da0a"]));
+      expect(fingerprint).toEqual(
+        expect.arrayContaining(["--master-fingerprint", TEST_FINGERPRINT]),
+      );
       expect(script.labels).toContain("Fingerprint");
-      expect(
-        warningsAt(
-          "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.)",
-        ),
-      ).toEqual([
+      expect(warningsAt(FINGERPRINT_PROMPT)).toEqual([
         undefined,
         "Type the eight characters of the fingerprint, or press Esc to go back.",
         "A master fingerprint must be eight hexadecimal characters.",
@@ -81,10 +80,7 @@ describe("start menu", () => {
       const address = "Bitcoin address (one of the first receiving ones)";
       // BIP173's testnet example, then the public phrase's first native SegWit address.
       await runOf(ENTRY.recover, [...DATE_WALLET, 1], {
-        [address]: [
-          "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx",
-          "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
-        ],
+        [address]: ["tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", TEST_ADDRESS],
       });
       expect(warningsAt(address)).toEqual([
         undefined,

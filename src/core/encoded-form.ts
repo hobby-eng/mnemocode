@@ -299,8 +299,8 @@ export class EncodedForm {
   /**
    * Codes, by their BIP39 indexes, written in this form: every form is written from the indexes
    * alone, so that no two forms of one result can disagree. Indexes that are no phrase are refused
-   * in every form, as the colours refuse them (AUD-037-API008), never written as text that cannot
-   * be read back.
+   * in every form as assertPhraseIndexes refuses them (core.bip39-sizes.expected-word-indexes,
+   * assert-word-indexes-refused; AUD-037-API008), never written as text that cannot be read back.
    */
   codes(indexes: readonly number[]): string {
     const phrase = Array.from(indexes);

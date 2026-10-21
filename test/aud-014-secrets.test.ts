@@ -3,12 +3,13 @@
 // (API002, recommendation 30). Public test data only: the BIP39 test phrase and synthetic
 // passphrases.
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSessionIdentity,
+  decryptCandidates,
   listFileLock,
   NoProtection,
   PassphraseProtection,
@@ -16,6 +17,7 @@ import {
   ScannerKeyProtection,
   type ListProtectionChoice,
 } from "../src/core/candidate-encryption.js";
+import { decodeCandidateList } from "../src/core/candidate-list.js";
 import { CandidateListWriter } from "../src/core/candidate-list-writer.js";
 import { bip39Passphrase } from "../src/cli/bitcoin-options.js";
 import { CandidatesFile } from "../src/cli/candidates-file.js";
@@ -221,12 +223,17 @@ describe("AUD-014-API002: a file or standard input is valid UTF-8 or refused", (
       "﻿synthetic\n",
     );
     expect(strictUtf8Text(Buffer.from("﻿a\r\n"), "The file")).toBe("﻿a\r\n");
-    // The list's passphrase drops the mark and the white space at its ends (parseListPassphrase).
-    const target = await CandidatesFile.of({
-      "candidates-file": join(directory, "list.age"),
+    // The list's passphrase drops the mark and the white space at its ends (parseListPassphrase):
+    // the list saved with it opens with the passphrase alone.
+    const list = join(directory, "list.age");
+    using target = await CandidatesFile.of({
+      "candidates-file": list,
       "candidates-passphrase-file": fileWith(`﻿${LIST_PASSPHRASE}\n`),
     });
-    expect(target).toBeInstanceOf(CandidatesFile);
+    assert(target !== undefined);
+    await target.savePhrases([TEST_PHRASE]);
+    const saved = await decryptCandidates(readFileSync(list), { passphrase: LIST_PASSPHRASE });
+    expect(decodeCandidateList(saved).records).toHaveLength(1);
     standardInput = Buffer.from(`${TEST_PHRASE}\n`);
     expect(textInput({ "mnemonic-file": "-" }, "mnemonic")).toBe(`${TEST_PHRASE}\n`);
     expect(allWiped()).toBe(true);

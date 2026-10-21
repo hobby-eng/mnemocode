@@ -27,9 +27,7 @@ import {
   terminalNotice,
   terminalPart,
   terminalResultHeader,
-  wrapText,
 } from "./terminal.js";
-import { EncodedForm } from "../core/encoded-form.js";
 import type { EncodedFormat } from "../core/types.js";
 import {
   assertSingleValues,
@@ -52,7 +50,7 @@ import { NO_PHRASE_FITS, type DateWork } from "../sskr/repair-report.js";
 import { ShareSet } from "../sskr/share-set.js";
 import type { ShareTrouble } from "../sskr/share-input.js";
 import { ShareUnmasking } from "../sskr/share-unmasking.js";
-import { type WalletPlace, givenWallet } from "./bitcoin-options.js";
+import { type GivenWallet, givenWallet } from "./bitcoin-options.js";
 import {
   assessShares,
   askShareFix,
@@ -75,6 +73,7 @@ import {
   maxCandidatesOf,
   PROGRESS_EVERY,
   DATES_AGAIN,
+  CHANGE_DATES_LABEL,
   walletExplanation,
 } from "./date-search.js";
 import { showEncodedFingerprint } from "./backup-questions.js";
@@ -98,6 +97,9 @@ const ERRORS = new ErrorCatalog("cli.sskr-restore-command", {
 });
 
 export const SSKR_INPUT_OPTIONS = [...SHARE_SOURCE_OPTIONS, "ask-secrets"] as const;
+
+/** The question of askShareFix when the shares that no phrase fits are to be changed. */
+const CHANGE_SHARES = "Which shares to change?";
 
 /**
  * The shares: asked on the private screen with --ask-secrets, or read from the options; CANCELLED
@@ -131,10 +133,11 @@ export interface Recovery {
    * combinations of --max-candidates, for every phrase.
    */
   readonly limits: SearchLimits;
-  /** The wallet's BIP39 passphrase, "" for none. */
-  readonly passphrase: string;
-  /** Where a wallet asked on the private screen is looked for (walletPlaceOf). */
-  readonly place: WalletPlace;
+  /**
+   * The wallet given with the options, if any, where a wallet asked on the private screen is
+   * looked for (walletPlaceOf), and the owner of the BIP39 passphrase, which the command disposes.
+   */
+  readonly wallet: GivenWallet;
   /** The candidate list to save (sskr-combine), for which every date match is kept. */
   readonly target?: CandidatesFile | undefined;
   readonly shares: TypedShares;
@@ -162,35 +165,29 @@ export async function recoverySettings(
     args["ask-secrets"] === true,
     DATE_COUNT_WORDS.recovery,
   );
-  const { evidence, place, passphrase } = givenWallet(args);
-  const interactive = args["ask-secrets"] === true;
-  const settings = {
-    interactive,
-    mode,
-    limits: { shares: searchLimit(args), dates: maxCandidatesOf(args) },
-    passphrase,
-    place,
-    evidence,
-    dates: given.length === 0 ? undefined : DatesAnswer.of(given),
-  };
+  const wallet = givenWallet(args);
+  let datesAnswer: DatesAnswer | undefined;
   try {
+    const limits = { shares: searchLimit(args), dates: maxCandidatesOf(args) };
+    datesAnswer = given.length === 0 ? undefined : DatesAnswer.of(given);
     await assertSskrSelfTest();
-    return settings;
+    const interactive = args["ask-secrets"] === true;
+    return { interactive, mode, limits, wallet, evidence: wallet.evidence, dates: datesAnswer };
   } catch (error) {
-    settings.dates?.wipe();
+    datesAnswer?.wipe();
+    wallet.wipe();
     throw error;
   }
 }
 
-/** What restorePhrases gives. */
-type Restoring =
-  /** The phrases of ShareRestore.phrases, with the places of their shares. */
-  | (PhrasesFound & {
-      /** The places of the sets' shares among those typed, by their index in a set. */
-      readonly places: readonly number[];
-    })
-  /** Too few shares, which the caller deals with (RestoreRules.few). */
-  | { readonly kind: "few" };
+/** The phrases of ShareRestore.phrases, with the places of their shares. */
+type PhrasesAt = PhrasesFound & {
+  /** The places of the sets' shares among those typed, by their index in a set. */
+  readonly places: readonly number[];
+};
+
+/** What restorePhrases gives: the phrases, or too few shares, which the caller deals with. */
+export type Restoring = PhrasesAt | { readonly kind: "few" };
 
 /** Too few shares to restore a phrase, by the code of the condition (ShareTrouble). */
 type FewTrouble = Extract<ShareTrouble, { readonly kind: "few" }>;
@@ -261,7 +258,7 @@ function unmaskingOf(r: Recovery, walletCheck?: OwnedWalletCheck): ShareUnmaskin
  * undefined without dates with ? or without a wallet.
  */
 async function dateWork(r: Recovery): Promise<DateWork | undefined> {
-  using walletCheck = walletCheckOf(r.evidence, r.passphrase);
+  using walletCheck = walletCheckOf(r.evidence, r.wallet.passphrase);
   return await unmaskingOf(r, walletCheck).dateWork();
 }
 
@@ -277,7 +274,7 @@ async function unmasked(
   places: readonly number[],
   notice?: string,
 ): Promise<RestoredPhrases> {
-  using walletCheck = walletCheckOf(r.evidence, r.passphrase);
+  using walletCheck = walletCheckOf(r.evidence, r.wallet.passphrase);
   const unmasking = unmaskingOf(r, walletCheck);
   if (!unmasking.searches) return await ShareRestore.phrases(unmasking, sets, places);
   // The search is a step of its own: its screen shows the title and the search, no longer the
@@ -332,7 +329,7 @@ async function walletForSearch(r: Recovery): Promise<Step | Cancelled> {
   const answer = await askWalletEvidence({
     optional: false,
     explanation: walletExplanation(r.mode),
-    place: r.place,
+    place: r.wallet.place,
   });
   if (answer === CANCELLED) return CANCELLED;
   if (answer.kind === "back") return "dates";
@@ -363,12 +360,50 @@ async function walletForSeveral(r: Recovery, sets: number): Promise<"given" | "n
   const answer = await askWalletEvidence({
     optional: true,
     explanation: { lines: [severalSetsNote(sets)] },
-    place: r.place,
+    place: r.wallet.place,
   });
   if (answer === CANCELLED) return CANCELLED;
   if (answer.kind !== "wallet") return "none";
   r.evidence = answer.evidence;
   return "given";
+}
+
+/** The sets of repaired shares that fit the shares typed, as a search of them found them. */
+interface FoundSets {
+  /** Each set that fits, with the phrase it holds. */
+  readonly sets: readonly RepairedSet[];
+  /** The places of the sets' shares among those typed, by their index in a set. */
+  readonly places: readonly number[];
+  /** What the date search that follows says of its time before it runs, if anything. */
+  readonly notice?: string | undefined;
+}
+
+/**
+ * The step of restorePhrases that takes the sets that fit the shares: their phrases with the dates
+ * and the wallet of `r` (unmasked), or the step that comes next. After phrases that the dates or
+ * the wallet refused it is the step that afterRefused gives. Where several sets fit, nothing tells
+ * the right one and `one` asks for one, the wallet is asked on the private screen
+ * (walletForSeveral): a wallet given searches the sets again with it ("search"), and "It cannot"
+ * keeps every set. The sets are data here, so that its tests can give it sets that typed shares
+ * give only by chance. CANCELLED when the person cancelled, at a question or by stopping the date
+ * search. Without a private screen a refusal ends the command, as afterRefused throws it.
+ */
+export async function phrasesOfSets(
+  r: Recovery,
+  found: FoundSets,
+  one: boolean,
+): Promise<PhrasesAt | Step | Cancelled> {
+  const { sets, places } = found;
+  const result = await unmasked(r, sets, places, found.notice);
+  // The person stopped the date search with Ctrl+C.
+  if (result.kind === "stopped") return CANCELLED;
+  if (result.kind === "dates" || result.kind === "mismatch") return afterRefused(r, result);
+  const restored = { ...result, places };
+  if (!(one && result.sets.length > 1 && r.evidence === undefined && r.interactive))
+    return restored;
+  const wallet = await walletForSeveral(r, result.sets.length);
+  if (wallet === "given") return "search";
+  return wallet === "none" ? restored : wallet;
 }
 
 /**
@@ -465,7 +500,7 @@ export async function restorePhrases(
             // Escape here is Stop (askAfterFailure): a search that found nothing has no question
             // to go back to, and the search question, whose own Escape leads here, would be asked
             // without end once the input has ended.
-            const change = await askShareFix(r.shares, { question: "Which shares to change?" });
+            const change = await askShareFix(r.shares, { question: CHANGE_SHARES });
             step = change === CANCELLED ? CANCELLED : "shares";
             continue;
           }
@@ -482,18 +517,9 @@ export async function restorePhrases(
           }
           notice = start.notice;
         }
-        const result = await unmasked(r, sets, places, notice);
-        // The person stopped the date search with Ctrl+C.
-        if (result.kind === "stopped") return CANCELLED;
-        if (result.kind === "dates" || result.kind === "mismatch") {
-          step = await afterRefused(r, result);
-          continue;
-        }
-        const restored = { ...result, places };
-        if (!(rules.one && result.sets.length > 1 && r.evidence === undefined && r.interactive))
-          return restored;
-        const wallet = await walletForSeveral(r, result.sets.length);
-        if (wallet !== "given") return wallet === "none" ? restored : wallet;
+        const next = await phrasesOfSets(r, { sets, places, notice }, rules.one);
+        if (typeof next === "object") return next;
+        step = next;
       }
     }
   } finally {
@@ -530,7 +556,7 @@ async function afterMismatch(r: Recovery, message: string): Promise<Step | Cance
   for (;;) {
     const next = await askOrCancel(WHAT_NOW, [
       ...(Masking.of(r.mode).masked
-        ? [{ label: "Change the dates", value: "dates" as const }]
+        ? [{ label: CHANGE_DATES_LABEL, value: "dates" as const }]
         : []),
       changeWalletAnswer("wallet" as const),
       { label: "Change a share", note: "or add more", value: "shares" as const },
@@ -542,14 +568,11 @@ async function afterMismatch(r: Recovery, message: string): Promise<Step | Cance
     if (next === "dates") return "dates";
     if (next === "mode") return otherMode(r);
     if (next === "shares") {
-      const change = await askShareFix(r.shares, {
-        question: "Which shares to change?",
-        back: true,
-      });
+      const change = await askShareFix(r.shares, { question: CHANGE_SHARES, back: true });
       if (change !== "back") return change === "changed" ? "shares" : change;
       continue;
     }
-    const answer = await askWalletEvidence({ optional: false, place: r.place });
+    const answer = await askWalletEvidence({ optional: false, place: r.wallet.place });
     if (answer === CANCELLED) return CANCELLED;
     if (answer.kind === "wallet") {
       r.evidence = answer.evidence;
@@ -600,15 +623,16 @@ export async function runSskrCombine(
   assertSingleValues(args);
   const settings = await recoverySettings(args);
   using initialDates = settings.dates;
+  using ownedWallet = settings.wallet;
   using target = await CandidatesFile.of(args);
-  target?.assertListable(settings.passphrase);
+  target?.assertListable(ownedWallet.passphrase);
   const shares =
     firstShare === undefined ? await typedShares(args) : await TypedShares.startingWith(firstShare);
   if (shares === CANCELLED) return CANCELLED;
   using ownedShares = shares;
   const r: Recovery = { ...settings, dates: initialDates, target, shares: ownedShares };
   try {
-    if ((await target?.prepare(r.passphrase)) === CANCELLED) return CANCELLED;
+    if ((await target?.prepare(r.wallet.passphrase)) === CANCELLED) return CANCELLED;
     const restored = await restorePhrases(r, {
       few: async (trouble) => (await mendShares(r.shares, trouble, r.interactive)) ?? "again",
       one: false,
@@ -648,7 +672,7 @@ export async function runSskrCombine(
       shown += 1;
     }
     reportWalletWarnings(phrases.slice(0, shown));
-    return await target?.savePhrases(restored.listed, r.passphrase);
+    return await target?.savePhrases(restored.listed, r.wallet.passphrase);
   } finally {
     r.dates?.wipe();
   }
@@ -751,11 +775,8 @@ function showRestoredParts(phrase: RestoredPhrase, mode: SplitMode, place: Resto
   const backup = restoredBackup(phrase, mode);
   if (backup !== undefined) {
     terminalPart(backup.label);
-    // Codes written joined apart, beside the joined text (printCodes); other forms
-    // wrapped at their spaces, as the terminal would break a long line inside a word.
-    if (EncodedForm.of(backup.form).apartCodes(backup.text) === undefined)
-      for (const line of wrapText(backup.text)) console.log(line);
-    else printCodes(backup.text, backup.form);
+    // Codes written joined apart, beside the joined text; other forms wrapped at their spaces.
+    printCodes(backup.text, backup.form);
     // Only a masked phrase has a fingerprint of its own; another form is the phrase below.
     using set = Masking.of(mode).masked ? ShareSet.of(phrase.set) : undefined;
     const encoded = set?.fingerprint(masterFingerprint);

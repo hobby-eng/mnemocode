@@ -8,7 +8,6 @@ import { encodeMnemonic, parseDate } from "../src/core.js";
 import { checksumValid, WordCandidateSearch } from "../src/core/candidates.js";
 import { DatesAnswer, DateSearch, type WalletCheck } from "../src/core/date-search.js";
 import { protectionFor, type ListProtectionChoice } from "../src/core/candidate-encryption.js";
-import { zeroEntropyPhrase } from "../src/core/english-words.js";
 import { Masking } from "../src/core/masking.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
@@ -37,12 +36,16 @@ import {
   urToBytewords,
   urToTransport,
 } from "../src/sskr/transport.js";
+import {
+  DATE,
+  LAST_WORD_FORGOTTEN,
+  OTHER_PHRASE,
+  TEST_INDEXES,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 import { sskrVectors } from "./helpers/vectors.js";
 
-const PHRASE = zeroEntropyPhrase(12);
-/** A published BIP39 test phrase (the 0x7f… vector), another phrase than PHRASE. */
-const OTHER_PHRASE = "legal winner thank year wave sausage worth useful legal winner thank yellow";
-const DATE = parseDate("23-09-2026");
+const PARSED_DATE = parseDate(DATE);
 const VECTOR = sskrVectors().deterministic[0]!;
 const SHARE: string = VECTOR.shares[0]!;
 
@@ -59,8 +62,8 @@ describe("AUD-015-API001: nothing found after a stop is published", () => {
     const controller = new AbortController();
     const published: string[] = [];
     const search = new DateSearch({
-      indexes: encodeMnemonic(PHRASE, [DATE]).shiftedIndexes,
-      dates: DatesAnswer.of([DATE]),
+      indexes: encodeMnemonic(TEST_PHRASE, [PARSED_DATE]).shiftedIndexes,
+      dates: DatesAnswer.of([PARSED_DATE]),
       mode: "seedshift",
       keep: 1,
       walletCheck: lateStop(controller),
@@ -76,13 +79,14 @@ describe("AUD-015-API001: nothing found after a stop is published", () => {
 
   it("the word search and the search of marked codes return nothing after it either", async () => {
     const words = new AbortController();
-    const found = await WordCandidateSearch.parse(`${"abandon ".repeat(11)}?`, "unknown-words").run(
-      { walletCheck: lateStop(words), signal: words.signal },
-    );
+    const found = await WordCandidateSearch.parse(LAST_WORD_FORGOTTEN, "unknown-words").run({
+      walletCheck: lateStop(words),
+      signal: words.signal,
+    });
     expect(found).toMatchObject({ stopped: true, count: 0, matched: 0, shown: [], entropies: [] });
     const codes = new AbortController();
     const result = await new MissingCodesSearch(
-      MissingCodes.read(`${"abandon ".repeat(11)}?`, "english", "direct"),
+      MissingCodes.read(LAST_WORD_FORGOTTEN, "english", "direct"),
       () => "00000000",
     )
       .byWallet(lateStop(codes))
@@ -92,8 +96,8 @@ describe("AUD-015-API001: nothing found after a stop is published", () => {
 
   it("keeps the matches of a search that nothing stops", async () => {
     const search = new DateSearch({
-      indexes: encodeMnemonic(PHRASE, [DATE]).shiftedIndexes,
-      dates: DatesAnswer.of([DATE]),
+      indexes: encodeMnemonic(TEST_PHRASE, [PARSED_DATE]).shiftedIndexes,
+      dates: DatesAnswer.of([PARSED_DATE]),
       mode: "seedshift",
       keep: 1,
       walletCheck: () => ({ matched: true }),
@@ -104,7 +108,7 @@ describe("AUD-015-API001: nothing found after a stop is published", () => {
       onMatch: (match) => published.push(match.mnemonic),
     });
     expect(result.matchCount).toBe(1);
-    expect(published).toEqual([PHRASE]);
+    expect(published).toEqual([TEST_PHRASE]);
   });
 });
 
@@ -125,19 +129,19 @@ describe("AUD-015-API002: a split is made of one request", () => {
 
   it.each([
     ["direct", []],
-    ["seedshift", [DATE]],
+    ["seedshift", [PARSED_DATE]],
   ] as const)(
     "keeps the phrase it was given in %s mode when the host edits it",
     async (mode, dates) => {
       let open!: () => void;
       const gate = new Promise<void>((resolve) => (open = resolve));
-      const request = { mnemonic: PHRASE, mode, dates: [...dates], threshold: 2, count: 3 };
+      const request = { mnemonic: TEST_PHRASE, mode, dates: [...dates], threshold: 2, count: 3 };
       const pending = gatedSplit(gate).splitBackup(request);
       request.mnemonic = OTHER_PHRASE;
       open();
       const split = await pending;
-      expect(split.original).toBe(PHRASE);
-      expect(split.held).toBe(Masking.of(mode).held(PHRASE, dates));
+      expect(split.original).toBe(TEST_PHRASE);
+      expect(split.held).toBe(Masking.of(mode).held(TEST_PHRASE, dates));
       expect(split.records).toHaveLength(3);
     },
   );
@@ -276,8 +280,8 @@ describe("AUD-015 observations: a host's object is read once, then its copy is u
 
   it("counts a wallet answer as the one that was checked", async () => {
     const search = new DateSearch({
-      indexes: encodeMnemonic(PHRASE, [DATE]).shiftedIndexes,
-      dates: DatesAnswer.of([DATE]),
+      indexes: encodeMnemonic(TEST_PHRASE, [PARSED_DATE]).shiftedIndexes,
+      dates: DatesAnswer.of([PARSED_DATE]),
       mode: "seedshift",
       keep: 1,
       walletCheck: () => changing<WalletMatch, boolean>({ matched: false }, "matched", false, true),
@@ -286,7 +290,7 @@ describe("AUD-015 observations: a host's object is read once, then its copy is u
   });
 
   it("computes the checksum of the words that were checked", () => {
-    const words = [...Array<number>(11).fill(0), 3];
+    const words = [...TEST_INDEXES];
     expect(checksumValid(words)).toBe(true);
     const host = changing([...words], "0", 0, 1);
     expect(checksumValid(host)).toBe(true);

@@ -7,12 +7,12 @@ import { printEncodeResult } from "../src/cli/encode-report.js";
 import { STYLE_CODES, TEXT_WIDTH } from "../src/cli/terminal-style.js";
 import { parseDate } from "../src/core/dates.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** Dates whose legacy shift of the test phrase keeps a valid checksum. */
 const VALID_DATES = ["01-02-2001", "03-04-2001", "05-06-2010", "07-08-2015"];
 /** A date whose legacy shift needs another last word for a valid checksum. */
-const INVALID_DATES = ["23-09-2026"];
+const INVALID_DATES = [DATE];
 const ALREADY_VALID =
   "Legacy shifted phrase already has a valid BIP39 checksum; no final-word replacement is needed.";
 

@@ -1,9 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
-import { planJointRepair } from "../src/sskr/joint-repair.js";
+import { planJointRepair, type JointPlan } from "../src/sskr/joint-repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 
 describe("The lifetime of an assessed joint repair", () => {
+  it("ends a plan when the host's using scope ends", async () => {
+    let search: JointPlan["search"];
+    {
+      using plan = await planJointRepair(SSKR_SET_VECTOR.shares.slice(0, 2), {
+        platform: nodeSharePlatform,
+      });
+      expect(plan.assessment.verdict).toBe("determined");
+      search = plan.search;
+    }
+    await expect(search()).rejects.toHaveProperty("code", "sskr.joint-repair.plan-wiped");
+  });
+
   it("refuses a later search through the original bound method after disposal", async () => {
     const plan = await planJointRepair(SSKR_SET_VECTOR.shares.slice(0, 2), {
       platform: nodeSharePlatform,

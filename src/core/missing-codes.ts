@@ -52,7 +52,7 @@ import {
 } from "./colors.js";
 import { EncodedBackup, type EncodedFormat } from "./encoded-backup.js";
 import { Masking } from "./masking.js";
-import { ENCODED_FORMATS, type MaskingMode } from "./types.js";
+import { ENCODED_FORMATS, isEncodedFormat, type MaskingMode } from "./types.js";
 import { SearchTurns, keptCount, type SearchProgress, type SearchRun } from "./search-turns.js";
 import {
   BIP39_DICTIONARY_SIZE,
@@ -190,43 +190,62 @@ function colorPlaces(colors: readonly (string | undefined)[]): WordPlace[][] {
   throw ERRORS.create("colors-give-no-word-at-place", [`${place + 1}`]);
 }
 
+/** Marked English words: each a word, a prefix with *, words joined by |, or a ?. */
+function englishPlaces(text: string): WordPlace[][] {
+  return [counted(englishTokens(text)).map((word, index) => wordPlaceOf(word, index + 1))];
+}
+
+/** Marked word numbers: each a number, a number with ? for a digit, or a ?. */
+function numberPlaces(text: string): WordPlace[][] {
+  const tokens = codeTokens(text);
+  // Numbers written without spaces are one token: that, not their count, is what is wrong.
+  if (!isBip39WordCount(tokens.length) && tokens.some(runTogetherNumbers))
+    throw ERRORS.create("word-numbers-run-together", []);
+  return [counted(tokens).map((token, index) => numberPlace(token, index + 1))];
+}
+
+/** Marked Unicode codes: each four hexadecimal digits, with ? for a digit, or a ?. */
+function unicodePlaces(text: string): WordPlace[][] {
+  const codes = hexUnits(text, UNICODE_CODE_DIGITS);
+  if (codes === undefined)
+    throw ERRORS.create("places-refused", [
+      withJoinedMarksHint(
+        "Unicode codes have four hexadecimal digits each, or ? where unread.",
+        text,
+      ),
+    ]);
+  return [counted(codes).map((code, index) => codePlace(code, index + 1))];
+}
+
+/** Marked colors: each six hexadecimal digits, or one ? for the whole color. */
+function rgbColorPlaces(text: string): WordPlace[][] {
+  const colors = hexUnits(text, RGB_HEX_DIGITS);
+  if (colors === undefined || colors.some((color) => color !== "?" && color.includes("?")))
+    throw ERRORS.create("mark-color-cannot-read-one-place-whole-color", []);
+  return colorPlaces(colors.map((color) => (color === "?" ? undefined : `#${color}`)));
+}
+
 /**
- * The places of `text` read in `format`, each with the codes it may hold, in each placement that
- * the codes allow: one, but for colors whose tags leave it open.
+ * How each form's marked codes are read: the places of the text, each with the codes it may hold,
+ * in each placement that the codes allow: one, but for colors whose tags leave it open. One reader
+ * per form, which the compiler asks for when a form is added (CORE-06). The readings stay here, with
+ * the feature, rather than in EncodedForm.
+ */
+const MARKED_READERS = Object.freeze({
+  english: englishPlaces,
+  indexes: numberPlaces,
+  unicode: unicodePlaces,
+  colors: rgbColorPlaces,
+  "colors-unicode": (text: string) => colorPlaces(unicodeColors(text)),
+}) satisfies Readonly<Record<EncodedFormat, (text: string) => WordPlace[][]>>;
+
+/**
+ * The places of `text` read in `format` (MARKED_READERS). A JavaScript host may pass any value as
+ * the format: one that is no form is refused (core.missing-codes.codes-cannot-marked-form).
  */
 function placementsOf(text: string, format: EncodedFormat): WordPlace[][] {
-  switch (format) {
-    case "english":
-      return [counted(englishTokens(text)).map((word, index) => wordPlaceOf(word, index + 1))];
-    case "indexes": {
-      const tokens = codeTokens(text);
-      // Numbers written without spaces are one token: that, not their count, is what is wrong.
-      if (!isBip39WordCount(tokens.length) && tokens.some(runTogetherNumbers))
-        throw ERRORS.create("word-numbers-run-together", []);
-      return [counted(tokens).map((token, index) => numberPlace(token, index + 1))];
-    }
-    case "unicode": {
-      const codes = hexUnits(text, UNICODE_CODE_DIGITS);
-      if (codes === undefined)
-        throw ERRORS.create("places-refused", [
-          withJoinedMarksHint(
-            "Unicode codes have four hexadecimal digits each, or ? where unread.",
-            text,
-          ),
-        ]);
-      return [counted(codes).map((code, index) => codePlace(code, index + 1))];
-    }
-    case "colors": {
-      const colors = hexUnits(text, RGB_HEX_DIGITS);
-      if (colors === undefined || colors.some((color) => color !== "?" && color.includes("?")))
-        throw ERRORS.create("mark-color-cannot-read-one-place-whole-color", []);
-      return colorPlaces(colors.map((color) => (color === "?" ? undefined : `#${color}`)));
-    }
-    case "colors-unicode":
-      return colorPlaces(unicodeColors(text));
-    default:
-      throw ERRORS.create("codes-cannot-marked-form", []);
-  }
+  if (!isEncodedFormat(format)) throw ERRORS.create("codes-cannot-marked-form", []);
+  return MARKED_READERS[format](text);
 }
 
 /**
@@ -327,7 +346,27 @@ export class MissingCodes extends Redacted implements Disposable {
     });
   }
 
-  /** Reads the marked codes of `text` in `format`, taken with `mode`; throws why they cannot be. */
+  /**
+   * Reads the marked codes of `text` in `format`, taken with `mode`. Refuses, as the form's reader
+   * finds it: a count of codes that no seed phrase has (core.missing-codes.codes-seed-phrase); in
+   * English words a prefix that no word starts with and a word that is not English BIP39
+   * (core.candidates.no-bip39-word-starts-letters-at, unknown-english-bip39-word-at); in word
+   * numbers numbers run together (core.missing-codes.word-numbers-run-together) and a number that
+   * no word has (word-number-no-number-from); in Unicode codes text that is not four hexadecimal
+   * digits a code (places-refused) and a code of no word (code-no-unicode-code-word-list); in
+   * colors a color marked other than whole (mark-color-cannot-read-one-place-whole-color); in
+   * Color Unicode codes that are no pairs (unicode-colors-refused), a count of colors that no seed
+   * phrase has (colors-seed-phrase) and a pair of no color
+   * (core.colors.color-unicode-uses-only-mnemo-code-private-use,
+   * color-unicode-contains-value-outside-rrggbb-range); in both forms of colors what
+   * wordPositionPlacements refuses (core.colors.enter-colors-standard-bip39-word-count and the
+   * others it names) and colors that give no word at a place
+   * (core.missing-codes.colors-give-no-word-at-place). Then refuses a `mode` that names none
+   * (core.masking.unsupported-mode), codes of which none is marked
+   * (core.missing-codes.no-code-marked-mark-each-code-cannot-read) and more combinations than a
+   * search takes (core.candidates.search-more-than-combinations); a `format` that is no form first
+   * of all (core.missing-codes.codes-cannot-marked-form).
+   */
   static read(text: string, format: EncodedFormat, mode: MaskingMode): MissingCodes {
     return new MissingCodes(placementsOf(text, format), format, mode);
   }

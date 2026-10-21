@@ -1,4 +1,4 @@
-# Prettier also reads .gitignore, so what Git ignores (dist/, node_modules/, goldens/ …) is not
+# Prettier also reads .gitignore, so what Git ignores (dist/, node_modules/, output/ …) is not
 # repeated here. scripts/verify-markdown.mjs leaves out the same files.
 assets/
 # The SSKR bridge keeps its notices as they came with it.

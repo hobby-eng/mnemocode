@@ -84,7 +84,7 @@ describe.skipIf(process.platform === "win32")("the image renderer", () => {
     stub(join(work, "bin"), log);
     process.chdir(work);
     process.env["PATH"] = ["", ".", "bin"].join(delimiter);
-    await expect((await imageExport()).assertImageRenderer()).rejects.toHaveProperty(
+    await expect((await imageExport()).ImageRenderer.assert()).rejects.toHaveProperty(
       "code",
       NO_RENDERER,
     );
@@ -92,8 +92,21 @@ describe.skipIf(process.platform === "win32")("the image renderer", () => {
     // One in an absolute folder is found after them, and asked for its version in its folder.
     const program = stubs(work);
     process.env["PATH"] = ["", ".", "bin", join(root, "poppler")].join(delimiter);
-    await (await imageExport()).assertImageRenderer();
+    await (await imageExport()).ImageRenderer.assert();
     expect(readFileSync(log, "utf8")).toBe(`${program} ${join(root, "poppler")} -v\n`);
+  });
+
+  it("looks again after a search that failed, and keeps the renderer once found", async () => {
+    const folder = join(root, "poppler");
+    process.env["PATH"] = folder;
+    const { ImageRenderer } = await imageExport();
+    await expect(ImageRenderer.assert()).rejects.toHaveProperty("code", NO_RENDERER);
+    stub(folder, log);
+    const program = join(folder, "pdftocairo");
+    expect(await ImageRenderer.find()).toBe(program);
+    // Found once for the process: it is asked for its version only the first time.
+    expect(await ImageRenderer.find()).toBe(program);
+    expect(readFileSync(log, "utf8")).toBe(`${program} ${folder} -v\n`);
   });
 
   it("draws each page with the renderer found, in its own folder, without a file", async () => {
@@ -173,10 +186,10 @@ describe.skipIf(process.platform === "win32")("the image renderer", () => {
 
   it("stops a renderer that takes longer than its time for a page", async () => {
     const started = join(root, "started");
-    const { assertImageRenderer, writeRenderedDocument } = await drawnWith(
+    const { ImageRenderer, writeRenderedDocument } = await drawnWith(
       `: > '${started}'\nexec sleep 30`,
     );
-    await assertImageRenderer();
+    await ImageRenderer.assert();
     // Fake time that also runs on, so that the reading of the document goes on as it does.
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldAdvanceTime: true });
     try {

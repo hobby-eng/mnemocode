@@ -12,9 +12,23 @@ import { askEncodedBackup } from "../src/cli/backup-questions.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 import { writeShare } from "../src/sskr/transport.js";
-import { MASKED } from "./helpers/phrase-questions.js";
-import { questionsOnPrivateScreen, seen, terminal, windowOf } from "./helpers/question-terminal.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { FINGERPRINT_PROMPT, WALLET_QUESTION } from "./helpers/prompts.js";
+import {
+  promptsMatching,
+  questionsOnPrivateScreen,
+  seen,
+  terminal,
+  windowOf,
+} from "./helpers/question-terminal.js";
+import {
+  DATE,
+  ENCODED_FINGERPRINT,
+  MASKED,
+  replacedAt,
+  TEST_FINGERPRINT,
+  TEST_NUMBERS,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 import { publicShare } from "./helpers/vectors.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
@@ -23,27 +37,18 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
 );
 
-const FOUND = `23-09-2026\t${TEST_PHRASE}\tmatched at m`;
-/** The test phrase masked with the Original Seedshift and 23-09-2026, as word numbers. */
-const LEGACY = formatEncoded(
-  encodeMnemonicLegacy(TEST_PHRASE, [parseDate("23-09-2026")]),
-  "indexes",
-);
+const FOUND = `${DATE}\t${TEST_PHRASE}\tmatched at m`;
+/** The test phrase masked with the Original Seedshift and DATE, as word numbers. */
+const LEGACY = formatEncoded(encodeMnemonicLegacy(TEST_PHRASE, [parseDate(DATE)]), "indexes");
 const DATES_PROMPT =
   "Dates with ? for what is forgotten (up to 4, one to three of them incomplete):";
+/** The prompts of recover-date, as they appear on the screen. */
+const PROMPTS =
+  /Encoded seed phrase, record or text file path:|Dates with \?[^:]*:|Original fingerprint of the wallet[^:]*:/gu;
 
 /** Runs recover-date --ask-secrets with `options`, answering as the terminal says. */
 function recover(options: Record<string, string>): Promise<Cancelled | undefined> {
   return runRecoverDate({ "ask-secrets": true, ...options });
-}
-
-/** Where each prompt appears on the screen, in order. */
-function promptsShown(): string[] {
-  return [
-    ...seen.screen.matchAll(
-      /(Encoded seed phrase, record or text file path:|Dates with \?[^:]*:|Original fingerprint of the wallet[^:]*:)/gu,
-    ),
-  ].map((match) => match[1]!);
 }
 
 questionsOnPrivateScreen();
@@ -53,7 +58,7 @@ describe("recover-date on the private screen", () => {
     terminal.answers = [
       `${MASKED}\r`,
       "23-09-2O26\r",
-      "23-09-2026\r",
+      `${DATE}\r`,
       "2?-09-2026\r",
       "zz\r",
       `${TEST_FINGERPRINT}\r`,
@@ -69,15 +74,15 @@ describe("recover-date on the private screen", () => {
         "A master fingerprint must be eight hexadecimal characters.",
       ]),
     );
-    expect(promptsShown()).toEqual([
+    expect(promptsMatching(PROMPTS)).toEqual([
       "Encoded seed phrase, record or text file path:",
       DATES_PROMPT,
       DATES_PROMPT,
       DATES_PROMPT,
-      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
-      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
+      `${FINGERPRINT_PROMPT}:`,
+      `${FINGERPRINT_PROMPT}:`,
     ]);
-    expect(terminal.questions).toEqual(["How can MnemoCode recognise the wallet?"]);
+    expect(terminal.questions).toEqual([WALLET_QUESTION]);
     // The private screen shows what is typed; no warning repeats it.
     expect(seen.notices.join("\n")).not.toContain("2O26");
   });
@@ -94,7 +99,7 @@ describe("recover-date on the private screen", () => {
 
   it("asks for a direct record again before the dates", async () => {
     terminal.answers = [
-      `MNC1:direct:indexes:${"1 ".repeat(11)}4\r`,
+      `MNC1:direct:indexes:${TEST_NUMBERS}\r`,
       "MNC1:seedshift:english\r",
       `${MASKED}\r`,
       "2?-09-2026\r",
@@ -106,7 +111,7 @@ describe("recover-date on the private screen", () => {
         "Malformed MnemoCode record header.",
       ]),
     );
-    expect(promptsShown().slice(0, 4)).toEqual([
+    expect(promptsMatching(PROMPTS).slice(0, 4)).toEqual([
       "Encoded seed phrase, record or text file path:",
       "Encoded seed phrase, record or text file path:",
       "Encoded seed phrase, record or text file path:",
@@ -145,7 +150,7 @@ describe("recover-date on the private screen", () => {
 
 describe("recover-date on the private screen", () => {
   it("offers the Original Seedshift when the codes lack MnemoCode Seedshift's checksum", async () => {
-    terminal.answers = [`${MASKED.replace(/377$/u, "378")}\r`, "2?-09-2026\r"];
+    terminal.answers = [`${replacedAt(MASKED, { 12: "378" })}\r`, "2?-09-2026\r"];
     // The original Seedshift then; nothing fits, and Escape at "What now?" stops.
     terminal.choices = ["It was the Original Seedshift"];
     await recover({ mode: "seedshift" });
@@ -164,9 +169,9 @@ describe("recover-date on the private screen", () => {
       "None of the 10 checksum-valid candidates matched the requested master fingerprint.",
       FOUND,
     ]);
-    expect(terminal.questions).toEqual(["What now?", "How can MnemoCode recognise the wallet?"]);
+    expect(terminal.questions).toEqual(["What now?", WALLET_QUESTION]);
     // The dates were asked once.
-    expect(promptsShown().filter((prompt) => prompt === DATES_PROMPT)).toHaveLength(1);
+    expect(promptsMatching(PROMPTS).filter((prompt) => prompt === DATES_PROMPT)).toHaveLength(1);
   });
 
   it("offers no wallet only where that changes the search", async () => {
@@ -177,7 +182,7 @@ describe("recover-date on the private screen", () => {
     await recover({ mode: "seedshift-legacy", "max-results": "1" });
     expect(terminal.questions.slice(0, 2)).toEqual([
       "Not every candidate is shown. What now?",
-      "How can MnemoCode recognise the wallet?",
+      WALLET_QUESTION,
     ]);
     expect(terminal.labels[1]).toEqual(["Fingerprint", "Address"]);
     const searches = () =>
@@ -191,10 +196,7 @@ describe("recover-date on the private screen", () => {
     terminal.answers = [`${MASKED}\r`, "2?-09-2026\r"];
     terminal.choices = ["Change the wallet", "It cannot"];
     await recover({ mode: "seedshift-legacy", "master-fingerprint": "00000000" });
-    expect(terminal.questions.slice(0, 2)).toEqual([
-      "What now?",
-      "How can MnemoCode recognise the wallet?",
-    ]);
+    expect(terminal.questions.slice(0, 2)).toEqual(["What now?", WALLET_QUESTION]);
     expect(terminal.labels[1]).toEqual(["Fingerprint", "Address", "It cannot"]);
     expect(searches()).toBe(2);
   });
@@ -209,7 +211,7 @@ describe("recover-date on the private screen", () => {
     await recover({ mode: "seedshift-legacy" });
     expect(terminal.questions).toEqual([
       "Not every candidate fits on the screen. What now?",
-      "How can MnemoCode recognise the wallet?",
+      WALLET_QUESTION,
     ]);
     expect(terminal.labels[0]).toEqual([
       "Check them against the wallet",
@@ -245,7 +247,7 @@ describe("recover-date on the private screen", () => {
       "None of the 10 checksum-valid candidates matched the requested master fingerprint.",
       FOUND,
     ]);
-    expect(promptsShown()).toEqual([
+    expect(promptsMatching(PROMPTS)).toEqual([
       "Encoded seed phrase, record or text file path:",
       DATES_PROMPT,
       "Encoded seed phrase, record or text file path:",
@@ -265,7 +267,7 @@ describe("recover-date on the private screen", () => {
       "Search 10 date combinations?",
       "Search 10 date combinations?",
     ]);
-    expect(promptsShown()).toEqual([
+    expect(promptsMatching(PROMPTS)).toEqual([
       "Encoded seed phrase, record or text file path:",
       DATES_PROMPT,
       DATES_PROMPT,
@@ -281,10 +283,7 @@ describe("recover-date on the private screen", () => {
       terminal.answers = ["2?-09-2026\r", `${TEST_FINGERPRINT}\r`];
       terminal.choices = ["MnemoCode Seedshift", "Fingerprint"];
       await recover({ "input-file": plain });
-      expect(terminal.questions).toEqual([
-        "Which Seedshift was used?",
-        "How can MnemoCode recognise the wallet?",
-      ]);
+      expect(terminal.questions).toEqual(["Which Seedshift was used?", WALLET_QUESTION]);
       expect(seen.out).toEqual([FOUND]);
 
       const bad = join(directory, "bad.txt");
@@ -371,8 +370,7 @@ describe("recover-date on the private screen", () => {
   });
 
   it("shows the encoded fingerprint before the dates, as decode does", async () => {
-    const encoded =
-      "Encoded BIP32 master fingerprint of the masked phrase (empty BIP39 passphrase): 0d05289e";
+    const encoded = `Encoded BIP32 master fingerprint of the masked phrase (empty BIP39 passphrase): ${ENCODED_FINGERPRINT}`;
     terminal.answers = [`${MASKED}\r`, "2?-09-2026\r"];
     await recover({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT });
     expect(seen.out).toEqual([FOUND]);

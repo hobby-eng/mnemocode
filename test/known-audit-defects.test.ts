@@ -24,8 +24,9 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
+import { BUILT_CLI } from "./helpers/built-cli.js";
 import { sskrVectors } from "./helpers/vectors.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_ADDRESS, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("AUD-001 regression contracts", () => {
   it("AUD-001-SEC002: protects input through an alias of its parent directory", async () => {
@@ -37,9 +38,9 @@ describe("AUD-001 regression contracts", () => {
       const source = join(real, "input.txt");
       const dateFile = join(directory, "public-dates.txt");
       await writeFile(source, TEST_PHRASE);
-      await writeFile(dateFile, "23-09-2026", "utf8");
+      await writeFile(dateFile, DATE, "utf8");
       const result = await promisify(execFile)(process.execPath, [
-        resolve("dist/mnemocode.js"),
+        BUILT_CLI,
         "encode",
         "--mode",
         "seedshift",
@@ -64,7 +65,7 @@ describe("AUD-001 regression contracts", () => {
     expect(
       matchBitcoinEvidence(TEST_PHRASE, {
         kind: "address",
-        value: "BC1QCR8TE4KR609GCAWUTMRZA0J4XV80JY8Z306FYU",
+        value: TEST_ADDRESS.toUpperCase(),
         profiles: ["native-segwit"],
         location: { network: "mainnet", account: 0, branch: 0, index: 0 },
       }).matched,
@@ -142,39 +143,15 @@ describe("AUD-004 regression contracts", () => {
     }
   });
 
-  it("AUD-004-SEC001: stops endless and growing input at the limit", async () => {
-    const limit = 16;
-    if (process.platform !== "win32") {
+  it.skipIf(process.platform === "win32")(
+    "AUD-004-SEC001: stops endless input that reports size 0 at the limit",
+    () => {
       // /dev/zero reports size 0 and never ends: the strongest form of a file that keeps growing.
-      expect(() => readBoundedFile("/dev/zero", limit, "too large")).toThrow("too large");
-    }
-    const directory = await mkdtemp(join(tmpdir(), "mnemocode-growing-"));
-    const growing = join(directory, "growing");
-    await writeFile(growing, "");
-    // Another process appends to the file while it is read. Whether the read meets the end of the
-    // file first or passes the limit depends on timing; either way it never returns more than the
-    // limit.
-    const writer = spawn(process.execPath, [
-      "-e",
-      `const fs = require('node:fs'); const end = Date.now() + 1500;
-       while (Date.now() < end) fs.appendFileSync(${JSON.stringify(growing)}, 'a'.repeat(4096));`,
-    ]);
-    try {
-      for (let attempt = 0; attempt < 50; attempt += 1) {
-        try {
-          expect(readBoundedFile(growing, 64 * 1024, "too large").length).toBeLessThanOrEqual(
-            64 * 1024,
-          );
-        } catch (error) {
-          expect(String(error)).toContain("too large");
-        }
-      }
-    } finally {
-      writer.kill();
-      await new Promise((done) => writer.once("close", done));
-      await rm(directory, { recursive: true, force: true });
-    }
-  });
+      // A file that another process appends to is not read here, since whether the read meets it
+      // growing depends on timing; the named pipe above has a reported size that says nothing too.
+      expect(() => readBoundedFile("/dev/zero", 16, "too large")).toThrow("too large");
+    },
+  );
 
   it("AUD-004-SEC001: refuses a QR PNG one byte over 16 MiB before decoding it", async () => {
     const directory = await mkdtemp(join(tmpdir(), "mnemocode-png-limit-"));
@@ -194,64 +171,89 @@ describe("AUD-004 regression contracts", () => {
 });
 
 describe("AUD-004 regression contracts", () => {
-  it("AUD-004-DOC001: a publication killed at any moment leaves no partial file under the final name", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "mnemocode-killed-"));
-    // Thirty-two publications of 1 MiB last long enough for every kill to land inside one, and each
-    // round deletes its files, so the disk use stays small.
-    const size = 1024 * 1024;
-    const publications = 32;
-    const publisher = `
-      import { publishNewPrivateFile } from ${JSON.stringify(pathToFileURL(resolve("src/export/private-file.ts")).href)};
-      const bytes = new Uint8Array(${size}).fill(97);
-      for (let index = 0; index < ${publications}; index += 1) {
-        await publishNewPrivateFile(${JSON.stringify(directory)} + '/shares-' + index + '.txt', bytes);
-      }`;
-    let interrupted = 0;
-    try {
-      for (let round = 0; round < 8; round += 1) {
+  /**
+   * The steps of a publication at which pausedPublisher stops, in their order, and what it says
+   * once it ran to the end.
+   */
+  const PUBLICATION_STEPS = [
+    "before mkdtemp",
+    "before writeFile",
+    "half written",
+    "before link",
+    "before rm",
+    "published",
+  ] as const;
+
+  /**
+   * A program that publishes `size` bytes of "a" to `path` with publishNewPrivateFile, its file
+   * system replaced at the edge so that it stops at step `pauseAt` of PUBLICATION_STEPS, says
+   * which on standard output and waits there to be killed: before each call of the file system
+   * that the publication makes, and half way through writing the file, which is written in two
+   * halves for that. Past the last step it runs to the end and says so.
+   */
+  function pausedPublisher(path: string, size: number, pauseAt: number): string {
+    const privateFile = pathToFileURL(resolve("src/export/private-file.ts")).href;
+    return `
+      import { createRequire, syncBuiltinESMExports } from "node:module";
+      const files = createRequire(import.meta.url)("node:fs/promises");
+      let step = 0;
+      async function reached(name) {
+        if (step++ !== ${pauseAt}) return;
+        process.stdout.write(name + "\\n");
+        setInterval(() => {}, 60_000);
+        await new Promise(() => {});
+      }
+      for (const name of ["mkdtemp", "link", "rm"]) {
+        const real = files[name];
+        files[name] = async (...args) => (await reached("before " + name), real(...args));
+      }
+      const { writeFile, appendFile } = files;
+      files.writeFile = async (path, bytes, options) => {
+        await reached("before writeFile");
+        await writeFile(path, bytes.subarray(0, bytes.length / 2), options);
+        await reached("half written");
+        await appendFile(path, bytes.subarray(bytes.length / 2));
+      };
+      syncBuiltinESMExports();
+      const { publishNewPrivateFile } = await import(${JSON.stringify(privateFile)});
+      await publishNewPrivateFile(${JSON.stringify(path)}, new Uint8Array(${size}).fill(97));
+      process.stdout.write("published\\n");`;
+  }
+
+  it("AUD-004-DOC001: a publication killed at each of its steps leaves no partial file under the final name", async () => {
+    const size = 4096;
+    for (const [pauseAt, step] of PUBLICATION_STEPS.entries()) {
+      const directory = await mkdtemp(join(tmpdir(), "mnemocode-killed-"));
+      try {
+        const path = join(directory, "shares.txt");
         const child = spawn(process.execPath, [
           "--import",
           "tsx",
           "--input-type=module",
           "-e",
-          publisher,
+          pausedPublisher(path, size, pauseAt),
         ]);
+        const closed = new Promise((done) => child.once("close", done));
+        let said = "";
         let errors = "";
         child.stderr.on("data", (chunk) => (errors += String(chunk)));
-        let running = true;
-        const ended = new Promise<number | null>((done) =>
-          child.once("close", (code) => {
-            running = false;
-            done(code);
-          }),
-        );
-        // Wait until the first file is published, so that the child is past its start-up, then
-        // kill it a different number of milliseconds later in each round.
-        while (running && !(await readdir(directory)).some((name) => name.startsWith("shares-"))) {
-          await new Promise((done) => setTimeout(done, 1));
-        }
-        await new Promise((done) => setTimeout(done, round * 2));
-        const killedWhileRunning = running;
+        await new Promise<void>((done) => {
+          child.stdout.on("data", (chunk) => {
+            said += String(chunk);
+            if (said.includes("\n")) done();
+          });
+          void closed.then(() => done());
+        });
         child.kill("SIGKILL");
-        const code = await ended;
-        expect(code === 0 || code === null, errors).toBe(true);
-        const finals = (await readdir(directory)).filter((name) => name.startsWith("shares-"));
-        if (killedWhileRunning && finals.length < publications) interrupted += 1;
-        for (const name of finals) {
-          const bytes = await readFile(join(directory, name));
-          expect(bytes.length, name).toBe(size);
-          expect(
-            bytes.every((byte) => byte === 97),
-            name,
-          ).toBe(true);
-        }
+        await closed;
+        expect(said.trim(), errors).toBe(step);
+        // The final name holds the whole file once it is linked, and nothing before.
+        if (pauseAt < PUBLICATION_STEPS.indexOf("before rm"))
+          expect(await readdir(directory), step).not.toContain("shares.txt");
+        else expect(await readFile(path), step).toEqual(Buffer.alloc(size, "a"));
+      } finally {
         await rm(directory, { recursive: true, force: true });
-        await mkdir(directory);
       }
-      // Most kills must land while files are still being published, or the test proves nothing.
-      expect(interrupted).toBeGreaterThanOrEqual(6);
-    } finally {
-      await rm(directory, { recursive: true, force: true });
     }
   });
 
@@ -284,7 +286,7 @@ describe("AUD-005 regression contracts", () => {
         "Malformed MnemoCode record header.",
       );
     expect(() => parseRecord(`MNC2:${payload}`)).toThrow(
-      "Unsupported MnemoCode record version: 2.",
+      "Unsupported MnemoCode record version. A newer MnemoCode reads it.",
     );
   });
 

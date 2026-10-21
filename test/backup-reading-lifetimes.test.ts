@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BackupReading } from "../src/core/backup-reading.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { LAST_WORD_FORGOTTEN, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const RULES = { seedshiftOnly: false, shareReader: "Shares" };
 
@@ -22,13 +22,13 @@ describe("The lifetime of a retained backup reading", () => {
   });
 
   it("does not erase the caller's input or an independent marked-code child", () => {
-    const text = "abandon ".repeat(11) + "?";
+    const text = LAST_WORD_FORGOTTEN;
     const reading = BackupReading.of(text, RULES);
     const codes = reading.missingCodes("english");
     reading.wipe();
     expect(codes.combinations).toBe(2048);
     expect(codes.missingPlaces).toEqual([12]);
-    expect(text).toBe("abandon ".repeat(11) + "?");
+    expect(text).toBe(LAST_WORD_FORGOTTEN);
   });
 
   it("overwrites the retained payload allocation rather than retaining its record payload", () => {

@@ -14,6 +14,7 @@ import { Decrypter, Encrypter, generateX25519Identity, identityToRecipient } fro
 import { describeError } from "./refusal.js";
 import {
   CandidateFileAdmission,
+  LIST_FILE_LOCKS,
   SCRYPT_LOG_N,
   type ListFileLock,
 } from "./candidate-file-admission.js";
@@ -151,6 +152,14 @@ export class CandidateCipher {
   }
 
   /**
+   * Refuses the operations of `lock` where it uses X25519 (LIST_FILE_LOCKS) and WebCrypto is
+   * missing (core.candidate-encryption.no-webcrypto, requireX25519); a passphrase needs neither.
+   */
+  static requireFor(lock: ListFileLock): void {
+    if (LIST_FILE_LOCKS[lock].x25519) CandidateCipher.requireX25519();
+  }
+
+  /**
    * The recipient as typed, pasted or read from a file: one age1… key, in any case. Its Bech32
    * checksum is checked here too, so that a typing error shows before any search. Refuses any
    * other text (core.candidate-encryption.key-one-age-key-62-characters-starts-age1).
@@ -251,7 +260,7 @@ export class CandidateCipher {
     add: (decrypter: Decrypter) => void,
   ): Promise<Uint8Array> {
     CandidateFileAdmission.assertLock(file, given);
-    if (given === "key") CandidateCipher.requireX25519();
+    CandidateCipher.requireFor(given);
     const decrypter = new Decrypter();
     add(decrypter);
     // Given bytes, age reads its output through a fetch Response, and a browser replaces any error
@@ -263,7 +272,7 @@ export class CandidateCipher {
       // way, which age cannot tell apart from a wrong key.
       stream = await decrypter.decrypt(streamOf(file));
     } catch (error) {
-      const refusal = given === "key" ? "scanner-key-does-not-open" : "passphrase-does-not-open";
+      const refusal = LIST_FILE_LOCKS[given].doesNotOpen;
       throw CandidateFileRefusedError.create(refusal, [describeError(error)], error);
     }
     try {

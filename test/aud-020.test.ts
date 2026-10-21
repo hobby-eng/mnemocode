@@ -6,12 +6,14 @@ import { describe, expect, it } from "vitest";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { ReEncoding } from "../src/core/re-encoding.js";
 import { FINGERPRINT_WARNING, fingerprintMatch } from "../src/core/wallet-check.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  TEST_ADDRESS,
+  TEST_FINGERPRINT,
+  TEST_PHRASE,
+  TEST_UNICODE,
+} from "./helpers/test-phrase.js";
 import { runBuiltCli } from "./helpers/built-cli.js";
 
-const ADDRESS = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
-/** The test phrase without Seedshift as Unicode codes, from the BIP39 Chinese list. */
-const UNICODE = `${"7684".repeat(11)}5728`;
 const ACCEPTED = "The fingerprint matches: the seed phrase is accepted, not proven.";
 
 /** re-encode of the test phrase, typed as words without Seedshift, as Unicode codes. */
@@ -34,7 +36,7 @@ describe("AUD-020-SEC001: a fingerprint's match is accepted with its warning", (
   it("shows the warning before the match, and claims no proof", async () => {
     const { stdout, stderr } = await reEncode("--master-fingerprint", TEST_FINGERPRINT);
     // The new backup is made as before.
-    expect(stdout).toContain(UNICODE);
+    expect(stdout).toContain(TEST_UNICODE);
     const warning = stderr.indexOf(FINGERPRINT_WARNING);
     expect(warning).toBeGreaterThanOrEqual(0);
     expect(stderr.indexOf(ACCEPTED)).toBeGreaterThan(warning);
@@ -42,8 +44,8 @@ describe("AUD-020-SEC001: a fingerprint's match is accepted with its warning", (
   });
 
   it("gives an address's match no fingerprint warning", async () => {
-    const { stdout, stderr } = await reEncode("--bitcoin-address", ADDRESS);
-    expect(stdout).toContain(UNICODE);
+    const { stdout, stderr } = await reEncode("--bitcoin-address", TEST_ADDRESS);
+    expect(stdout).toContain(TEST_UNICODE);
     expect(stderr).toContain("Address found at m/84'/0'/0'/0/0: the wallet matches");
     expect(stderr).not.toContain(FINGERPRINT_WARNING);
   });
@@ -55,7 +57,7 @@ describe("AUD-020-SEC001: a fingerprint's match is accepted with its warning", (
     );
     expect(refused?.code).not.toBe(0);
     expect(refused?.stderr).toContain("does not match: it is not confirmed");
-    expect(refused?.stdout).not.toContain(UNICODE);
+    expect(refused?.stdout).not.toContain(TEST_UNICODE);
   });
 
   it("keeps the check's warning in the library's record of the confirmation", async () => {

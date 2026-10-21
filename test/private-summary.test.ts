@@ -31,16 +31,18 @@ import {
   terminalWarningWithMore,
 } from "../src/cli/terminal.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
-import { encodeMnemonic, formatEncoded, parseDate } from "../src/core.js";
 import { FINGERPRINT_WARNING } from "../src/core/wallet-check.js";
+import { CTRL_C, ENTER } from "./helpers/keys.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  LAST_WORD_FORGOTTEN,
+  MASKED,
+  TEST_FINGERPRINT,
+  TEST_NUMBERS,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 
-/** The test phrase in word numbers, as Encode shows it with --format indexes. */
-const WORD_NUMBERS = `${"1 ".repeat(11)}4`;
-/** Enter, which clears the private screen after the result; Ctrl+C, which cancels a question. */
-const ENTER = "\r";
-const CTRL_C = "\x03";
 const HEADING = "MnemoCode · encode";
 const CLEARED = "The screen with the result was cleared.";
 /** A warning given with its README section, as the swap and cloud warnings are. */
@@ -48,8 +50,6 @@ const SWAP = "Swap space is not encrypted: a secret may be written to the disk."
 const SWAP_MORE = "More: https://github.com/hobby-eng/mnemocode#unencrypted-swap";
 /** What recover-word says under candidates that no wallet confirmed. */
 const NOT_PROVEN = "A valid checksum does not prove the wallet: compare an address.";
-/** The README's date, which masks the test phrase in the date search. */
-const MASK_DATE = "23-09-2026";
 
 questionsOnPrivateScreen();
 let directory: string;
@@ -117,12 +117,12 @@ describe("the summary left on the main screen after the private screen", () => {
     // No answer to "Check the backup now?": Escape skips it.
     expect(await encodeOnPrivateScreen(encodeArguments({ output: record }))).toBeUndefined();
     // The result was shown on the private screen, its fingerprint on standard error.
-    expect(seen.out).toContain(WORD_NUMBERS);
+    expect(seen.out).toContain(TEST_NUMBERS);
     const privateScreen = seen.screen.slice(0, seen.screen.indexOf(LEAVE_ALTERNATE_SCREEN));
     expect(privateScreen).toContain(TEST_FINGERPRINT);
     const shown = mainScreen();
     expect(shown).toEqual(["", HEADING, `Saved MnemoCode record: ${record}`, CLEARED, ""]);
-    for (const secret of [TEST_PHRASE, WORD_NUMBERS, TEST_FINGERPRINT])
+    for (const secret of [TEST_PHRASE, TEST_NUMBERS, TEST_FINGERPRINT])
       expect(shown.join("\n")).not.toContain(secret);
   });
 
@@ -169,7 +169,7 @@ describe("the summary left on the main screen after the private screen", () => {
   });
 
   it("keeps the warning under recover-word's candidates, never a candidate", async () => {
-    terminal.answers = [`${"abandon ".repeat(11)}?${ENTER}`, ENTER];
+    terminal.answers = [`${LAST_WORD_FORGOTTEN}${ENTER}`, ENTER];
     const found = withPrivateScreen(
       async () => runRecoverWord({ "ask-secrets": true }),
       "recover-word",
@@ -184,11 +184,10 @@ describe("the summary left on the main screen after the private screen", () => {
 
   it("keeps the warning of a date search confirmed by a fingerprint, never its match", async () => {
     terminal.answers = [ENTER];
-    const masked = encodeMnemonic(TEST_PHRASE, [parseDate(MASK_DATE)]);
     const found = withPrivateScreen(
       async () =>
         runRecoverDate({
-          input: formatEncoded(masked, "indexes"),
+          input: MASKED,
           format: "indexes",
           mode: "seedshift",
           date: "2?-09-2026",
@@ -197,10 +196,10 @@ describe("the summary left on the main screen after the private screen", () => {
       "recover-date",
     );
     expect(await found).toBeUndefined();
-    expect(seen.out.join("\n")).toContain(`${MASK_DATE}\t${TEST_PHRASE}`);
+    expect(seen.out.join("\n")).toContain(`${DATE}\t${TEST_PHRASE}`);
     const shown = mainScreen();
     expect(shown).toEqual(["", "MnemoCode · recover-date", FINGERPRINT_WARNING, CLEARED, ""]);
-    for (const secret of [MASK_DATE, TEST_PHRASE, TEST_FINGERPRINT])
+    for (const secret of [DATE, TEST_PHRASE, TEST_FINGERPRINT])
       expect(shown.join("\n")).not.toContain(secret);
   });
 

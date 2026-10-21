@@ -31,7 +31,7 @@ import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { SEED_BYTES } from "../src/sskr/share-platform.js";
 import { joinUnits } from "./helpers/shares.js";
 import { sskrVectors } from "./helpers/vectors.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const vectors = sskrVectors();
 const MAINNET_LOCATION = { network: "mainnet" as const, account: 0, branch: 0, index: 0 };
@@ -78,9 +78,12 @@ describe("AUD-008-API002: key evidence that no wallet can match is refused", () 
   });
 
   it("refuses an x at or above p, and a point off the curve", () => {
-    expect(() =>
-      matchBitcoinEvidence(TEST_PHRASE, evidence("compressed-public-key", `02${"ff".repeat(32)}`)),
-    ).toThrow(/secp256k1/u);
+    // p itself, the field prime of secp256k1 (SEC 2, section 2.4.1), and 2^256 - 1 above it.
+    const p = `${"ff".repeat(27)}fefffffc2f`;
+    for (const x of [p, "ff".repeat(32)])
+      expect(() =>
+        matchBitcoinEvidence(TEST_PHRASE, evidence("compressed-public-key", `02${x}`)),
+      ).toThrow(/secp256k1/u);
     // x = 5 gives x^3 + 7 = 132, which has no square root modulo p.
     expect(() =>
       matchBitcoinEvidence(
@@ -141,7 +144,7 @@ describe("AUD-008-API003: a word search that could not end is refused", () => {
 });
 
 describe("AUD-008-API004: an unknown Seedshift mode is refused", () => {
-  const encoded = encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]);
+  const encoded = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]);
   const patterns = [parseDatePattern("?3-09-2026")];
   it.each(["seedshift-typo", "direct", undefined, null])("refuses the mode %s", (mode) => {
     // A mode that no type allows, fed on purpose as a JavaScript host could.
@@ -181,18 +184,22 @@ describe("AUD-008-FUN001: every share given must agree with the restored secret"
   // polynomial of the others.
   const wrong = altered(vector.shares[2]!, (body) => void (body[8]! ^= 1));
 
-  it("refuses a wrong surplus share in every order, and names it", async () => {
+  it("refuses a wrong surplus share in every order, and names it when it comes last", async () => {
     const a = vector.shares[0]!;
     const b = vector.shares[1]!;
+    // The first two shares restore the secret: a wrong one among them restores none.
+    for (const order of [
+      [wrong, a, b],
+      [wrong, b, a],
+      [a, wrong, b],
+      [b, wrong, a],
+    ])
+      await expect(combineSskrShares(order)).rejects.toThrow(/^These shares do not restore/u);
     for (const order of [
       [a, b, wrong],
       [b, a, wrong],
-      [wrong, a, b],
-      [a, wrong, b],
-    ]) {
-      await expect(combineSskrShares(order)).rejects.toThrow(/does not fit|do not restore/u);
-    }
-    await expect(combineSskrShares([a, b, wrong])).rejects.toThrow(/Share 3 does not fit/u);
+    ])
+      await expect(combineSskrShares(order)).rejects.toThrow(/^Share 3 does not fit/u);
     expect(await shareBackupVerdict(expected, [a, b, wrong].join(";"), "direct", "")).toBe(
       "unreadable",
     );

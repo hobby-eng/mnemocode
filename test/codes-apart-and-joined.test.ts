@@ -17,12 +17,10 @@ import { planJointRepair } from "../src/sskr/joint-repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { bytewordUnits } from "../src/sskr/share-units.js";
 import { readShare, writeShare } from "../src/sskr/transport.js";
+import { TEST_INDEXES } from "./helpers/test-phrase.js";
 import { sskrVectors } from "./helpers/vectors.js";
 
-const PHRASES = [
-  [...Array<number>(11).fill(0), 3],
-  [...Array<number>(23).fill(0), 102],
-] as const;
+const PHRASES = [[...TEST_INDEXES], [...Array<number>(23).fill(0), 102]] as const;
 const RULES = { seedshiftOnly: false, shareReader: "sskr-combine" } as const;
 const SHARES = sskrVectors().deterministic[0]!.shares;
 const FIRST = SHARES[0]!;

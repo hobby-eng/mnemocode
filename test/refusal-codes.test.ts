@@ -26,7 +26,12 @@ import { ShareInput } from "../src/sskr/share-input.js";
 import { ShareSet } from "../src/sskr/share-set.js";
 import { Share } from "../src/sskr/transport.js";
 import { joinUnits, markUnits, shareUnits, VALUE_BYTE, wrongValue } from "./helpers/shares.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  TEST_ADDRESS,
+  TEST_FINGERPRINT,
+  TEST_NUMBERS,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 
 /** The code of what `run` throws. */
 function codeOf(run: () => unknown): string | undefined {
@@ -97,7 +102,7 @@ describe("the codes of refusals", () => {
     const given = (profiles: string) =>
       codeOf(() =>
         walletEvidence({
-          "bitcoin-address": "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
+          "bitcoin-address": TEST_ADDRESS,
           "bitcoin-profile": profiles,
         }),
       );
@@ -116,7 +121,7 @@ describe("the codes of refusals", () => {
       "sskr.share-input.seed-phrase-in-words",
     );
     // Codes whose BIP39 checksum holds, as an encoded phrase's do: 1 for "abandon", 4 at the end.
-    expect(codeOf(() => input.sharesOfAnswer("1 1 1 1 1 1 1 1 1 1 1 4"))).toBe(
+    expect(codeOf(() => input.sharesOfAnswer(TEST_NUMBERS))).toBe(
       "sskr.share-input.encoded-seed-phrase",
     );
   });

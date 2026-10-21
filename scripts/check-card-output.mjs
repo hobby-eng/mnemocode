@@ -13,7 +13,9 @@ import {
   qrOfPdfPage,
   REVIEW_TEXTS,
 } from "./card-fixtures.mjs";
-const destination = resolve(process.argv[2] ?? "goldens/current");
+/** Owner-only access for the files written here, as the program writes its exports. */
+const PRIVATE_FILE_MODE = 0o600;
+const destination = resolve(process.argv[2] ?? "output/card-output-check");
 await mkdir(destination, { recursive: true });
 // This checkout's build, which the command below runs too.
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -69,7 +71,7 @@ for (const [name, render, expected] of cases) {
     name + " must carry no document information",
   );
   const path = resolve(destination, name + ".pdf");
-  await writeFile(path, bytes, { mode: 0o600 });
+  await writeFile(path, bytes, { mode: PRIVATE_FILE_MODE });
   const page = pdf.getPageCount();
   assert.equal(page, 1, name + " must remain a single page");
   const code = await qrOfPdfPage(path, page, resolve(destination, name));
@@ -102,7 +104,7 @@ const shareFile = resolve(cliDirectory, "public-shares.txt");
 const proposal = resolve(cliDirectory, "sskr-2of3-study.pdf");
 // Cards print shares in colors or in Unicode codes only (owner, 2026-10-13): given in colors.
 const colorShares = shares.map((share) => writeShare(share, "colors"));
-await writeFile(shareFile, colorShares.join("\n") + "\n", { mode: 0o600 });
+await writeFile(shareFile, colorShares.join("\n") + "\n", { mode: PRIVATE_FILE_MODE });
 execFileSync(
   process.execPath,
   [
@@ -144,7 +146,7 @@ console.log("Public-data proposal: " + proposal);
 if (process.argv[3]) {
   const sampleOutput = resolve(process.argv[3]);
   await mkdir(dirname(sampleOutput), { recursive: true });
-  await writeFile(sampleOutput, await readFile(proposal), { flag: "wx", mode: 0o600 });
+  await writeFile(sampleOutput, await readFile(proposal), { flag: "wx", mode: PRIVATE_FILE_MODE });
   console.log("Saved verified public-data example: " + sampleOutput);
 }
 await writeFile(resolve(destination, "report.txt"), report.join("\n") + "\n");

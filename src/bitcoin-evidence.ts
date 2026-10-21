@@ -75,7 +75,11 @@ export function assertBitcoinEvidence(evidence: WalletEvidence): void {
   assertWalletEvidence(evidence);
 }
 
-/** Compares a recovered mnemonic locally. It does not contact a node or a block explorer. */
+/**
+ * Compares a recovered mnemonic locally. It does not contact a node or a block explorer. Refuses
+ * evidence as assertWalletEvidence does, and the phrase as Bip39Seed.now refuses it
+ * (core.master-fingerprint.invalid-mnemonic and the others it names).
+ */
 export function matchWalletEvidence(
   mnemonic: string,
   evidence: WalletEvidence,
@@ -84,7 +88,10 @@ export function matchWalletEvidence(
   return walletEvidence.match(mnemonic, evidence, passphrase);
 }
 
-/** The same comparison under its name from when the evidence was Bitcoin's only. */
+/**
+ * The same comparison as matchWalletEvidence, with its refusals, under its name from when the
+ * evidence was Bitcoin's only.
+ */
 export function matchBitcoinEvidence(
   mnemonic: string,
   evidence: WalletEvidence,
@@ -93,7 +100,11 @@ export function matchBitcoinEvidence(
   return matchWalletEvidence(mnemonic, evidence, passphrase);
 }
 
-/** Returns the standard four-byte BIP32 master fingerprint as lowercase hexadecimal. */
+/**
+ * Returns the standard four-byte BIP32 master fingerprint as lowercase hexadecimal. The phrase is
+ * refused as Bip39Seed.now refuses it (core.master-fingerprint.invalid-mnemonic and the others it
+ * names).
+ */
 export function masterFingerprint(mnemonic: string, passphrase = ""): string {
   return walletEvidence.fingerprint(mnemonic, passphrase);
 }
@@ -115,6 +126,8 @@ export type OwnedWalletCheck = ((mnemonic: string) => EvidenceMatch) &
  * The wallet check that the searches take (core/wallet-check.ts): each phrase compared with
  * `evidence` and the wallet's BIP39 `passphrase`; none without evidence, when every candidate is
  * kept. The returned callable owns its retained values and must be disposed after its final use.
+ * Refuses evidence at once as assertWalletEvidence does; the check refuses a phrase as
+ * Bip39Seed.now refuses it (core.master-fingerprint.invalid-mnemonic and the others it names).
  */
 export function walletCheckOf(
   evidence: WalletEvidence | undefined,

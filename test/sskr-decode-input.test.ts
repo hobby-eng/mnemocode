@@ -8,12 +8,11 @@ import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { describe, expect, it, vi } from "vitest";
 import { runDecode } from "../src/cli/decode-command.js";
 import { BackupReading } from "../src/core/backup-reading.js";
-import { encodeMnemonic, parseDate } from "../src/core.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { MAX_GROUPS, MAX_GROUP_MEMBERS } from "../src/sskr/share-layout.js";
 import { SHARE_FORMATS, writeShare } from "../src/sskr/transport.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, MASKED_WORDS, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { sskrVectors } from "./helpers/vectors.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
@@ -26,7 +25,6 @@ questionsOnPrivateScreen();
 
 const vectors = sskrVectors().deterministic;
 const selected = [vectors[0]!, vectors.at(-1)!];
-const DATE = "23-09-2026";
 
 describe.each(SHARE_FORMATS)("Decode of several %s shares", (format) => {
   it.each(selected)("restores members 1 and 3 from a $name file", async (vector) => {
@@ -49,8 +47,7 @@ describe.each(SHARE_FORMATS)("Decode of several %s shares", (format) => {
   });
 
   it("restores the two pasted lines of a Seedshift backup with their dates", async () => {
-    const masked = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]).shiftedEnglish.join(" ");
-    const shares = await splitSskrMnemonic(masked, 2, 3);
+    const shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
     terminal.answers = [
       `${writeShare(shares[0]!, format)}\n${writeShare(shares[2]!, format)}\r`,
       `${DATE}\r`,
@@ -71,7 +68,7 @@ describe.each(SHARE_FORMATS)("Decode of several %s shares", (format) => {
 });
 
 it("still reads English phrase words pasted one per line", async () => {
-  const masked = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]).shiftedEnglish.join("\n");
+  const masked = MASKED_WORDS.split(" ").join("\n");
   terminal.answers = [`${masked}\r`, `${DATE}\r`];
   expect(await runDecode({ "ask-secrets": true, mode: "seedshift" })).toBeUndefined();
   expect(seen.out).toContain(TEST_PHRASE);

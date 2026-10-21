@@ -55,7 +55,7 @@ import { reportChecksumAndFingerprint } from "./fingerprint-report.js";
 import { RenamedOutputs } from "./output-paths.js";
 import { clearPrivateScreen, showProtection } from "./private-screen.js";
 import { PrivateSteps } from "./private-steps.js";
-import { dropUnneededAfterAnswers } from "./protection.js";
+import { ProcessProtection } from "./protection.js";
 import {
   asksNewBackup,
   LAST_WORD_OPTION,
@@ -225,7 +225,7 @@ export async function runReEncode(args: ParsedArguments): Promise<Cancelled | un
   // The new backup's options, its destinations and cards, are checked before any question; without
   // them it is asked once the phrase is confirmed.
   const encode = asksNewBackup(args) ? undefined : await prepareEncode(fresh);
-  const given = givenWallet(old);
+  using given = givenWallet(old);
   const confirmedBy = givenConfirmation(args, given);
   const confirmed =
     args["ask-secrets"] === true
@@ -450,7 +450,7 @@ async function askedNewBackup(
   const fresh = parseArguments(encoding.slice(1));
   await RenamedOutputs.settle(fresh);
   const prepared = await prepareEncode(fresh);
-  dropUnneededAfterAnswers(fresh);
+  ProcessProtection.dropUnneededAfterAnswers(fresh);
   // Only answers that are taken name files that will be saved: a refused one warns of none. The
   // warning is given when the new backup is made, on the screen of its result.
   return async (known) => {

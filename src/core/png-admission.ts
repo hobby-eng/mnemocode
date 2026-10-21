@@ -261,7 +261,11 @@ export class PngAdmission {
     return bytes;
   }
 
-  /** Rejects both truncated scanlines and surplus expansion, including Adam7's empty passes. */
+  /**
+   * Refuses a `length`, the inflated bytes, other than filteredBytes
+   * (core.png-admission.invalid-png-input): truncated scanlines and surplus expansion, including
+   * Adam7's empty passes.
+   */
   assertInflatedSize(length: number): void {
     if (length !== this.#filteredBytes) refused();
   }

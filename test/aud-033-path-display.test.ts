@@ -9,6 +9,8 @@ import { warnOfCloudCopy } from "../src/cli/cloud-folders.js";
 import { LeftStagingCopyError } from "../src/export/private-file.js";
 import { PrivateSteps } from "../src/cli/private-steps.js";
 import { terminalFailure } from "../src/cli/terminal.js";
+import { BUILT_CLI } from "./helpers/built-cli.js";
+import { ESCAPE } from "./helpers/keys.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 import { TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
@@ -68,7 +70,7 @@ it.runIf(process.platform !== "win32")(
     const child = spawnSync(
       process.execPath,
       [
-        "dist/mnemocode.js",
+        BUILT_CLI,
         "encode",
         "--sskr",
         "--mnemonic-file",
@@ -124,7 +126,7 @@ it.each(CONTROLS)(
       (warning) => output.push(warning),
     );
     for (const code of ["EACCES", undefined]) {
-      keyboard.bytes = [0x1b];
+      keyboard.bytes = [ESCAPE.charCodeAt(0)];
       const failure = new Error(`Synthetic callback failure at ${path}`);
       if (code !== undefined) Object.assign(failure, { code });
       expect(
@@ -185,7 +187,7 @@ it("keeps ordinary path spelling and the established save-failure text", async (
     () => undefined,
     () => undefined,
   );
-  keyboard.bytes = [0x1b];
+  keyboard.bytes = [ESCAPE.charCodeAt(0)];
   await saveWithRetry({
     what: "The record",
     kind: "file",

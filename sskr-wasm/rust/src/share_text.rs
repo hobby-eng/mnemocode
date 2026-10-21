@@ -29,6 +29,17 @@ const BYTE_STRING: u8 = 2;
 const TAG: u8 = 6;
 /// The bits of a CBOR head's first byte that hold its major type.
 const MAJOR_SHIFT: u8 = 5;
+/// The bits of a CBOR head's first byte below its major type: its additional information.
+const ADDITIONAL_INFORMATION: u8 = (1 << MAJOR_SHIFT) - 1;
+/// The additional information that says how many bytes of the head's value follow its first byte
+/// (RFC 8949, 3): one, two, four or eight. A value below ONE_BYTE is the additional information
+/// itself.
+const ONE_BYTE: u8 = 24;
+const TWO_BYTES: u8 = 25;
+const FOUR_BYTES: u8 = 26;
+const EIGHT_BYTES: u8 = 27;
+/// The longest CBOR head: its first byte and a value of eight bytes.
+const LONGEST_HEAD: usize = 1 + size_of::<u64>();
 /// The CRC-32 at the end of the bytes that Bytewords write.
 const CHECKSUM_BYTES: usize = 4;
 /// The reflected polynomial of the CRC-32 that Bytewords use (ISO-HDLC, as in zlib).
@@ -39,47 +50,48 @@ const CRC32_POLYNOMIAL: u32 = 0xEDB8_8320;
 fn head(major: u8, value: u64) -> Vec<u8> {
     let kind = major << MAJOR_SHIFT;
     if let Ok(small) = u8::try_from(value) {
-        return if small < 24 {
+        return if small < ONE_BYTE {
             vec![kind | small]
         } else {
-            vec![kind | 24, small]
+            vec![kind | ONE_BYTE, small]
         };
     }
-    let mut written = Vec::with_capacity(9);
+    let mut written = Vec::with_capacity(LONGEST_HEAD);
     if let Ok(two) = u16::try_from(value) {
-        written.push(kind | 25);
+        written.push(kind | TWO_BYTES);
         written.extend_from_slice(&two.to_be_bytes());
     } else if let Ok(four) = u32::try_from(value) {
-        written.push(kind | 26);
+        written.push(kind | FOUR_BYTES);
         written.extend_from_slice(&four.to_be_bytes());
     } else {
-        written.push(kind | 27);
+        written.push(kind | EIGHT_BYTES);
         written.extend_from_slice(&value.to_be_bytes());
     }
     written
 }
 
 /// The value of the CBOR head of `major` type at `at` in `cbor`, which `at` then passes; refused
-/// unless it is written in the fewest bytes, as dcbor refuses it.
+/// unless it is written in the fewest bytes, as dcbor refuses it (RFC 8949, 4.2.1): a value of
+/// two bytes, for one, is at least the first that one byte cannot hold.
 fn read_head(cbor: &[u8], at: &mut usize, major: u8) -> Result<u64, Refusal> {
     let first = *cbor.get(*at).ok_or(Refusal::Decode)?;
     if first >> MAJOR_SHIFT != major {
         return Err(Refusal::Decode);
     }
     *at += 1;
-    let (bytes, least) = match first & 0x1f {
-        info @ 0..=23 => return Ok(u64::from(info)),
-        24 => (1, 24),
-        25 => (2, 1 << 8),
-        26 => (4, 1 << 16),
-        27 => (8, 1 << 32),
+    let (bytes, least) = match first & ADDITIONAL_INFORMATION {
+        info @ 0..ONE_BYTE => return Ok(u64::from(info)),
+        ONE_BYTE => (size_of::<u8>(), u64::from(ONE_BYTE)),
+        TWO_BYTES => (size_of::<u16>(), u64::from(u8::MAX) + 1),
+        FOUR_BYTES => (size_of::<u32>(), u64::from(u16::MAX) + 1),
+        EIGHT_BYTES => (size_of::<u64>(), u64::from(u32::MAX) + 1),
         _ => return Err(Refusal::Decode),
     };
     let field = cbor.get(*at..*at + bytes).ok_or(Refusal::Decode)?;
     *at += bytes;
     let value = field
         .iter()
-        .fold(0_u64, |value, byte| (value << 8) | u64::from(*byte));
+        .fold(0_u64, |value, byte| (value << u8::BITS) | u64::from(*byte));
     if value < least {
         return Err(Refusal::Decode);
     }

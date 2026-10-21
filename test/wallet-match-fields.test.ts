@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { WordCandidateSearch } from "../src/core/candidates.js";
 import { askWallet, type WalletMatch } from "../src/core/wallet-check.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { LAST_WORD_FORGOTTEN, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("a wallet's match", () => {
   it.each([
@@ -34,7 +34,7 @@ describe("a wallet's match", () => {
   });
 
   it("is refused with a warning of null before a search shows it", async () => {
-    const search = WordCandidateSearch.parse(`${"abandon ".repeat(11)}?`, "unknown-words");
+    const search = WordCandidateSearch.parse(LAST_WORD_FORGOTTEN, "unknown-words");
     // A warning of null, which no WalletMatch has, given on purpose as a JavaScript host could.
     const walletCheck = (phrase: string) =>
       ({ matched: phrase === TEST_PHRASE, warning: null }) as unknown as WalletMatch;

@@ -6,11 +6,11 @@ import { encodeCandidateList } from "../src/core/candidate-list.js";
 import { parseUnknownWords, WordCandidateSearch } from "../src/core/candidates.js";
 import { colorsToIndexes, colorsToUnicode, indexesToColors } from "../src/core/colors.js";
 import { DatesAnswer, DateSearch } from "../src/core/date-search.js";
-import { datePatternCombinations } from "../src/core/dates.js";
+import { datePatternCombinations, parseDate } from "../src/core/dates.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { Masking } from "../src/core/masking.js";
 import { encodeMnemonicLegacy, legacyChecksumValidResult } from "../src/core/seedshift.js";
-import type { DatePattern } from "../src/core/types.js";
+import { MASKING_MODES, type DatePattern, type DateShiftDate } from "../src/core/types.js";
 import { ExportDetails } from "../src/export/export-details.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
 import { JointRepair } from "../src/sskr/joint-repair.js";
@@ -22,19 +22,24 @@ import { writeShare } from "../src/sskr/transport.js";
 import { pageOperators } from "./helpers/pdf-content.js";
 import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
 import { holes, withHoles } from "./helpers/holes.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  LAST_WORD_FORGOTTEN,
+  TEST_INDEXES,
+  TEST_PHRASE,
+  WRONG_DATE,
+} from "./helpers/test-phrase.js";
 import { sskrVectors } from "./helpers/vectors.js";
 
 // Public data only: the all-zero entropy's phrase, synthetic dates, and the public SSKR vectors.
 const TEXTS = { decodeEntry: "Decode" };
-const DATE = { year: 2026, month: 9, day: 23 };
 const SHARES: readonly string[] = sskrVectors().deterministic[0]!.shares;
 /** A class whose constructor TypeScript calls private, as a JavaScript host can still call it. */
 type Constructible<T> = new (...args: unknown[]) => T;
 
 describe("AUD-009-FUN001: objects own the dates they were given", () => {
   it("keeps a complete date as built, whatever the caller does with its own object", () => {
-    const date = { year: 2026, month: 9, day: 23 };
+    const date = { ...parseDate(DATE) };
     const answer = DatesAnswer.of([date]);
     date.day = 24;
     expect(answer.known).toEqual([{ year: 2026, month: 9, day: 23 }]);
@@ -46,7 +51,7 @@ describe("AUD-009-FUN001: objects own the dates they were given", () => {
   it("keeps a pattern within the limit it was checked against", () => {
     const answer = DatesAnswer.parse("??-??-2026", { patterns: true, wordCount: 12 });
     const search = new DateSearch({
-      indexes: [...Array<number>(11).fill(0), 3],
+      indexes: [...TEST_INDEXES],
       dates: answer,
       mode: "seedshift",
     });
@@ -63,7 +68,7 @@ describe("AUD-009-FUN001: objects own the dates they were given", () => {
   });
 
   it("approves a share backup only when its dates really give the phrase back", async () => {
-    const date = { year: 2026, month: 9, day: 23 };
+    const date = { ...parseDate(DATE) };
     const masked = Masking.of("seedshift").encode(TEST_PHRASE, [date]).shiftedEnglish.join(" ");
     const shares = await new ShareSplit(nodeSharePlatform, (bytes) => bytes.fill(7)).split(
       masked,
@@ -76,23 +81,20 @@ describe("AUD-009-FUN001: objects own the dates they were given", () => {
       TEXTS,
     );
     const backup = shares.slice(0, 2).join(";");
-    expect((await check.check({ backup, dates: "23-09-2026" })).verdict).toBe("restores");
+    expect((await check.check({ backup, dates: DATE })).verdict).toBe("restores");
     // The caller changes its date object afterwards: the check still holds the date of the result.
     date.day = 24;
-    expect((await check.check({ backup, dates: "24-09-2026" })).verdict).not.toBe("restores");
-    expect((await check.check({ backup, dates: "23-09-2026" })).verdict).toBe("restores");
+    expect((await check.check({ backup, dates: WRONG_DATE })).verdict).not.toBe("restores");
+    expect((await check.check({ backup, dates: DATE })).verdict).toBe("restores");
   });
 });
 
 describe("AUD-009-API001: DatesAnswer.of holds dates to the rules of parse", () => {
   it("refuses a day the calendar does not have, naming its place", () => {
     expect(() => DatesAnswer.of([{ year: 2026, month: 2, day: 31 }])).toThrow(/^Date 1: /u);
-    expect(() =>
-      DatesAnswer.of([
-        { year: 2026, month: 9, day: 23 },
-        { year: 2026, month: 13, day: 1 },
-      ]),
-    ).toThrow(/^Date 2: /u);
+    expect(() => DatesAnswer.of([parseDate(DATE), { year: 2026, month: 13, day: 1 }])).toThrow(
+      /^Date 2: /u,
+    );
   });
 
   it("refuses a pattern that no date fits", () => {
@@ -110,7 +112,7 @@ describe("AUD-009-API001: DatesAnswer.of holds dates to the rules of parse", () 
   it("accepts a leap day and an ordinary pattern", () => {
     expect(DatesAnswer.of([{ year: 2024, month: 2, day: 29 }]).known).toHaveLength(1);
     const answer = DatesAnswer.of(
-      [{ year: 2026, month: 9, day: 23 }],
+      [parseDate(DATE)],
       [{ key: "2026-09-??", years: [2026], months: [9], days: [1, 2] }],
     );
     expect(answer.combinations).toBe(2);
@@ -133,19 +135,15 @@ describe("AUD-009-API002: EncodedBackup.of refuses index arrays with holes", () 
   });
 
   it("still reads dense codes in every mode", () => {
-    const encoded = Masking.of("seedshift").encode(TEST_PHRASE, [
-      { year: 2026, month: 9, day: 23 },
-    ]);
-    expect(EncodedBackup.of(encoded.shiftedIndexes, "indexes", "seedshift").indexes).toEqual(
-      encoded.shiftedIndexes,
-    );
-    expect(
-      EncodedBackup.of(
-        Array.from({ length: 12 }, () => 0),
-        "indexes",
-        "seedshift-legacy",
-      ).mode,
-    ).toBe("seedshift-legacy");
+    for (const mode of MASKING_MODES) {
+      const masking = Masking.of(mode);
+      const codes = masking.encode(
+        TEST_PHRASE,
+        masking.masked ? [parseDate(DATE)] : [],
+      ).shiftedIndexes;
+      const backup = EncodedBackup.of(codes, "indexes", mode);
+      expect([backup.mode, backup.indexes], mode).toEqual([mode, codes]);
+    }
   });
 });
 
@@ -188,7 +186,7 @@ describe("AUD-009 follow-up: every DatesAnswer holds the limits it was checked a
   });
 
   it("refuses a hole in the dates, which was counted as a date", () => {
-    expect(() => DatesAnswer.of(holes<typeof DATE>(2))).toThrow(
+    expect(() => DatesAnswer.of(holes<DateShiftDate>(2))).toThrow(
       /^Date 1: a date must have a year, a month and a day\.$/u,
     );
   });
@@ -203,7 +201,7 @@ describe("AUD-009 follow-up: every DatesAnswer holds the limits it was checked a
         return reads === 1 ? 23 : 31;
       },
     };
-    expect(DatesAnswer.of([date]).known).toEqual([DATE]);
+    expect(DatesAnswer.of([date]).known).toEqual([{ year: 2026, month: 9, day: 23 }]);
   });
 
   it("holds the limits when its private constructor is called, as JavaScript can", () => {
@@ -257,7 +255,7 @@ describe("AUD-009 follow-up: codes are checked before an object holds them", () 
   });
 
   it("refuses an index above 2047 in a legacy result, which shifted every later bit", () => {
-    const result = encodeMnemonicLegacy(TEST_PHRASE, [DATE]);
+    const result = encodeMnemonicLegacy(TEST_PHRASE, [parseDate(DATE)]);
     const wide = { ...result, shiftedIndexes: [...result.shiftedIndexes.slice(0, 11), 4096] };
     expect(() => legacyChecksumValidResult(wide)).toThrow(/integer from 0/u);
     expect(legacyChecksumValidResult(result).shiftedIndexes).toHaveLength(12);
@@ -296,8 +294,8 @@ describe("AUD-009 follow-up: a backup check says restores only after a real reco
   });
 
   it("refuses a hole among the dates of the result", () => {
-    const encoded = Masking.of("seedshift").encode(TEST_PHRASE, [DATE]);
-    const dates = holes<typeof DATE>(1);
+    const encoded = Masking.of("seedshift").encode(TEST_PHRASE, [parseDate(DATE)]);
+    const dates = holes<DateShiftDate>(1);
     expect(
       () =>
         new EncodedBackupCheck({
@@ -321,7 +319,7 @@ describe("AUD-009 follow-up: a backup check says restores only after a real reco
 
 describe("AUD-009 follow-up: nothing a library object hands out changes it", () => {
   it("keeps the list of every word behind ? out of reach of the search it was given to", () => {
-    const typed = `${"abandon ".repeat(11)}?`;
+    const typed = LAST_WORD_FORGOTTEN;
     const search = parseUnknownWords(typed);
     if (search.kind !== "unknown-words") throw new Error("Expected unknown words.");
     // Before: the pop took zoo from every later search with ?. A readonly array changed on

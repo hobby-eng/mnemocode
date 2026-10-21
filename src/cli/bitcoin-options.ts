@@ -27,6 +27,8 @@ import {
 import { withoutByteOrderMark } from "../core/white-space.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { Redacted } from "../core/redacted.js";
+import { SecretValue } from "../core/secret-value.js";
 
 const ERRORS = new ErrorCatalog("cli.bitcoin-options", {
   "bitcoin-address-profile-auto-comma-separated-list": (value0: string) =>
@@ -219,6 +221,10 @@ export function walletEvidence(arguments_: ParsedArguments): WalletEvidence | un
   return { kind, value: value_, profiles, location };
 }
 
+/**
+ * The text of --bip39-passphrase-file, without one line break at its end; "" without the option.
+ * Refuses a file as readBoundedTextFile does. GivenWallet keeps it as bytes at once.
+ */
 export function bip39Passphrase(arguments_: ParsedArguments): string {
   const path = value(arguments_, "bip39-passphrase-file");
   return path === undefined
@@ -301,34 +307,94 @@ export function assertWalletPlaceUsed(
   throw ERRORS.create("applies-wallet-given-as-option-such-as-bitcoin", [`${placing}`, `${asked}`]);
 }
 
-/** The wallet that the options give, where a wallet is looked for, and its BIP39 passphrase. */
-export interface GivenWallet {
+/**
+ * `evidence`, a WIF, whose text is read from `wif` at each use, so that the string read from the
+ * file goes out of scope at once (TS-07). The text is no enumerable field: JSON and Node.js's
+ * inspect leave it out, as Redacted owners do.
+ */
+function wifReadFrom(
+  evidence: Extract<WalletEvidence, { readonly kind: "wif" }>,
+  wif: SecretValue<string>,
+): Extract<WalletEvidence, { readonly kind: "wif" }> {
+  return Object.defineProperty({ ...evidence }, "value", {
+    get: () => wif.value,
+    enumerable: false,
+  });
+}
+
+/**
+ * The wallet that the options give, where a wallet is looked for, and its BIP39 passphrase: the
+ * owner of the wallet's secrets for one command (CORE-24), which the command disposes with `using`
+ * once its work ends. The passphrase, and the text of a WIF given with --wif-file, are kept as
+ * bytes and decoded only for each call that takes them as text: a wallet check (walletCheckOf)
+ * and a candidate list. After wipe() both are refused (core.secret-value.wiped).
+ */
+export class GivenWallet extends Redacted implements Disposable {
+  /** The evidence given with the options, none without; a WIF's text is read from this owner. */
   readonly evidence: WalletEvidence | undefined;
+  /** Where a wallet asked on the private screen is looked for (walletPlaceOf). */
   readonly place: WalletPlace;
-  /** The wallet's BIP39 passphrase, "" for none. */
-  readonly passphrase: string;
   /**
    * Whether a BIP39 passphrase was given: what a question says about it, which needs no copy of
    * the passphrase itself (CORE-49). An empty passphrase is the same as none in BIP39.
    */
   readonly withPassphrase: boolean;
+  readonly #passphrase: SecretValue<string>;
+  readonly #wif: SecretValue<string> | undefined;
+
+  /**
+   * Takes what givenWallet read and checked. A WIF's text and the passphrase, both read from UTF-8
+   * files, which SecretValue.text keeps exactly, are kept as bytes at once (TS-07).
+   */
+  constructor(evidence: WalletEvidence | undefined, place: WalletPlace, passphrase: string) {
+    super("GivenWallet");
+    this.place = place;
+    this.withPassphrase = passphrase !== "";
+    let wif: SecretValue<string> | undefined;
+    if (evidence?.kind === "wif") {
+      wif = SecretValue.text(evidence.value);
+      this.evidence = wifReadFrom(evidence, wif);
+    } else this.evidence = evidence;
+    this.#wif = wif;
+    try {
+      this.#passphrase = SecretValue.text(passphrase);
+    } catch (error) {
+      wif?.wipe();
+      throw error;
+    }
+  }
+
+  /**
+   * The wallet's BIP39 passphrase, "" for none, as text for the one call that takes it, such as a
+   * wallet check or a candidate list; a new string at each read.
+   */
+  get passphrase(): string {
+    return this.#passphrase.value;
+  }
+
+  /** Erases the passphrase and a WIF's text as far as the runtime allows. */
+  wipe(): void {
+    this.#passphrase.wipe();
+    this.#wif?.wipe();
+  }
+
+  /** Ends this owner's lifetime, also when a using scope exits through a failure. */
+  [Symbol.dispose](): void {
+    this.wipe();
+  }
 }
 
 /**
  * Every option of the wallet, read and checked before any secret is asked, in one order for
  * every command that compares phrases with a wallet: the evidence, refused when no wallet can
  * match it; options that place a wallet that no option gives; where a wallet asked later is
- * looked for; and the BIP39 passphrase.
+ * looked for; and the BIP39 passphrase. Refuses as walletEvidence, assertWalletEvidence,
+ * assertWalletPlaceUsed, walletPlaceOf and bip39Passphrase do. The caller owns the result.
  */
 export function givenWallet(arguments_: ParsedArguments): GivenWallet {
   const evidence = walletEvidence(arguments_);
   if (evidence !== undefined) assertWalletEvidence(evidence);
   assertWalletPlaceUsed(arguments_, evidence);
-  const passphrase = bip39Passphrase(arguments_);
-  return {
-    evidence,
-    place: walletPlaceOf(evidence, arguments_),
-    passphrase,
-    withPassphrase: passphrase !== "",
-  };
+  const place = walletPlaceOf(evidence, arguments_);
+  return new GivenWallet(evidence, place, bip39Passphrase(arguments_));
 }

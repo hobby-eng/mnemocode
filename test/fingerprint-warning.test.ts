@@ -4,19 +4,24 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
-import { encodeMnemonic, formatEncoded, parseDate } from "../src/core.js";
 import { DatesAnswer, DateSearch } from "../src/core/date-search.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import { FINGERPRINT_WARNING, fingerprintWalletCheck } from "../src/core/wallet-check.js";
 import type { RepairedSet } from "../src/sskr/joint-results.js";
 import { ShareUnmasking } from "../src/sskr/share-unmasking.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  ENCODED_FINGERPRINT,
+  MASKED,
+  MASKED_INDEXES,
+  replacedAt,
+  TEST_FINGERPRINT,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 
-const DATE = "23-09-2026";
 const PATTERN = "2?-09-2026";
 const wallet = fingerprintWalletCheck(masterFingerprint, TEST_FINGERPRINT);
-const masked = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]);
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -26,7 +31,7 @@ afterEach(() => {
 describe("the warning of a fingerprint's match", () => {
   it("comes with the matches of a date search", async () => {
     using search = new DateSearch({
-      indexes: masked.shiftedIndexes,
+      indexes: MASKED_INDEXES,
       dates: DatesAnswer.parse(PATTERN, { wordCount: 12, patterns: true }),
       mode: "seedshift",
       walletCheck: wallet,
@@ -46,7 +51,7 @@ describe("the warning of a fingerprint's match", () => {
         said.push(line.join(" "));
       });
     await runRecoverDate({
-      input: formatEncoded(masked, "indexes"),
+      input: MASKED,
       format: "indexes",
       mode: "seedshift",
       date: PATTERN,
@@ -63,9 +68,7 @@ describe("the warning of a fingerprint's match", () => {
     const plain = await new MissingCodesSearch(direct, masterFingerprint).byWallet(wallet).run();
     expect(plain).toMatchObject({ kind: "found", warning: FINGERPRINT_WARNING });
     if (plain.kind === "found") plain.backup.wipe();
-    const codes = formatEncoded(masked, "indexes").split(" ");
-    codes[11] = "?";
-    using marked = MissingCodes.read(codes.join(" "), "indexes", "seedshift");
+    using marked = MissingCodes.read(replacedAt(MASKED, { 12: "?" }), "indexes", "seedshift");
     const dates = DatesAnswer.parse(PATTERN, { wordCount: 12, patterns: true });
     const withDates = await new MissingCodesSearch(marked, masterFingerprint)
       .byWallet(wallet, dates)
@@ -75,12 +78,12 @@ describe("the warning of a fingerprint's match", () => {
   });
 
   it("comes with the codes that the encoded fingerprint found", async () => {
-    const codes = formatEncoded(masked, "indexes").split(" ");
+    const codes = MASKED.split(" ");
     codes[11] = `${codes[11]!.slice(0, -1)}?`;
     using marked = MissingCodes.read(codes.join(" "), "indexes", "seedshift");
     // The fingerprint of the masked phrase, as Encode shows it ("Encoded fingerprint").
     const found = await new MissingCodesSearch(marked, masterFingerprint)
-      .byEncodedFingerprint("0d05289e")
+      .byEncodedFingerprint(ENCODED_FINGERPRINT)
       .run();
     expect(found).toMatchObject({ kind: "found", warning: FINGERPRINT_WARNING });
     if (found.kind === "found") found.backup.wipe();

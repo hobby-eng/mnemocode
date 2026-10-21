@@ -1,7 +1,8 @@
 // The public data that the self-tests check the rules with, each written once: the phrase of
-// all-zero entropy, the first BIP39 vector, its master fingerprint, and its Seedshift vector
-// (vectors/mnemocode-v1.json: direct-12 and checksum-valid-seedshift-12). Each self-test, beside
-// the feature it checks, takes them here; a host builds in only the self-tests it wants.
+// all-zero entropy, the first BIP39 vector, its master fingerprint, its Unicode codes, and its
+// Seedshift vector (vectors/mnemocode-v1.json: direct-12 and checksum-valid-seedshift-12). Each
+// self-test, beside the feature it checks, takes them here; a host builds in only the self-tests
+// it wants.
 // Host-neutral: it imports nothing.
 
 /** The public test phrase of all-zero entropy, the first BIP39 vector. */
@@ -9,6 +10,13 @@ export const PUBLIC_MNEMONIC =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 /** Its master fingerprint without a passphrase (direct-12, sourceFingerprint). */
 export const PUBLIC_FINGERPRINT = "73c5da0a";
+/**
+ * The Unicode codes of its words, from the published BIP39 Chinese list (bitcoin/bips
+ * bip-0039/chinese_simplified.txt): word 1, abandon, is 的 (U+7684), word 4, about, is 在 (U+5728).
+ */
+export const PUBLIC_UNICODE_CODES: readonly string[] = [...Array<string>(11).fill("7684"), "5728"];
+/** The public phrase as Unicode codes, written joined as Encode writes them. */
+export const PUBLIC_UNICODE = PUBLIC_UNICODE_CODES.join("");
 /** The date, day-month-year, that the Seedshift vector masks the public phrase with. */
 export const MASKED_DATE = "23-09-2026";
 /** The public phrase masked with MnemoCode Seedshift and MASKED_DATE, in English words. */

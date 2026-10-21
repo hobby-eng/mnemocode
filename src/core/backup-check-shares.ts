@@ -117,7 +117,12 @@ export class RestoredShares extends Redacted implements Disposable {
     return this.#mnemonic.value === phrase;
   }
 
-  /** Whether undoing `mode` with `dates` gives `mnemonic`; refused after disposal. */
+  /**
+   * Whether undoing `mode` with `dates` gives `mnemonic`; refused after disposal
+   * (core.secret-value.wiped). Refuses what EncodedBackup.decode refuses of the mode and the dates
+   * (core.encoded-backup.original-seedshift-valid-last-word-gives-several-phrases; what
+   * Masking.undo refuses of the dates).
+   */
   unmasksTo(mnemonic: string, mode: MaskedMode, dates: readonly DateShiftDate[]): boolean {
     using masked = EncodedBackup.read(this.#mnemonic.value, "english", mode);
     return masked.decode(dates).recoveredMnemonic === mnemonic;

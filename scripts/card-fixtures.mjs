@@ -1,7 +1,7 @@
-// The public fixtures of the manual card-output scripts, business-goldens.mjs and
+// The public fixtures of the manual card-output scripts, business-renders.mjs and
 // check-card-output.mjs: the build they render with, the cards they draw and how they read a
 // card's QR code back; and how a page of a card PDF is drawn as an image, for the QR code and for
-// the comparison of two builds (compare-business-goldens.mjs). Public test data only; not part of
+// the comparison of two builds (compare-business-renders.mjs). Public test data only; not part of
 // the program, its startup or its tests.
 
 import { execFileSync } from "node:child_process";

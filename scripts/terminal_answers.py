@@ -7,6 +7,10 @@ fingerprint and its masked forms and shares appear here.
 from terminal_session import CTRL_UP, DOWN, ENTER, UP
 
 TEST_PHRASE = " ".join(["abandon"] * 11 + ["about"])
+# Its words, which the marked forms of the checks change.
+TEST_WORDS = TEST_PHRASE.split(" ")
+# The test phrase with its last word forgotten, marked ?.
+LAST_WORD_FORGOTTEN = " ".join([*TEST_WORDS[:-1], "?"])
 # The test phrase as word numbers (format 2), and the same with a wrong
 # last number.
 WORD_NUMBERS = " ".join(["1"] * 11 + ["4"])

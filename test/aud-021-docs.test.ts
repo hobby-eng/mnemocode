@@ -4,7 +4,7 @@ import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { parseDate } from "../src/core/dates.js";
 import { Masking } from "../src/core/masking.js";
 import { HeirInstructions, type HeirRoute } from "../src/export/heir-sheet-text.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { MASKED_WORDS, TEST_PHRASE, WRONG_DATE } from "./helpers/test-phrase.js";
 
 const route: HeirRoute = {
   subtitle: "Public audit fixture",
@@ -43,14 +43,10 @@ describe("AUD-021-DOC001: heir advice follows masking semantics", () => {
       "unicode",
       "seedshift-legacy",
     );
-    expect(legacy.decode([parseDate("24-09-2026")]).checksumValid).toBe(false);
+    expect(legacy.decode([parseDate(WRONG_DATE)]).checksumValid).toBe(false);
     expect(Masking.of("seedshift-legacy").wrongDateWarning).toContain("may fail the checksum");
-    const modern = EncodedBackup.read(
-      "wool abuse actual wool abuse actual wool abuse actual wool abuse congress",
-      "english",
-      "seedshift",
-    );
-    const wrong = modern.decode([parseDate("24-09-2026")]);
+    const modern = EncodedBackup.read(MASKED_WORDS, "english", "seedshift");
+    const wrong = modern.decode([parseDate(WRONG_DATE)]);
     expect(wrong.checksumValid).toBe(true);
     expect(wrong.recoveredMnemonic).not.toBe(TEST_PHRASE);
     // A date key is not unique: the published modulo-2048 shift also accepts this later year.

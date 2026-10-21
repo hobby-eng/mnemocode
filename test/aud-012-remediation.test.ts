@@ -67,7 +67,7 @@ import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import { holes } from "./helpers/holes.js";
 import { refusalOf } from "./helpers/refusals.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /**
  * The most the search of two dates over the public phrase may take: it finds the phrase in well
@@ -77,7 +77,7 @@ const SEARCH_TIME_LIMIT_MS = 10_000;
 
 describe("AUD-012-FUN001: codes and dates found together decode to the wallet that matched", () => {
   const known = parseDate("01-01-2025");
-  const guessed = parseDate("23-09-2026");
+  const guessed = parseDate(DATE);
   for (const [mode, encode] of [
     ["seedshift", encodeMnemonic],
     ["seedshift-legacy", encodeMnemonicLegacy],
@@ -96,9 +96,9 @@ describe("AUD-012-FUN001: codes and dates found together decode to the wallet th
         .run({ signal: AbortSignal.timeout(SEARCH_TIME_LIMIT_MS) });
       expect(result.kind).toBe("found");
       if (result.kind !== "found") return;
-      expect(result.dates!.map(formatDate)).toEqual(["01-01-2025", "23-09-2026"]);
+      expect(result.dates!.map(formatDate)).toEqual(["01-01-2025", DATE]);
       // What the search found, as it is shown: the guessed date alone.
-      expect(result.foundDates).toBe("23-09-2026");
+      expect(result.foundDates).toBe(DATE);
       expect(result.backup.decode(result.dates!).recoveredMnemonic).toBe(TEST_PHRASE);
     });
 });
@@ -115,7 +115,7 @@ describe("AUD-012-FUN002: the plan of codes with complete dates counts the check
   });
 
   it("plans 128 checks for each candidate of a 12-word phrase whose last word was replaced", async () => {
-    const date = [parseDate("23-09-2026")];
+    const date = [parseDate(DATE)];
     const { backup } = EncodedBackup.encode(TEST_PHRASE, date, "indexes", "seedshift-legacy", {
       validLastWord: true,
     });

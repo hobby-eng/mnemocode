@@ -2,7 +2,7 @@
 // failure (save-retry.ts): one place for the rules of every file and folder that the options name
 // (output-options.ts), so that Encode, SSKR, Preview and the candidate list check them alike.
 
-import { assertImageRenderer, claimImageFolder } from "../export/image-export.js";
+import { claimImageFolder, ImageRenderer } from "../export/image-export.js";
 import { claimCardFolder } from "../export/individual-cards.js";
 import { NewFolder } from "../export/private-file.js";
 import { value, type ParsedArguments } from "./arguments.js";
@@ -58,7 +58,7 @@ export async function preflightOutputs(args: ParsedArguments): Promise<void> {
     const path = value(args, key);
     if (path !== undefined) await claimOutputFolder(key, path);
   }
-  if (needsRenderer) await assertImageRenderer();
+  if (needsRenderer) await ImageRenderer.assert();
   for (const key of FILE_OUTPUTS) {
     const path = value(args, key);
     if (path !== undefined) await preflightFileDestination(path, true);

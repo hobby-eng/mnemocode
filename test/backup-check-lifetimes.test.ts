@@ -1,34 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EncodedBackupCheck, KeptShares, WrittenCodes } from "../src/core/backup-check.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { parseDate } from "../src/core/dates.js";
+import { endLifetimeIfPresent } from "./helpers/owner-lifetime.js";
+import {
+  DATE,
+  MASKED_INDEXES,
+  MASKED_WORDS,
+  replacedAt,
+  TEST_INDEXES,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
+import { publicShare, sskrVectors } from "./helpers/vectors.js";
 
-// Public vectors: BIP39 zero entropy, checksum-valid-seedshift-12 in mnemocode-v1.json,
-// and the first two shares of bip39-128-2-of-3 in sskr-v1.json.
-const DIRECT_INDEXES = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3];
-const MASKED_INDEXES = [2026, 9, 23, 2026, 9, 23, 2026, 9, 23, 2026, 9, 376];
-const MASKED_PHRASE = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
-const DATE_LINE = "23-09-2026";
-const FIRST_SHARE = "ur:sskr/goemjzaeadaejoinoyvotkwlptsskispvwbkbwjnamstlubnampf";
-const SECOND_SHARE = "ur:sskr/goemjzaeadadflihpkmhspcheycndschfhcmkelyvaveiesolrls";
-
-// Optional only for the pre-fix run: a missing lifetime method must not mask the assertion
-// that a disposed owner still publishes its secret. Production cleanup must be unconditional.
-function hasLifetime(value: object): value is Disposable & { wipe(): void } {
-  return (
-    "wipe" in value &&
-    typeof value.wipe === "function" &&
-    Symbol.dispose in value &&
-    typeof value[Symbol.dispose] === "function"
-  );
-}
-
-function wipeIfPresent(value: object): void {
-  if (hasLifetime(value)) value.wipe();
-}
-
-function disposeIfPresent(value: object): void {
-  if (hasLifetime(value)) value[Symbol.dispose]();
-}
+// Public vectors: BIP39 zero entropy, and the first two shares of bip39-128-2-of-3 in
+// sskr-v1.json.
+const FIRST_SHARE = publicShare();
+const SECOND_SHARE = sskrVectors().deterministic[0]!.shares[1]!;
 
 function maskedCheck(): EncodedBackupCheck {
   return new EncodedBackupCheck({
@@ -36,7 +23,7 @@ function maskedCheck(): EncodedBackupCheck {
     format: "english",
     mode: "seedshift",
     codes: MASKED_INDEXES,
-    dates: [{ year: 2026, month: 9, day: 23 }],
+    dates: [parseDate(DATE)],
   });
 }
 
@@ -48,13 +35,13 @@ describe("The lifetime of written codes", () => {
     const indexes = codes.indexes;
     try {
       expect(codes.restores(TEST_PHRASE, [])).toBe(true);
-      wipeIfPresent(codes);
-      disposeIfPresent(codes);
+      endLifetimeIfPresent(codes, "wipe");
+      endLifetimeIfPresent(codes, "dispose");
       expect(() => codes.indexes).toThrow("has been wiped");
       expect(() => codes.restores(TEST_PHRASE, [])).toThrow("has been wiped");
-      expect(indexes).toEqual(DIRECT_INDEXES);
+      expect(indexes).toEqual(TEST_INDEXES);
     } finally {
-      disposeIfPresent(codes);
+      endLifetimeIfPresent(codes, "dispose");
     }
   });
 });
@@ -72,16 +59,16 @@ describe("The lifetime of an encoded backup check", () => {
     try {
       expect(allocations.length).toBeGreaterThan(0);
       expect(allocations.some((bytes) => bytes.some((byte) => byte !== 0))).toBe(true);
-      disposeIfPresent(check);
+      endLifetimeIfPresent(check, "dispose");
       expect(allocations.every((bytes) => bytes.every((byte) => byte === 0))).toBe(true);
     } finally {
-      disposeIfPresent(check);
+      endLifetimeIfPresent(check, "dispose");
     }
   });
 
   it("snapshots borrowed codes and dates and leaves an independently read child live", () => {
     const indexes = [...MASKED_INDEXES];
-    const dates = [{ year: 2026, month: 9, day: 23 }];
+    const dates = [{ ...parseDate(DATE) }];
     const check = new EncodedBackupCheck({
       mnemonic: TEST_PHRASE,
       format: "english",
@@ -89,34 +76,28 @@ describe("The lifetime of an encoded backup check", () => {
       codes: indexes,
       dates,
     });
-    const child = check.readCodes(MASKED_PHRASE);
+    const child = check.readCodes(MASKED_WORDS);
     try {
       indexes[0] = 0;
       dates[0]!.day = 24;
-      expect(check.checkNow({ backup: MASKED_PHRASE, dates: DATE_LINE }).verdict).toBe("restores");
-      wipeIfPresent(check);
-      disposeIfPresent(check);
-      expect(() => check.checkNow({ backup: MASKED_PHRASE, dates: DATE_LINE })).toThrow(
-        "has been wiped",
-      );
-      expect(() => check.readCodes(MASKED_PHRASE)).toThrow("has been wiped");
-      expect(child.restores(TEST_PHRASE, [{ year: 2026, month: 9, day: 23 }])).toBe(true);
+      expect(check.checkNow({ backup: MASKED_WORDS, dates: DATE }).verdict).toBe("restores");
+      endLifetimeIfPresent(check, "wipe");
+      endLifetimeIfPresent(check, "dispose");
+      expect(() => check.checkNow({ backup: MASKED_WORDS, dates: DATE })).toThrow("has been wiped");
+      expect(() => check.readCodes(MASKED_WORDS)).toThrow("has been wiped");
+      expect(child.restores(TEST_PHRASE, [parseDate(DATE)])).toBe(true);
       expect(indexes[0]).toBe(0);
       expect(dates[0]!.day).toBe(24);
     } finally {
-      disposeIfPresent(child);
-      disposeIfPresent(check);
+      endLifetimeIfPresent(child, "dispose");
+      endLifetimeIfPresent(check, "dispose");
     }
   });
 
   it.each([
-    [MASKED_PHRASE, DATE_LINE, "restores"],
-    [
-      "wool abuse wool wool abuse actual wool abuse actual wool abuse congress",
-      DATE_LINE,
-      "differs",
-    ],
-    [MASKED_PHRASE, "32-09-2026", "unreadable"],
+    [MASKED_WORDS, DATE, "restores"],
+    [replacedAt(MASKED_WORDS, { 3: "wool" }), DATE, "differs"],
+    [MASKED_WORDS, "32-09-2026", "unreadable"],
   ] as const)(
     "closes temporary written codes after a %s / %s check returns %s",
     (backup, dates, verdict) => {
@@ -131,11 +112,11 @@ describe("The lifetime of an encoded backup check", () => {
           try {
             expect(() => temporary.value.indexes).toThrow("has been wiped");
           } finally {
-            disposeIfPresent(temporary.value);
+            endLifetimeIfPresent(temporary.value, "dispose");
           }
         }
       } finally {
-        disposeIfPresent(check);
+        endLifetimeIfPresent(check, "dispose");
       }
     },
   );
@@ -152,14 +133,14 @@ describe("The lifetime of kept shares", () => {
       expect(kept.places).toEqual([1, 3]);
       expect(kept.notes).toEqual(["Share 2 is a copy of share 1: it is used once."]);
       expect(kept.setProblem).toBeUndefined();
-      wipeIfPresent(kept);
-      disposeIfPresent(kept);
+      endLifetimeIfPresent(kept, "wipe");
+      endLifetimeIfPresent(kept, "dispose");
       expect(() => kept.texts).toThrow("has been wiped");
       expect(() => kept.setProblem).toThrow("has been wiped");
       expect(earlier).toEqual([FIRST_SHARE, SECOND_SHARE]);
       expect(texts).toEqual([SECOND_SHARE, FIRST_SHARE, SECOND_SHARE]);
     } finally {
-      disposeIfPresent(kept);
+      endLifetimeIfPresent(kept, "dispose");
     }
   });
 });

@@ -14,6 +14,7 @@ import { checkWordTableStartup } from "../src/core/word-table-self-test.js";
 import { runTable } from "../src/cli/table-command.js";
 import { parseArguments } from "../src/cli/arguments.js";
 import { TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
+import { DATE, replacedAt, TEST_NUMBERS } from "./helpers/test-phrase.js";
 
 let directory: string;
 beforeEach(async () => {
@@ -123,30 +124,30 @@ describe("the guide's standalone Python arithmetic", () => {
   }
 
   it("keeps direct word numbers unchanged without dates", async () => {
-    const numbers = `${"1 ".repeat(11)}4`;
+    const numbers = TEST_NUMBERS;
     expect(await helper(`direct\ndecode\n\n${numbers}\n`)).toContain(`Word numbers: ${numbers}\n`);
   });
 
   it.each([
-    ["seedshift-legacy-valid", "decode", "23-09-2026", `${"1 ".repeat(11)}4`, "Unknown mode"],
-    ["seedshift", "decode", "", `${"1 ".repeat(11)}4`, "Seedshift takes"],
-    ["direct", "decode", "23-09-2026", `${"1 ".repeat(11)}4`, "Direct takes no dates"],
+    ["seedshift-legacy-valid", "decode", DATE, TEST_NUMBERS, "Unknown mode"],
+    ["seedshift", "decode", "", TEST_NUMBERS, "Seedshift takes"],
+    ["direct", "decode", DATE, TEST_NUMBERS, "Direct takes no dates"],
     [
       "seedshift",
       "decode",
-      "23-09-2026",
-      `${"1 ".repeat(11)}0`,
+      DATE,
+      replacedAt(TEST_NUMBERS, { 12: "0" }),
       "word numbers from 1 through 2048",
     ],
     [
       "seedshift",
       "decode",
-      "23-09-2026",
-      `${"1 ".repeat(11)}2049`,
+      DATE,
+      replacedAt(TEST_NUMBERS, { 12: "2049" }),
       "word numbers from 1 through 2048",
     ],
-    ["seedshift", "decode", "23-09-2026", "1 4", "Give 12, 15, 18, 21 or 24"],
-    ["seedshift", "decode", "23-09-2026", "1 ".repeat(12), "Input phrase fails its BIP39 checksum"],
+    ["seedshift", "decode", DATE, "1 4", "Give 12, 15, 18, 21 or 24"],
+    ["seedshift", "decode", DATE, "1 ".repeat(12), "Input phrase fails its BIP39 checksum"],
   ])(
     "refuses invalid helper input (%s, %s, %s)",
     async (mode, operation, dates, numbers, error) => {
@@ -162,7 +163,7 @@ describe("the guide's standalone Python arithmetic", () => {
         .split(" ")
         .map((word) => wordlist.indexOf(word) + 1)
         .join(" ");
-      const dates = ["23-09-2026", "07-11-1951", "07-11-1951"];
+      const dates = [DATE, "07-11-1951", "07-11-1951"];
       const parsed = dates.map(parseDate);
       for (const [mode, encode] of [
         ["seedshift", encodeMnemonic],

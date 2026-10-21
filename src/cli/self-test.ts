@@ -6,7 +6,7 @@
 
 import { masterFingerprint, nodePbkdf2HmacSha512 } from "../bitcoin-evidence.js";
 import { STYLE, terminalLayout, terminalPaint } from "./terminal.js";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { encodeMnemonic, formatEncoded, parseDate } from "../core.js";
@@ -27,7 +27,8 @@ import { SSKR_VECTOR } from "../sskr/known-answers.js";
 import { decodeQrPngFile } from "./qr-input.js";
 import { saveQrBeside, saveQrInside } from "./qr-export.js";
 import { exportQrPayload } from "../export/qr-image.js";
-import { assertProtected, permissionSummary, sandboxReport } from "./protection.js";
+import { writeNewPrivateFile } from "../export/private-file.js";
+import { ProcessProtection } from "./protection.js";
 import { nodeSharePlatform } from "../sskr/share-platform-node.js";
 import { MNEMOCODE_VERSION } from "../version.js";
 import { readBundledFile } from "../bundled-files.js";
@@ -101,21 +102,24 @@ export function assertCoreSelfTest(): void {
   }
 }
 
+/** What a refusal of the self-test's own text files names them by. */
+const TEST_FILE = "The test file";
+
 /** Inline input stays inline and remote file links fail before any user text is read. */
 function checkTextFileInputStartup(): void {
   expectSame(
-    TextFileInput.read(SSKR_VECTOR.shares[0], "The test file"),
+    TextFileInput.read(SSKR_VECTOR.shares[0], TEST_FILE),
     SSKR_VECTOR.shares[0],
     "An inline UR is no file path",
   );
   expectRefused(
-    () => TextFileInput.read("file://example.invalid/backup.txt", "The test file"),
+    () => TextFileInput.read("file://example.invalid/backup.txt", TEST_FILE),
     /local text file/u,
     "A remote file link",
   );
 }
 
-/** The full CLI self-test reads one synthetic share file without changing its line boundaries. */
+/** The full CLI self-test reads one synthetic share file without changing its lines. */
 export const TEXT_FILE_INPUT_CHECK: SelfTestCheck = {
   name: "Text file input",
   detail: "local UTF-8 file, share lines retained, missing file refused",
@@ -124,10 +128,10 @@ export const TEXT_FILE_INPUT_CHECK: SelfTestCheck = {
     await withTemporaryFolder(async (directory) => {
       const path = join(directory, "public shares.txt");
       const text = `${SSKR_VECTOR.shares[0]}\n${SSKR_VECTOR.shares[2]}\n`;
-      await writeFile(path, text, { mode: 0o600 });
-      expectSame(TextFileInput.read(`"${path}"`, "The test file"), text, "All share file lines");
+      await writeNewPrivateFile(path, Buffer.from(text, "utf8"));
+      expectSame(TextFileInput.read(`"${path}"`, TEST_FILE), text, "All share file lines");
       expectRefused(
-        () => TextFileInput.read(join(directory, "missing.txt"), "The test file"),
+        () => TextFileInput.read(join(directory, "missing.txt"), TEST_FILE),
         /could not be read/u,
         "A missing text file",
       );
@@ -224,10 +228,14 @@ export async function runSelfTest(): Promise<void> {
     features: FEATURES,
     // Built here, not at load: the protection is in place only once the command has started.
     before: [
-      { name: "Process protection", detail: permissionSummary(), run: assertProtected },
-      // A report of what the system enforces, which never fails: a system without a boundary
+      {
+        name: "Process protection",
+        detail: ProcessProtection.permissionSummary(),
+        run: () => ProcessProtection.assert(),
+      },
+      // A report of what the system enforces, which never fails: a system without a protection
       // runs without it (system-sandbox.ts).
-      { name: "System sandbox", detail: sandboxReport(), run: () => undefined },
+      { name: "System sandbox", detail: ProcessProtection.sandboxReport(), run: () => undefined },
     ],
     after: [
       TEXT_FILE_INPUT_CHECK,

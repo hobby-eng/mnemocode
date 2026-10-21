@@ -12,8 +12,8 @@ const ERRORS = new ErrorCatalog("record", {
   "unsupported-format": () => "Unsupported MnemoCode record format.",
   "empty-payload": () => "A MnemoCode record payload must not be empty.",
   "malformed-header": () => "Malformed MnemoCode record header.",
-  "unsupported-version": (version: string) =>
-    `Unsupported MnemoCode record version: ${version}. A newer MnemoCode reads it.`,
+  // The version's digits stay out: they are typed text, which a message never repeats (CORE-24).
+  "unsupported-version": () => "Unsupported MnemoCode record version. A newer MnemoCode reads it.",
 });
 
 /** The version of the MNC1 record that this program writes, and the only one it reads. */
@@ -69,10 +69,8 @@ export function parseRecord(value: string): MnemoCodeRecord | undefined {
   if (!normalized.startsWith(RECORD_PREFIX)) return undefined;
   const match = RECORD_PATTERN.exec(normalized);
   if (match === null || !isMaskingMode(match[2])) throw ERRORS.create("malformed-header", []);
-  const version = Number(match[1]);
   // The pattern admits only versions from 1 up, so any other than this one is newer.
-  if (version !== MNEMOCODE_RECORD_VERSION)
-    throw ERRORS.create("unsupported-version", [`${version}`]);
+  if (Number(match[1]) !== MNEMOCODE_RECORD_VERSION) throw ERRORS.create("unsupported-version", []);
   const format = match[3];
   if (!isEncodedFormat(format)) throw ERRORS.create("unsupported-format", []);
   return {

@@ -7,9 +7,9 @@
 // tells a copy of a share, the texts for shares that took no part and for a wallet that no phrase
 // restored matches, and the rules by which an export writes the shares of a set again
 // (ShareExport).
-// Does not: run the SSKR self-test (the Node.js wrapper in shares.ts does, and another host checks
-// its own library first), ask for shares, name them by where they were typed (share-input.ts), or
-// say what a repair filled in (repair-report.ts).
+// Does not: run the SSKR self-test (the share functions for Node.js in shares.ts do, and another
+// host checks its own library first), ask for shares, name them by where they were typed
+// (share-input.ts), or say what a repair filled in (repair-report.ts).
 
 import { formatEncoded } from "../core/representations.js";
 import { representMnemonic } from "../core/seedshift.js";
@@ -368,17 +368,13 @@ export class ShareSet extends Redacted implements Disposable {
     return ShareSet.wordCountOf(this.secretBytes);
   }
 
-  /** The form in which the backup that was split is shown again: that of its first share. */
-  get backupForm(): EncodedFormat {
-    return RESTORED_FORM[defined(this.shares[0]).format];
-  }
-
   /**
-   * The backup that was split, in the form its shares were written in, which the dates turn into
-   * the seed phrase `mnemonic`; undefined where it would be the same words again.
+   * The backup that was split, in the form its shares were written in (that of its first share,
+   * RESTORED_FORM), which the dates turn into the seed phrase `mnemonic`; undefined where it would
+   * be the same words again.
    */
   backup(mnemonic: string): SetBackup | undefined {
-    const form = this.backupForm;
+    const form = RESTORED_FORM[defined(this.shares[0]).format];
     const text = formatEncoded(representMnemonic(this.mnemonic), form);
     return text === mnemonic ? undefined : { form, text };
   }

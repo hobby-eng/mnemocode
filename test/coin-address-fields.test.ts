@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { coinById } from "../src/core/coins.js";
+import { TEST_ADDRESS } from "./helpers/test-phrase.js";
 
 /** The first legacy address of the public test phrase, at m/44'/0'/0'/0/0. */
 const ADDRESS = "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA";
@@ -21,7 +22,8 @@ describe("a parsed address", () => {
       ["coin", coinById("litecoin")],
       ["type", "p2tr"],
       ["testnet", true],
-      ["text", "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyv"],
+      // The test phrase's first native SegWit address with its last letter changed.
+      ["text", `${TEST_ADDRESS.slice(0, -1)}v`],
     ] as const;
     for (const [field, value] of writes)
       expect(Reflect.set(address, field, value), field).toBe(false);
@@ -30,7 +32,7 @@ describe("a parsed address", () => {
     expect(address.testnet).toBe(false);
     expect(address.text).toBe(ADDRESS);
     expect(address.description).toBe("legacy (BIP44)");
-    expect(address.pathsAt(FIRST)).toEqual(["m/44'/0'/0'/0/0"]);
+    expect(address.branchPathsAt(FIRST)).toEqual(["m/44'/0'/0'/0"]);
     expect(address.isAddressOf(PUBLIC_KEY)).toBe(true);
   });
 });

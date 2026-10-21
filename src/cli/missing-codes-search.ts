@@ -27,6 +27,7 @@ import type { MissingCodes } from "../core/missing-codes.js";
 import { askAfterFailure, askValueUntil, WHAT_NOW } from "./ask.js";
 import { askWalletEvidence } from "./wallet-question.js";
 import { askDates } from "./date-search.js";
+import { CODES_AGAIN_LABEL } from "./backup-questions.js";
 import { choose } from "./terminal-choice.js";
 import { askToSearch } from "./search-consent.js";
 import { CtrlCWatch, nodeTurn } from "./terminal-input.js";
@@ -37,11 +38,10 @@ import {
   terminalLastingWarning,
   terminalLayout,
   terminalNotice,
-  terminalPart,
   terminalResultHeader,
   terminalStatus,
 } from "./terminal.js";
-import { factLine } from "./terminal-style.js";
+import { showCandidate } from "./candidate-view.js";
 import { counting } from "../core/search-plan.js";
 import { type WalletPlace } from "./bitcoin-options.js";
 import { lowerFirst } from "../core/prose.js";
@@ -67,7 +67,10 @@ export interface MissingCodesAnswers {
   readonly place: WalletPlace | undefined;
   /** The wallet given with the options, which answers "The wallet". */
   readonly evidence?: WalletEvidence | undefined;
-  /** The wallet's BIP39 passphrase, "" for none. */
+  /**
+   * The wallet's BIP39 passphrase, "" for none, as its owner (GivenWallet.passphrase) gives it for
+   * the search of marked codes that these answers are given to.
+   */
   readonly passphrase: string;
   /** --encoded-fingerprint, which answers "Encoded fingerprint". */
   readonly encodedFingerprint?: string | undefined;
@@ -309,21 +312,16 @@ function candidateFacts({ codes, phrase, fingerprint }: MissingCodesRow): [strin
 
 /**
  * The candidates of a listed search: on the private screen a result, "MnemoCode · Candidates" with
- * their number, then each candidate as a part of its own with its facts as grey labels (CORE-36),
- * which the page shows by pages when they do not fit (PrivatePage); elsewhere one row each, for a
- * script.
+ * their number, then each candidate as a part of its own with its facts as grey labels
+ * (showCandidate, CORE-36), which the page shows by pages when they do not fit (PrivatePage);
+ * elsewhere one row each, for a script.
  */
 function showCandidates(rows: readonly MissingCodesRow[]): void {
   if (onPrivateScreen() && terminalLayout("stdout")) {
     terminalResultHeader("Candidates", [["Found", String(rows.length)]]);
     terminalHint(FINGERPRINT_DISCLOSURE);
-    for (const [index, row] of rows.entries()) {
-      terminalPart(`Candidate ${index + 1}`);
-      const facts = candidateFacts(row);
-      const width = Math.max(...facts.map(([label]) => label.length));
-      for (const [label, value] of facts)
-        console.log(factLine(process.stdout, label, value, width));
-    }
+    for (const [index, row] of rows.entries())
+      showCandidate(`Candidate ${index + 1}`, candidateFacts(row));
     return;
   }
   rows.forEach(({ codes, phrase, fingerprint }, index) =>
@@ -387,7 +385,7 @@ async function outcomeOf(
     WHAT_NOW,
     [
       { label: "Tell them by the wallet", value: "wallet" },
-      { label: "Type the codes again", value: "again" },
+      { label: CODES_AGAIN_LABEL, value: "again" },
     ] as const,
     { escape: "types the codes again" },
   );

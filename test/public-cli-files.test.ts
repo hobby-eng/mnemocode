@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import { assertSafeMaterialArgv, parseArguments, value, values } from "../src/cli/arguments.js";
 import { PublicCliFiles } from "./helpers/public-cli-files.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 it("translates published fixture text into safe files and closes only its own directory", () => {
   using material = new PublicCliFiles([
@@ -10,7 +10,7 @@ it("translates published fixture text into safe files and closes only its own di
     "--mnemonic",
     TEST_PHRASE,
     "--dates",
-    "23-09-2026",
+    DATE,
     "08-08-1988",
     "--format",
     "indexes",
@@ -23,7 +23,7 @@ it("translates published fixture text into safe files and closes only its own di
   expect(args.mnemonic).toBeUndefined();
   expect(args.date).toBeUndefined();
   expect(readFileSync(words, "utf8")).toBe(`${TEST_PHRASE}\n`);
-  expect(readFileSync(dates, "utf8")).toBe("23-09-2026\n08-08-1988\n");
+  expect(readFileSync(dates, "utf8")).toBe(`${DATE}\n08-08-1988\n`);
   material.close();
   material.close();
   expect(existsSync(words)).toBe(false);

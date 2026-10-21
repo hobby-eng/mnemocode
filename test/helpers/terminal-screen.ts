@@ -1,6 +1,6 @@
 // The terminal of the tests of questions at a terminal: a screen that understands what the
-// questions write, the keys that the tests type, and the hooks that put the terminal back after
-// each test. The keys are given to keyed-terminal.ts, which replaces the terminal's input.
+// questions write, and the hooks that put the terminal back after each test. The keys that the
+// tests type (keys.ts) are given to keyed-terminal.ts, which replaces the terminal's input.
 
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,18 +10,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, vi } from "vitest";
 import { AnswerRecord, askLine } from "../../src/cli/terminal-choice.js";
 import { displayWidth } from "../../src/cli/terminal-geometry.js";
 import { terminal } from "./keyed-terminal.js";
+import { ESCAPE } from "./keys.js";
 import type { Cancelled } from "../../src/cli/terminal-keys.js";
-
-/** The keys that the tests type. */
-export const ESCAPE = "\x1b";
-export const DOWN = "\x1b[B";
-export const LEFT = "\x1b[D";
-export const HOME = "\x1b[H";
-export const CTRL_A = "\x01";
-export const CTRL_D = "\x04";
-export const CTRL_U = "\x15";
-export const BACKSPACE = "\x7f";
-export const ENTER = "\r";
 
 /**
  * A terminal `columns` wide with as many rows as are written, or at most `height`, after which it

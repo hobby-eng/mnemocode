@@ -39,6 +39,7 @@ import {
 } from "./sskr-output.js";
 import {
   type Recovery,
+  type Restoring,
   recoverySettings,
   reportWalletWarnings,
   restorePhrases,
@@ -74,6 +75,16 @@ async function cardForm(
   );
 }
 
+/** Where and how an export shows and saves the shares, as its options say. */
+interface ExportOutput {
+  /** The form of --format, in which every share is written; undefined keeps each share's own. */
+  readonly given: ShareFormat | undefined;
+  /** The cards to save, checked before the shares were asked; undefined without cards. */
+  readonly checked: ShareCardOptions | undefined;
+  /** The options of the command, which name the files to save. */
+  readonly args: ParsedArguments;
+}
+
 /**
  * Shows a set of shares, repaired or not, each in its own form or the one of --format, and saves
  * it where the options say, by the rules of an export (ShareExport): a share with elements that
@@ -85,10 +96,9 @@ async function exportSet(
   r: Recovery,
   set: RepairedShares,
   places: readonly number[],
-  given: ShareFormat | undefined,
-  checked: ShareCardOptions | undefined,
-  args: ParsedArguments,
+  output: ExportOutput,
 ): Promise<"exported" | "changed" | Cancelled> {
+  const { given, checked, args } = output;
   // The result is a step of its own: the questions and the search are cleared away (CORE-39),
   // before the repairs it reports.
   clearPrivateScreen();
@@ -251,16 +261,22 @@ export async function runSskrExport(args: ParsedArguments): Promise<Cancelled | 
   await assertShareCardsPrintable(checked);
   const settings = await recoverySettings(args);
   using initialDates = settings.dates;
+  using ownedWallet = settings.wallet;
   // Refused before the shares are asked.
   const refusal = ShareRestore.repairRefusal(settings.mode, settings.evidence !== undefined);
   if (refusal !== undefined) throw ERRORS.create("run-sskr-export-refused", [refusal]);
   const shares = await typedShares(args);
   if (shares === CANCELLED) return CANCELLED;
   using ownedShares = shares;
-  const r: Recovery = { ...settings, dates: initialDates, shares: ownedShares };
+  const r: Recovery = {
+    ...settings,
+    dates: initialDates,
+    wallet: ownedWallet,
+    shares: ownedShares,
+  };
   try {
     for (;;) {
-      const exported = await exportOnce(r, given, checked, args);
+      const exported = await exportOnce(r, { given, checked, args });
       if (exported !== "changed") return exported;
     }
   } finally {
@@ -275,18 +291,37 @@ export async function runSskrExport(args: ParsedArguments): Promise<Cancelled | 
  */
 async function exportOnce(
   r: Recovery,
-  given: ShareFormat | undefined,
-  checked: ShareCardOptions | undefined,
-  args: ParsedArguments,
+  output: ExportOutput,
 ): Promise<"changed" | undefined | Cancelled> {
   if (ShareRestore.rewritesOnly(r.shares.input, r.evidence !== undefined)) {
     const typed = r.shares.input.rewritten();
     if (typed.kind === "trouble")
       return (await mendShares(r.shares, typed.trouble, r.interactive)) ?? "changed";
-    return settled(await exportSet(r, typed.set, r.shares.places(), given, checked, args));
+    return settled(await exportSet(r, typed.set, r.shares.places(), output));
   }
   const restored = await restorePhrases(r, { few: () => fewForExport(r), one: true });
   if (restored === CANCELLED) return CANCELLED;
+  return exportRestored(r, restored, output);
+}
+
+/**
+ * The step of an export that takes what the restore of the shares gave (restorePhrases): the sets
+ * that fit, with their phrases, or too few shares. One set has its shares saved and shown
+ * (exportSet); several, which no wallet told apart, are each shown with the fingerprint of its
+ * phrase (showVariants) and none is saved; what the wallet check said of the matches is said after
+ * them. Too few shares are repaired each on its own (repairEach), and complete ones whose wallet
+ * check was dropped are only written again, on the next try ("changed"). The sets are data here,
+ * so that its tests can give it sets that typed shares give only by chance. "changed" when the
+ * shares are to be tried again; undefined once the shares were exported, or shown as variants, or
+ * nothing was to be saved; CANCELLED when the person cancelled. Refuses fewer shares than the
+ * threshold with the wallet kept, off the private screen
+ * (cli.sskr-export-command.few-export-refused); what exportSet and repairEach refuse passes on.
+ */
+export async function exportRestored(
+  r: Recovery,
+  restored: Restoring,
+  output: ExportOutput,
+): Promise<"changed" | undefined | Cancelled> {
   if (
     restored.kind === "few" &&
     ShareRestore.rewritesOnly(r.shares.input, r.evidence !== undefined)
@@ -299,23 +334,23 @@ async function exportOnce(
   if (decision.kind === "each") {
     // Without the wallet check complete shares are only written again (rewritesOnly), above.
     // Fewer shares than the threshold restore no phrase; each is then repaired on its own.
-    const shares = await repairEach(r, given);
+    const shares = await repairEach(r, output.given);
     if (shares === undefined || shares === "changed" || shares === CANCELLED) return shares;
     const set = { shares, unsettled: [] };
-    return settled(await exportSet(r, set, r.shares.places(), given, checked, args));
+    return settled(await exportSet(r, set, r.shares.places(), output));
   }
   const { sets, places, phrases } = decision.found;
   if (decision.kind === "variants") {
-    showVariants(phrases, sets, places, given, r.evidence !== undefined);
+    showVariants(phrases, sets, places, output.given, r.evidence !== undefined);
     reportWalletWarnings(phrases);
     return undefined;
   }
-  const exported = settled(await exportSet(r, decision.set, places, given, checked, args));
+  const exported = settled(await exportSet(r, decision.set, places, output));
   if (exported === undefined) reportWalletWarnings(phrases);
   return exported;
 }
 
-/** What exportSet gave, as exportOnce ends: undefined once the shares were exported. */
+/** What exportSet gave, as an export's try ends: undefined once the shares were exported. */
 function settled(exported: "exported" | "changed" | Cancelled): "changed" | undefined | Cancelled {
   return exported === "exported" ? undefined : exported;
 }

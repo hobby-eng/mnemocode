@@ -8,7 +8,7 @@ import { createHmac } from "node:crypto";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { describe, expect, it, vi } from "vitest";
-import { encodeMnemonic, parseDate } from "../src/core.js";
+import { parseDate } from "../src/core.js";
 import { ShareBackupCheck } from "../src/core/backup-check.js";
 import { DatesAnswer } from "../src/core/date-search.js";
 import {
@@ -24,13 +24,12 @@ import { ShareSplit } from "../src/sskr/split.js";
 import { ShareSet } from "../src/sskr/share-set.js";
 import { ShareUnmasking } from "../src/sskr/share-unmasking.js";
 import { writeShare } from "../src/sskr/transport.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, MASKED_WORDS, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { sskrVectors } from "./helpers/vectors.js";
 
 const VECTOR = sskrVectors().deterministic[0]!;
 const PHRASE = entropyToMnemonic(Uint8Array.from(Buffer.from(VECTOR.entropy, "hex")), wordlist);
 const [FIRST, SECOND] = [VECTOR.shares[0]!, VECTOR.shares[1]!];
-const DATE = parseDate("23-09-2026");
 
 /** The host's own platform, which counts its calls: node:crypto's HMAC and the bundled SSKR. */
 function hostPlatform(): ShareRepairPlatform & {
@@ -151,7 +150,6 @@ describe("the share parts with the host's platform", () => {
 });
 
 describe("ShareUnmasking", () => {
-  const masked = encodeMnemonic(TEST_PHRASE, [DATE]).shiftedEnglish.join(" ");
   /** A set as a restore gives it: the phrase that the shares hold. */
   const setOf = (mnemonic: string) => ({ mnemonic, shares: [], unsettled: [] });
   const testWallet = vi.fn((mnemonic: string) => ({
@@ -177,8 +175,8 @@ describe("ShareUnmasking", () => {
   });
 
   it("unmasks with whole dates, and searches dates with ? with the host's wallet check", async () => {
-    const set = setOf(masked);
-    const whole = DatesAnswer.of([DATE]);
+    const set = setOf(MASKED_WORDS);
+    const whole = DatesAnswer.of([parseDate(DATE)]);
     expect(await new ShareUnmasking({ mode: "seedshift", dates: whole }).unmask([set])).toEqual({
       kind: "phrases",
       phrases: [{ set, mnemonic: TEST_PHRASE }],
@@ -194,7 +192,7 @@ describe("ShareUnmasking", () => {
     const progress = vi.fn();
     expect(await searched.unmask([set], { onProgress: progress })).toEqual({
       kind: "phrases",
-      phrases: [{ set, mnemonic: TEST_PHRASE, dates: "23-09-2026", matchedAt: "m" }],
+      phrases: [{ set, mnemonic: TEST_PHRASE, dates: DATE, matchedAt: "m" }],
       listed: [TEST_PHRASE],
     });
     expect(progress).toHaveBeenLastCalledWith(
@@ -212,7 +210,7 @@ describe("ShareUnmasking", () => {
   it("refuses dates that the phrase of a set cannot take, and a mode that no share is made in", async () => {
     const five = DatesAnswer.of([1, 2, 3, 4, 5].map((day) => parseDate(`0${day}-01-2020`)));
     expect(
-      await new ShareUnmasking({ mode: "seedshift", dates: five }).unmask([setOf(masked)]),
+      await new ShareUnmasking({ mode: "seedshift", dates: five }).unmask([setOf(MASKED_WORDS)]),
     ).toEqual({
       kind: "dates",
       message: "12-word phrases support at most 4 dates.",

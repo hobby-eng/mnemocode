@@ -41,14 +41,12 @@ import { serializeRecord } from "../src/record.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { urToBytewords, writeShare } from "../src/sskr/transport.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, MASKED_WORDS, TEST_PHRASE, WRONG_DATE } from "./helpers/test-phrase.js";
 
 /** The host's reader of an encoded seed phrase, which a phrase typed as shares is sent to. */
 const TEXTS = { decodeEntry: "The Decode tab" };
 
-// The public BIP39 test phrase and public dates of the examples.
-const DATE = "23-09-2026";
-const OTHER_DATE = "24-09-2026";
+// A second public date of the examples, after DATE.
 const LATER_DATE = "01-10-2026";
 const vectors = sskrVectors();
 
@@ -95,17 +93,17 @@ describe("the codes that differ, counted and placed as typed (AUD-037-FUN003)", 
     const changed = original.codes.map((code, place) =>
       place === 0 || place === 11 ? (code + 1) % 2048 : code,
     );
-    expect(check.compareCodes(check.readCodes(colors.codes(changed)))).toMatchObject({
+    expect(check.steps.compare(check.readCodes(colors.codes(changed)))).toMatchObject({
       places: [1, 8],
       message: "The codes at places 1 and 8 differ from the result.",
     });
     const longer = encodeMnemonic(`${"abandon ".repeat(14)}address`, [parseDate(DATE)]);
-    expect(check.compareCodes(check.readCodes(formatEncoded(longer, "colors")))).toMatchObject({
+    expect(check.steps.compare(check.readCodes(formatEncoded(longer, "colors")))).toMatchObject({
       kind: "count",
       message: "The backup has 8 codes; these are 10.",
     });
     const words = new EncodedBackupCheck(encoded([DATE], "english"));
-    expect(words.compareCodes(words.readCodes(formatEncoded(longer, "english")))?.message).toBe(
+    expect(words.steps.compare(words.readCodes(formatEncoded(longer, "english")))?.message).toBe(
       "The backup has 12 words; these are 15.",
     );
   });
@@ -133,7 +131,7 @@ describe("the codes that differ, counted and placed as typed (AUD-037-FUN003)", 
         const changed = masked.shiftedIndexes.map((code, index) =>
           index === word ? (code + 1) % 2048 : code,
         );
-        expect(check.compareCodes(check.readCodes(unicode.codes(changed)))).toMatchObject({
+        expect(check.steps.compare(check.readCodes(unicode.codes(changed)))).toMatchObject({
           places: [place],
           message: `The code at place ${place} differs from the result.`,
         });
@@ -142,7 +140,7 @@ describe("the codes that differ, counted and placed as typed (AUD-037-FUN003)", 
     const check = new EncodedBackupCheck(encoded([DATE], "colors-unicode"));
     const longer = encodeMnemonic(`${"abandon ".repeat(14)}address`, [parseDate(DATE)]);
     expect(
-      check.compareCodes(check.readCodes(formatEncoded(longer, "colors-unicode")))?.message,
+      check.steps.compare(check.readCodes(formatEncoded(longer, "colors-unicode")))?.message,
     ).toBe("The backup has 16 codes; these are 20.");
   });
 
@@ -161,9 +159,11 @@ describe("the codes that differ, counted and placed as typed (AUD-037-FUN003)", 
       index === 0 || index === 23 ? (code + 1) % 2048 : code,
     );
     const typed = colors.codes(changed).split(" ");
-    expect(check.compareCodes(check.readCodes(typed.join(" ")))).toMatchObject({ places: [1, 16] });
+    expect(check.steps.compare(check.readCodes(typed.join(" ")))).toMatchObject({
+      places: [1, 16],
+    });
     // Typed in reverse: colour 1 is typed last, colour 16 first.
-    expect(check.compareCodes(check.readCodes(typed.reverse().join(" ")))).toMatchObject({
+    expect(check.steps.compare(check.readCodes(typed.reverse().join(" ")))).toMatchObject({
       places: [1, 16],
       message: "The codes at places 1 and 16 differ from the result.",
     });
@@ -171,7 +171,7 @@ describe("the codes that differ, counted and placed as typed (AUD-037-FUN003)", 
       index === 0 ? (code + 1) % 2048 : code,
     );
     const reversed = colors.codes(once).split(" ").reverse().join(" ");
-    expect(check.compareCodes(check.readCodes(reversed))?.places).toEqual([16]);
+    expect(check.steps.compare(check.readCodes(reversed))?.places).toEqual([16]);
   });
 
   it("counts and places a record in the form it was written in", () => {
@@ -181,7 +181,7 @@ describe("the codes that differ, counted and placed as typed (AUD-037-FUN003)", 
       index === 2 || index === 11 ? (code + 1) % 2048 : code,
     );
     const colors = serializeRecord("seedshift", "colors", EncodedForm.of("colors").codes(changed));
-    expect(check.compareCodes(check.readCodes(colors))).toMatchObject({
+    expect(check.steps.compare(check.readCodes(colors))).toMatchObject({
       places: [2, 8],
       message: "The codes at places 2 and 8 differ from the result.",
     });
@@ -191,7 +191,7 @@ describe("the codes that differ, counted and placed as typed (AUD-037-FUN003)", 
       "english",
       EncodedForm.of("english").codes(changed),
     );
-    expect(words.compareCodes(words.readCodes(english))).toMatchObject({
+    expect(words.steps.compare(words.readCodes(english))).toMatchObject({
       places: [3, 12],
       message: "The words at places 3 and 12 differ from the result.",
     });
@@ -222,7 +222,7 @@ describe("checking a written-down encoded seed phrase", () => {
     });
     const backup = formatEncoded(legacy, "indexes");
     expect((await check.check({ backup, dates: DATE })).verdict).toBe("restores");
-    expect((await check.check({ backup, dates: OTHER_DATE })).finding).toMatchObject({
+    expect((await check.check({ backup, dates: WRONG_DATE })).finding).toMatchObject({
       part: "dates",
       places: [1],
     });
@@ -239,7 +239,7 @@ describe("checking a written-down encoded seed phrase", () => {
       places: [5],
       message: "The word number at place 5 differs from the result.",
     });
-    const three = check.compareCodes(check.readCodes(changedAt(written(original), [2, 7, 12])));
+    const three = check.steps.compare(check.readCodes(changedAt(written(original), [2, 7, 12])));
     expect(three).toMatchObject({ places: [2, 7, 12] });
     expect(three?.message).toBe("The word numbers at places 2, 7 and 12 differ from the result.");
   });
@@ -251,7 +251,7 @@ describe("checking a written-down encoded seed phrase", () => {
     expect((await check.check({ backup, dates: `${LATER_DATE} ${DATE}` })).verdict).toBe(
       "restores",
     );
-    expect((await check.check({ backup, dates: `${LATER_DATE} ${OTHER_DATE}` })).finding).toEqual({
+    expect((await check.check({ backup, dates: `${LATER_DATE} ${WRONG_DATE}` })).finding).toEqual({
       part: "dates",
       kind: "places",
       places: [2],
@@ -262,9 +262,9 @@ describe("checking a written-down encoded seed phrase", () => {
       kind: "count",
       message: "The backup was made with 2 dates; 1 was typed.",
     });
-    expect(check.compareDates([parseDate(OTHER_DATE), parseDate("02-10-2026")])?.message).toBe(
-      "Dates 1 and 2 are not dates of this backup.",
-    );
+    expect(
+      (await check.check({ backup, dates: `${WRONG_DATE} 02-10-2026` })).finding?.message,
+    ).toBe("Dates 1 and 2 are not dates of this backup.");
   });
 });
 
@@ -311,7 +311,6 @@ describe("checking a written-down encoded seed phrase", () => {
   });
 });
 
-const masked = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]).shiftedEnglish.join(" ");
 const dates: readonly DateShiftDate[] = [parseDate(DATE)];
 
 describe("checking written-down Shamir shares", () => {
@@ -322,10 +321,10 @@ describe("checking written-down Shamir shares", () => {
     );
     const words = `${urToBytewords(shares[1]!)};${urToBytewords(shares[2]!)}`;
     expect(await shareBackupVerdict(TEST_PHRASE, words, "direct", "")).toBe("restores");
-    const maskedShares = await splitSskrMnemonic(masked, 2, 3);
+    const maskedShares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
     const typed = `${maskedShares[0]};${maskedShares[1]}`;
     expect(await shareBackupVerdict(TEST_PHRASE, typed, "seedshift", DATE)).toBe("restores");
-    expect(await shareBackupVerdict(TEST_PHRASE, typed, "seedshift", OTHER_DATE)).toBe("differs");
+    expect(await shareBackupVerdict(TEST_PHRASE, typed, "seedshift", WRONG_DATE)).toBe("differs");
     expect(await shareBackupVerdict(TEST_PHRASE, shares[0]!, "direct", "")).toBe("unreadable");
   });
 
@@ -404,10 +403,10 @@ describe("checking written-down Shamir shares", () => {
       TEXTS,
     );
     expect(check.dated).toBe(true);
-    const maskedShares = await splitSskrMnemonic(masked, 2, 3);
+    const maskedShares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
     const typed = `${maskedShares[0]};${maskedShares[2]}`;
     expect((await check.check({ backup: typed, dates: DATE })).verdict).toBe("restores");
-    expect((await check.check({ backup: typed, dates: OTHER_DATE })).finding).toEqual({
+    expect((await check.check({ backup: typed, dates: WRONG_DATE })).finding).toEqual({
       part: "dates",
       kind: "places",
       places: [1],
@@ -428,7 +427,7 @@ describe("checking written-down Shamir shares", () => {
       nodeSharePlatform,
       TEXTS,
     );
-    expect((await unknown.check({ backup: typed, dates: OTHER_DATE })).finding).toMatchObject({
+    expect((await unknown.check({ backup: typed, dates: WRONG_DATE })).finding).toMatchObject({
       part: "dates",
       kind: "other-phrase",
     });

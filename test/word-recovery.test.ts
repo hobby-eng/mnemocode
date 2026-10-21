@@ -100,7 +100,20 @@ describe("forgotten BIP39 word recovery", () => {
     const candidates = recoverLegacyValidLastWords(legacy);
     expect(candidates).toHaveLength(128);
     expect(candidates.every((candidate) => candidate.position === 12)).toBe(true);
-    expect(candidates.filter((candidate) => candidate.preservesLegacyEntropy)).toHaveLength(1);
+    expect(candidates.every(({ mnemonic }) => validateMnemonic(mnemonic, wordlist))).toBe(true);
+    // The first 128 bits of the legacy words are its entropy: the one marked is its phrase.
+    const bits = legacy
+      .split(" ")
+      .map((word) => wordlist.indexOf(word).toString(2).padStart(11, "0"))
+      .join("");
+    const entropy = Uint8Array.from(bits.slice(0, 128).match(/.{8}/gu)!, (byte) =>
+      Number.parseInt(byte, 2),
+    );
+    expect(
+      candidates
+        .filter((candidate) => candidate.preservesLegacyEntropy)
+        .map(({ mnemonic }) => mnemonic),
+    ).toEqual([entropyToMnemonic(entropy, wordlist)]);
     expect(
       candidates.every(
         (candidate) => candidate.mnemonic.split(" ").slice(0, -1).join(" ") === prefix,

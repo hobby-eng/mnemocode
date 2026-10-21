@@ -7,8 +7,10 @@ import { STYLE_CODES } from "../src/cli/terminal-style.js";
 import { Masking } from "../src/core/masking.js";
 import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { SHARE_FORMATS } from "../src/sskr/transport.js";
+import { CTRL_C, ENTER, ESCAPE } from "./helpers/keys.js";
 import { PrivateTerminal } from "./helpers/private-terminal.js";
 import { Screen } from "./helpers/terminal-screen.js";
+import { TEST_FINGERPRINT } from "./helpers/test-phrase.js";
 
 // The page of the private screen (private-page.ts): what was written since the screen was last
 // cleared, shown by pages before a question or an Enter prompt when it does not fit with them.
@@ -57,7 +59,7 @@ describe("the page of the private screen", () => {
     console.error("MnemoCode · SSKR export");
     console.error("The shares do not store the dates or the mode; keep them yourself.");
     for (let row = 0; row < 60; row += 1) console.log(`Public row ${row}`);
-    type("\x1b[6~".repeat(10) + "\x1b[1~" + "\x1b[4~" + "\r");
+    type("\x1b[6~".repeat(10) + "\x1b[1~" + "\x1b[4~" + ENTER);
     expect(await PrivatePage.keepReadable(2)).toBeUndefined();
     const shown = terminal.frames().join("\n");
     expect(shown).toContain("MnemoCode · SSKR export");
@@ -79,7 +81,7 @@ describe("the page of the private screen", () => {
       process.stderr.write(CLEAR_SCREEN);
       console.log("\x1b[1mMnemoCode · SSKR share 1 of 3\x1b[0m");
       for (let row = 0; row < 40; row += 1) console.log(`Public row ${row}`);
-      type("\r");
+      type(ENTER);
       await PrivatePage.keepReadable(2);
       expect(terminal.written).toContain("\x1b[90mPage 1/");
       expect(terminal.written).toContain("\x1b[1mMnemoCode · SSKR share 1 of 3\x1b[0m");
@@ -91,7 +93,7 @@ describe("the page of the private screen", () => {
   it("leaves the end of the page on the screen after Enter, without the keys, and fits then", async () => {
     process.stderr.write(CLEAR_SCREEN);
     for (let row = 0; row < 40; row += 1) console.log(`Public row ${row}`);
-    type("\r");
+    type(ENTER);
     await PrivatePage.keepReadable(2);
     const after = screen();
     expect(after.join("\n")).not.toMatch(/Page |Enter done/u);
@@ -104,10 +106,10 @@ describe("the page of the private screen", () => {
   });
 
   it.each([
-    ["\x03", CANCELLED],
+    [CTRL_C, CANCELLED],
     // Escape, q and Ctrl+D end the pages as Enter does: the question under them says what Escape
     // does there.
-    ["\x1b", undefined],
+    [ESCAPE, undefined],
     ["q", undefined],
   ] as const)("ends at %j with %s and releases the resize listener", async (key, ended) => {
     process.stderr.write(CLEAR_SCREEN);
@@ -121,7 +123,7 @@ describe("the page of the private screen", () => {
   it("shows again only when rows written since it was read do not fit (AUD-037-UI002)", async () => {
     process.stderr.write(CLEAR_SCREEN);
     for (let row = 0; row < 40; row += 1) console.log(`Public row ${row}`);
-    type("\r");
+    type(ENTER);
     await PrivatePage.keepReadable(3);
     // An answer refused again and again: each try is read as it is typed, and none is paged.
     for (let attempt = 0; attempt < 12; attempt += 1) {
@@ -132,7 +134,7 @@ describe("the page of the private screen", () => {
     }
     // A result longer than the screen after them is.
     for (let row = 0; row < 30; row += 1) console.log(`Later row ${row}`);
-    type("\r");
+    type(ENTER);
     await PrivatePage.keepReadable(3);
     expect(terminal.frames().some((frame) => frame.includes("Later row 0"))).toBe(true);
   });
@@ -141,7 +143,7 @@ describe("the page of the private screen", () => {
     process.stderr.write(CLEAR_SCREEN);
     console.log("First public row");
     for (let row = 0; row < 40; row += 1) console.log(`Public wide row ${row} ${"的".repeat(30)}`);
-    type("\r");
+    type(ENTER);
     terminal.stderr.mockImplementation((chunk: unknown) => {
       terminal.write(chunk);
       if (process.stderr.columns === 80 && String(chunk).includes("Page 1/")) {
@@ -185,7 +187,7 @@ describe("the page of the private screen", () => {
     process.stderr.rows = 12;
     process.stderr.write(CLEAR_SCREEN);
     blocks(6);
-    type("\x1b[6~".repeat(10) + "\r");
+    type("\x1b[6~".repeat(10) + ENTER);
     await PrivatePage.keepReadable(2);
     const pages = terminal.frames().filter((frame) => frame.includes("Page "));
     expect(pages.length).toBeGreaterThan(1);
@@ -203,7 +205,7 @@ describe("the page of the private screen", () => {
     process.stderr.write(CLEAR_SCREEN);
     for (let row = 0; row < 85; row += 1) console.log(`Public row ${row} ${"的".repeat(row % 50)}`);
     // Page by page, then the last and the first as a VT220 or rxvt sends End and Home.
-    type("\x1b[6~".repeat(100) + "\x1b[8~\x1b[7~\r");
+    type("\x1b[6~".repeat(100) + "\x1b[8~\x1b[7~" + ENTER);
     await PrivatePage.keepReadable(2);
     const pages = terminal.frames().filter((frame) => frame.includes("Page "));
     for (const page of pages) expect(rowsOf(page).length).toBeLessThanOrEqual(height);
@@ -219,7 +221,7 @@ describe("the rows that a page takes", () => {
   it("counts a tab as the columns it moves on when it bounds the page's rows", async () => {
     // Nine tabs and nine letters take 81 columns of an 80-column terminal from 18 bytes: two rows.
     for (let row = 0; row < 11; row += 1) console.log(`${"\t".repeat(9)}${"x".repeat(9)}`);
-    type("\r");
+    type(ENTER);
     expect(await PrivatePage.keepReadable(3)).toBeUndefined();
     expect(terminal.frames().join("\n")).toContain("Page 1/");
   });
@@ -231,7 +233,7 @@ describe("shares on the private screen", () => {
     process.stderr.write(CLEAR_SCREEN);
     const shares = Array.from({ length: 16 }, (_, at) => SSKR_SET_VECTOR.shares[at % 3]!);
     printShares(inForm(shares, form));
-    type("\x1b[6~".repeat(200) + "\r");
+    type("\x1b[6~".repeat(200) + ENTER);
     await PrivatePage.keepReadable(2);
     for (let number = 1; number <= 16; number += 1)
       expect(terminal.frames().join("\n")).toContain(`SSKR share ${number} of 16`);
@@ -246,14 +248,14 @@ describe("shares on the private screen", () => {
         process.stderr.write(CLEAR_SCREEN);
         console.log("MnemoCode · SSKR export");
         printShares(inForm(SSKR_SET_VECTOR.shares, form), 3, Masking.of("direct").holds);
-        console.log("Original fingerprint 73c5da0a");
-        type("\x1b[6~".repeat(20) + "\r");
+        console.log(`Original fingerprint ${TEST_FINGERPRINT}`);
+        type("\x1b[6~".repeat(20) + ENTER);
         await PrivatePage.keepReadable(8);
         const shown = terminal.frames().join("\n");
         for (let number = 1; number <= 3; number += 1)
           expect(shown).toContain(`SSKR share ${number} of 3`);
         expect(shown).toContain("MnemoCode · SSKR export");
-        expect(shown).toContain("Original fingerprint 73c5da0a");
+        expect(shown).toContain(`Original fingerprint ${TEST_FINGERPRINT}`);
       } finally {
         vi.unstubAllEnvs();
       }

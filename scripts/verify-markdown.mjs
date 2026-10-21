@@ -16,10 +16,10 @@ import { KEY_DOCUMENTS, shownFingerprints, SIGNING_KEY } from "./release-key.mjs
 // Deliberate copy: LIST_ITEM, CODE_FENCE, INDENTED_TEXT and looseListLines copy the check of the
 // same rule (DOC-01 of the workspace's coding guide) in the multi-chain wallet tools,
 // looseListLine and its patterns in tooling/verify-project-facts.mjs. It is copied because
-// MnemoCode is a program of its own that imports nothing from another project of the workspace
-// (AGENTS.md). No check here can keep the two in step, as this repository does not read the
-// other: a change to either is made to both by hand. Both find the same loose lines, though this
-// one reports every loose line and the other stops at the first.
+// MnemoCode is a program of its own that may not import from another project of the workspace
+// (AGENTS.md). A change to either copy goes to both. As a copy of another project's code, it
+// needs no test that keeps the two in step (the exception of CORE-10 in the coding guide). This
+// one reports every loose line; the other stops at the first.
 const LIST_ITEM = /^\s*(?:[-*+]|\d+[.)])\s/u;
 const CODE_FENCE = /^\s*(?:```|~~~)/u;
 const INDENTED_TEXT = /^\s{2,}\S/u;

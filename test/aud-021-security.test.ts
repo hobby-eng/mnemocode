@@ -22,6 +22,7 @@ import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { exportQrPayload } from "../src/export/qr-image.js";
 import { candidateVectors } from "./helpers/vectors.js";
 import { testFolder } from "./helpers/test-folders.js";
+import { TEST_NUMBERS } from "./helpers/test-phrase.js";
 
 const captured = vi.hoisted(
   (): { limits: (number | undefined)[]; compressed: Uint8Array[]; inflated: Uint8Array[] } => ({
@@ -68,7 +69,7 @@ function image(ihdr: Uint8Array, filtered = WHITE_PIXEL, extra: Uint8Array[] = [
 }
 
 describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () => {
-  it("detects PNG bytes independently of host media labels without copying the signature rule", () => {
+  it("detects PNG bytes by the whole 8-byte signature and nothing else", () => {
     const png = image(PIXEL_HEADER);
     expect(PngAdmission.hasSignature(png)).toBe(true);
     expect(PngAdmission.hasSignature(Uint8Array.from([...PNG_SIGNATURE, 0]))).toBe(true);
@@ -117,7 +118,7 @@ describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () =>
   );
 
   it("reads an actual exporter QR unchanged after admission", async () => {
-    const payload = `MNC1:direct:indexes:${"1 ".repeat(11)}4`;
+    const payload = `MNC1:direct:indexes:${TEST_NUMBERS}`;
     const path = await pathOf();
     await exportQrPayload(payload, path);
     expect(await decodeQrPngFile(path)).toBe(payload);
@@ -232,8 +233,10 @@ describe("AUD-021-SEC001/SEC002: PNG admission precedes pixel allocation", () =>
     );
   });
 
-  it("refuses more pixels than a 3840 x 2160 screen holds before inflation", () => {
-    expect(3840 * 2160).toBeLessThanOrEqual(MAX_PNG_PIXELS);
+  it("admits a 3840 x 2160 screen and refuses more than 8 megapixels before inflation", () => {
+    // Each row holds a filter byte, then four bytes for each pixel; 4096 x 2048 is 8 x 2^20 pixels.
+    expect(PngAdmission.read(image(pngHeader(3840, 2160, 8, 6))).filteredBytes).toBe(2160 * 15_361);
+    expect(PngAdmission.read(image(pngHeader(4096, 2048, 8, 6))).filteredBytes).toBe(2048 * 16_385);
     const over = MAX_PNG_PIXELS / MAX_PNG_DIMENSION + 1;
     expect(() => PngAdmission.read(image(pngHeader(MAX_PNG_DIMENSION, over, 8, 6)))).toThrow(
       "4096 px / 8-megapixel safety limit",

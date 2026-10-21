@@ -54,7 +54,7 @@ export function afterAngles(tokens, at) {
  * The index of the `{` that opens the body of the class or interface whose keyword is at `at`: the
  * first one outside the parentheses, brackets and type arguments of its heritage.
  */
-export function bodyOpening(tokens, at) {
+function bodyOpening(tokens, at) {
   let depth = 0;
   for (let index = at + 1; index < tokens.length; index += 1) {
     const { key } = tokens[index];
@@ -89,7 +89,7 @@ export function functionBody(tokens, params) {
  * only before another name; `[` names a computed member, unless it opens an index signature
  * ([key: string]) or the keys of a mapped type ([K in Keys]), which name no member.
  */
-export function memberAt(tokens, at) {
+function memberAt(tokens, at) {
   // A static block has no name, and nothing outside the class can call it.
   if (tokens[at].key === "static" && tokens[at + 1]?.key === "{")
     return { name: "", public: false, params: undefined };

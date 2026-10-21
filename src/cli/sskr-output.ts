@@ -2,12 +2,8 @@
 // QR codes that the options name, each saved with a choice after a failure (save-retry.ts).
 
 import { imageFormat, cardFileFormat, savedPagesNotice } from "./image-options.js";
-import {
-  assertSeparateCards,
-  DEFAULT_SHARE_TEMPLATE_ID,
-  resolveTemplateId,
-} from "../export/template-catalog.js";
-import { resolveSskrLayout, parseSskrLayout } from "../export/sskr-content.js";
+import { DEFAULT_SHARE_TEMPLATE_ID, resolveTemplateId } from "../export/template-catalog.js";
+import { resolveSskrLayout, parseSskrLayout, SSKR_LAYOUT_RULES } from "../export/sskr-content.js";
 import {
   printableText,
   codeLines,
@@ -44,7 +40,7 @@ import { nodeCardRenderer } from "../export/platform-node.js";
 import { saveQrBeside, saveQrInside } from "./qr-export.js";
 import { saveOutput } from "./output-saving.js";
 import { assertCardOutput } from "./card-options.js";
-import type { DocumentFormat } from "../export/image-export.js";
+import { isImageFormat, type DocumentFormat } from "../export/document-formats.js";
 import { shareKeepingNote, type ShareCardPackaging } from "../export/sskr-keeping-text.js";
 import { refusalMessage } from "../core/refusal.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
@@ -82,7 +78,7 @@ export function exportOptions(
   const settings = businessOptions(args, template);
   // Resolved here so that the messages below describe what is actually written.
   const layout = resolveSskrLayout(requested, settings.pageSize);
-  if (layout === "individual") assertSeparateCards(design);
+  SSKR_LAYOUT_RULES[layout].assertDesign(design);
   return {
     ...settings,
     style: design.style,
@@ -241,9 +237,9 @@ async function saveShareCards(
     );
     if ((await saveShareQrsInside(set, directory)) === CANCELLED) return CANCELLED;
     keep(
-      options.layout === "individual"
+      SSKR_LAYOUT_RULES[set.layout].separateCards
         ? "folders"
-        : options.imageFormat !== "pdf"
+        : isImageFormat(options.imageFormat)
           ? "pages"
           : "files",
     );

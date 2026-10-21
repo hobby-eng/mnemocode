@@ -13,9 +13,15 @@ import { wipeAll } from "./bits.js";
 import { WordCandidateSearch, type WordSearch } from "./candidates.js";
 import { expectRefused, expectSame, hexOfBytes } from "./self-test-check.js";
 import { fingerprintWalletCheck, type PhraseFingerprint } from "./wallet-check.js";
-import { PUBLIC_FINGERPRINT } from "./self-test-vectors.js";
+import { PUBLIC_FINGERPRINT, PUBLIC_MNEMONIC } from "./self-test-vectors.js";
 
-const ABANDON_ELEVEN = Array<string>(11).fill("abandon").join(" ");
+/** The first `count` words of the public phrase, "abandon" each, for a count up to eleven. */
+function publicWordsUpTo(count: number): string {
+  return PUBLIC_MNEMONIC.split(" ").slice(0, count).join(" ");
+}
+
+/** The public phrase's first ten words: the searches below put their marks and words around them. */
+const ABANDON_TEN = publicWordsUpTo(10);
 
 /** One search and what it finds: candidate N is the same in every host (docs/CANDIDATES.md). */
 interface SearchCase {
@@ -32,22 +38,14 @@ interface SearchCase {
  * independently with Python's hashlib from the order of docs/CANDIDATES.md; the entropy is BIP39's.
  */
 const PREFIX_AND_CHOICE: SearchCase = {
-  text: "abandon ab* abandon abandon abandon abandon abandon abandon abandon abandon abandon zoo|zone|about|abandon",
+  text: `abandon ab* ${publicWordsUpTo(9)} zoo|zone|about|abandon`,
   kind: "unknown-words",
   combinations: 40,
   count: 3,
   candidates: [
-    [1, `${ABANDON_ELEVEN} about`, "00000000000000000000000000000000"],
-    [
-      2,
-      "abandon ability abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
-      "00000400000000000000000000000000",
-    ],
-    [
-      3,
-      "abandon above abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
-      "00001000000000000000000000000000",
-    ],
+    [1, PUBLIC_MNEMONIC, "00000000000000000000000000000000"],
+    [2, `abandon ability ${publicWordsUpTo(9)} about`, "00000400000000000000000000000000"],
+    [3, `abandon above ${publicWordsUpTo(9)} about`, "00001000000000000000000000000000"],
   ],
 };
 const WORD_IN_THE_MIDDLE: SearchCase = {
@@ -62,14 +60,14 @@ const WORD_IN_THE_MIDDLE: SearchCase = {
   ],
 };
 const MISSING_AMONG_REPEATED: SearchCase = {
-  text: `${Array<string>(10).fill("abandon").join(" ")} about`,
+  text: `${ABANDON_TEN} about`,
   kind: "missing-word",
   combinations: 24_576,
   count: 1_497,
   candidates: [
-    [1, `${ABANDON_ELEVEN} about`],
-    [2, `abstract ${Array<string>(10).fill("abandon").join(" ")} about`],
-    [1_497, `${Array<string>(10).fill("abandon").join(" ")} about zoo`],
+    [1, PUBLIC_MNEMONIC],
+    [2, `abstract ${ABANDON_TEN} about`],
+    [1_497, `${ABANDON_TEN} about zoo`],
   ],
 };
 /** BIP39's vector of entropy 8080…80 in 24 words, with its 10th word left out. */
@@ -90,11 +88,11 @@ const MISSING_OF_24: SearchCase = {
 
 /** Searches that are refused, and why. */
 const REFUSED_SEARCHES: readonly (readonly [string, RegExp])[] = [
-  [`${ABANDON_ELEVEN} zzz`, /Unknown English BIP39 word at place 12/u],
-  [`${ABANDON_ELEVEN} about`, /Mark each forgotten word/u],
-  [`xyz* ${Array<string>(10).fill("abandon").join(" ")} ?`, /No BIP39 word starts/u],
+  [`${publicWordsUpTo(11)} zzz`, /Unknown English BIP39 word at place 12/u],
+  [PUBLIC_MNEMONIC, /Mark each forgotten word/u],
+  [`xyz* ${ABANDON_TEN} ?`, /No BIP39 word starts/u],
   // 2^33 combinations, beyond the 2^24 of one search.
-  [`? ? ? ${Array<string>(9).fill("abandon").join(" ")}`, /more than 16,777,216 combinations/u],
+  [`? ? ? ${publicWordsUpTo(9)}`, /more than 16,777,216 combinations/u],
 ];
 
 /** The combinations, the candidate count and the numbered candidates of `search`. */
@@ -131,7 +129,7 @@ function checkLifetimes(): void {
     if (first.done) return;
     using candidate = first.value;
     search.wipe();
-    expectSame(candidate.phrase, `${ABANDON_ELEVEN} about`, "Transferred word candidate");
+    expectSame(candidate.phrase, PUBLIC_MNEMONIC, "Transferred word candidate");
     expectRefused(() => search.expected, /has been wiped/u, "Disposed word search");
     expectRefused(() => candidates.next(), /has been wiped/u, "Disposed word iterator");
     candidate.wipe();

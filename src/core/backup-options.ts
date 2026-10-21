@@ -86,7 +86,10 @@ export class ShareSetChoice {
     this.#count = count;
   }
 
-  /** `count` shares of which `threshold` restore the phrase; refused as SSKR refuses it. */
+  /**
+   * `count` shares of which `threshold` restore the phrase; refused as ShareSplit.validateThreshold
+   * refuses it (sskr.split.split-threshold-from-number-shares-at-most-shares).
+   */
   static of(threshold: number, count: number): ShareSetChoice {
     return new ShareSetChoice(threshold, count);
   }
@@ -108,7 +111,10 @@ export class ShareSetChoice {
   /** What the answer Other says about the sets one may type. */
   static readonly OTHER_NOTE = `type the numbers, up to ${MAX_SHARES} shares`;
 
-  /** The number of shares in all, as typed; refused unless it is a number SSKR allows. */
+  /**
+   * The number of shares in all, as typed; refused unless it is a number SSKR allows
+   * (typedWholeNumber: core.typed-number.typed-whole-number-refused).
+   */
   static typedCount(answer: string): number {
     return typedWholeNumber(
       answer,
@@ -117,7 +123,10 @@ export class ShareSetChoice {
     );
   }
 
-  /** How many of `count` shares restore the phrase, as typed; refused unless it fits `count`. */
+  /**
+   * How many of `count` shares restore the phrase, as typed; refused unless it fits `count`
+   * (typedWholeNumber: core.typed-number.typed-whole-number-refused).
+   */
   static typedThreshold(answer: string, count: number): number {
     return typedWholeNumber(
       answer,

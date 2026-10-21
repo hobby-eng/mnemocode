@@ -93,21 +93,20 @@ import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { MAX_JOINT_MARKED_ELEMENTS } from "../src/sskr/joint-repair.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { SHARE_SEPARATOR } from "../src/sskr/share-input.js";
+import { CTRL_C } from "./helpers/keys.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import {
   expectTerminalGivenBack,
   Keyboard,
   keyboardAsStandardInput,
 } from "./helpers/terminal-streams.js";
+import { DATE } from "./helpers/test-phrase.js";
 
 // Windows deliberately keeps raw mode between reads so that ConPTY cannot lose Ctrl+C.
 // Pausing and removing listeners still ends the watch; Unix also restores line mode immediately.
 const RAW_ENTRY = process.platform === "win32" ? [false, true] : [true];
 const RAW_SESSION = process.platform === "win32" ? [false, true] : [true, false];
 
-const CTRL_C = "\x03";
-/** Any date: the Seedshift test only needs the question for it asked. */
-const TEST_DATE = "23-09-2026";
 /** The beginnings of the questions for the shares and for the dates, as the restore asks them. */
 const SHARES_QUESTION = "Shamir shares or text file path";
 const DATES_QUESTION = "Dates (";
@@ -224,7 +223,7 @@ describe("Ctrl+C during the assessment of marked shares", () => {
   it("asks for the dates only after the watch of the assessment has stopped", async () => {
     terminal.answers = [
       { prompt: SHARES_QUESTION, typed: markedShares(SETTLED_MARK).join(SHARE_SEPARATOR) },
-      { prompt: DATES_QUESTION, typed: TEST_DATE },
+      { prompt: DATES_QUESTION, typed: DATE },
     ];
     await runSskrCombine({ mode: "seedshift", "ask-secrets": true });
     // The shares are asked before the assessment, the dates after it; neither while it is watched:

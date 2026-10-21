@@ -2,9 +2,9 @@
 // docs/CANDIDATES.md, "Encryption"): the published age files opened with the public test key and
 // passphrase, a file to two keys and one at another work factor refused, one changed by a byte or
 // opened with another key refused, and a list encrypted here opened again. All but the file with
-// the passphrase are quick (checkCandidateEncryptionQuick), which a host may run at its start; the
-// scrypt of the passphrase is slow, so the whole check runs only in the full self-test
-// (core/self-test.ts).
+// the passphrase are quick (CandidateEncryption.recheck, or checkCandidateEncryptionQuick for the
+// shared gate), which a host may run at its start; the scrypt of the passphrase is slow, so the
+// whole check runs only in the full self-test (core/self-test.ts).
 //
 // From the host it needs what candidate-encryption.ts needs: crypto.getRandomValues and WebCrypto.
 // It holds public test keys and data, no secret.

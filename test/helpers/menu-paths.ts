@@ -19,6 +19,8 @@ import { AnswerRecord } from "../../src/cli/terminal-choice.js";
 import { parseSskrLayout, resolveSskrLayout } from "../../src/export/sskr-content.js";
 import { COIN_ADDRESS_ANSWERS } from "./coin-addresses.js";
 import { script } from "./menu-script.js";
+import { FINGERPRINT_PROMPT } from "./prompts.js";
+import { TEST_ADDRESS, TEST_FINGERPRINT } from "./test-phrase.js";
 
 /** Questions whose answers all lead to command lines of the same shape; only the first is taken. */
 const SAME_SHAPE = new Set(["Which card design?"]);
@@ -47,9 +49,8 @@ const USUAL: Readonly<Record<string, string>> = {
   "How many shares in all? (2 to 16)": "7",
   "How many of them restore the seed phrase?": "4",
   // The public test phrase's fingerprint and its first native SegWit address.
-  "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.)":
-    "73c5da0a",
-  "Bitcoin address (one of the first receiving ones)": "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
+  [FINGERPRINT_PROMPT]: TEST_FINGERPRINT,
+  "Bitcoin address (one of the first receiving ones)": TEST_ADDRESS,
   // The public test phrase\'s first address in each other coin.
   ...COIN_ADDRESS_ANSWERS,
   // A public test key: the recipient of a key that is thrown away.

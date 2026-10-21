@@ -5,14 +5,15 @@ import { join } from "node:path";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { heirSheetText, type HeirSheetFacts } from "../src/cli/heir-sheet.js";
+import { SPLIT_MODES_ONLY } from "../src/core/masking.js";
 import { A5, A6, renderHeirSheet } from "../src/export/heir-sheet.js";
 import { HeirInstructions, type HeirRoute } from "../src/export/heir-sheet-text.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { runBuiltCliSync as cli } from "./helpers/built-cli.js";
 
 // The public dates of the examples.
-const DATES = ["23-09-2026", "08-08-1988"];
+const DATES = [DATE, "08-08-1988"];
 
 /** The most dates MnemoCode takes: one for every three words of a 24-word phrase. */
 const MOST_DATES = 8;
@@ -288,7 +289,7 @@ describe("instructions for heirs", () => {
   });
 
   it("refuses a size without a sheet and a size that does not exist", () => {
-    const base = ["encode", "--mnemonic", TEST_PHRASE, "--dates", DATES[0]!];
+    const base = ["encode", "--mnemonic", TEST_PHRASE, "--dates", DATE];
     const alone = cli([...base, "--heir-sheet-size", "a6"]);
     expect(alone.status).not.toBe(0);
     expect(alone.stderr).toContain("--heir-sheet-size needs --heir-sheet");
@@ -314,7 +315,7 @@ describe("instructions for heirs", () => {
       "--mnemonic",
       TEST_PHRASE,
       "--dates",
-      DATES[0]!,
+      DATE,
       "--heir-sheet",
       join(tmpdir(), "mnc-heirs-refused.pdf"),
     ]);
@@ -322,5 +323,15 @@ describe("instructions for heirs", () => {
     expect(refused.stderr).toContain(
       "A sheet for heirs cannot be made for the Original Seedshift with a valid last word",
     );
+  });
+
+  it("refuses shares said to be masked with the Original Seedshift, which makes none", () => {
+    expect(() =>
+      heirSheetText({
+        backup: { kind: "shares", format: "words", threshold: 2, count: 3 },
+        mode: "seedshift-legacy",
+        dates: 1,
+      }),
+    ).toThrow(SPLIT_MODES_ONLY);
   });
 });

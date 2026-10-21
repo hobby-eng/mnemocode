@@ -50,17 +50,18 @@ import { datesPrompt, mostDates } from "./input.js";
 import { evidenceLabel } from "./option-copy.js";
 import { onPrivateScreen, closingRows } from "./private-screen.js";
 import { PrivateSteps } from "./private-steps.js";
-import { PrivateSummary } from "./private-summary.js";
-import { linesFitPrivateScreen } from "./screen-fit.js";
+import { candidateLines, candidatesFitScreen } from "./candidate-view.js";
 import {
   ProgressLine,
+  terminalLayout,
   terminalNotice,
   terminalResultHeader,
+  terminalResultNote,
   wrapText,
   readmeLink,
   resultHeaderLines,
-  noticeLines,
-  moreLine,
+  resultNoteLines,
+  type ResultNote,
 } from "./terminal.js";
 import { type Choice, type Explanation, rowsOf } from "./terminal-choice.js";
 import { askToSearch, type SearchRefusal, allowedBy } from "./search-consent.js";
@@ -69,7 +70,7 @@ import { counted } from "../core/search-plan.js";
 import { DATE_FORMAT_TEXT } from "../core/dates.js";
 import { numberWord } from "../core/prose.js";
 import { type WalletPlace } from "./bitcoin-options.js";
-import { fromFile } from "./backup-questions.js";
+import { fromFile, TYPE_ENCODED_AGAIN_LABEL, TYPE_ENCODED_LABEL } from "./backup-questions.js";
 
 // The core's reason why a date search needs a wallet, which decode-command.ts says as well.
 export { walletReason } from "../core/date-search.js";
@@ -165,7 +166,10 @@ export interface DateSearchRequest {
   readonly mode: SeedshiftMode;
   /** The wallet, which each checksum-valid candidate is compared with; none lists them all. */
   readonly evidence?: WalletEvidence | undefined;
-  /** The BIP39 passphrase of the wallet, "" for none. */
+  /**
+   * The BIP39 passphrase of the wallet, "" for none, as its owner (GivenWallet.passphrase) gives
+   * it for this search.
+   */
   readonly passphrase: string;
   /**
    * How many matches are kept to be shown (recover-date's --max-results), and the combinations
@@ -282,7 +286,7 @@ export interface MatchesReport {
 
 /**
  * Shows the result as recover-date does: the heading with the mode and the number of matches,
- * then one line per shown match (its dates, its phrase and where the wallet matched). With a
+ * then each shown match (matchLines: its dates, its phrase and where the wallet matched). With a
  * wallet that none of the checksum-valid candidates matched, it says so.
  */
 export function reportDateMatches(result: DateSearchResult, report: MatchesReport): void {
@@ -297,7 +301,7 @@ export function reportDateMatches(result: DateSearchResult, report: MatchesRepor
     for (const line of layout ? wrapText(sentence) : [sentence]) console.log(line);
     return;
   }
-  for (const match of result.shown) console.log(matchLine(match));
+  for (const line of matchLines(result.shown)) console.log(line);
   if (result.matchCount > report.maxResults)
     terminalNotice(
       `Displayed ${report.maxResults} of ${result.matchCount} checksum-valid candidates.`,
@@ -316,10 +320,27 @@ function matchFacts(result: DateSearchResult, report: MatchesReport): [string, s
   ];
 }
 
-/** A match as reportDateMatches prints it: its dates, its phrase and where the wallet matched. */
-function matchLine(match: DateMatch): string {
-  const where = match.evidence === undefined ? "" : `\tmatched at ${match.evidence}`;
-  return `${match.dates}\t${match.mnemonic}${where}`;
+/**
+ * The shown matches as reportDateMatches prints them, each with its dates, its phrase and where
+ * the wallet matched: on a terminal as a part of the result with its facts as grey labels
+ * (candidateLines, CORE-36), numbered among those shown; for a file, a pipe or TERM=dumb one row
+ * of tab-separated fields each, for a script.
+ */
+function matchLines(matches: readonly DateMatch[]): string[] {
+  if (!terminalLayout("stdout"))
+    return matches.map((match) => {
+      const where = match.evidence === undefined ? "" : `\tmatched at ${match.evidence}`;
+      return `${match.dates}\t${match.mnemonic}${where}`;
+    });
+  return matches.flatMap((match, index) =>
+    candidateLines(`Match ${index + 1}`, [
+      ["Dates", match.dates],
+      ...(match.evidence === undefined
+        ? []
+        : [["Wallet", `matched at ${match.evidence}`] as const]),
+      ["Phrase", match.mnemonic],
+    ]),
+  );
 }
 
 /**
@@ -332,38 +353,44 @@ function matchesFitScreen(result: DateSearchResult, report: MatchesReport): bool
     rowsOf(resultHeaderLines(MATCHES_TITLE, matchFacts(result, report))) +
     rowsOf(dateMatchNoteLines(report.evidence, result.warning)) +
     closingRows();
-  return linesFitPrivateScreen(result.shown.map(matchLine), beside);
+  return candidatesFitScreen(matchLines(result.shown), beside);
 }
 
 /**
- * The note after shown matches: what a valid checksum proves, or what the wallet check did, with
+ * The notes after shown matches: what a valid checksum proves, or what the wallet check did, with
  * the `warning` that the check gave with its matches, such as that a fingerprint is only a filter
- * (DateSearchResult.warning, AUD-037-SEC004).
+ * (DateSearchResult.warning, AUD-037-SEC004), which still holds once the command has ended.
  */
+function dateMatchNoteList(evidence: WalletEvidence | undefined, warning?: string): ResultNote[] {
+  if (evidence === undefined)
+    return [
+      { text: "A valid checksum does not prove the date: compare an address.", kind: "info" },
+      { more: "exact-local-recovery-checks" },
+    ];
+  return [
+    {
+      text: `Each displayed candidate matched the requested ${evidenceLabel(evidence)} locally.`,
+      kind: "info",
+    },
+    ...(warning === undefined ? [] : [{ text: warning, kind: "lasting" } as const]),
+  ];
+}
+
+/** Writes the notes after shown matches (dateMatchNoteList, terminalResultNote). */
 export function dateMatchNotes(evidence: WalletEvidence | undefined, warning?: string): void {
-  for (const line of dateMatchNoteLines(evidence, warning)) console.error(line);
-  // The check's warning still holds once the command has ended (terminalLastingWarning).
-  if (evidence !== undefined && warning !== undefined)
-    PrivateSummary.add({ kind: "warning", text: warning });
+  for (const note of dateMatchNoteList(evidence, warning)) terminalResultNote(note);
 }
 
 /** The lines of dateMatchNotes. */
 function dateMatchNoteLines(evidence: WalletEvidence | undefined, warning?: string): string[] {
-  if (evidence === undefined)
-    return [
-      ...noticeLines("A valid checksum does not prove the date: compare an address."),
-      moreLine("exact-local-recovery-checks"),
-    ];
-  return [
-    ...noticeLines(
-      `Each displayed candidate matched the requested ${evidenceLabel(evidence)} locally.`,
-    ),
-    ...(warning === undefined ? [] : noticeLines(warning, "warning")),
-  ];
+  return dateMatchNoteList(evidence, warning).flatMap(resultNoteLines);
 }
 
 /** The answer that types the dates again, after a phrase or a part that does not fit. */
 export const DATES_AGAIN_LABEL = "Type the dates again";
+
+/** The answer that changes the dates, after a search or phrases that none of them fits. */
+export const CHANGE_DATES_LABEL = "Change the dates";
 
 /** The choice that asks for the dates again, after a phrase that cannot be the right one. */
 export function datesAgainChoice(): Choice<"dates"> {
@@ -373,8 +400,8 @@ export function datesAgainChoice(): Choice<"dates"> {
 /** The choice that asks for the encoded seed phrase once more; after a file, it is typed. */
 export function backupChoice(args: ParsedArguments): Choice<"backup"> {
   return fromFile(args)
-    ? { label: "Type the encoded seed phrase", note: "instead of the file", value: "backup" }
-    : { label: "Type the encoded seed phrase again", value: "backup" };
+    ? { label: TYPE_ENCODED_LABEL, note: "instead of the file", value: "backup" }
+    : { label: TYPE_ENCODED_AGAIN_LABEL, value: "backup" };
 }
 
 /** What comes after a date search: a step of the command, or a search with another wallet. */
@@ -432,7 +459,7 @@ async function afterSearchChoice(
   question: AfterDateSearchQuestion,
 ): Promise<AfterSearchChoice | Cancelled> {
   const done: Choice<AfterSearchChoice> = { label: "Stop", value: "done" };
-  const dates: Choice<AfterSearchChoice> = { label: "Change the dates", value: "dates" };
+  const dates: Choice<AfterSearchChoice> = { label: CHANGE_DATES_LABEL, value: "dates" };
   const checkWallet = checkWalletAnswer<AfterSearchChoice>("wallet");
   if (result.matchCount === 0)
     return askAfterFailure(WHAT_NOW, [

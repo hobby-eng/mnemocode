@@ -383,7 +383,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage --testTimeout=180000",
+    "test:coverage": "vitest run --coverage",
     "verify": "pnpm format:check && pnpm check && pnpm build && pnpm test",
     "build:executable": "node scripts/build-executable.mjs && node scripts/verify-executable.mjs",
     "build:sskr": "node scripts/build-sskr-wasm.mjs",

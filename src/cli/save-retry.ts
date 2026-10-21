@@ -10,7 +10,8 @@
 import { askAfterFailure, askValueUntil, droppedPath, WHAT_NOW } from "./ask.js";
 import { warnOfCloudCopy } from "./cloud-folders.js";
 import { RenamedOutputs } from "./output-paths.js";
-import { onPrivateScreen } from "./private-screen.js";
+import { clearPrivateScreen, onPrivateScreen } from "./private-screen.js";
+import { PrivateSteps } from "./private-steps.js";
 import { printableText, terminalLastingWarning, terminalNotice } from "./terminal.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { lowerFirst } from "../core/prose.js";
@@ -131,10 +132,14 @@ export async function writeSaved(write: () => Promise<unknown>): Promise<void> {
 /**
  * Saves a result as described at the top. Resolves with the path it was saved at, undefined when
  * the person skipped it, or CANCELLED at Ctrl+C. Escape at "What now?" skips; Escape at the new
- * name brings the choice back without saving.
+ * name brings the choice back without saving. Why a save failed is the warning of its step, shown
+ * with "What now?"; once the result is tried again or skipped that step ends (endFailedStep), while
+ * the files left behind stay in the summary.
  */
 export async function saveWithRetry(saving: Saving): Promise<string | undefined | Cancelled> {
   let path = saving.path;
+  // Whether "What now?" is asked under a result shown already, as Encode's is.
+  let underResult = PrivateSteps.showingResult;
   for (let write = true; ;) {
     if (write)
       try {
@@ -152,6 +157,7 @@ export async function saveWithRetry(saving: Saving): Promise<string | undefined 
         // Why it failed, which another try may mend, then what it left behind to delete, which
         // holds after the command.
         const { failure, notices } = leftBehind(saving, error);
+        underResult = PrivateSteps.showingResult;
         terminalNotice(saveFailure(saving.what, path, failure), "warning");
         for (const notice of notices) terminalLastingWarning(notice);
       }
@@ -166,6 +172,7 @@ export async function saveWithRetry(saving: Saving): Promise<string | undefined 
     );
     if (next === CANCELLED) return CANCELLED;
     if (next === "skip") {
+      endFailedStep(underResult);
       RenamedOutputs.discard(saving.path);
       terminalLastingWarning(
         `${saving.what} ${saving.plural === true ? "were" : "was"} not saved.`,
@@ -179,5 +186,18 @@ export async function saveWithRetry(saving: Saving): Promise<string | undefined 
       if (other === undefined) write = false;
       else path = other;
     }
+    // Tried again: a new failure says why on its own.
+    if (write) endFailedStep(underResult);
   }
+}
+
+/**
+ * Ends the step of a failed save once the person tries again or skips the result (CORE-39): why it
+ * failed no longer holds, and no later step screen shows it (PrivateSteps.endWarnings). Where
+ * "What now?" had a screen of its own, not one under a result shown already, a new page starts, so
+ * that what follows, such as the result, is not drawn under the failure.
+ */
+function endFailedStep(underResult: boolean): void {
+  if (underResult) PrivateSteps.endWarnings();
+  else clearPrivateScreen();
 }

@@ -5,7 +5,7 @@
 import { CardPreview as CardPreviewClass } from "../src/export/card-preview.js";
 import { MissingChecksumError as EncodedBackupMissingChecksum } from "../src/core/encoded-backup.js";
 import { readFileSync, readdirSync } from "node:fs";
-import { STYLE_CODES } from "../src/cli/terminal-style.js";
+import { STYLE, STYLE_CODES } from "../src/cli/terminal-style.js";
 import { describe, expect, it, vi } from "vitest";
 import { choiceOption } from "../src/cli/arguments.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
@@ -51,15 +51,16 @@ import { walletReason, DatesAnswer } from "../src/core/date-search.js";
 import { ShareUnmasking } from "../src/sskr/share-unmasking.js";
 import { Redacted } from "../src/core/redacted.js";
 import { inspect } from "node:util";
-import {
-  nextFinding,
-  type PartChecks,
-  type BackupPart,
-  KeptShares,
-} from "../src/core/backup-check.js";
+import { EncodedBackupCheck, nextFinding, KeptShares } from "../src/core/backup-check.js";
 import { ShareInput } from "../src/sskr/share-input.js";
 import { withoutCopies } from "../src/sskr/set-topology.js";
-import { decodeIndexes, parseDate, encodeMnemonic } from "../src/core.js";
+import {
+  decodeIndexes,
+  parseDate,
+  encodeMnemonic,
+  representMnemonic,
+  type DateShiftDate,
+} from "../src/core.js";
 import { listInWords } from "../src/core/places.js";
 import { parseSskrLayout } from "../src/export/sskr-content.js";
 import { parseImageFormat } from "../src/export/image-export.js";
@@ -106,7 +107,7 @@ import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 import { publicShare } from "./helpers/vectors.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_ADDRESS, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("S006: the facts of a kind of wallet evidence follow from its level", () => {
   it("tells which kinds are scanned and which are placed", async () => {
@@ -165,9 +166,19 @@ describe("S009: one look-up in the word table", () => {
       log.mockRestore();
       vi.unstubAllEnvs();
     }
-    const plain = lines.map((line) => line.replace(STYLE_CODES, ""));
-    expect(plain).toContain("  Unicode hex 7684");
-    expect(plain).not.toContain("unicode hex: 7684");
+    // The heading of the result first, then each fact under it.
+    expect(lines.map((line) => line.replace(STYLE_CODES, ""))).toEqual([
+      "\nMnemoCode · Word mapping",
+      "  Index       1",
+      "  English     abandon",
+      "  Unicode hex 7684",
+    ]);
+    // Each label in grey.
+    for (const label of ["Index", "English", "Unicode hex"])
+      expect(
+        lines.some((line) => line.startsWith(`  \x1b[${STYLE.muted}m${label}`)),
+        label,
+      ).toBe(true);
   });
 
   it("on a terminal, the whole table starts with the result's heading; a pipe gets the table alone", async () => {
@@ -334,6 +345,7 @@ describe("S022: every class that holds a secret shows only its kind", () => {
         "DatesAnswer",
         "EncodeCardExport",
         "EncodedBackup",
+        "GivenWallet",
         "InputBytes",
         "KeptShares",
         "MarkedReading",
@@ -379,35 +391,64 @@ describe("S022: every class that holds a secret shows only its kind", () => {
 });
 
 describe("S024: one order of the steps of a backup check", () => {
-  /** Steps that record which comparison ran, each giving `found` for one part. */
-  function steps(dated: boolean, found: Partial<Record<"compare" | "dates" | "restored", true>>) {
-    const ran: string[] = [];
-    const finding = (part: BackupPart) =>
-      ({ part, kind: "places", places: [], message: part }) as const;
-    const checks: PartChecks<string> = {
-      dated,
-      wordCount: 12,
-      readDates: () => [],
-      compare: () => (ran.push("compare"), found.compare ? finding("codes") : undefined),
-      compareDates: () => (ran.push("dates"), found.dates ? finding("dates") : undefined),
-      compareRestored: () => (ran.push("restored"), found.restored ? finding("codes") : undefined),
+  /**
+   * The steps of a real check of TEST_PHRASE as Encode shows it with `dates` (in direct mode
+   * without any), and the codes of that result as written down, with the first code changed where
+   * `wrongCode` is set. Each step runs as it is, watched by a spy that changes nothing; `ran` names
+   * the steps in the order they ran.
+   */
+  function watchedCheck(dates: readonly DateShiftDate[], wrongCode = false) {
+    const result =
+      dates.length === 0 ? representMnemonic(TEST_PHRASE) : encodeMnemonic(TEST_PHRASE, dates);
+    const check = new EncodedBackupCheck({
+      mnemonic: TEST_PHRASE,
+      format: "indexes",
+      mode: dates.length === 0 ? "direct" : "seedshift",
+      codes: result.shiftedIndexes,
+      dates,
+    });
+    const codes = result.shiftedIndexes.map((code, place) =>
+      wrongCode && place === 0 ? (code + 1) % 2048 : code,
+    );
+    const written = check.readCodes(EncodedForm.of("indexes").codes(codes));
+    const { steps } = check;
+    const spies = [
+      ["compare", vi.spyOn(steps, "compare")],
+      ["dates", vi.spyOn(steps, "compareDates")],
+      ["restored", vi.spyOn(steps, "compareRestored")],
+    ] as const;
+    const ran = () =>
+      spies
+        .flatMap(([name, spy]) => spy.mock.invocationCallOrder.map((order) => ({ order, name })))
+        .sort((left, right) => left.order - right.order)
+        .map(({ name }) => name);
+    return {
+      steps,
+      written,
+      ran,
+      [Symbol.dispose]() {
+        written.wipe();
+        check.wipe();
+      },
     };
-    return { checks, ran };
   }
 
   it("asks for the dates only where the backup is dated and what was written fits", () => {
-    const undated = steps(false, {});
-    expect(nextFinding(undated.checks, "w")).toBeUndefined();
-    expect(undated.ran).toEqual(["compare", "restored"]);
-    const dated = steps(true, {});
-    expect(nextFinding(dated.checks, "w")).toBe("dates");
-    expect(nextFinding(dated.checks, "w", [])).toBeUndefined();
-    expect(dated.ran).toEqual(["compare", "compare", "dates", "restored"]);
-    const wrong = steps(true, { compare: true });
-    expect(nextFinding(wrong.checks, "w")).toMatchObject({ part: "codes" });
-    const wrongDates = steps(true, { dates: true });
-    expect(nextFinding(wrongDates.checks, "w", [])).toMatchObject({ part: "dates" });
-    expect(wrongDates.ran).toEqual(["compare", "dates"]);
+    using undated = watchedCheck([]);
+    expect(nextFinding(undated.steps, undated.written)).toBeUndefined();
+    expect(undated.ran()).toEqual(["compare", "restored"]);
+    using dated = watchedCheck([parseDate(DATE)]);
+    expect(nextFinding(dated.steps, dated.written)).toBe("dates");
+    expect(nextFinding(dated.steps, dated.written, [parseDate(DATE)])).toBeUndefined();
+    expect(dated.ran()).toEqual(["compare", "compare", "dates", "restored"]);
+    using wrong = watchedCheck([parseDate(DATE)], true);
+    expect(nextFinding(wrong.steps, wrong.written)).toMatchObject({ part: "codes", places: [1] });
+    expect(wrong.ran()).toEqual(["compare"]);
+    using wrongDates = watchedCheck([parseDate(DATE)]);
+    expect(
+      nextFinding(wrongDates.steps, wrongDates.written, [parseDate("01-01-2000")]),
+    ).toMatchObject({ part: "dates" });
+    expect(wrongDates.ran()).toEqual(["compare", "dates"]);
   });
 });
 
@@ -449,7 +490,7 @@ describe("S026: one refusal of codes without the checksum their mode keeps", () 
 });
 
 describe("S029: the BIP39 lengths from one list", () => {
-  it("checks, names and derives them from BIP39_WORD_COUNTS", () => {
+  it("tells a BIP39 length from others, names the lengths, and refuses a preview of another length", () => {
     expect([11, 12, 24, 25].map(isBip39WordCount)).toEqual([false, true, true, false]);
     expect(WORD_COUNTS_TEXT).toBe("12, 15, 18, 21 or 24");
     expect(WORD_COUNTS_LESS_ONE_TEXT).toBe("11, 14, 17, 20 or 23");
@@ -523,14 +564,19 @@ describe("S035: refusals told apart by their kind, not their words", () => {
     expect(isMaskingMode("toString")).toBe(false);
   });
 
-  it("says that a newer MnemoCode reads a record of a newer version", () => {
-    expect(() => parseRecord("MNC2:direct:english:abandon")).toThrow(
-      "Unsupported MnemoCode record version: 2. A newer MnemoCode reads it.",
-    );
+  it("says that a newer MnemoCode reads a record of a newer version, without its typed digits", () => {
+    for (const version of ["2", "20482048"])
+      expect(() => parseRecord(`MNC${version}:direct:english:abandon`)).toThrow(
+        expect.objectContaining({
+          code: "record.unsupported-version",
+          message: "Unsupported MnemoCode record version. A newer MnemoCode reads it.",
+        }),
+      );
   });
 
   it("gives an address refusal the code of its condition, and too large input its own class", () => {
-    expect(() => BITCOIN.parse("bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyv")).toThrow(
+    // The test address with its last character, part of the checksum, changed.
+    expect(() => BITCOIN.parse(`${TEST_ADDRESS.slice(0, -1)}v`)).toThrow(
       expect.objectContaining({
         code: "core.coins.coin.address-damaged",
         message: "The address cannot be used for the check: its checksum or format is wrong.",
@@ -620,7 +666,7 @@ describe("S042: one plan of a search", () => {
 describe("S043-S045: one table of the parts of a date", () => {
   it("reads, writes and names dates from the same parts and orders", () => {
     expect(DATE_FORMAT_TEXT).toBe("DD-MM-YYYY");
-    expect(parseDate("2026-09-23")).toEqual(parseDate("23-09-2026"));
+    expect(parseDate("2026-09-23")).toEqual(parseDate(DATE));
     expect(formatDate({ year: 26, month: 9, day: 3 })).toBe("03-09-0026");
     expect(() => parseDate("23-09-26")).toThrow("Use DD-MM-YYYY with a four-digit year");
     expect(parseDatePattern("?").key).toBe(parseDatePattern("??-??-????").key);
@@ -687,8 +733,8 @@ describe("S055: one rule of the coin types and paths on each network", () => {
     expect(BITCOIN.branchPathsOf("p2wpkh", true, location)).toEqual(["m/84'/1'/0'/0"]);
     expect(BITCOIN.accountPathsOf("p2tr", true, 2)).toEqual(["m/86'/1'/2'"]);
     const classic = COINS.find((coin) => coin.id === "ethereum-classic")!;
-    expect(classic.coinTypesOn(false)).toEqual([61, 60]);
-    expect(classic.coinTypesOn(true)).toEqual([1]);
+    expect(classic.accountPathsOf("keccak", false, 0)).toEqual(["m/44'/61'/0'", "m/44'/60'/0'"]);
+    expect(classic.accountPathsOf("keccak", true, 0)).toEqual(["m/44'/1'/0'"]);
   });
 });
 

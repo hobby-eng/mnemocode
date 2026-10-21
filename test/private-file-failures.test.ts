@@ -69,7 +69,10 @@ describe("a failed save whose staging folder stays", () => {
       write,
     ).catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(FailedSaveLeftCopyError);
-    expect(failure).toHaveProperty(["cause", "code"], "ENOSPC");
+    if (!(failure instanceof FailedSaveLeftCopyError)) return;
+    expect(failure.cause).toHaveProperty("code", "ENOSPC");
+    expect(failure.staging).toContain(join(root, ".card-collection-"));
+    expect(failure.message).toContain(failure.staging);
   });
 });
 

@@ -3,12 +3,20 @@
 // Each case runs in an engine of its own, so that no earlier call has written over what it left,
 // and the whole memory is then searched for the secret, the seed and each share: as bytes, as the
 // text of the share, and as a table of references to the engine's words, which spells the bytes
-// as well. Public test data only: a secret and a seed whose bytes rise by a fixed step.
+// as well. The search is first given a memory laid out to hold each of them, which it must name.
+// Public test data only: a secret and a seed whose bytes rise by a fixed step.
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as recordMaker from "../sskr-wasm/generated/recovery_sskr_wasm.js";
-import { BYTEWORD_VALUES, MINIMAL_BYTEWORD_VALUES } from "../src/sskr/bytewords-list.js";
+import {
+  BYTEWORD_LETTERS,
+  BYTEWORD_VALUES,
+  BYTEWORDS,
+  MINIMAL_BYTEWORD_LETTERS,
+  MINIMAL_BYTEWORD_VALUES,
+  MINIMAL_BYTEWORDS,
+} from "../src/sskr/bytewords-list.js";
 import { crc32 } from "../src/sskr/checksum.js";
 import {
   bytewordsToUr,
@@ -221,6 +229,56 @@ function sharesOf(records: readonly string[], encoding: EncodingName, secretByte
     texts: Object.fromEntries(records.map((record, place) => [names[place], record])),
   };
 }
+
+/**
+ * Writes into `memory`, from `at`, a reference to a word for each of `bytes`: the address of the
+ * word for that byte in the table of `letters`-letter words at `table`, then `letters`.
+ */
+function writeReferences(
+  memory: Uint8Array,
+  at: number,
+  bytes: Uint8Array,
+  table: number,
+  letters: number,
+): void {
+  const view = new DataView(memory.buffer, memory.byteOffset, memory.byteLength);
+  for (const [entry, byte] of bytes.entries()) {
+    view.setUint32(at + entry * REFERENCE_BYTES, table + byte * letters, true);
+    view.setUint32(at + entry * REFERENCE_BYTES + REFERENCE_BYTES / 2, letters, true);
+  }
+}
+
+describe("the search of a memory for what a call left", () => {
+  it("names a secret, a seed and a share that a memory holds, in each form and in part", () => {
+    // A memory laid out by hand: the two tables of words that the engine holds, a secret whole and
+    // the end of one, as a freed block keeps it, a share's text, and the references to words that
+    // spell a share's value in Bytewords, from place 0, and the seed in minimal pairs, from place 4.
+    const memory = new Uint8Array(8192);
+    const [words, pairs] = [1024, 2048];
+    for (const [value, word] of BYTEWORDS.entries())
+      memory.set(new TextEncoder().encode(word), words + value * BYTEWORD_LETTERS);
+    for (const [value, pair] of MINIMAL_BYTEWORDS.entries())
+      memory.set(new TextEncoder().encode(pair), pairs + value * MINIMAL_BYTEWORD_LETTERS);
+    const secret = secretOf(16);
+    memory.set(secret, 64);
+    memory.set(secret.subarray(6), 160);
+    const [record] = split(recordMaker, LAYOUTS[2]!, secret, "CompactUr");
+    memory.set(new TextEncoder().encode(record), 256);
+    writeReferences(memory, 4096, valueOf(record!, "CompactUr", 16), words, BYTEWORD_LETTERS);
+    writeReferences(memory, 6148, SEED, pairs, MINIMAL_BYTEWORD_LETTERS);
+    const shares = sharesOf([record!], "CompactUr", 16);
+    expect(
+      leftovers(memory, { bytes: { secret, seed: SEED, ...shares.bytes }, texts: shares.texts }),
+    ).toEqual([
+      "secret as bytes at 64",
+      // The end of the secret, at 160, is where the whole would have started 6 bytes before.
+      "secret as bytes at 154",
+      "seed as word references at 6148",
+      "share 1 as word references at 4096",
+      "share 1 as text at 256",
+    ]);
+  });
+});
 
 describe("the memory of the SSKR engine after a call", () => {
   it.each(CASES)("holds no secret, seed or share after a split: $name", async (sample) => {

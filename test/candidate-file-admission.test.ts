@@ -328,7 +328,7 @@ describe("Candidate file admission", () => {
 });
 
 describe("Candidate file admission", () => {
-  it("checks cumulative decrypted bytes before copying and cancels on overflow", async () => {
+  it("refuses decrypted chunks that together pass the limit, wiping them before it cancels the stream", async () => {
     const chunks = [announcedBytes(Uint8Array.of(1), parameters.plaintextBytes), Uint8Array.of(2)];
     let wipedAtCancellation = false;
     const cancel = vi.fn(() => {

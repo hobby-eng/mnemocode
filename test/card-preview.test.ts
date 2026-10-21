@@ -6,7 +6,7 @@ import { CardPreview } from "../src/export/card-preview.js";
 import { CardRenderer } from "../src/export/card-renderer.js";
 import { phraseOfRandomEntropy } from "../src/core/english-words.js";
 import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { OTHER_PHRASE, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("Sample cards as a library (export/card-preview.ts)", () => {
   it(
@@ -61,7 +61,7 @@ describe("Sample cards as a library (export/card-preview.ts)", () => {
     // alike.
     const vectors = [
       [0x00, TEST_PHRASE],
-      [0x7f, "legal winner thank year wave sausage worth useful legal winner thank yellow"],
+      [0x7f, OTHER_PHRASE],
       [0x80, "letter advice cage absurd amount doctor acoustic avoid letter advice cage above"],
       [0xff, "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong"],
     ] as const;

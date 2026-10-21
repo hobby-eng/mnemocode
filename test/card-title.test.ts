@@ -6,7 +6,8 @@
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { PDFDocument } from "pdf-lib";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runPreview } from "../src/cli/preview-command.js";
 import { parseDate } from "../src/core/dates.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
@@ -18,7 +19,7 @@ import { renderCards } from "../src/export/render.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
 import { DEFAULT_SHARE_TEMPLATE_ID } from "../src/export/template-catalog.js";
 import { CARD_TEMPLATES } from "../src/export/templates.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { publicShare } from "./helpers/vectors.js";
 import { testFolder } from "./helpers/test-folders.js";
 
@@ -29,14 +30,11 @@ const BLANK_MESSAGE =
 
 /** The cards of the test phrase written in colours, with `title`. */
 function cardsTitled(title: string): ReturnType<typeof backupCardContent> {
-  const backup = EncodedBackup.encode(
-    TEST_PHRASE,
-    [parseDate("23-09-2026")],
-    "colors",
-    "seedshift",
-  );
+  const backup = EncodedBackup.encode(TEST_PHRASE, [parseDate(DATE)], "colors", "seedshift");
   return backupCardContent(backup.backup, { title });
 }
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("the title of a sheet of cards", () => {
   it.each([
@@ -71,7 +69,7 @@ describe("the title of a sheet of cards", () => {
     expect(backupCardContent(backup.backup)).not.toHaveProperty("title");
   });
 
-  it("from --title is refused before the preview draws a card or writes its file", async () => {
+  it("from --title is refused before the preview writes its file", async () => {
     const folder = await testFolder("mnemocode-card-title-");
     const pdf = join(folder, "preview.pdf");
     await expect(runPreview({ title: "Studio\u2028Two", pdf })).rejects.toMatchObject({
@@ -105,11 +103,14 @@ describe("the title that a host gives cards without backupCardContent", () => {
   });
 
   it("is refused in content that a host draws itself, before a card is drawn", async () => {
+    // A card is drawn on a page of a PDF document: none is added before the refusal.
+    const pages = vi.spyOn(PDFDocument.prototype, "addPage");
     const template = CARD_TEMPLATES.find((known) => known.id === DEFAULT_SHARE_TEMPLATE_ID)!;
     const content = { ...cardsTitled("Atelier"), title: "Studio\u2028Two" };
     await expect(renderCards(nodeCardRenderer, [{ template, content }])).rejects.toMatchObject({
       code: BLANK,
       message: BLANK_MESSAGE,
     });
+    expect(pages).not.toHaveBeenCalled();
   });
 });

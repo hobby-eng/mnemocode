@@ -160,8 +160,8 @@ export interface CommandFacts {
   readonly listed: boolean;
   /**
    * Whether it asks on its private screen where its results go, so that what it gives up before
-   * its first question (dropUnneeded) must leave what any answer may need, as re-encode does
-   * without options of its new backup.
+   * its first question (ProcessProtection.dropUnneeded) must leave what any answer may need, as
+   * re-encode does without options of its new backup.
    */
   readonly asksOutputs?: (args: ParsedArguments) => boolean;
 }

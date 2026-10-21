@@ -25,18 +25,23 @@ import {
   OLD_BACKUP_OPTIONS,
   RECOGNISED_OPTION,
 } from "../src/cli/re-encode-options.js";
+import { combineSskrShares } from "../src/sskr/shares.js";
 import { containing } from "./helpers/matchers.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  MASKED_WORDS,
+  TEST_ADDRESS,
+  TEST_FINGERPRINT,
+  TEST_PHRASE,
+  TEST_UNICODE,
+  WRONG_DATE,
+} from "./helpers/test-phrase.js";
 import { runBuiltCli } from "./helpers/built-cli.js";
 
-// Public test data only: the BIP39 test phrase, masked with MnemoCode Seedshift and 23-09-2026
+// Public test data only: the BIP39 test phrase, masked with MnemoCode Seedshift and DATE
 // (vectors/mnemocode-v1.json), and its fingerprint and first native SegWit address.
-const MASKED_WORDS = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
-const ADDRESS = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
-/** The test phrase without Seedshift as Unicode codes, from the BIP39 Chinese list. */
-const UNICODE = `${"7684".repeat(11)}5728`;
-const RIGHT = parseDate("23-09-2026");
-const WRONG = parseDate("24-09-2026");
+const RIGHT = parseDate(DATE);
+const WRONG = parseDate(WRONG_DATE);
 
 function masked(): EncodedBackup {
   return EncodedBackup.read(MASKED_WORDS, "english", "seedshift");
@@ -48,7 +53,7 @@ async function run(arguments_: readonly string[], command = "re-encode") {
 }
 
 /** The old backup as typed text, masked with its date, for the command line. */
-const OLD = ["--input", MASKED_WORDS, "--old-mode", "seedshift", "--old-dates", "23-09-2026"];
+const OLD = ["--input", MASKED_WORDS, "--old-mode", "seedshift", "--old-dates", DATE];
 
 describe("ReEncoding", () => {
   it("decodes the old backup and holds its phrase back until it is confirmed", () => {
@@ -140,7 +145,7 @@ describe("re-encode options", () => {
       "--words",
       "24",
       "--bitcoin-address",
-      ADDRESS,
+      TEST_ADDRESS,
       "--mode",
       "direct",
       "--format",
@@ -158,7 +163,7 @@ describe("re-encode options", () => {
       mode: "seedshift",
       format: "5",
       words: "24",
-      "bitcoin-address": ADDRESS,
+      "bitcoin-address": TEST_ADDRESS,
     });
     expect({ ...fresh }).toEqual({
       "ask-secrets": true,
@@ -215,7 +220,7 @@ describe("re-encode CLI", () => {
     ]);
     // Standard output carries only the new backup, never the old phrase (AUD-022-SEC001).
     expect(result.stdout).not.toContain("abandon");
-    expect(result.stdout).toContain(UNICODE);
+    expect(result.stdout).toContain(TEST_UNICODE);
     expect(result.stderr).toContain(
       `Original BIP32 master fingerprint (empty BIP39 passphrase): ${TEST_FINGERPRINT}`,
     );
@@ -235,7 +240,7 @@ describe("re-encode CLI", () => {
       "--format",
       "2",
       "--bitcoin-address",
-      ADDRESS,
+      TEST_ADDRESS,
     ]);
     expect(result.stderr).toContain("Address found at m/84'/0'/0'/0/0: the wallet matches");
     // The new backup decodes back to the phrase with its new date.
@@ -261,14 +266,14 @@ describe("re-encode CLI", () => {
       const old = join(dir, "old.txt");
       const fresh = join(dir, "new.txt");
       await run(
-        ["--mnemonic", TEST_PHRASE, "--dates", "23-09-2026", "--format", "5", "--output", old],
+        ["--mnemonic", TEST_PHRASE, "--dates", DATE, "--format", "5", "--output", old],
         "encode",
       );
       await run([
         "--input-file",
         old,
         "--old-dates",
-        "23-09-2026",
+        DATE,
         "--mode",
         "direct",
         "--format",
@@ -277,7 +282,7 @@ describe("re-encode CLI", () => {
         fresh,
         "--recognised",
       ]);
-      expect(readFileSync(fresh, "utf8").trim()).toBe(`MNC1:direct:unicode:${UNICODE}`);
+      expect(readFileSync(fresh, "utf8").trim()).toBe(`MNC1:direct:unicode:${TEST_UNICODE}`);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -295,7 +300,10 @@ describe("re-encode CLI", () => {
       "3",
       "--recognised",
     ]);
-    expect(result.stdout.match(/ur:sskr\//gu)).toHaveLength(3);
+    const shares = result.stdout.match(/ur:sskr\/[a-z]+/gu) ?? [];
+    expect(shares).toHaveLength(3);
+    // Any two of them restore the phrase of the backup.
+    expect(await combineSskrShares(shares.slice(1))).toBe(TEST_PHRASE);
   });
 
   it("stops where the wallet does not match: a wrong date gives another valid phrase", async () => {
@@ -306,7 +314,7 @@ describe("re-encode CLI", () => {
         "--old-mode",
         "seedshift",
         "--old-dates",
-        "24-09-2026",
+        WRONG_DATE,
         "--format",
         "3",
         "--master-fingerprint",
@@ -324,7 +332,7 @@ describe("re-encode CLI", () => {
     await expect(
       run([...OLD, "--recognised", "--master-fingerprint", TEST_FINGERPRINT]),
     ).rejects.toMatchObject({ stderr: containing("give one") });
-    await expect(run(["--ask-secrets", "--old-dates", "23-09-2026"])).rejects.toMatchObject({
+    await expect(run(["--ask-secrets", "--old-dates", DATE])).rejects.toMatchObject({
       stderr: containing(
         "Secret material for --old-dates must not be passed as a command-line value",
       ),
@@ -340,12 +348,12 @@ describe("re-encode CLI", () => {
     const several = EncodedBackup.encode(TEST_PHRASE, [RIGHT], "indexes", "seedshift-legacy", {
       validLastWord: true,
     }).backup;
-    const old = ["--input", several.record(), "--old-dates", "23-09-2026", "--format", "3"];
+    const old = ["--input", several.record(), "--old-dates", DATE, "--format", "3"];
     await expect(run([...old, "--recognised"])).rejects.toMatchObject({
       stderr: containing("give the last word of the original seed phrase"),
     });
     const result = await run([...old, "--last-word", "about", "--recognised"]);
-    expect(result.stdout).toContain(UNICODE);
+    expect(result.stdout).toContain(TEST_UNICODE);
   });
 
   it("refuses a new backup's option before the old backup is read", async () => {
@@ -376,7 +384,7 @@ describe("re-encode CLI", () => {
   it("says which refusals are of the old backup's options", async () => {
     const backup = ["--input", MASKED_WORDS, "--format", "3", "--recognised"];
     await expect(
-      run([...backup, "--old-mode", "direct", "--old-dates", "23-09-2026"]),
+      run([...backup, "--old-mode", "direct", "--old-dates", DATE]),
     ).rejects.toMatchObject({
       stderr: containing(`${OLD_BACKUP_REFUSAL}Dates cannot be used in direct mode.`),
     });

@@ -22,20 +22,17 @@ import {
 import { WalletEvidenceCheck } from "../src/core/wallet-evidence.js";
 import { Masking } from "../src/core/masking.js";
 import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, ENCODED_FINGERPRINT, TEST_PHRASE, WRONG_DATE } from "./helpers/test-phrase.js";
 
 // The host-neutral encoded backup on its own, as another host such as the Deriver uses it: the
 // codes of an encoded seed phrase checked before its dates, the encoded fingerprint with the
 // host's PBKDF2, and the decoding with complete dates. Public test phrase only.
 
-const DATE = parseDate("23-09-2026");
-const MASKED = encodeMnemonic(TEST_PHRASE, [DATE]);
-const LEGACY = encodeMnemonicLegacy(TEST_PHRASE, [DATE]);
+/** DATE as the maskings read it. */
+const PARSED_DATE = parseDate(DATE);
+const MASKED = encodeMnemonic(TEST_PHRASE, [PARSED_DATE]);
+const LEGACY = encodeMnemonicLegacy(TEST_PHRASE, [PARSED_DATE]);
 const LEGACY_VALID = legacyChecksumValidResult(LEGACY);
-/**
- * The fingerprint of MASKED's codes read as a phrase, as encode shows it ("Encoded fingerprint").
- */
-const ENCODED_FINGERPRINT = "0d05289e";
 const FORMATS: readonly EncodedFormat[] = [
   "english",
   "indexes",
@@ -175,7 +172,7 @@ describe("EncodedBackup", () => {
 describe("EncodedBackup", () => {
   it("decodes with complete dates in every mode, and gives the candidates of a valid last word", () => {
     const decoded = (indexes: readonly number[], mode: "seedshift" | "seedshift-legacy") =>
-      EncodedBackup.of(indexes, "indexes", mode).decode([DATE]);
+      EncodedBackup.of(indexes, "indexes", mode).decode([PARSED_DATE]);
     expect(decoded(MASKED.shiftedIndexes, "seedshift")).toMatchObject({
       recoveredMnemonic: TEST_PHRASE,
       checksumValid: true,
@@ -184,7 +181,7 @@ describe("EncodedBackup", () => {
     // A wrong date gives the Original Seedshift's phrase an invalid checksum.
     expect(
       EncodedBackup.of(LEGACY.shiftedIndexes, "indexes", "seedshift-legacy").decode([
-        parseDate("24-09-2026"),
+        parseDate(WRONG_DATE),
       ]).checksumValid,
     ).toBe(false);
     // Without Seedshift the codes are the words themselves.
@@ -205,8 +202,8 @@ describe("EncodedBackup", () => {
       "seedshift-legacy-valid",
     );
     expect(valid.givesSeveral).toBe(true);
-    expect(() => valid.decode([DATE])).toThrow("gives several phrases");
-    const candidates = valid.candidates([DATE]);
+    expect(() => valid.decode([PARSED_DATE])).toThrow("gives several phrases");
+    const candidates = valid.candidates([PARSED_DATE]);
     // Every last word whose checksum fits: 2^(11 - 4) for 12 words.
     expect(candidates).toHaveLength(128);
     expect(candidates.map((candidate) => candidate.recoveredMnemonic)).toContain(TEST_PHRASE);

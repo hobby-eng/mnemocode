@@ -63,7 +63,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CARD_FORMAT_NUMBERS, noCardTemplateMessage } from "../src/cli/format-numbers.js";
 import { DatesAnswer } from "../src/core/date-search.js";
-import { ShareInput } from "../src/sskr/share-input.js";
 import { formatEncoded, representMnemonic } from "../src/core.js";
 import { resolveSskrLayout } from "../src/export/sskr-content.js";
 import { writeRenderedDocument } from "../src/export/image-export.js";
@@ -115,7 +114,12 @@ import { shareKeepingNote } from "../src/export/sskr-keeping-text.js";
 import { POINTS_PER_INCH } from "../src/export/document-formats.js";
 import { publicShare, sskrVectors } from "./helpers/vectors.js";
 import { scriptExports } from "./helpers/script-exports.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  LAST_WORD_FORGOTTEN,
+  replacedAt,
+  TEST_FINGERPRINT,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 
 describe("S100: the default page sizes are named once", () => {
   it("resolves a sheet's and a separate card's size and refuses a sheet size for separate cards", () => {
@@ -415,7 +419,7 @@ describe("S128: one reading of what a thrown value says, and rules in the librar
   });
 
   it("refuses a ? for the old exact last word in the library", () => {
-    expect(() => recoverLegacyValidLastWords(`${"abandon ".repeat(11)}?`)).toThrow(
+    expect(() => recoverLegacyValidLastWords(LAST_WORD_FORGOTTEN)).toThrow(
       "This mode needs the exact old final word: ? stands for no word here.",
     );
   });
@@ -488,9 +492,9 @@ describe("S132: the scaffolding of the self-tests in one place each", () => {
   });
 
   it("checks a wallet by its fingerprint", async () => {
-    const check = fingerprintWalletCheck(() => "73c5da0a", "73c5da0a");
+    const check = fingerprintWalletCheck(() => TEST_FINGERPRINT, TEST_FINGERPRINT);
     expect((await check("any phrase")).matched).toBe(true);
-    const other = fingerprintWalletCheck(async () => "00000000", "73c5da0a");
+    const other = fingerprintWalletCheck(async () => "00000000", TEST_FINGERPRINT);
     expect((await other("any phrase")).matched).toBe(false);
   });
 
@@ -551,7 +555,7 @@ describe("S138: one rule for the case of a first letter", () => {
     expect(afterPlace("Date", 2, "The day is wrong.")).toBe("Date 2: the day is wrong.");
     // Before, a date's message lost the case of an abbreviation: "bIP39".
     expect(afterPlace("Date", 1, "BIP39 says no.")).toBe("Date 1: BIP39 says no.");
-    expect(ShareInput.aboutShare(3, " cannot be read: ", "Unknown word.")).toBe(
+    expect(afterPlace("Share", 3, "Unknown word.", " cannot be read: ")).toBe(
       "Share 3 cannot be read: unknown word.",
     );
   });
@@ -571,9 +575,9 @@ describe("S140: the master key's path and the fingerprint's form in one place", 
     expect(MASTER_KEY_PATH).toBe("m");
     expect(isMasterKeyPath("m")).toBe(true);
     expect(isMasterKeyPath("m/84'/0'/0'/0/0")).toBe(false);
-    expect(fingerprintMatch("73c5da0a", "73c5da0a").path).toBe(MASTER_KEY_PATH);
-    expect(isFingerprintText("73c5da0a")).toBe(true);
-    expect(isFingerprintText("73c5da0")).toBe(false);
+    expect(fingerprintMatch(TEST_FINGERPRINT, TEST_FINGERPRINT).path).toBe(MASTER_KEY_PATH);
+    expect(isFingerprintText(TEST_FINGERPRINT)).toBe(true);
+    expect(isFingerprintText(TEST_FINGERPRINT.slice(0, -1))).toBe(false);
     expect(FINGERPRINT_HEX_DIGITS).toBe(8);
   });
 });
@@ -598,9 +602,8 @@ describe("S141: each message has one owner", () => {
 
 describe("S142: a phrase is fingerprinted only when it is valid, by one rule", () => {
   it("gives the fingerprint of a valid phrase and none of another", () => {
-    const valid = zeroEntropyPhrase(12);
-    expect(fingerprintOfValidPhrase(valid, () => "73c5da0a")).toBe("73c5da0a");
-    expect(fingerprintOfValidPhrase(valid.replace(/about$/u, "abandon"), () => "x")).toBe(
+    expect(fingerprintOfValidPhrase(TEST_PHRASE, () => TEST_FINGERPRINT)).toBe(TEST_FINGERPRINT);
+    expect(fingerprintOfValidPhrase(replacedAt(TEST_PHRASE, { 12: "abandon" }), () => "x")).toBe(
       undefined,
     );
   });
@@ -608,7 +611,7 @@ describe("S142: a phrase is fingerprinted only when it is valid, by one rule", (
 
 describe("S144: the searches count what passed and time with one clock", () => {
   it("counts several sets of codes by all that passed, not by those kept", async () => {
-    const codes = formatEncoded(representMnemonic(zeroEntropyPhrase(12)), "indexes").split(" ");
+    const codes = formatEncoded(representMnemonic(TEST_PHRASE), "indexes").split(" ");
     codes[2] = "?";
     const search = new MissingCodesSearch(
       MissingCodes.read(codes.join(" "), "indexes", "direct"),

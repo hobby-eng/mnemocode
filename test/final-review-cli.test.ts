@@ -19,12 +19,13 @@ import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { runEncode } from "../src/cli/encode-command.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { englishWordlist } from "../src/core/english-words.js";
-import { encodeMnemonic, indexesToColors, parseDate } from "../src/core.js";
+import { indexesToColors } from "../src/core.js";
 import { searchDates } from "../src/cli/date-search.js";
 import { DatesAnswer } from "../src/core/date-search.js";
 import { DATE_COUNT_WORDS, Masking, PHRASE_WORDS } from "../src/core/masking.js";
 import { SearchPlan } from "../src/core/search-plan.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { CTRL_C } from "./helpers/keys.js";
+import { DATE, MASKED_INDEXES, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // No terminal, unless a test types at one: codes that fit several forms end the command instead of
 // asking.
@@ -33,7 +34,6 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   typing.replacedTerminalInput(await importOriginal()),
 );
 const { keyboard } = typing;
-const CTRL_C = 0x03;
 
 /** Codes that are both word numbers and Unicode text (test/cli.test.ts). */
 const AMBIGUOUS = "76 84 57 28 90 19 59 27 62 11 89 81 66 42 75 28 50 11 52 30 57 30 62 10";
@@ -70,7 +70,7 @@ describe("CC-01: a saved candidate list leaves no copy of the entropies", () => 
     });
     // Ctrl+C at the passphrase question on the private screen, the one question of the output.
     keyboard.terminal = true;
-    keyboard.bytes = [CTRL_C];
+    keyboard.bytes = [CTRL_C.charCodeAt(0)];
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const entropy = Uint8Array.from({ length: 16 }, (_, index) => index + 1);
     expect(await withPrivateScreen(() => target!.saveEntropies([entropy]))).toBe(CANCELLED);
@@ -157,7 +157,7 @@ describe("CC-05: list options are looked up by their own names", () => {
 describe("CC-06: the date counts of shares in the words they always had", () => {
   it.each([
     [["--mode", "seedshift"], "Seedshift recovery requires its original dates."],
-    [["--mode", "direct", "--date", "23-09-2026"], "Direct mode does not accept dates."],
+    [["--mode", "direct", "--date", DATE], "Direct mode does not accept dates."],
   ])(
     "refuses %j in a restore or an export from shares in the words it always had",
     async (options, message) => {
@@ -167,7 +167,7 @@ describe("CC-06: the date counts of shares in the words they always had", () => 
 
   it.each([
     [["--mode", "seedshift"], "Seedshift requires at least one date."],
-    [["--mode", "direct", "--date", "23-09-2026"], "Direct mode does not accept dates."],
+    [["--mode", "direct", "--date", DATE], "Direct mode does not accept dates."],
   ])("refuses %j in a split into shares in the words it always had", async (options, message) => {
     const args = ["--threshold", "2", "--shares", "3", "--mnemonic", TEST_PHRASE, ...options];
     await expect(runSskrSplit(parseArguments(args))).rejects.toThrow(message);
@@ -191,7 +191,7 @@ describe("CC-14: the names of the original seed phrase come from PHRASE_WORDS", 
 
 describe("CC-07: decode refuses a wrong date count before the form is settled", () => {
   it.each([
-    [["--mode", "direct", "--date", "23-09-2026"], "Dates cannot be used in direct mode."],
+    [["--mode", "direct", "--date", DATE], "Dates cannot be used in direct mode."],
     [["--mode", "seedshift"], "seedshift requires at least one date."],
   ])("refuses %j before the form is settled", async (options, message) => {
     await expect(runDecode(parseArguments(["--input", AMBIGUOUS, ...options]))).rejects.toThrow(
@@ -207,10 +207,9 @@ describe("CC-09: the size of a search is said once, in the singular for one", ()
     vi.spyOn(console, "error").mockImplementation((...line: unknown[]) => {
       lines.push(line.join(" "));
     });
-    const encoded = encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]);
     await searchDates({
-      indexes: encoded.shiftedIndexes,
-      dates: DatesAnswer.parse("23-09-2026", { wordCount: 12, patterns: true }),
+      indexes: MASKED_INDEXES,
+      dates: DatesAnswer.parse(DATE, { wordCount: 12, patterns: true }),
       mode: "seedshift",
       passphrase: "",
       limits: { maxResults: 10 },

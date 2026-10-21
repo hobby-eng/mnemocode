@@ -11,7 +11,7 @@ import { encodeMnemonic, parseDate } from "../src/core.js";
 import { DatesAnswer } from "../src/core/date-search.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // Colors with an unread one whose order tags start later than 0, as older records may
 // (AUD-037-FUN004): every placement that the tags read allow is searched, and colors typed in the
@@ -24,7 +24,7 @@ const PHRASES = [
   `${"abandon ".repeat(20)}admit`,
   `${"abandon ".repeat(23)}art`,
 ];
-const DATE = parseDate("23-09-2026");
+const PARSED_DATE = parseDate(DATE);
 /** The digits of a color's tag before its six digits of word positions (colors.ts). */
 const TAG_DIGITS = 2;
 
@@ -70,7 +70,7 @@ describe("marked colors of a record whose tags start later", () => {
   it.each(PHRASES.map((phrase) => [phrase.split(" ").length, phrase] as const))(
     "are found for %i words, the lowest, a middle or the highest color unread",
     async (_, phrase) => {
-      const encoded = encodeMnemonic(phrase, [DATE]);
+      const encoded = encodeMnemonic(phrase, [PARSED_DATE]);
       const indexes = encoded.shiftedIndexes;
       const colors = indexesToColors(indexes);
       const step = colors.length === 8 ? 2 : 1;
@@ -103,7 +103,10 @@ describe("marked colors of a record whose tags start later", () => {
         // And the wallet, with the date known: the same search, so once.
         if (colors.length !== 8) continue;
         const wallet = await new MissingCodesSearch(codes, fingerprint)
-          .byWallet(async (mnemonic) => ({ matched: mnemonic === phrase }), DatesAnswer.of([DATE]))
+          .byWallet(
+            async (mnemonic) => ({ matched: mnemonic === phrase }),
+            DatesAnswer.of([PARSED_DATE]),
+          )
           .run();
         expect(wallet.kind, `offset ${offset}, wallet`).toBe("found");
       }
@@ -111,7 +114,7 @@ describe("marked colors of a record whose tags start later", () => {
   );
 
   it("take the placement that colors typed in order tell, and every one in another order", () => {
-    const colors = indexesToColors(encodeMnemonic(PHRASES[0]!, [DATE]).shiftedIndexes);
+    const colors = indexesToColors(encodeMnemonic(PHRASES[0]!, [PARSED_DATE]).shiftedIndexes);
     // Tags from 0 with the first color unread fit a start one step later too: in their order the
     // colors tell 0, in another order both starts are placements, the lowest first.
     const [unread, ...read] = [undefined, ...colors.slice(1)];

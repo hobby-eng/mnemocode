@@ -30,50 +30,32 @@ import { wordlist as englishWordlist } from "@scure/bip39/wordlists/english.js";
 import { parseRecord, serializeRecord } from "../src/record.js";
 import { assertCoreSelfTest } from "../src/cli/self-test.js";
 import { MNEMOCODE_VERSION } from "../src/index.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  MASKED_WORDS,
+  TEST_ADDRESS,
+  TEST_FINGERPRINT,
+  TEST_PHRASE,
+  WRONG_DATE,
+} from "./helpers/test-phrase.js";
 
 const SOURCE = "oppose duck hello neglect reveal key humor mosquito road evoke flock hedgehog";
 const dates = ["10-07-1963", "27-04-1956", "31-01-1994"].map(parseDate);
 const EXPECTED = "mosquito dust hotel maximum rich kitten hair mother salute dream flush hospital";
 
-describe("startup core self-test", () => {
+describe("the package entry", () => {
   it("exports the package version", () => {
     expect(MNEMOCODE_VERSION).toBe("0.1.0");
   });
+});
 
+describe("startup core self-test", () => {
   it("accepts the bundled word list and fixed forward/reverse vectors", () => {
     expect(() => assertCoreSelfTest()).not.toThrow();
   });
 });
 
 describe("original Seedshift compatibility mode", () => {
-  it("rejects a source phrase whose words exist but whose BIP39 checksum is invalid", () => {
-    expect(() =>
-      encodeMnemonic(
-        "table dial lion ginger smile science impact certain melody life limit silver",
-        dates,
-      ),
-    ).toThrow("fail the BIP39 checksum");
-  });
-
-  it("rejects a source word outside the English BIP39 list", () => {
-    expect(() =>
-      encodeMnemonic(
-        "table dial notaword ginger smile science impact certain melody life limit silver",
-        dates,
-      ),
-    ).toThrow("Unknown English BIP39 word at position 3.");
-  });
-
-  it("rejects a non-English lookalike character inside a BIP39 word", () => {
-    expect(() =>
-      encodeMnemonic(
-        "tablе dial predict ginger smile science impact certain melody life limit silver",
-        dates,
-      ),
-    ).toThrow("Unknown English BIP39 word");
-  });
-
   it("reproduces the documented Seedshift example", () => {
     const result = encodeMnemonicLegacy(SOURCE, dates);
     expect(formatEncoded(result, "english")).toBe(EXPECTED);
@@ -118,14 +100,12 @@ describe("legacy checksum-word replacement", () => {
         Uint8Array.from({ length: entropySize }, (_, index) => index),
         englishWordlist,
       );
-      const legacy = encodeMnemonicLegacy(mnemonic, [parseDate("23-09-2026")]);
+      const legacy = encodeMnemonicLegacy(mnemonic, [parseDate(DATE)]);
       const corrected = legacyChecksumValidResult(legacy);
       expect(representMnemonic(corrected.shiftedEnglish.join(" ")).sourceMnemonic).toBe(
         corrected.shiftedEnglish.join(" "),
       );
-      const candidates = decodeIndexesLegacyValid(corrected.shiftedIndexes, [
-        parseDate("23-09-2026"),
-      ]);
+      const candidates = decodeIndexesLegacyValid(corrected.shiftedIndexes, [parseDate(DATE)]);
       expect(candidates).toHaveLength(expectedCandidates[position]!);
       expect(candidates.some((candidate) => candidate.recoveredMnemonic === mnemonic)).toBe(true);
     });
@@ -133,13 +113,11 @@ describe("legacy checksum-word replacement", () => {
 });
 
 describe("checksum-valid Seedshift mode", () => {
-  const oneDate = [parseDate("23-09-2026")];
+  const oneDate = [parseDate(DATE)];
 
   it("reproduces the explained twelve-word checksum-valid example", () => {
     const encoded = encodeMnemonic(TEST_PHRASE, oneDate);
-    expect(encoded.shiftedEnglish.join(" ")).toBe(
-      "wool abuse actual wool abuse actual wool abuse actual wool abuse congress",
-    );
+    expect(encoded.shiftedEnglish.join(" ")).toBe(MASKED_WORDS);
     expect(
       decodeInput(encoded.shiftedEnglish.join(" "), "english", oneDate).recoveredMnemonic,
     ).toBe(TEST_PHRASE);
@@ -150,11 +128,36 @@ describe("checksum-valid Seedshift mode", () => {
     expect(representMnemonic(encoded.shiftedEnglish.join(" ")).sourceMnemonic).toBe(
       encoded.shiftedEnglish.join(" "),
     );
-    const wrong = decodeInput(encoded.shiftedEnglish.join(" "), "english", [
-      parseDate("24-09-2026"),
-    ]);
+    const wrong = decodeInput(encoded.shiftedEnglish.join(" "), "english", [parseDate(WRONG_DATE)]);
     expect(wrong.checksumValid).toBe(true);
     expect(wrong.recoveredMnemonic).not.toBe(TEST_PHRASE);
+  });
+
+  it("rejects a source phrase whose words exist but whose BIP39 checksum is invalid", () => {
+    expect(() =>
+      encodeMnemonic(
+        "table dial lion ginger smile science impact certain melody life limit silver",
+        dates,
+      ),
+    ).toThrow("fail the BIP39 checksum");
+  });
+
+  it("rejects a source word outside the English BIP39 list", () => {
+    expect(() =>
+      encodeMnemonic(
+        "table dial notaword ginger smile science impact certain melody life limit silver",
+        dates,
+      ),
+    ).toThrow("Unknown English BIP39 word at position 3.");
+  });
+
+  it("rejects a non-English lookalike character inside a BIP39 word", () => {
+    expect(() =>
+      encodeMnemonic(
+        "tablе dial predict ginger smile science impact certain melody life limit silver",
+        dates,
+      ),
+    ).toThrow("Unknown English BIP39 word");
   });
 });
 
@@ -206,10 +209,9 @@ describe("all standard BIP39 lengths and representations", () => {
         expect(decodeInputDirect(formatEncoded(direct, format), format).recoveredMnemonic).toBe(
           mnemonic,
         );
-        const shifted = encodeMnemonic(mnemonic, [parseDate("23-09-2026")]);
+        const shifted = encodeMnemonic(mnemonic, [parseDate(DATE)]);
         expect(
-          decodeInput(formatEncoded(shifted, format), format, [parseDate("23-09-2026")])
-            .recoveredMnemonic,
+          decodeInput(formatEncoded(shifted, format), format, [parseDate(DATE)]).recoveredMnemonic,
         ).toBe(mnemonic);
       });
     }
@@ -357,7 +359,7 @@ describe("local Bitcoin recovery evidence", () => {
     expect(
       matchBitcoinEvidence(TEST_PHRASE, {
         kind: "address",
-        value: "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
+        value: TEST_ADDRESS,
         profiles: ["native-segwit"],
         location,
       }).matched,
@@ -376,7 +378,8 @@ describe("local Bitcoin recovery evidence", () => {
     expect(() =>
       matchBitcoinEvidence(TEST_PHRASE, {
         kind: "address",
-        value: "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyq",
+        // The test address with its last character, part of the checksum, changed.
+        value: `${TEST_ADDRESS.slice(0, -1)}q`,
         profiles: ["native-segwit"],
         location,
       }),
@@ -426,7 +429,7 @@ describe("local Bitcoin recovery evidence", () => {
 
 describe("date spelling", () => {
   it("needs a four-digit year in both spellings", () => {
-    expect(parseDate("23-09-2026")).toEqual({ year: 2026, month: 9, day: 23 });
+    expect(parseDate(DATE)).toEqual({ year: 2026, month: 9, day: 23 });
     expect(parseDate("2026-09-23")).toEqual({ year: 2026, month: 9, day: 23 });
     // The year 26 is written with four digits.
     expect(parseDate("23-09-0026")).toEqual({ year: 26, month: 9, day: 23 });

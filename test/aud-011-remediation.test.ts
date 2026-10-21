@@ -29,6 +29,7 @@ import { mnemonicToSeedSync } from "@scure/bip39";
 import { NETWORK, TEST_NETWORK, p2pkh, p2sh, p2tr, p2wpkh } from "@scure/btc-signer";
 import {
   matchWalletEvidence,
+  nodePbkdf2HmacSha512,
   parseBitcoinAddress,
   type BitcoinNetworkName,
   type BitcoinProfile,
@@ -47,7 +48,7 @@ import {
   fingerprintMatch,
   MasterFingerprintCheck,
 } from "../src/core/master-fingerprint.js";
-import { pbkdf2Sync } from "node:crypto";
+import { parseDate } from "../src/core/dates.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { encodeMnemonicLegacy, legacyChecksumValidResult } from "../src/core/seedshift.js";
 import { formatEncoded } from "../src/core/representations.js";
@@ -73,10 +74,7 @@ import type { ShareInfo } from "../src/sskr/transport.js";
 import { COLOR_FORMAT_NUMBERS, formatLegend } from "../src/cli/format-numbers.js";
 import { HEIR_MENU } from "../src/cli/heir-sheet.js";
 import { TOPIC_HELP } from "../src/cli/help-pages.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
-
-/** The public phrase masked with 23-09-2026 (vectors/mnemocode-v1.json), as word numbers. */
-const MASKED_NUMBERS = "2027 10 24 2027 10 24 2027 10 24 2027 10 377";
+import { DATE, MASKED, TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("AUD-011-ARC001: one reader of a known word number", () => {
   it("reads numbers alike in complete codes and beside a ?", () => {
@@ -99,8 +97,8 @@ describe("AUD-011-ARC001: one reader of a known word number", () => {
     ] as const)
       expect(() => wordIndexOfNumber(token), token).toThrow(expect.objectContaining(refusal));
     // A padded known number beside a ? was refused, though complete codes read it.
-    const padded = MASKED_NUMBERS.replace(/^2027 10/u, "2027 0010").replace(/377$/u, "?");
-    expect(parseInput(MASKED_NUMBERS.replace(/^2027 10/u, "2027 0010"), "indexes")[1]).toBe(9);
+    const padded = MASKED.replace(/^2027 10/u, "2027 0010").replace(/377$/u, "?");
+    expect(parseInput(MASKED.replace(/^2027 10/u, "2027 0010"), "indexes")[1]).toBe(9);
     expect(MissingCodes.read(padded, "indexes", "seedshift").missingPlaces).toEqual([12]);
     expect(() => MissingCodes.read(padded.replace("0010", "2049"), "indexes", "seedshift")).toThrow(
       "Word number 2 is no number from 1 through 2048.",
@@ -147,7 +145,7 @@ describe("AUD-011-ARC019: the sizes of a BIP39 phrase have one owner", () => {
 });
 
 describe("AUD-011-ARC002, ARC003, ARC020: the color form has one decoder and derived sizes", () => {
-  const indexes = parseInput(MASKED_NUMBERS, "indexes");
+  const indexes = parseInput(MASKED, "indexes");
   const colors = indexesToColors(indexes);
 
   it("reads colors in any order and with offset tags, complete or marked, alike", () => {
@@ -285,9 +283,7 @@ describe("AUD-011-ARC014, ARC015, ARC016, ARC022: Bitcoin evidence reads through
 
 describe("AUD-011-ARC017: one comparison of master fingerprints", () => {
   it("gives the same fields to the fingerprint check and the evidence, which adds its own", () => {
-    const check = new MasterFingerprintCheck((password, salt, rounds, bytes) =>
-      Uint8Array.from(pbkdf2Sync(password, salt, rounds, bytes, "sha512")),
-    );
+    const check = new MasterFingerprintCheck(nodePbkdf2HmacSha512);
     for (const expected of [TEST_FINGERPRINT, "00000000"]) {
       const direct = check.match(TEST_PHRASE, expected);
       const evidence = matchWalletEvidence(TEST_PHRASE, {
@@ -634,7 +630,7 @@ describe("AUD-011-ARC073, ARC074, ARC079, ARC085, ARC086, ARC087: card rules wit
 });
 
 describe("Encode's rule in the library: the replaced last word of the Original Seedshift", () => {
-  const date = [{ year: 2026, month: 9, day: 23 }];
+  const date = [parseDate(DATE)];
 
   it("refuses what Encode cannot make, before any secret", () => {
     expect(() => EncodedBackup.assertEncodable("seedshift-legacy-valid")).toThrow(

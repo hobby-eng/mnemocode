@@ -2,17 +2,22 @@
 // the last question before them was answered, and what a search says of its size and time is drawn
 // on it (CORE-39): the words, shares, dates or wallet typed before are no longer on the screen.
 // The terminal is replaced (test/helpers/question-terminal.ts). Public test data only: the
-// "abandon … about" phrase, its fingerprint 73c5da0a, and shares split from it here.
+// "abandon … about" phrase, its fingerprint, and shares split from it here.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { encodeMnemonic, parseDate } from "../src/core.js";
 import { PrivateSteps } from "../src/cli/private-steps.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
 import { runSskrCombine } from "../src/cli/sskr-restore-command.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
 import { markUnits } from "./helpers/shares.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  LAST_WORD_FORGOTTEN,
+  MASKED_WORDS,
+  replacedAt,
+  TEST_FINGERPRINT,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -46,18 +51,45 @@ afterEach(() => {
 
 describe("the search of recover-word", () => {
   it("opens a step screen of its own once the words are typed", async () => {
-    terminal.answers = [`${"abandon ".repeat(11)}?\r`];
+    terminal.answers = [`${LAST_WORD_FORGOTTEN}\r`];
     await runRecoverWord({ "ask-secrets": true });
     expect(seen.notices).toContain(SEARCH_SCREEN);
     expect(seen.out.some((line) => line.includes(TEST_PHRASE))).toBe(true);
   });
+
+  it("asks what comes next under its result and warnings, then types the words on a new screen", async () => {
+    // Each step screen says how many list questions were asked before it.
+    PrivateSteps.open(
+      () => seen.notices.push(`step screen after ${terminal.questions.length} questions`),
+      () => undefined,
+    );
+    terminal.answers = [
+      `${LAST_WORD_FORGOTTEN}\r`,
+      `${replacedAt(TEST_PHRASE, { 12: "about|abandon" })}\r`,
+    ];
+    terminal.choices = ["Type the words again"];
+    await runRecoverWord({ "ask-secrets": true, "master-fingerprint": "00000000" });
+    const result = seen.notices.indexOf(
+      "Matched 0 of 128 candidates against the requested master fingerprint locally.",
+    );
+    const typedAgain = seen.notices.indexOf("step screen after 1 questions");
+    // The result and its warnings stay on the screen of "What now?", which opens none of its own;
+    // the words typed again then have a step screen of their own.
+    expect(result).toBeGreaterThan(0);
+    expect(typedAgain).toBeGreaterThan(result);
+    const between = seen.notices.slice(result, typedAgain);
+    expect(between.some((line) => line.startsWith("step screen"))).toBe(false);
+    expect(between).toContain(
+      "A master fingerprint is only 32 bits and is a filter, not proof of recovery.",
+    );
+    expect(terminal.questions).toEqual(["What now?", "What now?"]);
+  });
 });
 
 describe("the searches of sskr-combine", () => {
-  const masked = encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]).shiftedEnglish.join(" ");
   let shares: string[];
   beforeEach(async () => {
-    shares = await splitSskrMnemonic(masked, 2, 3);
+    shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
   });
 
   /** The notice just before the one that starts with `start`: the screen it is drawn on. */

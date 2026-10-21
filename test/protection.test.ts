@@ -9,6 +9,8 @@ import { cloudServiceOf } from "../src/cli/cloud-folders.js";
 import { neededPermissions, PROTECTION_FLAGS } from "../src/cli/protection.js";
 import { swapWarning, unencryptedSwap } from "../src/cli/swap-check.js";
 import { COMMAND_FACTS, type CommandName } from "../src/cli/command-options.js";
+import { runBuiltCli } from "./helpers/built-cli.js";
+import { LONGEST_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
 const execute = promisify(execFile);
 
@@ -159,20 +161,11 @@ describe("process protection", () => {
     expect(needs("self-test", [])).toEqual({ writes: true, runsPrograms: false });
   });
 
-  // The full self-test draws cards; with every other test running beside it, it can take longer
-  // than the common time limit (vitest.config.ts).
-  const SELF_TEST_TIMEOUT_MS = 180_000;
   it(
     "runs every start under the permission model, without network, with core dumps off",
     async () => {
       // A plain node start runs the program again with PROTECTION_FLAGS; the self-test reports it.
-      const { stdout, stderr } = await execute(
-        process.execPath,
-        ["dist/mnemocode.js", "self-test"],
-        {
-          env: { ...process.env, NO_COLOR: "1" },
-        },
-      );
+      const { stdout, stderr } = await runBuiltCli(["self-test"]);
       const report = `${stdout}${stderr}`;
       expect(report).toContain("Process protection");
       expect(report).toContain("no network");
@@ -181,7 +174,7 @@ describe("process protection", () => {
       expect(PROTECTION_FLAGS).toContain("--permission");
       expect(PROTECTION_FLAGS.some((flag) => flag.startsWith("--allow-net"))).toBe(false);
     },
-    SELF_TEST_TIMEOUT_MS,
+    LONGEST_TEST_TIME_LIMIT_MS,
   );
 
   it.runIf(process.platform === "linux" || process.platform === "darwin")(
@@ -189,10 +182,10 @@ describe("process protection", () => {
     async () => {
       // A caller's permission model without --allow-ffi: the sandbox cannot reach the system.
       const script = `
-        import("./dist/cli/protection.js").then(async (protection) => {
-          await protection.hardenProcess();
-          protection.dropUnneeded(false, {});
-          try { protection.assertProtected(); console.log("protected"); }
+        import("./dist/cli/protection.js").then(async ({ ProcessProtection }) => {
+          await ProcessProtection.harden();
+          ProcessProtection.dropUnneeded(false, {});
+          try { ProcessProtection.assert(); console.log("protected"); }
           catch (error) { console.log(error.message); }
         });`;
       const { stdout } = await execute(process.execPath, [
@@ -209,10 +202,10 @@ describe("process protection", () => {
 
   it("gives up file writes when a command saves nothing", async () => {
     const script = `
-      import("./dist/cli/protection.js").then(async (protection) => {
-        await protection.hardenProcess();
-        protection.dropUnneeded(false, {});
-        console.log(protection.protectionSummary());
+      import("./dist/cli/protection.js").then(async ({ ProcessProtection }) => {
+        await ProcessProtection.harden();
+        ProcessProtection.dropUnneeded(false, {});
+        console.log(ProcessProtection.summary());
       });`;
     const { stdout } = await execute(process.execPath, [
       ...PROTECTION_FLAGS,

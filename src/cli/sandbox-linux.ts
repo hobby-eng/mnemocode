@@ -1,7 +1,7 @@
-// The Linux kernel's own boundaries for a MnemoCode process, as mhfe sets them
+// The Linux kernel's own protections for a MnemoCode process, as mhfe sets them
 // (src/bin/mhfe/protect.rs and its core dump check), with one difference that Node.js imposes: it
 // has started its threads, the pool of libuv that runs file operations among them, before any
-// script runs. Each boundary is therefore applied to every thread at once
+// script runs. Each protection is therefore applied to every thread at once
 // (SECCOMP_FILTER_FLAG_TSYNC, LANDLOCK_RESTRICT_SELF_TSYNC), and a kernel that cannot do so gets
 // none of it, rather than one that holds for one thread only.
 //
@@ -23,7 +23,7 @@
 //   process at once. mlockall would crash every run that the system lets lock memory, such as one
 //   as root; the warning about unencrypted swap covers swap instead (swap-check.ts).
 //
-// Every boundary is read back by a probe that tries what it forbids, as mhfe's are: a socket, an
+// Every protection is read back by a probe that tries what it forbids, as mhfe's are: a socket, an
 // io_uring, /dev/null opened for writing, a program started at a path where none can be.
 
 import {
@@ -61,7 +61,7 @@ const REFUSED = 13;
 const NOT_A_DIRECTORY = 20;
 
 /**
- * The system calls the boundaries name, by architecture, with the AUDIT_ARCH_* value of
+ * The system calls the protections name, by architecture, with the AUDIT_ARCH_* value of
  * linux/audit.h that seccomp reports for them (asm/unistd_64.h on x86-64, asm-generic/unistd.h on
  * arm64). io_uring and Landlock have the same numbers on both.
  */
@@ -202,7 +202,7 @@ const LIBC_FUNCTIONS = {
 /** A system call's argument: a number, or the buffer of a structure. */
 type Argument = bigint | Buffer | null;
 
-/** The C library's functions that the boundaries and their probes call. */
+/** The C library's functions that the protections and their probes call. */
 class Libc {
   readonly #ffi: NodeFfi;
   readonly #functions;
@@ -242,9 +242,9 @@ class Libc {
   }
 }
 
-/** The Linux kernel's boundaries, as described at the top. */
+/** The Linux kernel's protections, as described at the top. */
 export class LinuxSandbox implements SystemSandbox {
-  /** The boundaries that the kernel enforces and a probe confirmed, and what it did not. */
+  /** The protections that the kernel enforces and a probe confirmed, and what it did not. */
   readonly #record = new SandboxRecord();
   readonly #libc: Libc | undefined;
   #coreDumps: CoreDumps;

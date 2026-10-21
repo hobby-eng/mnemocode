@@ -54,14 +54,19 @@ export const COINS: readonly Coin[] = Object.freeze(
 /** Every coin, each once, which the command line's wallet checks offer. */
 const COIN_LIST = new CoinList(COINS);
 
-/** The coin of an identifier such as "bitcoin-cash", in either case; refused when unknown. */
+/**
+ * The coin of an identifier such as "bitcoin-cash", in either case; refused when unknown, naming
+ * the coins there are (CoinList.byId: core.coins.coin.unknown-coin-coins).
+ */
 export function coinById(id: string): Coin {
   return COIN_LIST.byId(id);
 }
 
 /**
  * An address as typed, in its standard form, when it is a single-key receiving address of `coin`;
- * refused, naming why, otherwise. A host checks an answer with it at once: no secret is needed.
+ * refused as coinById refuses an unknown coin (core.coins.coin.unknown-coin-coins) and as
+ * Coin.parse refuses the address, with the codes it names. A host checks an answer with it at
+ * once: no secret is needed.
  */
 export function parseCoinAddress(coin: string, text: string): string {
   return coinById(coin).parse(text).text;

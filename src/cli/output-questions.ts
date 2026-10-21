@@ -153,6 +153,14 @@ export async function inputFile(answer: string, limit: number): Promise<string> 
   return path;
 }
 
+/** The question for the name of each kind of file that a person names, to save or to read. */
+export const FILE_NAME_QUESTIONS = Object.freeze({
+  pdf: "PDF file name",
+  text: "Text file name",
+  record: "Record file name",
+  qr: "QR code file name",
+} as const);
+
 /** Asks for the name of a file to save, `fallback` by default. */
 export function askOutputFile(
   question: string,

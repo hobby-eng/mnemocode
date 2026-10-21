@@ -6,11 +6,11 @@ import { MarkedReading } from "../src/sskr/repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { Share } from "../src/sskr/transport.js";
 import { deferred } from "./helpers/deferred.js";
+import { WIPED_CODE } from "./helpers/owner-lifetime.js";
 
 // Public bip39-128-2-of-3 vector: no generated or private recovery material.
 const ONE_MARK = SSKR_SET_VECTOR.colors[0].replace("#37B8CA", "?");
 const PUBLIC_ENTROPY_BYTES = 16;
-const WIPED_CODE = "core.secret-value.wiped";
 const PLAN_WIPED_CODE = "sskr.joint-repair.plan-wiped";
 
 async function pausedConfirmation(records: readonly string[] = SSKR_SET_VECTOR.shares) {
@@ -147,7 +147,7 @@ describe("AUD-029-SEC001: recovery follow-up lifetimes", () => {
       await expect(run.pending).rejects.toHaveProperty("code", PLAN_WIPED_CODE);
       expect(run.entropyResults).toHaveLength(1);
       expect(run.entropyResults[0]!.nonzeroAtReturn).toBe(true);
-      // The wrapper retains the exact host-returned object, not a zeroed test-side copy.
+      // The combineShares above keeps the exact host-returned object, not a zeroed test-side copy.
       expect(run.entropyResults[0]!.bytes).toEqual(new Uint8Array(PUBLIC_ENTROPY_BYTES));
     } finally {
       await run.close();

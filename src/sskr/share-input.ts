@@ -496,6 +496,8 @@ export class ShareInput implements Disposable {
    * The parts of a share file or paste, with empty lines left out and wrapped shares joined.
    * Unreadable parts stay in place: the reader must name them, never silently drop them. Decode
    * uses the same boundaries before deciding whether the text holds shares or phrase codes.
+   * Refuses more parts than a set has shares (assertShareCount:
+   * sskr.transport.assert-share-count-refused).
    */
   static partsOfText(text: string): string[] {
     const parts = text
@@ -514,7 +516,7 @@ export class ShareInput implements Disposable {
    * `message` of a share after "Share N" and `joint`, such as "Share 2 cannot be read: unknown …".
    * Its first letter is made small, unless it begins an abbreviation such as SSKR.
    */
-  static aboutShare(place: number, joint: string, message: string): string {
+  static #aboutShare(place: number, joint: string, message: string): string {
     return afterPlace("Share", place, message, joint);
   }
 
@@ -522,7 +524,7 @@ export class ShareInput implements Disposable {
    * The first share of `shares` that does not belong with the others, for shares that need no
    * quorum, such as those written again by an export. A copy of a share is no problem.
    */
-  static looseSetTrouble(shares: readonly PlacedShare[]): SetTrouble | undefined {
+  static #looseSetTrouble(shares: readonly PlacedShare[]): SetTrouble | undefined {
     return setTrouble(withoutCopies(shares).map(withInfo));
   }
 
@@ -595,6 +597,8 @@ export class ShareInput implements Disposable {
    * the end or two in a row, is no share and is passed over. A seed phrase, also one word per line,
    * is refused as one, in words (sskr.share-input.seed-phrase-in-words) or encoded
    * (encoded-seed-phrase): `subject` names the text in that message, "This is" or "The file holds".
+   * Refuses more parts than a set has (partsOfText: sskr.transport.assert-share-count-refused), and
+   * any text once this input was ended (assertLive: core.secret-value.wiped).
    */
   sharesOfText(text: string, subject = "This is"): string[] {
     this.#texts.assertLive();
@@ -625,7 +629,11 @@ export class ShareInput implements Disposable {
     return shares;
   }
 
-  /** Adds shares after those typed, each at the next place; adding none changes nothing. */
+  /**
+   * Adds shares after those typed, each at the next place; adding none changes nothing. Refuses
+   * more shares in all than a set has (sskr.transport.assert-share-count-refused), and any once
+   * this input was ended (assertLive: core.secret-value.wiped).
+   */
   add(texts: readonly string[]): void {
     this.#texts.assertLive();
     if (texts.length === 0) return;
@@ -638,7 +646,11 @@ export class ShareInput implements Disposable {
     this.#nextPlace += texts.length;
   }
 
-  /** Takes `texts` in place of every share typed before, at places from 1. */
+  /**
+   * Takes `texts` in place of every share typed before, at places from 1. Refuses none, or more
+   * than a set has (sskr.transport.assert-share-count-refused), and any once this input was ended
+   * (assertLive: core.secret-value.wiped).
+   */
   replaceAll(texts: readonly string[]): void {
     this.#texts.assertLive();
     assertShareCount(texts.length);
@@ -700,7 +712,7 @@ export class ShareInput implements Disposable {
     } catch (error) {
       const kind = phraseKind(text);
       if (kind !== undefined) return this.#notShare(kind, `Share ${place} is`);
-      const message = ShareInput.aboutShare(place, " cannot be read: ", refusalMessage(error));
+      const message = ShareInput.#aboutShare(place, " cannot be read: ", refusalMessage(error));
       return error instanceof Error
         ? { code: "share-unreadable", message, cause: error }
         : { code: "share-unreadable", message };
@@ -723,7 +735,7 @@ export class ShareInput implements Disposable {
    */
   #looseTrouble(): ShareTrouble | undefined {
     const read = this.#readAll();
-    return Array.isArray(read) ? ShareInput.looseSetTrouble(read) : read;
+    return Array.isArray(read) ? ShareInput.#looseSetTrouble(read) : read;
   }
 
   /**
@@ -761,7 +773,7 @@ export class ShareInput implements Disposable {
   /**
    * The shares of `set` to write again, named by `places`, in `form` or their own: a share that
    * nothing settles is left out, and shares repaired each on its own must still be of one set
-   * (looseSetTrouble).
+   * (#looseSetTrouble).
    */
   static checkedExport(
     set: RepairedShares,
@@ -771,7 +783,7 @@ export class ShareInput implements Disposable {
     const written = ShareExport.of(set, places, form);
     try {
       if (written.shown.length === 0) return { kind: "none", written };
-      const trouble = ShareInput.looseSetTrouble(written.members);
+      const trouble = ShareInput.#looseSetTrouble(written.members);
       if (trouble !== undefined) return { kind: "trouble", written, trouble };
       return { kind: "written", written };
     } catch (error) {
@@ -803,7 +815,7 @@ export class ShareInput implements Disposable {
         return {
           kind: "unreadable",
           place,
-          message: ShareInput.aboutShare(place, ": ", error.message),
+          message: ShareInput.#aboutShare(place, ": ", error.message),
           cause: error,
         };
       }

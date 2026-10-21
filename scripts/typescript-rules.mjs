@@ -16,7 +16,8 @@
 //   has at least SENTENCE_WORDS words besides those values.
 // - CORE-20: the doc comment of an exported function of a library module, and of a public method
 //   of an exported class there, names the code of each error that the function creates itself
-//   (`ERRORS.create("<code>"`, with any catalog of the file).
+//   (`ERRORS.create("<code>"`, with a catalog that the file makes or imports from a module of
+//   errors, `<feature>-errors.js`).
 
 import { dirname, join, normalize } from "node:path";
 import {
@@ -32,6 +33,8 @@ import { afterGroup } from "./source-tokens.mjs";
 const ASSERTION_COMMENT_LINES = 3;
 /** TS-09: the name of a constant with a fixed meaning. */
 const UPPER_SNAKE = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/u;
+/** CORE-20: a module that holds only the catalog of coded errors of a feature. */
+const ERRORS_MODULE = /^["'][^"']*-errors\.js["']$/u;
 /** CORE-34: the fewest words of a test's name, the values of its cases left out. */
 const SENTENCE_WORDS = 3;
 /** CORE-34: where the value of a case goes in the name of a test of several cases. */
@@ -305,7 +308,10 @@ export function checkTestNames(path, tokens, report) {
   });
 }
 
-/** The catalogs of coded errors that the file makes: `const NAME = new ErrorCatalog(`. */
+/**
+ * The catalogs of coded errors that the file makes, `const NAME = new ErrorCatalog(`, or takes from
+ * a module of its own errors, `import { NAME } from "./<feature>-errors.js"`.
+ */
 function catalogsOf(tokens) {
   const catalogs = new Set();
   tokens.forEach((token, at) => {
@@ -315,6 +321,11 @@ function catalogsOf(tokens) {
       tokens[at - 1]?.key === "="
     )
       catalogs.add(tokens[at - 2]?.key);
+    if (token.key !== "import" || tokens[at + 1]?.key !== "{") return;
+    const close = afterGroup(tokens, at + 1);
+    if (tokens[close]?.key !== "from" || !ERRORS_MODULE.test(tokens[close + 1]?.key ?? "")) return;
+    for (let inside = at + 2; inside < close - 1; inside += 1)
+      if (UPPER_SNAKE.test(tokens[inside].key)) catalogs.add(tokens[inside].key);
   });
   return catalogs;
 }

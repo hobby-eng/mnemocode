@@ -11,8 +11,9 @@ import { CardValues } from "../src/export/card-values.js";
 import { nodeRenderPlatform } from "../src/export/platform-node.js";
 import type { CardDrawing } from "../src/export/templates.js";
 import { deferred } from "./helpers/deferred.js";
+import { endLifetimeIfPresent, WIPED_CODE } from "./helpers/owner-lifetime.js";
 
-const WIPED = { code: "core.secret-value.wiped" };
+const WIPED = { code: WIPED_CODE };
 const noDrawing = (): never => {
   throw new Error("This lifetime test must not render or read an asset.");
 };
@@ -24,12 +25,6 @@ const drawing = new CardRenderer({
   qrModules: noDrawing,
 });
 const OPTIONS = { style: "it", layout: "individual", pageSize: "business" } as const;
-
-// The RED baseline has no disposal API yet; still end every owner that provides one.
-function disposeIfPresent(owner: object): void {
-  const dispose: unknown = Reflect.get(owner, Symbol.dispose);
-  if (typeof dispose === "function") Reflect.apply(dispose, owner, []);
-}
 
 function heldFont() {
   const entered = deferred();
@@ -72,7 +67,7 @@ describe("card result owners", () => {
       expect(cards.shares[0]?.reference).toBe("4BBF-1-1");
       expect(cards.qrCodes).toEqual([]);
     } finally {
-      disposeIfPresent(cards);
+      endLifetimeIfPresent(cards, "dispose");
     }
   });
 
@@ -89,7 +84,7 @@ describe("card result owners", () => {
       expect((await cards.job()).content).toEqual(first.content);
       expect((await cards.separateJob()).content.payload).toBe(first.content.payload);
     } finally {
-      disposeIfPresent(cards);
+      endLifetimeIfPresent(cards, "dispose");
     }
     expect(backup.text()).not.toBe("");
   });
@@ -108,7 +103,7 @@ describe("card result owners", () => {
       await expect(cards.renderAll()).rejects.toMatchObject(WIPED);
       await expect(cards.documents(0).next()).rejects.toMatchObject(WIPED);
     } finally {
-      disposeIfPresent(cards);
+      endLifetimeIfPresent(cards, "dispose");
     }
   });
 
@@ -124,12 +119,12 @@ describe("card result owners", () => {
         child.wipe();
         expect(another.printedCodes(0)).toEqual(codes);
       } finally {
-        disposeIfPresent(another);
+        endLifetimeIfPresent(another, "dispose");
       }
       expect(() => child.printedCodes(0)).toThrow(expect.objectContaining(WIPED));
     } finally {
-      disposeIfPresent(child);
-      disposeIfPresent(parent);
+      endLifetimeIfPresent(child, "dispose");
+      endLifetimeIfPresent(parent, "dispose");
     }
   });
 
@@ -150,7 +145,7 @@ describe("card result owners", () => {
       await expect(cards.job()).rejects.toMatchObject(WIPED);
       await expect(cards.separateJob()).rejects.toMatchObject(WIPED);
     } finally {
-      disposeIfPresent(cards);
+      endLifetimeIfPresent(cards, "dispose");
     }
   });
 });
@@ -182,7 +177,7 @@ describe("Card planning and publication", () => {
       expect(backup.text()).not.toBe("");
     } finally {
       font.held.release();
-      disposeIfPresent(cards);
+      endLifetimeIfPresent(cards, "dispose");
     }
   });
 

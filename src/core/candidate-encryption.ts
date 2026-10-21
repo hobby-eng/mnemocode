@@ -2,11 +2,14 @@
 // MnemoCode, the Wallet Deriver and the Discovery Scanner compile it unchanged. A list goes either
 // to the Scanner's one-time X25519 key (age1…) or, as a separate file, under a passphrase through
 // scrypt; never both and never to more than one key, since a file is only as strong as its weakest
-// stanza and age-encryption itself would accept a mix. ListProtection, at the end, is the entry:
-// the three ways to protect a list behind one interface, chosen once. It also holds the rule for
-// the passphrase of a list (parseListPassphrase), so that every host accepts the same ones.
+// stanza and age-encryption itself would accept a mix. CandidateEncryption is the entry: the gate
+// of the age operations and the operations behind it, which a host may hold for its session; the
+// functions that hosts already call share one gate per realm. ListProtection, at the end, gives
+// the three ways to protect a list behind one interface, chosen once. The module also holds the
+// rule for the passphrase of a list (parseListPassphrase), so that every host accepts the same
+// ones.
 //
-// The age operations themselves are candidate-cipher.ts's; this module runs them only after their
+// The age operations themselves are candidate-cipher.ts's; the gate runs them only after their
 // self-test passed (candidate-encryption-checks.ts), once per kind of lock and again where a host
 // asks. From the host it needs what they need: crypto.getRandomValues and, for X25519 only,
 // WebCrypto (crypto.subtle), without which the X25519 operations refuse at once with one line,
@@ -17,7 +20,11 @@ import { Redacted } from "./redacted.js";
 import { bytesWhileLive, SecretValue } from "./secret-value.js";
 import { withoutByteOrderMark } from "./white-space.js";
 import { listInWords } from "./places.js";
-import { CandidateFileAdmission, type ListFileLock } from "./candidate-file-admission.js";
+import {
+  CandidateFileAdmission,
+  LIST_FILE_LOCKS,
+  type ListFileLock,
+} from "./candidate-file-admission.js";
 import {
   CandidateCipher,
   type CandidateFileKey,
@@ -27,8 +34,9 @@ import { ERRORS } from "./candidate-encryption-errors.js";
 import { CandidateEncryptionChecks } from "./candidate-encryption-checks.js";
 
 /**
- * For other hosts: the owner of the Scanner's one-time key, which createSessionIdentity makes and
- * decryptCandidates takes as `{ identity }`; SessionIdentity.fromText takes a published test key.
+ * For other hosts: the owner of the Scanner's one-time key, which CandidateEncryption's
+ * createSessionIdentity makes and its decrypt takes as `{ identity }`, as createSessionIdentity and
+ * decryptCandidates do; SessionIdentity.fromText takes a published test key.
  */
 export { SessionIdentity } from "./candidate-cipher.js";
 
@@ -134,9 +142,7 @@ class CipherHealth {
   }
 }
 
-const SYMMETRIC_HEALTH = new CipherHealth(() => CandidateEncryptionChecks.symmetric());
-const KEY_HEALTH = new CipherHealth(() => CandidateEncryptionChecks.quick());
-
+/** The checks that one operation passed: a later failure of either voids its result. */
 interface CipherState {
   readonly symmetric: Promise<void>;
   readonly key: Promise<void> | undefined;
@@ -144,170 +150,260 @@ interface CipherState {
   readonly keyEpoch: symbol | undefined;
 }
 
-function assertNoCipherFailure(state: CipherState): void {
-  if (
-    SYMMETRIC_HEALTH.failureEpoch() !== state.symmetricEpoch ||
-    (state.keyEpoch !== undefined && KEY_HEALTH.failureEpoch() !== state.keyEpoch)
-  )
-    throw ERRORS.create("self-test-failed", []);
-}
-
-function currentCipher(state: CipherState): boolean {
-  return (
-    SYMMETRIC_HEALTH.current(state.symmetric) &&
-    (state.key === undefined || KEY_HEALTH.current(state.key))
-  );
-}
-
-async function cipherState(kind: ListFileLock): Promise<CipherState> {
-  if (!CandidateFileAdmission.isLock(kind)) throw ERRORS.create("unsupported-lock", []);
-  if (kind === "key") CandidateCipher.requireX25519();
-  try {
-    for (;;) {
-      const symmetric = SYMMETRIC_HEALTH.ready();
-      await symmetric;
-      const key = kind === "key" ? KEY_HEALTH.ready() : undefined;
-      if (key !== undefined) await key;
-      const state = {
-        symmetric,
-        key,
-        symmetricEpoch: SYMMETRIC_HEALTH.failureEpoch(),
-        keyEpoch: key === undefined ? undefined : KEY_HEALTH.failureEpoch(),
-      };
-      if (currentCipher(state)) return state;
-    }
-  } catch {
-    throw ERRORS.create("self-test-failed", []);
-  }
-}
-
-/** A forced recheck is a barrier before work and before publishing its asynchronous result. */
-async function withCipherHealth<Value>(
+/**
+ * `use` run through the gate of `encryption` for a `kind` of lock, its result retired by `retire`
+ * when a check fails meanwhile (CandidateEncryption's #gated). CandidateEncryption's static block
+ * sets it, so that this module's protections can read their secret only once the gate is open,
+ * which a public operation taking the secret as an argument cannot: a protection wiped while the
+ * first check runs then encrypts nothing.
+ */
+let throughGate: <Value>(
+  encryption: CandidateEncryption,
   kind: ListFileLock,
   use: () => Promise<Value>,
-  retire?: (value: Value) => void,
-): Promise<Value> {
-  for (;;) {
-    const state = await cipherState(kind);
-    if (!currentCipher(state)) continue;
-    const value = await use();
+  retire: (value: Value) => void,
+) => Promise<Value>;
+
+/**
+ * The gate of candidate encryption and the age operations behind it. The fast known answers of the
+ * operations (CandidateEncryptionChecks) run before the first operation of each kind of lock and
+ * again where the host asks, and every operation runs only while the answers of its lock hold. A
+ * class, so that the state of the gate has an owner whose rules hold: a check that passed is shared
+ * by concurrent calls and kept, one that failed runs again at the next call, a forced recheck is a
+ * barrier before new work, and a result is not handed out when a recheck fails while it is made.
+ * For other hosts: a host may hold one for its session and pass it to the protections it makes; the
+ * functions of this module, and a protection made without one, share one gate per realm.
+ */
+export class CandidateEncryption {
+  readonly #symmetric = new CipherHealth(() => CandidateEncryptionChecks.symmetric());
+  readonly #key = new CipherHealth(() => CandidateEncryptionChecks.quick());
+
+  static {
+    throughGate = (encryption, kind, use, retire) => encryption.#gated(kind, use, retire);
+  }
+
+  /**
+   * Fast lazy integrity gate before a host enables candidate encryption controls. Passphrase
+   * operations need only the symmetric check; key operations additionally require WebCrypto and
+   * X25519 known answers. Successful checks are kept; failures leave the feature unavailable.
+   * Refuses a `kind` that is no lock (core.candidate-encryption.unsupported-lock), "key" where
+   * WebCrypto is missing (no-webcrypto), and a failed check (self-test-failed).
+   */
+  async ready(kind: ListFileLock): Promise<void> {
+    for (;;) {
+      const state = await this.#state(kind);
+      if (this.#current(state)) return;
+    }
+  }
+
+  /**
+   * Reruns all fast known answers explicitly, without scrypt and without the kept successes. Fails
+   * as the first failed check fails (CandidateEncryptionChecks.symmetric and quick:
+   * core.self-test-check.mismatch and the others they name); the feature stays unavailable until a
+   * later check passes.
+   */
+  async recheck(): Promise<void> {
+    // Publish both barriers synchronously: new operations cannot reuse an earlier successful run.
+    const symmetric = this.#symmetric.refresh();
+    const key = this.#key.refresh(symmetric);
+    await Promise.all([symmetric, key]);
+  }
+
+  /**
+   * Generates a session identity only after the fast key feature checks pass: the owner of its
+   * private key, which the host keeps for the session and then wipes (SessionIdentity). Refuses where
+   * WebCrypto is missing (core.candidate-encryption.no-webcrypto) and where a check failed
+   * (self-test-failed); an identity made while a check failed is wiped.
+   */
+  async createSessionIdentity(): Promise<SessionIdentity> {
+    return this.#gated(
+      "key",
+      () => CandidateCipher.createSessionIdentity(),
+      (identity) => identity.wipe(),
+    );
+  }
+
+  /**
+   * Encrypts borrowed plaintext to a validated Scanner key after the fast key integrity gate:
+   * fresh bytes that the caller wipes. Refuses a plaintext over the size limit
+   * (core.candidate-file-refusal.plaintext-list-too-large), a `recipient` that is no age key
+   * (core.candidate-encryption.key-one-age-key-62-characters-starts-age1), a page without WebCrypto
+   * (no-webcrypto) and a failed check (self-test-failed).
+   */
+  async encrypt(plain: Uint8Array, recipient: string): Promise<Uint8Array> {
+    CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
+    const checked = parseRecipient(recipient);
+    return this.#gated(
+      "key",
+      () => CandidateCipher.encrypt(plain, checked),
+      (bytes) => bytes.fill(0),
+    );
+  }
+
+  /**
+   * Encrypts borrowed plaintext with fixed-cost scrypt after the fast symmetric integrity gate:
+   * fresh bytes that the caller wipes. Refuses a plaintext over the size limit
+   * (core.candidate-file-refusal.plaintext-list-too-large), an empty passphrase
+   * (core.candidate-encryption.passphrase-candidates-empty) and a failed check (self-test-failed).
+   */
+  async encryptWithPassphrase(plain: Uint8Array, passphrase: string): Promise<Uint8Array> {
+    CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
+    CandidateCipher.assertPassphrase(passphrase);
+    return this.#gated(
+      "passphrase",
+      () => CandidateCipher.encryptWithPassphrase(plain, passphrase),
+      (bytes) => bytes.fill(0),
+    );
+  }
+
+  /**
+   * Authenticates borrowed file bytes after admission and the appropriate fast feature gate, with
+   * `key`: `{ identity }`, the live session identity, or `{ passphrase }`. The plaintext is fresh
+   * bytes that the caller wipes, returned only while the session identity is live. Refuses, as
+   * CandidateFileRefusedError, a file that is not one for `key`
+   * (CandidateFileAdmission.assertLock: core.candidate-file-refusal.recipient-of-another-key and the
+   * others it names) and what CandidateCipher.decrypt refuses (scanner-key-does-not-open,
+   * passphrase-does-not-open, contents-damaged, plaintext-list-too-large); an identity that is no
+   * SessionIdentity (core.candidate-encryption.not-session-identity), and one wiped before the
+   * plaintext is returned (core.secret-value.wiped, the plaintext overwritten); and, for an
+   * identity, a page without WebCrypto (core.candidate-encryption.no-webcrypto), and a failed check
+   * (self-test-failed).
+   */
+  async decrypt(file: Uint8Array, key: CandidateFileKey): Promise<Uint8Array> {
+    // Read once: a host's object may answer differently when it is read again (AUD-015).
+    const owned: CandidateFileKey =
+      "identity" in key ? { identity: key.identity } : { passphrase: key.passphrase };
+    const kind = "identity" in owned ? "key" : "passphrase";
+    CandidateFileAdmission.assertLock(file, kind);
+    const plain = await this.#gated(
+      kind,
+      () => CandidateCipher.decrypt(file, owned),
+      (bytes) => bytes.fill(0),
+    );
+    // The session may end while the gate rechecks its cipher: its list is then not handed out.
+    return "identity" in owned ? bytesWhileLive(plain, () => owned.identity.assertLive()) : plain;
+  }
+
+  #assertNoFailure(state: CipherState): void {
+    if (
+      this.#symmetric.failureEpoch() !== state.symmetricEpoch ||
+      (state.keyEpoch !== undefined && this.#key.failureEpoch() !== state.keyEpoch)
+    )
+      throw ERRORS.create("self-test-failed", []);
+  }
+
+  #current(state: CipherState): boolean {
+    return (
+      this.#symmetric.current(state.symmetric) &&
+      (state.key === undefined || this.#key.current(state.key))
+    );
+  }
+
+  async #state(kind: ListFileLock): Promise<CipherState> {
+    if (!CandidateFileAdmission.isLock(kind)) throw ERRORS.create("unsupported-lock", []);
+    CandidateCipher.requireFor(kind);
     try {
       for (;;) {
-        // A later successful retry may admit fresh work, but cannot rehabilitate this result.
-        assertNoCipherFailure(state);
-        const checked = await cipherState(kind);
-        assertNoCipherFailure(state);
-        if (currentCipher(checked)) return value;
+        const symmetric = this.#symmetric.ready();
+        await symmetric;
+        // The X25519 known answers gate only the locks that use X25519.
+        const key = LIST_FILE_LOCKS[kind].x25519 ? this.#key.ready() : undefined;
+        if (key !== undefined) await key;
+        const state = {
+          symmetric,
+          key,
+          symmetricEpoch: this.#symmetric.failureEpoch(),
+          keyEpoch: key === undefined ? undefined : this.#key.failureEpoch(),
+        };
+        if (this.#current(state)) return state;
       }
-    } catch (error) {
-      retire?.(value);
-      throw error;
+    } catch {
+      throw ERRORS.create("self-test-failed", []);
+    }
+  }
+
+  /** A forced recheck is a barrier before work and before publishing its asynchronous result. */
+  async #gated<Value>(
+    kind: ListFileLock,
+    use: () => Promise<Value>,
+    retire: (value: Value) => void,
+  ): Promise<Value> {
+    for (;;) {
+      const state = await this.#state(kind);
+      if (!this.#current(state)) continue;
+      const value = await use();
+      try {
+        for (;;) {
+          // A later successful retry may admit fresh work, but cannot rehabilitate this result.
+          this.#assertNoFailure(state);
+          const checked = await this.#state(kind);
+          this.#assertNoFailure(state);
+          if (this.#current(checked)) return value;
+        }
+      } catch (error) {
+        retire(value);
+        throw error;
+      }
     }
   }
 }
 
+// The functions that hosts already call (docs/CANDIDATES.md), kept beside the class as the older
+// functions of a part are kept (docs/ARCHITECTURE.md): they share one gate per realm, which the
+// command line uses too, as does a protection that a host makes without a gate of its own.
+const SHARED_GATE = new CandidateEncryption();
+
 /**
- * Fast lazy integrity gate before a host enables candidate encryption controls. Passphrase
- * operations need only the symmetric check; key operations additionally require WebCrypto and
- * X25519 known answers. Successful checks are cached; failures leave the feature unavailable.
- * Refuses a `kind` that is no lock (core.candidate-encryption.unsupported-lock), "key" where
- * WebCrypto is missing (no-webcrypto), and a failed check (self-test-failed).
+ * The shared gate's CandidateEncryption.ready: refuses as it refuses
+ * (core.candidate-encryption.unsupported-lock and the others it names).
  */
-export async function assertCandidateEncryptionReady(kind: ListFileLock): Promise<void> {
-  for (;;) {
-    const state = await cipherState(kind);
-    if (currentCipher(state)) return;
-  }
+export function assertCandidateEncryptionReady(kind: ListFileLock): Promise<void> {
+  return SHARED_GATE.ready(kind);
 }
 
 /**
- * Reruns all fast known answers explicitly, without scrypt or the first-use cache. Fails as the
- * first failed check fails (CandidateEncryptionChecks.symmetric and quick:
- * core.self-test-check.mismatch and the others they name); the feature stays unavailable until a
- * later check passes.
+ * The shared gate's CandidateEncryption.recheck: fails as it fails (core.self-test-check.mismatch
+ * and the others it names).
  */
-export async function checkCandidateEncryptionQuick(): Promise<void> {
-  // Publish both barriers synchronously: new operations cannot reuse an earlier successful run.
-  const symmetric = SYMMETRIC_HEALTH.refresh();
-  const key = KEY_HEALTH.refresh(symmetric);
-  await Promise.all([symmetric, key]);
+export function checkCandidateEncryptionQuick(): Promise<void> {
+  return SHARED_GATE.recheck();
 }
 
 /**
- * Generates a session identity only after the fast key feature checks pass: the owner of its
- * private key, which the host keeps for the session and then wipes (SessionIdentity). Refuses where
- * WebCrypto is missing (core.candidate-encryption.no-webcrypto) and where a check failed
- * (self-test-failed).
+ * A session identity made through the shared gate (CandidateEncryption.createSessionIdentity),
+ * refused as it refuses (core.candidate-encryption.no-webcrypto, self-test-failed).
  */
-export async function createSessionIdentity(): Promise<SessionIdentity> {
-  return withCipherHealth("key", () => CandidateCipher.createSessionIdentity());
+export function createSessionIdentity(): Promise<SessionIdentity> {
+  return SHARED_GATE.createSessionIdentity();
 }
 
 /**
- * Encrypts borrowed plaintext to a validated Scanner key after the fast key integrity gate.
- * Refuses a plaintext over the size limit (core.candidate-file-refusal.plaintext-list-too-large),
- * a `recipient` that is no age key
- * (core.candidate-encryption.key-one-age-key-62-characters-starts-age1), a page without WebCrypto
- * (no-webcrypto) and a failed check (self-test-failed).
+ * `plain` encrypted to `recipient` through the shared gate (CandidateEncryption.encrypt), refused
+ * as it refuses (core.candidate-encryption.key-one-age-key-62-characters-starts-age1 and the others
+ * it names).
  */
-export async function encryptCandidates(plain: Uint8Array, recipient: string): Promise<Uint8Array> {
-  CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
-  const checked = parseRecipient(recipient);
-  return withCipherHealth(
-    "key",
-    () => CandidateCipher.encrypt(plain, checked),
-    (bytes) => bytes.fill(0),
-  );
+export function encryptCandidates(plain: Uint8Array, recipient: string): Promise<Uint8Array> {
+  return SHARED_GATE.encrypt(plain, recipient);
 }
 
 /**
- * Encrypts borrowed plaintext with fixed-cost scrypt after the fast symmetric integrity gate.
- * Refuses a plaintext over the size limit (core.candidate-file-refusal.plaintext-list-too-large),
- * an empty passphrase (core.candidate-encryption.passphrase-candidates-empty) and a failed check
- * (self-test-failed).
+ * `plain` encrypted under `passphrase` through the shared gate
+ * (CandidateEncryption.encryptWithPassphrase), refused as it refuses
+ * (core.candidate-encryption.passphrase-candidates-empty and the others it names).
  */
-export async function encryptCandidatesWithPassphrase(
+export function encryptCandidatesWithPassphrase(
   plain: Uint8Array,
   passphrase: string,
 ): Promise<Uint8Array> {
-  CandidateFileAdmission.assertSize(plain.byteLength, "plaintext");
-  CandidateCipher.assertPassphrase(passphrase);
-  return withCipherHealth(
-    "passphrase",
-    () => CandidateCipher.encryptWithPassphrase(plain, passphrase),
-    (bytes) => bytes.fill(0),
-  );
+  return SHARED_GATE.encryptWithPassphrase(plain, passphrase);
 }
 
 /**
- * Authenticates borrowed file bytes after admission and the appropriate fast feature gate, with
- * `key`: `{ identity }`, the live session identity, or `{ passphrase }`. The plaintext is fresh
- * bytes that the caller wipes, returned only while the session identity is live. Refuses, as
- * CandidateFileRefusedError, a file that is not one for `key`
- * (CandidateFileAdmission.assertLock: core.candidate-file-refusal.recipient-of-another-key and the
- * others it names) and what CandidateCipher.decrypt refuses (scanner-key-does-not-open,
- * passphrase-does-not-open, contents-damaged, plaintext-list-too-large); an identity that is no
- * SessionIdentity (core.candidate-encryption.not-session-identity), and one wiped before the
- * plaintext is returned (core.secret-value.wiped, the plaintext overwritten); and, for an
- * identity, a page without WebCrypto (core.candidate-encryption.no-webcrypto), and a failed check
- * (self-test-failed).
+ * `file` decrypted with `key` through the shared gate (CandidateEncryption.decrypt), refused as it
+ * refuses (core.candidate-file-refusal.recipient-of-another-key and the others it names).
  */
-export async function decryptCandidates(
-  file: Uint8Array,
-  key: CandidateFileKey,
-): Promise<Uint8Array> {
-  // Read once: a host's object may answer differently when it is read again (AUD-015).
-  const owned: CandidateFileKey =
-    "identity" in key ? { identity: key.identity } : { passphrase: key.passphrase };
-  const kind = "identity" in owned ? "key" : "passphrase";
-  CandidateFileAdmission.assertLock(file, kind);
-  const plain = await withCipherHealth(
-    kind,
-    () => CandidateCipher.decrypt(file, owned),
-    (bytes) => bytes.fill(0),
-  );
-  // The session may end while the gate rechecks its cipher: its list is then not handed out.
-  return "identity" in owned ? bytesWhileLive(plain, () => owned.identity.assertLive()) : plain;
+export function decryptCandidates(file: Uint8Array, key: CandidateFileKey): Promise<Uint8Array> {
+  return SHARED_GATE.decrypt(file, key);
 }
 
 /**
@@ -333,13 +429,17 @@ export interface OwnedListProtection extends ListProtection, Disposable {
 /** A list encrypted to the Discovery Scanner's one-time X25519 key (age1…). */
 export class ScannerKeyProtection implements OwnedListProtection {
   readonly #recipient: string;
+  readonly #encryption: CandidateEncryption;
 
   /**
    * Takes the key as typed, pasted or read from a file, and refuses one that is not an age key
-   * (core.candidate-encryption.key-one-age-key-62-characters-starts-age1, parseRecipient).
+   * (core.candidate-encryption.key-one-age-key-62-characters-starts-age1, parseRecipient). It
+   * encrypts through `encryption`, the host's gate, or the module's shared one when the host holds
+   * none, as hosts made it before the class.
    */
-  constructor(key: string) {
+  constructor(key: string, encryption: CandidateEncryption = SHARED_GATE) {
     this.#recipient = parseRecipient(key);
+    this.#encryption = encryption;
   }
 
   // Getters, not readonly fields, which a caller could overwrite at run time: what the object says
@@ -366,7 +466,7 @@ export class ScannerKeyProtection implements OwnedListProtection {
    * failed (core.candidate-encryption.self-test-failed).
    */
   protect(list: Uint8Array): Promise<Uint8Array> {
-    return encryptCandidates(list, this.#recipient);
+    return this.#encryption.encrypt(list, this.#recipient);
   }
 
   /** This adapter retains only a public recipient key; there is no secret allocation to erase. */
@@ -385,15 +485,18 @@ export class ScannerKeyProtection implements OwnedListProtection {
  */
 export class PassphraseProtection extends Redacted implements OwnedListProtection {
   readonly #passphrase: SecretValue<string>;
+  readonly #encryption: CandidateEncryption;
 
   /**
    * Takes the passphrase as typed or read from a file, refused when it is too short
    * (parseListPassphrase,
-   * core.candidate-encryption.use-at-least-characters-passphrase-all-protects-seed).
+   * core.candidate-encryption.use-at-least-characters-passphrase-all-protects-seed). It encrypts
+   * through `encryption`, the host's gate, or the module's shared one, as for ScannerKeyProtection.
    */
-  constructor(text: string) {
+  constructor(text: string, encryption: CandidateEncryption = SHARED_GATE) {
     super("PassphraseProtection");
     this.#passphrase = SecretValue.text(parseListPassphrase(text));
+    this.#encryption = encryption;
   }
 
   // Getters, as in ScannerKeyProtection: they cannot be overwritten.
@@ -416,7 +519,9 @@ export class PassphraseProtection extends Redacted implements OwnedListProtectio
    */
   async protect(list: Uint8Array): Promise<Uint8Array> {
     this.#passphrase.assertLive();
-    const bytes = await withCipherHealth(
+    // The passphrase is read once the gate is open: a protection wiped meanwhile encrypts nothing.
+    const bytes = await throughGate(
+      this.#encryption,
       "passphrase",
       () => CandidateCipher.encryptWithPassphrase(list, this.#passphrase.value),
       (held) => held.fill(0),
@@ -514,19 +619,23 @@ function checkedChoice(given: unknown): ListProtectionChoice {
 }
 
 /**
- * The protection that a host's `choice` names (ListProtectionChoice); a list in the open only for
- * an explicit `{ kind: "none" }`. Anything else that is not one of the three is refused as a
- * TypeError (core.candidate-encryption.not-protection-choice), and so is what the protection's
- * constructor refuses: a key that is no age key (key-one-age-key-62-characters-starts-age1) or a
- * passphrase too short (use-at-least-characters-passphrase-all-protects-seed).
+ * The protection that a host's `choice` names (ListProtectionChoice), encrypting through
+ * `encryption`, the host's gate, or the module's shared one; a list in the open only for an explicit
+ * `{ kind: "none" }`. Anything else that is not one of the three is refused as a TypeError
+ * (core.candidate-encryption.not-protection-choice), and so is what the protection's constructor
+ * refuses: a key that is no age key (key-one-age-key-62-characters-starts-age1) or a passphrase too
+ * short (use-at-least-characters-passphrase-all-protects-seed).
  */
-export function protectionFor(choice: ListProtectionChoice): OwnedListProtection {
+export function protectionFor(
+  choice: ListProtectionChoice,
+  encryption: CandidateEncryption = SHARED_GATE,
+): OwnedListProtection {
   const checked = checkedChoice(choice);
   switch (checked.kind) {
     case "key":
-      return new ScannerKeyProtection(checked.recipient);
+      return new ScannerKeyProtection(checked.recipient, encryption);
     case "passphrase":
-      return new PassphraseProtection(checked.passphrase);
+      return new PassphraseProtection(checked.passphrase, encryption);
     case "none":
       return new NoProtection();
   }

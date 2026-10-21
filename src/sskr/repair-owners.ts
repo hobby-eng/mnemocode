@@ -183,7 +183,7 @@ export class MarkedReading extends Redacted implements Disposable {
 
   /** Caller-owned unit values with `bits` at the marks; refused after disposal. */
   valuesAt(bits: bigint): number[] {
-    const values = this.zeroFilled();
+    const values = this.#zeroFilled();
     this.#holes.forEach((hole, order) => {
       // The mask admits one unit only, at most 24 bits, so this conversion is exact.
       values[hole] = Number((bits & this.unitMask(order)) >> this.#shift(order));
@@ -192,12 +192,12 @@ export class MarkedReading extends Redacted implements Disposable {
   }
 
   /** Caller-owned values with every marked unit set to zero; refused after disposal. */
-  zeroFilled(): number[] {
+  #zeroFilled(): number[] {
     return [...this.#values.value];
   }
 
   /** Independent reading with chosen unit values added as full-width equations. */
-  withValues(chosen: ReadonlyMap<number, number>): MarkedReading {
+  #withValues(chosen: ReadonlyMap<number, number>): MarkedReading {
     const units = this.#snapshot();
     const mask = 2 ** this.unitBits - 1;
     const readBits = units.values.map((_, place) => {
@@ -209,7 +209,7 @@ export class MarkedReading extends Redacted implements Disposable {
 
   /** Whether changing unit `place`, counted from 0, reaches the share's metadata bytes. */
   reachesMetadata(place: number): boolean {
-    const values = this.zeroFilled();
+    const values = this.#zeroFilled();
     let before: Uint8Array | undefined;
     try {
       before = this.#structure.evaluate(values).payload;
@@ -243,7 +243,7 @@ export class MarkedReading extends Redacted implements Disposable {
     try {
       for (const values of picks)
         readings.push(
-          this.withValues(new Map(tried.map((place, index) => [place, defined(values[index])]))),
+          this.#withValues(new Map(tried.map((place, index) => [place, defined(values[index])]))),
         );
       return readings;
     } catch (error) {

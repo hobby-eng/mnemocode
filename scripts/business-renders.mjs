@@ -1,6 +1,6 @@
 /** Manual public-data rendering check; not part of normal CLI startup or CI. */
-// Usage: node scripts/business-goldens.mjs [module root] [destination]; compare two destinations
-// with scripts/compare-business-goldens.mjs.
+// Usage: node scripts/business-renders.mjs [module root] [destination]; compare two destinations
+// with scripts/compare-business-renders.mjs.
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
@@ -10,7 +10,7 @@ import {
   REVIEW_TEXTS,
 } from "./card-fixtures.mjs";
 const moduleRoot = resolve(process.argv[2] ?? ".");
-const destination = resolve(process.argv[3] ?? "goldens/after");
+const destination = resolve(process.argv[3] ?? "output/business-renders/after");
 const renderer = await loadCardRenderer(moduleRoot);
 const ordinary = (bytes, pageSize) => ordinaryContent(renderer, bytes, pageSize);
 const PROFILE = {

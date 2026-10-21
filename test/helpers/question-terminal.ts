@@ -80,6 +80,11 @@ interface Seen {
 /** What the questions wrote: the private screen (standard error), and the lines of each stream. */
 export const seen: Seen = { screen: "", out: [], notices: [], refusals: [] };
 
+/** Each text on the private screen that `pattern`, a global pattern of prompts, finds, in order. */
+export function promptsMatching(pattern: RegExp): string[] {
+  return [...seen.screen.matchAll(pattern)].map((match) => match[0]);
+}
+
 /**
  * Everything written to standard error in the current test, which the questions read their keys
  * by; apart from `seen.screen`, which a test may empty.

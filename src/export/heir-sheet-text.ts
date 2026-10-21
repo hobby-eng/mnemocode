@@ -171,50 +171,132 @@ function wholeAddress(address: string): RegExp | undefined {
 /** What printed cards end with: decoys, which the sheet tells apart by their count. */
 const DECOYS_AFTER = "the cards after them belong to nothing";
 
-/** The line that says how many codes of printed cards are the backup, or none without cards. */
-function printedCodesLine(backup: HeirBackup): string[] {
-  if (backup.kind === "shares")
-    return backup.codes !== undefined && shareFormatHasCards(backup.format)
-      ? [`On printed cards each share is the first ${backup.codes} codes; ${DECOYS_AFTER}.`]
-      : [];
-  const form = EncodedForm.of(backup.format);
-  const words = `The seed phrase has ${backup.words} words.`;
-  if (form.cardKind === undefined) return [words];
-  const codes = form.elementCount(backup.words);
-  return [`${words} On printed cards its backup is the first ${codes} codes; ${DECOYS_AFTER}.`];
+/** A backup of one kind (HeirBackup kind). */
+type HeirBackupKind = HeirBackup["kind"];
+/** The backup of the kind `K`. */
+type BackupOfKind<K extends HeirBackupKind> = Extract<HeirBackup, { readonly kind: K }>;
+
+/** What the sheet says of one backup, as the rules of its kind read it (HEIR_BACKUPS). */
+interface HeirBackupWords {
+  /** The lines of "What you need" that name the backup, before the dates. */
+  readonly needs: readonly string[];
+  /** The steps through `route` to the seed phrase, which ask for `typedDates` where it is masked. */
+  readonly steps: (route: HeirRoute, typedDates: string | undefined) => readonly string[];
+  /** The advice for a step that fails that only this kind of backup needs. */
+  readonly trouble: readonly string[];
 }
 
 /**
- * Whether the backup is the seed phrase itself, which needs no program at all: codes that are its
- * English words (EncodedForm writtenInWords), not masked.
+ * The words of the sheet for the seed phrase in one encoded form, made in `mode`. Refuses a form
+ * that does not exist (EncodedForm.of; core.encoded-form.unsupported-encoded-format) and a count
+ * of words that no phrase has (core.bip39-sizes.expected-word-indexes).
  */
-function isPhraseItself({ backup, mode }: HeirSheetFacts): boolean {
-  return (
-    backup.kind === "encoded" &&
-    EncodedForm.of(backup.format).writtenInWords &&
-    !Masking.of(mode).masked
-  );
+function encodedWords(backup: BackupOfKind<"encoded">, mode: HeirMode): HeirBackupWords {
+  const form = EncodedForm.of(backup.format);
+  const { words } = backup;
+  assertWordCount(words);
+  // Codes that are the phrase's English words (EncodedForm writtenInWords), not masked, are the
+  // seed phrase itself, which needs no program at all.
+  if (form.writtenInWords && !Masking.of(mode).masked)
+    return {
+      needs: [`The seed phrase itself: ${words} English words, not masked.`],
+      steps: () => [OPEN_WALLET],
+      trouble: [],
+    };
+  const count = `The seed phrase has ${words} words.`;
+  const printed =
+    form.cardKind === undefined
+      ? count
+      : `${count} On printed cards its backup is the first ${form.elementCount(words)} codes; ${DECOYS_AFTER}.`;
+  return {
+    needs: [`The backup: ${ENCODED_LOOKS[backup.format]}.`, printed],
+    steps: (route, typedDates) => [
+      ...route.start,
+      ...route.decode(mode, words, typedDates),
+      OPEN_WALLET,
+    ],
+    trouble: [],
+  };
 }
 
-function needs(facts: HeirSheetFacts): string[] {
-  const { backup, mode, dates } = facts;
-  const lines =
-    backup.kind === "shares"
-      ? [
-          `Any ${backup.threshold} of the ${backup.count} Shamir shares, written as ${SHARE_LOOKS[backup.format]}.`,
-        ]
-      : isPhraseItself(facts)
-        ? [`The seed phrase itself: ${backup.words} English words, not masked.`]
-        : [`The backup: ${ENCODED_LOOKS[backup.format]}.`, ...printedCodesLine(backup)];
-  if (backup.kind === "shares") lines.push(...printedCodesLine(backup));
-  lines.push(
+/**
+ * The words of the sheet for Shamir shares of the seed phrase, made in `mode`. Refuses a form of
+ * no shares (parseShareFormat; sskr.transport.share-format-one), an impossible quorum
+ * (export.heir-sheet-text.sheet-heirs-threshold-from-number-shares-at-most), codes that are no
+ * whole number from 1 (export.heir-sheet-text.sheet-heirs-whole-number-codes-each-share) and a
+ * mode that makes no shares (core.masking.split-modes-only).
+ */
+function shareWords(backup: BackupOfKind<"shares">, mode: HeirMode): HeirBackupWords {
+  const { format, threshold, count, codes } = backup;
+  parseShareFormat(format);
+  assertQuorum(threshold, count);
+  if (codes !== undefined && (!Number.isSafeInteger(codes) || codes < 1))
+    throw ERRORS.create("sheet-heirs-whole-number-codes-each-share", []);
+  Masking.assertSplitMode(mode);
+  const splitMode: HeirShareMode = mode;
+  return {
+    needs: [
+      `Any ${threshold} of the ${count} Shamir shares, written as ${SHARE_LOOKS[format]}.`,
+      ...(codes !== undefined && shareFormatHasCards(format)
+        ? [`On printed cards each share is the first ${codes} codes; ${DECOYS_AFTER}.`]
+        : []),
+    ],
+    steps: (route, typedDates) => [
+      ...route.start,
+      ...route.restore(splitMode, threshold, typedDates),
+      OPEN_WALLET,
+    ],
+    // Unreadable elements of a share are filled in from its checksum (src/sskr/repair.ts).
+    trouble: ["Type ? for each code you cannot read."],
+  };
+}
+
+/**
+ * The rules of each kind of backup, each written for its own kind: a new kind cannot compile
+ * without its entry (CORE-06).
+ */
+const HEIR_BACKUPS: {
+  readonly [K in HeirBackupKind]: (backup: BackupOfKind<K>, mode: HeirMode) => HeirBackupWords;
+} = Object.freeze({ encoded: encodedWords, shares: shareWords });
+
+/** Whether `kind` names a kind of backup that the sheet names (HEIR_BACKUPS). */
+function isHeirBackupKind(kind: unknown): kind is HeirBackupKind {
+  return typeof kind === "string" && Object.hasOwn(HEIR_BACKUPS, kind);
+}
+
+/**
+ * The words of `backup`, of the kind `kind`, by the rules of that kind: generic, so that the
+ * compiler pairs the entry of each kind with a backup of that kind.
+ */
+function wordsOfKind<K extends HeirBackupKind>(
+  kind: K,
+  backup: BackupOfKind<K>,
+  mode: HeirMode,
+): HeirBackupWords {
+  return HEIR_BACKUPS[kind](backup, mode);
+}
+
+/**
+ * What the sheet says of `backup`, made in `mode`, once the rules of its kind have checked it.
+ * Refuses another kind (export.heir-sheet-text.sheet-heirs-made-encoded-backup-shamir-shares), and
+ * what encodedWords and shareWords refuse. A host may pass anything at run time (AUD-014-API012).
+ */
+function backupWords(backup: HeirBackup, mode: HeirMode): HeirBackupWords {
+  const kind: unknown = backup?.kind;
+  if (!isHeirBackupKind(kind))
+    throw ERRORS.create("sheet-heirs-made-encoded-backup-shamir-shares", []);
+  return wordsOfKind(kind, backup, mode);
+}
+
+function needs(backup: HeirBackupWords, { mode, dates }: HeirSheetFacts): string[] {
+  return [
+    ...backup.needs,
     !Masking.of(mode).masked
       ? "No secret dates are needed."
       : dates === 1
         ? "The owner's secret date (see the back). It is written nowhere; the hint may lead to it."
         : `The owner's ${dates} secret dates (see the back). They are written nowhere; the hint may lead to them.`,
-  );
-  return lines;
+  ];
 }
 
 function hintNote({ mode, dates }: HeirSheetFacts): string {
@@ -272,38 +354,17 @@ function assertQuorum(threshold: number, count: number): void {
 }
 
 /**
- * Refuses a backup that the sheet cannot name truthfully: another kind, a form that the encoded
- * forms (EncodedForm.of) or the share forms (parseShareFormat) refuse, or an impossible quorum. A
- * host may pass anything at run time (AUD-014-API012).
+ * What the sheet says of the backup of `facts`, once the facts are checked: refuses facts that
+ * would print a wrong sheet, a mode without one, a backup it cannot name (backupWords), or a count
+ * of dates that does not fit the mode.
  */
-function assertBackup(backup: HeirBackup): void {
-  switch (backup?.kind) {
-    case "encoded":
-      EncodedForm.of(backup.format);
-      assertWordCount(backup.words);
-      return;
-    case "shares":
-      parseShareFormat(backup.format);
-      assertQuorum(backup.threshold, backup.count);
-      if (backup.codes !== undefined && (!Number.isSafeInteger(backup.codes) || backup.codes < 1))
-        throw ERRORS.create("sheet-heirs-whole-number-codes-each-share", []);
-      return;
-    default:
-      throw ERRORS.create("sheet-heirs-made-encoded-backup-shamir-shares", []);
-  }
-}
-
-/**
- * Refuses facts that would print a wrong sheet: a mode without one, a backup it cannot name
- * (assertBackup), or a count of dates that does not fit the mode.
- */
-function assertFacts({ backup, mode, dates }: HeirSheetFacts): void {
+function checkedBackup({ backup, mode, dates }: HeirSheetFacts): HeirBackupWords {
   Masking.assertHeirSheetMode(mode);
-  assertBackup(backup);
-  if (backup.kind === "shares") Masking.assertSplitMode(mode);
+  const words = backupWords(backup, mode);
   if (!Number.isSafeInteger(dates) || dates < 0)
     throw ERRORS.create("sheet-heirs-whole-number-dates", []);
   Masking.of(mode).assertDateCount(dates);
+  return words;
 }
 
 /** Every line of `text`, in the order it is printed. */
@@ -362,19 +423,19 @@ export class HeirInstructions {
    * (export.heir-sheet-text.sheet-heirs-may-print-route-s-address-once).
    */
   text(facts: HeirSheetFacts): HeirSheetText {
-    assertFacts(facts);
+    const backup = checkedBackup(facts);
     const text: HeirSheetText = {
       title: "How to restore this wallet backup",
       subtitle: this.#route.subtitle,
       newcomer: `The ${STEPS_TITLE.toLowerCase()} are on the back. New to wallets? Read "${BASICS_TITLE}" there first.`,
       needsHeading: "What you need",
-      needs: needs(facts),
+      needs: needs(backup, facts),
       hintHeading: "Hint from the owner",
       hintNote: hintNote(facts),
       stepsTitle: STEPS_TITLE,
-      steps: this.#steps(facts),
+      steps: this.#steps(backup, facts),
       troubleHeading: "If something goes wrong",
-      trouble: this.#trouble(facts),
+      trouble: this.#trouble(backup, facts),
       warning: `Never type the backup${!Masking.of(facts.mode).masked ? "" : ", the dates"} or the seed phrase into a website or send them to anyone.`,
       footer: "This sheet holds no secret. Keep it apart from the backup.",
       basicsTitle: BASICS_TITLE,
@@ -392,27 +453,19 @@ export class HeirInstructions {
     return text;
   }
 
-  #steps(facts: HeirSheetFacts): string[] {
-    const { backup, mode, dates } = facts;
-    if (isPhraseItself(facts)) return [OPEN_WALLET];
+  #steps(backup: HeirBackupWords, { mode, dates }: HeirSheetFacts): readonly string[] {
     // As the programs ask for them: day-month-year, as datesPrompt and the share prompt do.
     const typedDates = !Masking.of(mode).masked
       ? undefined
       : `the secret ${dates === 1 ? "date" : "dates"} as day-month-year (23-09-2026)`;
-    const route = this.#route;
-    if (backup.kind === "encoded")
-      return [...route.start, ...route.decode(mode, backup.words, typedDates), OPEN_WALLET];
-    // assertFacts refused shares in a mode that makes none; the same check narrows the mode here.
-    Masking.assertSplitMode(mode);
-    return [...route.start, ...route.restore(mode, backup.threshold, typedDates), OPEN_WALLET];
+    return backup.steps(this.#route, typedDates);
   }
 
-  #trouble({ backup, mode }: HeirSheetFacts): string {
+  #trouble(backup: HeirBackupWords, { mode }: HeirSheetFacts): string {
     const advice = [
       "An error usually means a mistyped code or word: check each one against the paper.",
+      ...backup.trouble,
     ];
-    // Unreadable elements of a share are filled in from its checksum (src/sskr/repair.ts).
-    if (backup.kind === "shares") advice.push("Type ? for each code you cannot read.");
     const help = this.#route.dateDigitHelp;
     if (Masking.of(mode).masked && help !== undefined) advice.push(help);
     return advice.join(" ");

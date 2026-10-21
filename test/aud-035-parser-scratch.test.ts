@@ -2,13 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import { EncodedForm } from "../src/core/encoded-form.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { detectInputFormats } from "../src/core/representations.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { TEST_INDEXES, TEST_NUMBERS, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("private parser scratch lifetime (AUD-029-SEC001)", () => {
   it.each(["read", "detect"] as const)("retires accepted indexes after %s", (operation) => {
     const parser = vi.spyOn(EncodedForm.prototype, "read");
     try {
-      const text = `${"1 ".repeat(11)}4`;
+      const text = TEST_NUMBERS;
       if (operation === "read") {
         using owner = EncodedBackup.read(text, "indexes", "direct");
         expect(owner.decode([]).recoveredMnemonic).toBe(TEST_PHRASE);
@@ -51,7 +51,7 @@ describe("private parser scratch lifetime (AUD-029-SEC001)", () => {
       using owner = EncodedBackup.of(indexes, "indexes", "direct");
       expect(owner.decode([]).recoveredMnemonic).toBe(TEST_PHRASE);
       owner.wipe();
-      expect(indexes).toEqual([...Array<number>(11).fill(0), 3]);
+      expect(indexes).toEqual(TEST_INDEXES);
     } finally {
       indexes.fill(0);
     }
@@ -65,7 +65,7 @@ describe("private parser scratch lifetime (AUD-029-SEC001)", () => {
       const shorter = owner.shorterPhrases([]);
       expect(shorter).toHaveLength(1);
       expect(shorter[0]!.result.recoveredMnemonic).toBe(TEST_PHRASE);
-      expect(shorter[0]!.result.recoveredIndexes).toEqual([...Array<number>(11).fill(0), 3]);
+      expect(shorter[0]!.result.recoveredIndexes).toEqual(TEST_INDEXES);
       expect(owner.indexes).toEqual(indexes);
       expect(factory.mock.calls).toHaveLength(1);
       expect(factory.mock.calls[0]![0]).toEqual(Array<number>(12).fill(0));

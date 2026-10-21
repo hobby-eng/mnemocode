@@ -29,4 +29,8 @@ describe("the joint repair's entry", () => {
     expectTypeOf<RepairedSet>().toExtend<RepairedShares>();
     expectTypeOf<RepairedShares["unsettled"][number]>().toEqualTypeOf<MarkedElement>();
   });
+
+  it("gives a plan's type as one that a host can dispose with using", () => {
+    expectTypeOf<JointPlan>().toExtend<Disposable>();
+  });
 });

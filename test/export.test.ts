@@ -14,6 +14,7 @@ import { resolveCardPresentation } from "../src/export/card-copy.js";
 import { createCardIdentity } from "../src/export/card-identities.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { anyOf } from "./helpers/matchers.js";
+import { DATE } from "./helpers/test-phrase.js";
 
 // Blank PDF fixture tests the export transport only. It is never a registered design.
 async function fixture(pageCount = 1) {
@@ -210,8 +211,8 @@ describe("export infrastructure", () => {
   });
 
   it("keeps a date list in entered order", () => {
-    const args = parseArguments(["--dates", "23-09-2026", "08-08-1988"]);
-    expect(values(args, "date")).toEqual(["23-09-2026", "08-08-1988"]);
+    const args = parseArguments(["--dates", DATE, "08-08-1988"]);
+    expect(values(args, "date")).toEqual([DATE, "08-08-1988"]);
     // The labels of dated Unicode cards went with those cards (owner, 2026-10-09): no command
     // takes them.
     expect(Object.values(COMMAND_OPTIONS).flat()).not.toContain("event");

@@ -18,10 +18,11 @@ import {
   SHEET_QR_HOLDS,
 } from "../export/card-settings.js";
 import { SHEET_PLAN_TEXT } from "../export/collection-layout.js";
-import { assertImageRenderer } from "../export/image-export.js";
+import { ImageRenderer } from "../export/image-export.js";
 import {
   DOCUMENT_FORMAT_FACTS,
   DOCUMENT_FORMATS,
+  isImageFormat,
   type DocumentFormat,
 } from "../export/document-formats.js";
 import { CARD_TEMPLATES } from "../export/templates.js";
@@ -30,7 +31,7 @@ import { refusal } from "./terminal-input.js";
 import { readmeLink } from "./terminal.js";
 import { COPY_OPTIONS, profileOption } from "./business-options.js";
 import { defined } from "../core/defined.js";
-import { askNewFolder, askOutputFile } from "./output-questions.js";
+import { askNewFolder, askOutputFile, FILE_NAME_QUESTIONS } from "./output-questions.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
@@ -103,7 +104,7 @@ interface CardFiles {
 /** Why PNG and JPEG are refused at once where pdftocairo cannot be run; undefined where it can. */
 async function missingImageRenderer(): Promise<string | undefined> {
   try {
-    await assertImageRenderer();
+    await ImageRenderer.assert();
     return undefined;
   } catch (error) {
     // The renderer's own refusal, as the command says it.
@@ -131,7 +132,7 @@ async function askCardFiles(
   // The page size that the commands take when none is given is left out of the command.
   const pageSize =
     layout === "separate" || layout === SHEET_PAGE_SIZE ? [] : ["--page-size", layout];
-  const image = kind === "pdf" ? [] : ["--image-format", kind];
+  const image = isImageFormat(kind) ? ["--image-format", kind] : [];
   if (layout === "separate") {
     const folder = await askNewFolder(base);
     if (folder === undefined || folder === CANCELLED) return folder;
@@ -150,7 +151,7 @@ async function askCardFiles(
   if (turn === undefined || turn === CANCELLED) return turn;
   const size = [...pageSize, ...turn];
   if (kind === "pdf") {
-    const path = await askOutputFile("PDF file name", `${base}.pdf`);
+    const path = await askOutputFile(FILE_NAME_QUESTIONS.pdf, `${base}.pdf`);
     if (path === undefined || path === CANCELLED) return path;
     return { sheets: true, options: ["--pdf", path, ...size] };
   }
@@ -172,13 +173,13 @@ async function askCardFileKind(): Promise<DocumentFormat | undefined | Cancelled
         // Images are drawn from the PDF with pdftocairo, which the menu checks for below.
         return {
           label: name,
-          note: format === "pdf" ? note : `${note}; needs pdftocairo`,
+          note: isImageFormat(format) ? `${note}; needs pdftocairo` : note,
           value: format,
         };
       }),
       { label: "Files", warning },
     );
-    if (kind === undefined || kind === CANCELLED || kind === "pdf") return kind;
+    if (kind === undefined || kind === CANCELLED || !isImageFormat(kind)) return kind;
     warning = await missingImageRenderer();
     if (warning === undefined) return kind;
   }

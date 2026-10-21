@@ -29,22 +29,21 @@ import { CtrlCWatch } from "../src/cli/terminal-input.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { drawnList, keysOfAnswer } from "./helpers/drawn-list.js";
+import { CTRL_C, CTRL_Z } from "./helpers/keys.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import {
   expectTerminalGivenBack,
   Keyboard,
   keyboardAsStandardInput,
 } from "./helpers/terminal-streams.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { replacedAt, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // Windows deliberately keeps raw mode between reads so that ConPTY cannot lose Ctrl+C.
 // Pausing and removing listeners still ends the watch; Unix also restores line mode immediately.
 const RAW_ENTRY = process.platform === "win32" ? [false, true] : [true];
 const RAW_SESSION = process.platform === "win32" ? [false, true] : [true, false];
 
-const CTRL_C = "\x03";
 const CTRL_BACKSLASH = "\x1c";
-const CTRL_Z = "\x1a";
 
 let keys = new Keyboard(terminal);
 
@@ -118,7 +117,7 @@ describe("Ctrl+C during a long search", () => {
     const watch = new CtrlCWatch();
     keys.type(CTRL_Z);
     expect(kill).not.toHaveBeenCalled();
-    // Raw mode is taken again at once (takeRawMode), as another process may have left it.
+    // Raw mode is taken again at once (RawMode.take), as another process may have left it.
     expect(terminal.rawModes).toEqual([false, true]);
     expect(watch.signal.aborted).toBe(false);
     await watch.stop();
@@ -188,7 +187,7 @@ describe("Ctrl+C during a long search", () => {
 
   it("stops a search for forgotten words at its next turn", async () => {
     // Two forgotten words: 4,194,304 combinations, some seconds of search.
-    const search = runRecoverWord({ mnemonic: `? ? ${TEST_PHRASE.split(" ").slice(2).join(" ")}` });
+    const search = runRecoverWord({ mnemonic: replacedAt(TEST_PHRASE, { 1: "?", 2: "?" }) });
     setTimeout(() => keys.type(CTRL_C), 10);
     expect(await search).toBe(CANCELLED);
     expect(terminal.rawModes).toEqual(RAW_SESSION);

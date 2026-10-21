@@ -6,9 +6,10 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { PROTECTION_FLAGS } from "../src/cli/protection.js";
+import { BUILT_CLI } from "./helpers/built-cli.js";
 import { UNREACHED_FAULT_EXIT } from "./helpers/unreached-fault.js";
 import { LONGEST_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, ENCODED_FINGERPRINT, TEST_PHRASE, WRONG_DATE } from "./helpers/test-phrase.js";
 
 const execute = promisify(execFile);
 
@@ -76,7 +77,7 @@ function cliArguments(directory: string, ...args: string[]): string[] {
     ...PROTECTION_FLAGS,
     "--import",
     OVERLAY_PRELOAD,
-    resolve("dist/mnemocode.js"),
+    BUILT_CLI,
     ...args,
     ...(args[0] === "encode" ? ["--mnemonic-file", join(directory, "public-mnemonic.txt")] : []),
   ];
@@ -151,12 +152,11 @@ async function runCheck(
 ): Promise<{ code: number; stderr: string }> {
   const dist = pathToFileURL(resolve("dist")).href;
   const script = `
-    import { pbkdf2Sync } from "node:crypto";
     const [dist, file, expression] = process.argv.slice(1);
     const { MasterFingerprintCheck } = await import(dist + "/core/master-fingerprint.js");
     const { nodeSharePlatform } = await import(dist + "/sskr/share-platform-node.js");
     const { nodeCardRenderer } = await import(dist + "/export/platform-node.js");
-    const pbkdf2 = (p, salt, r, b) => new Uint8Array(pbkdf2Sync(p, salt, r, b, "sha512"));
+    const { nodePbkdf2HmacSha512: pbkdf2 } = await import(dist + "/bitcoin-evidence.js");
     const fingerprints = new MasterFingerprintCheck(pbkdf2);
     const s = {
       fingerprint: (m) => fingerprints.fingerprint(m),
@@ -226,8 +226,8 @@ const DAMAGED_ANSWERS: readonly DamagedCase[] = [
   {
     name: "date of the Seedshift vector",
     file: "dist/core/self-test-vectors.js",
-    from: 'const MASKED_DATE = "23-09-2026"',
-    to: 'const MASKED_DATE = "24-09-2026"',
+    from: `const MASKED_DATE = "${DATE}"`,
+    to: `const MASKED_DATE = "${WRONG_DATE}"`,
     module: "core/date-search-self-test.js",
     run: "m.checkDateSearchStartup()",
     fails: /Date search of the Seedshift vector mismatch/u,
@@ -244,7 +244,7 @@ const DAMAGED_ANSWERS: readonly DamagedCase[] = [
   {
     name: "encoded fingerprint",
     file: "dist/core/self-test-vectors.js",
-    from: '"0d05289e"',
+    from: `"${ENCODED_FINGERPRINT}"`,
     to: '"0d05289f"',
     module: "core/backup-reading-self-test.js",
     run: "m.checkBackupReading(s.fingerprint)",
@@ -386,7 +386,7 @@ const LOST_REFUSALS: readonly DamagedCase[] = [
   {
     name: "an age file at another scrypt work factor",
     file: "dist/core/candidate-file-admission.js",
-    from: "defined(stanzas[0])[STANZA_FIELD.workFactor] !== String(SCRYPT_LOG_N)",
+    from: "defined(stanzas[0])[STANZA_FIELD.workFactor] !== String(rules.workFactor)",
     to: "false",
     module: "core/candidate-encryption-self-test.js",
     run: "m.checkCandidateEncryptionQuick()",
@@ -497,8 +497,19 @@ describe("Each self-test check can fail", () => {
     LONGEST_TEST_TIME_LIMIT_MS,
   );
 
-  for (const damaged of [...DAMAGED_ANSWERS, ...LOST_REFUSALS])
-    it(`fails with ${damaged.name}`, async () => {
+  // Each named by the fault put into the build: a known answer damaged, or a refusal taken out.
+  const faults = [
+    ...DAMAGED_ANSWERS.map((damaged) => ({
+      damaged,
+      fault: `its known answer is damaged: ${damaged.name}`,
+    })),
+    ...LOST_REFUSALS.map((damaged) => ({
+      damaged,
+      fault: `the build no longer refuses ${damaged.name}`,
+    })),
+  ];
+  for (const { damaged, fault } of faults)
+    it(`fails when ${fault}`, async () => {
       await withVirtualBuild(async (directory) => {
         await patchBuild(directory, damaged.file, damaged.from, damaged.to);
         const result = await runCheck(directory, damaged.module, damaged.run);

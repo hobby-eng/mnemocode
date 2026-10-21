@@ -133,7 +133,7 @@ export function isNotSingleKeyRefusal(error: unknown): boolean {
  * because a coin owns what describes it and the reading of its addresses; each family adds only
  * how its addresses are written.
  */
-export abstract class Coin implements CoinDescription {
+export abstract class Coin {
   readonly #id: CoinId;
   readonly #name: string;
   readonly #addressForms: string;
@@ -171,11 +171,6 @@ export abstract class Coin implements CoinDescription {
     return this.#addressForms;
   }
 
-  /** The owned, read-only SLIP-44 coin types of the main network's paths. */
-  get coinTypes(): readonly number[] {
-    return this.#coinTypes;
-  }
-
   /**
    * How the coin's addresses begin on the main network, or on its test network where `testnet`
    * and they differ there (testnetAddressForms): what a question names beside the coin.
@@ -206,8 +201,8 @@ export abstract class Coin implements CoinDescription {
   }
 
   /** The coin types of the coin's paths: its own, or coin type 1 on every test network. */
-  coinTypesOn(testnet: boolean): readonly number[] {
-    return testnet ? [TESTNET_COIN_TYPE] : this.coinTypes;
+  #coinTypesOn(testnet: boolean): readonly number[] {
+    return testnet ? [TESTNET_COIN_TYPE] : this.#coinTypes;
   }
 
   /**
@@ -217,12 +212,14 @@ export abstract class Coin implements CoinDescription {
    */
   branchPathsOf(type: AddressType, testnet: boolean, location: AddressLocation): string[] {
     const owned = checkedAddressLocation(location);
-    return this.coinTypesOn(testnet).map((coinType) => this.branchPathOf(type, coinType, owned));
+    return this.#coinTypesOn(testnet).map((coinType) => this.branchPathOf(type, coinType, owned));
   }
 
   /** The paths of the account `account` for addresses of `type`, one for each coin type. */
   accountPathsOf(type: AddressType, testnet: boolean, account: number): string[] {
-    return this.coinTypesOn(testnet).map((coinType) => this.accountPathOf(type, coinType, account));
+    return this.#coinTypesOn(testnet).map((coinType) =>
+      this.accountPathOf(type, coinType, account),
+    );
   }
 
   /** The first step of the paths of addresses of `type`: BIP44's 44 unless the family says. */
@@ -384,21 +381,13 @@ export class CoinAddress {
   }
 
   /**
-   * The paths where wallets put it at `location`: one for each coin type of its coin, or coin
-   * type 1 on a test network. Every step down to the account is hardened, and on DIP17 the key
-   * class too. Refuses a location outside the BIP32 ranges, each of account, branch and index from
-   * 0 through 2^31 - 1 (checkedAddressLocation: core.coins.coin.assert-address-location-refused).
-   */
-  pathsAt(location: AddressLocation): string[] {
-    const owned = checkedAddressLocation(location);
-    return this.branchPathsAt(owned).map((path) => `${path}/${owned.index}`);
-  }
-
-  /**
-   * The paths of the branch that holds the address at `location`, as pathsAt gives them without
-   * the last step: the index, which is never hardened, so that the addresses that follow it are
-   * derived from the branch's key one step each. Refuses a location outside the BIP32 ranges, as
-   * Coin#branchPathsOf does (core.coins.coin.assert-address-location-refused).
+   * The paths of the branch that holds the address at `location`, where wallets put it: one for
+   * each coin type of its coin, or coin type 1 on a test network. Every step down to the account
+   * is hardened, and on DIP17 the key class too; the address is the branch's child at the index,
+   * which is never hardened, so that the addresses that follow it are derived from the branch's key
+   * one step each. Refuses a location outside the BIP32 ranges, each of account, branch and index
+   * from 0 through 2^31 - 1, as Coin#branchPathsOf does
+   * (core.coins.coin.assert-address-location-refused).
    */
   branchPathsAt(location: AddressLocation): string[] {
     return this.#coin.branchPathsOf(this.#type, this.#testnet, location);

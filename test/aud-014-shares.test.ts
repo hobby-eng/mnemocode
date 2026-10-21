@@ -78,7 +78,7 @@ describe("AUD-014-FUN001: a share read with a longer CBOR head restores", () => 
     expect(long).not.toBe(FIRST);
     // Read as the same share, in every form it is written in.
     expect(readShare(long)).toEqual({ ur: FIRST, format: "ur" });
-    expect(Share.read(long).sameAs(Share.read(FIRST))).toBe(true);
+    expect(Share.read(long).ur).toBe(Share.read(FIRST).ur);
     expect(writeShare(long, "words")).toBe(writeShare(FIRST, "words"));
     // The canonical control, and the long head with the second member: the same phrase.
     expect((await ShareSet.restore([FIRST, SECOND], nodeSharePlatform)).mnemonic).toBe(PHRASE);

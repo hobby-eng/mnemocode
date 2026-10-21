@@ -12,11 +12,9 @@ vi.mock("node:tty", async (importOriginal) => ({
 import { clearPrivateScreen, withPrivateScreen } from "../src/cli/private-screen.js";
 import { waitForEnter } from "../src/cli/terminal-choice.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
+import { CTRL_C, ENTER, ESCAPE } from "./helpers/keys.js";
 import { Keyboard, keyboardAsStandardInput } from "./helpers/terminal-streams.js";
 
-const ENTER = "\r";
-const ESCAPE = "\x1b";
-const CTRL_C = "\x03";
 /** How private-screen.ts leaves the alternate screen (xterm's "?1049l"). */
 const LEAVE_ALTERNATE_SCREEN = "\x1b[?1049l";
 /**

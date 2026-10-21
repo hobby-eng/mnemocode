@@ -21,9 +21,9 @@ vi.mock("../src/export/private-file.js", async (original) => {
 
 import { wipedAfterAsync } from "../src/core/bits.js";
 import { exportQrPayload } from "../src/export/qr-image.js";
+import { allWiped } from "./helpers/made-arrays.js";
 import { testFolder } from "./helpers/test-folders.js";
-
-const wiped = (bytes: Uint8Array) => bytes.every((byte) => byte === 0);
+import { TEST_NUMBERS } from "./helpers/test-phrase.js";
 
 afterEach(() => {
   captured.published.length = 0;
@@ -55,11 +55,11 @@ describe("a saved QR image of a backup", () => {
   it("is written complete, and the bytes that were written are wiped afterwards", async () => {
     const folder = await testFolder("mnemocode-saved-wiped-");
     const path = join(folder, "record-qr.png");
-    await exportQrPayload(`MNC1:direct:indexes:${"1 ".repeat(11)}4`, path);
+    await exportQrPayload(`MNC1:direct:indexes:${TEST_NUMBERS}`, path);
     expect((await readFile(path)).length).toBeGreaterThan(0);
     expect(captured.published).toHaveLength(1);
     expect(captured.published[0]!.length).toBeGreaterThan(0);
-    expect(wiped(captured.published[0]!)).toBe(true);
+    expect(allWiped(captured.published)).toBe(true);
   });
 
   it("is wiped too when the name is taken and nothing is written", async () => {
@@ -69,6 +69,6 @@ describe("a saved QR image of a backup", () => {
     captured.published.length = 0;
     await expect(exportQrPayload("public payload", path)).rejects.toMatchObject({ code: "EEXIST" });
     expect(captured.published).toHaveLength(1);
-    expect(wiped(captured.published[0]!)).toBe(true);
+    expect(allWiped(captured.published)).toBe(true);
   });
 });

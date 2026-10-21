@@ -109,9 +109,9 @@ The [format table](../README.md#commands) lists names and numbers. Input syntax 
 
 Color Unicode needs no special font when written as hexadecimal text.
 
-On a terminal, codes that formats 3 and 4 write joined are shown twice, for the phrase and for its shares: apart, separated by spaces, so that each code can be told and an unreadable one replaced by `?`, and then joined on one line, for copying. A file or a pipe gets the joined line alone.
+On a terminal, codes that formats 3 and 4 write joined are shown twice, for the phrase and for its shares: apart, separated by spaces, so that each code can be told and an unreadable one replaced by `?`, and then joined on one line, for copying. The codes of formats 1, 2 and 5, which are separated by spaces already, are wrapped at those spaces, so that the terminal never breaks a word or a code in two. A file or a pipe gets the codes on one line.
 
-The layout follows where the output goes: a terminal gets headings, labelled facts, numbered phrases and marked notices, and a file, a pipe or `TERM=dumb` the plain lines of a script. Colour is decided apart from it: `NO_COLOR` or `CLICOLOR=0` takes the colours away and keeps the terminal layout, and `CLICOLOR_FORCE` adds colour without changing the form.
+The layout follows where the output goes: a terminal gets headings, labelled facts, numbered phrases and marked notices, and a file, a pipe or `TERM=dumb` the plain lines of a script. On a terminal each candidate of `recover-word` and each match of `recover-date` is a part of its own, with the words or dates found, the wallet check and the phrase as labelled facts; a file or a pipe gets one row of tab-separated fields for each. Colour is decided apart from it: `NO_COLOR` or `CLICOLOR=0` takes the colours away and keeps the terminal layout, and `CLICOLOR_FORCE` adds colour without changing the form.
 
 For `decode` and `recover-date`, `--format` is usually optional. MnemoCode picks the form itself when exactly one form fits the whole record. Otherwise it asks in the terminal, and a script must pass `--format`.
 
@@ -121,7 +121,7 @@ On the private screen, the fields for Shamir shares, forgotten words and encoded
 
 Control and text-direction characters in displayed paths are replaced with U+FFFD; the actual filesystem names are unchanged. A command preview containing such characters is omitted, with a warning.
 
-On the private screen, a result that does not fit with the question or prompt under it, such as a long share set with its heading and notices, missing-code candidates or the phrases of an Original Seedshift record with a replaced last word, is shown whole by pages first. Use Up/Down or PageUp/PageDown to move, Home/End to reach the first or last page, and Enter or Escape when finished copying; the end of the result then stays above the question. Ctrl+C cancels. Output redirected to a file or pipe stays complete and has no page controls.
+On the private screen, a result that does not fit with the question or prompt under it, such as a long share set with its heading and notices, missing-code candidates, the candidates of `recover-word`, the matches of `recover-date` or the phrases of an Original Seedshift record with a replaced last word, is shown whole by pages first. Use Up/Down or PageUp/PageDown to move, Home/End to reach the first or last page, and Enter or Escape when finished copying; the end of the result then stays above the question. Ctrl+C cancels. Output redirected to a file or pipe stays complete and has no page controls. `recover-word` shows every candidate there when the list would fit on the screen as one row per candidate, as a file gets it; a longer list shows only the candidates that match the wallet, and without a wallet or a candidate list offers to check them against one.
 
 `--mnemonic-file PATH` reads a phrase; `--input-file PATH` reads codes or a record. The path `-` reads standard input. With `--ask-secrets`, Decode and date recovery can read `--input-file` or `--qr-file` and then ask only for dates. Decode also accepts a file of Shamir shares, one per line, and passes every share to restoration.
 

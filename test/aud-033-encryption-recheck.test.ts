@@ -8,6 +8,8 @@ import {
   PassphraseProtection,
 } from "../src/core/candidate-encryption.js";
 import { deferred } from "./helpers/deferred.js";
+import { allWiped } from "./helpers/made-arrays.js";
+import { WIPED_CODE } from "./helpers/owner-lifetime.js";
 
 const FAILED = "core.candidate-encryption.self-test-failed";
 
@@ -231,7 +233,7 @@ it("retires delayed decrypted plaintext after a transient failed explicit self-t
     held.release();
     await refused;
     expect(new Set(retired).size).toBe(2);
-    expect(retired.every((bytes) => bytes.every((byte) => byte === 0))).toBe(true);
+    expect(allWiped(retired)).toBe(true);
     expect([...plain]).toEqual([21, 22, 23]);
   } finally {
     held.release();
@@ -267,7 +269,7 @@ it.each([
       if (disposed) protection.wipe();
       const refused = expect(encrypted).rejects.toHaveProperty(
         "code",
-        failed ? FAILED : "core.secret-value.wiped",
+        failed ? FAILED : WIPED_CODE,
       );
       held.release();
       await refused;
@@ -290,16 +292,16 @@ it("retires decrypted plaintext when its session identity ends during the decryp
   await entered.promise;
   try {
     pair.wipe();
-    const refused = expect(decrypted).rejects.toHaveProperty("code", "core.secret-value.wiped");
+    const refused = expect(decrypted).rejects.toHaveProperty("code", WIPED_CODE);
     held.release();
     await refused;
     expect(retired.length).toBeGreaterThan(0);
-    expect(retired.every((bytes) => bytes.every((byte) => byte === 0))).toBe(true);
+    expect(allWiped(retired)).toBe(true);
     expect([...plain]).toEqual([41, 42, 43]);
     // The ended session opens nothing more.
     await expect(decryptCandidates(file, { identity: pair })).rejects.toHaveProperty(
       "code",
-      "core.secret-value.wiped",
+      WIPED_CODE,
     );
   } finally {
     held.release();

@@ -8,13 +8,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import {
-  encodeMnemonic,
-  encodeMnemonicLegacy,
-  formatEncoded,
-  parseDate,
-  representMnemonic,
-} from "../src/core.js";
+import { encodeMnemonicLegacy, formatEncoded, parseDate, representMnemonic } from "../src/core.js";
 import { runDecode } from "../src/cli/decode-command.js";
 import { exportQrPayload } from "../src/export/qr-image.js";
 import { runEncode } from "../src/cli/encode-command.js";
@@ -24,9 +18,20 @@ import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { STYLE_CODES } from "../src/cli/terminal-style.js";
 import { FINGERPRINT_WARNING } from "../src/core/wallet-check.js";
-import { DATE, MASKED, promptsShown } from "./helpers/phrase-questions.js";
+import { ESCAPE } from "./helpers/keys.js";
+import { promptsShown } from "./helpers/phrase-questions.js";
+import { DATES_PROMPT, DECODE_DATES_PROMPT, WALLET_QUESTION } from "./helpers/prompts.js";
 import { questionsOnPrivateScreen, seen, terminal, windowOf } from "./helpers/question-terminal.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  ENCODED_FINGERPRINT,
+  MASKED,
+  MASKED_WORDS,
+  replacedAt,
+  TEST_FINGERPRINT,
+  TEST_PHRASE,
+  WRONG_DATE,
+} from "./helpers/test-phrase.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
@@ -38,20 +43,11 @@ vi.mock("node:fs/promises", async (importOriginal) =>
   harness.replacedFiles(await importOriginal()),
 );
 
-/**
- * The fingerprint of MASKED read as a phrase itself, as encode shows it ("Encoded fingerprint").
- */
-const ENCODED_FINGERPRINT = "0d05289e";
-/** The test phrase masked with the Original Seedshift and 23-09-2026, as word numbers. */
+/** The test phrase masked with the Original Seedshift and DATE, as word numbers. */
 const LEGACY = formatEncoded(encodeMnemonicLegacy(TEST_PHRASE, [parseDate(DATE)]), "indexes");
-const ESCAPE = "\x1b";
 const SEED_PROMPT = "Seed phrase (English BIP39 words):";
-const DATES_PROMPT = "Dates (up to 4, DD-MM-YYYY, separated by spaces):";
-const DECODE_DATES_PROMPT =
-  "Dates (up to 4, DD-MM-YYYY, ? for what is forgotten, separated by spaces):";
-const WALLET_QUESTION = "How can MnemoCode recognise the wallet?";
 
-/** The size of the pseudo-terminal of scripts/verify-terminal-input.py. */
+/** A window of 40 rows of 80 columns: fewer rows than the candidates that some tests list. */
 const TERMINAL_ROWS = 40;
 const TERMINAL_COLUMNS = 80;
 
@@ -61,11 +57,11 @@ describe("encode, decode and the backup check on the private screen", () => {
   describe("encode", () => {
     it("asks for the seed phrase again before the dates, and then for the dates alone", async () => {
       terminal.answers = [
-        `${"abandon ".repeat(11)}abandonn\r`,
+        `${replacedAt(TEST_PHRASE, { 12: "abandonn" })}\r`,
         `${"abandon ".repeat(12)}\r`,
         `  ${TEST_PHRASE.toUpperCase()}  \r`,
         "23-9-2026\r",
-        "23-09-2026 24-09-2026 25-09-2026 26-09-2026 27-09-2026\r",
+        `${DATE} 24-09-2026 25-09-2026 26-09-2026 27-09-2026\r`,
         "2?-09-2026\r",
         "31-09-2026\r",
         `${DATE}\r`,
@@ -206,7 +202,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         "1-1-1 2-2-2 3-3-3 4-4-4 5-5-5",
         "2?-09-2026",
         "31-09-2026",
-        "23-09-2026 30-02-2026",
+        `${DATE} 30-02-2026`,
         "23-09-26",
       ];
       terminal.answers = [`${TEST_PHRASE}\r`, ...wrong.map((line) => `${line}\r`), `${DATE}\r`];
@@ -233,7 +229,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       terminal.answers = [
         `${MASKED}\r`,
         "23-9-2026\r",
-        "23-09-2026 24-09-2026 1-1-1 2-2-2 3-3-3\r",
+        `${DATE} 24-09-2026 1-1-1 2-2-2 3-3-3\r`,
         `${DATE}\r`,
       ];
       await runDecode({ "ask-secrets": true, mode: "seedshift" });
@@ -314,8 +310,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     });
 
     it("sends a Shamir share typed for the codes to the restore, the share kept", async () => {
-      const masked = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]).shiftedEnglish.join(" ");
-      const shares = await splitSskrMnemonic(masked, 2, 3);
+      const shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
       const first = writeShare(shares[0]!, "indexes").split(" ");
       first[6] = "?";
       terminal.answers = [
@@ -333,8 +328,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     });
 
     it("keeps a share read from a QR code image, shows it, and offers the next from one", async () => {
-      const masked = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]).shiftedEnglish.join(" ");
-      const shares = await splitSskrMnemonic(masked, 2, 3);
+      const shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
       const directory = await mkdtemp(join(tmpdir(), "mnemocode-share-qr-"));
       try {
         const [first, second] = [0, 1].map((index) => join(directory, `share ${index + 1}.png`));
@@ -418,8 +412,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     });
 
     it("restores from a share without asking with --input-kind share", async () => {
-      const masked = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]).shiftedEnglish.join(" ");
-      const shares = await splitSskrMnemonic(masked, 2, 3);
+      const shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
       terminal.answers = [
         `${writeShare(shares[0]!, "indexes")}\r`,
         `${writeShare(shares[1]!, "indexes")}\r`,
@@ -575,7 +568,7 @@ describe("encode, decode and the backup check on the private screen", () => {
 
     it("offers the dates or the codes again after a result without a valid checksum", async () => {
       // A wrong date gives the Original Seedshift's phrase an invalid checksum.
-      terminal.answers = [`${LEGACY}\r`, "24-09-2026\r", `${DATE}\r`];
+      terminal.answers = [`${LEGACY}\r`, `${WRONG_DATE}\r`, `${DATE}\r`];
       terminal.choices = ["Type the dates again"];
       await runDecode({ "ask-secrets": true, mode: "seedshift-legacy" });
       expect(terminal.questions).toEqual(["What now?"]);
@@ -610,7 +603,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         const file = join(directory, "record.txt");
         await writeFile(file, `MNC1:seedshift-legacy:indexes:${LEGACY}\n`);
         // A wrong date, then the codes typed without the header, then the right date.
-        terminal.answers = ["24-09-2026\r", `${LEGACY}\r`, `${DATE}\r`];
+        terminal.answers = [`${WRONG_DATE}\r`, `${LEGACY}\r`, `${DATE}\r`];
         terminal.choices = ["Type the encoded seed phrase", "Type the dates again"];
         await runDecode({ "ask-secrets": true, "input-file": file });
         expect(terminal.labels).toEqual([
@@ -793,9 +786,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         terminal.choices = [...choices];
         await runDecode({ "ask-secrets": true, ...options });
         expect(terminal.questions).toHaveLength(choices.length);
-        expect(seen.out).toEqual([
-          "wool abuse actual wool abuse actual wool abuse actual wool abuse congress",
-        ]);
+        expect(seen.out).toEqual([MASKED_WORDS]);
       }
     });
 

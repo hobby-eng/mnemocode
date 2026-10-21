@@ -14,23 +14,21 @@ import { COIN_ADDRESS_ANSWERS } from "./helpers/coin-addresses.js";
 import { terminal } from "./helpers/keyed-terminal.js";
 import type { DrawnQuestion } from "./helpers/drawn-question.js";
 import { ENCODE_FORM_LABELS } from "./helpers/encode-form-cases.js";
+import { CTRL_D, DOWN, ENTER, ESCAPE, LEFT } from "./helpers/keys.js";
+import { FINGERPRINT_PROMPT } from "./helpers/prompts.js";
 import {
   answer,
   answerLine,
   BEFORE,
-  CTRL_D,
-  DOWN,
-  ENTER,
-  ESCAPE,
   expectScreen,
   folder,
   keyedQuestions,
-  LEFT,
   screenOf,
   stopWatching,
   watchScreen,
   type Screen,
 } from "./helpers/terminal-screen.js";
+import { TEST_ADDRESS, TEST_FINGERPRINT } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/keyed-terminal.js"));
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
@@ -74,46 +72,6 @@ describe("a typed answer leaves only its line in the record of answers", () => {
     expect(shown[1]!.slice(1, -1)).toEqual(["", "! The answer is not valid UTF-8 text."]);
   });
 
-  const ONLY_ESCAPE = { onlyEscapeLeaves: true };
-  it.each([
-    {
-      typed: "q, Q and Ctrl+D, then Enter",
-      keys: `qQ${CTRL_D}word${ENTER}`,
-      options: {},
-      entered: "escape",
-      leaving: "q, Q and Ctrl+D leave too",
-    },
-    {
-      typed: "q, Q and Ctrl+D, then Enter",
-      keys: `qQ${CTRL_D}word${ENTER}`,
-      options: ONLY_ESCAPE,
-      entered: "enter",
-      leaving: "only Escape leaves",
-    },
-    {
-      typed: "a word, then Escape",
-      keys: `query${ESCAPE}`,
-      options: ONLY_ESCAPE,
-      entered: "escape",
-      leaving: "only Escape leaves",
-    },
-    // A function key whose sequence ends in a letter that alone would leave.
-    {
-      typed: "F2 (ESC O Q), then Enter",
-      keys: `\x1bOQ${ENTER}`,
-      options: ONLY_ESCAPE,
-      entered: "enter",
-      leaving: "only Escape leaves",
-    },
-  ] as const)(
-    "ends the wait for Enter with $entered after $typed where $leaving",
-    async ({ keys, options, entered }) => {
-      watchScreen(80);
-      terminal.keysFor = () => keys;
-      expect(await waitForEnter("Press Enter.", options)).toBe(entered);
-    },
-  );
-
   it("leaves out an optional answer at Enter and records what that means", async () => {
     const result = await answer(ENTER, 80, { optional: "random" });
     expect(result.answer).toBe("");
@@ -145,6 +103,48 @@ describe("a typed answer leaves only its line in the record of answers", () => {
   });
 });
 
+describe("the wait for Enter", () => {
+  const ONLY_ESCAPE = { onlyEscapeLeaves: true };
+  it.each([
+    {
+      typed: "q, Q and Ctrl+D, then Enter",
+      keys: `qQ${CTRL_D}word${ENTER}`,
+      options: {},
+      entered: "escape",
+      leaving: "q, Q and Ctrl+D leave too",
+    },
+    {
+      typed: "q, Q and Ctrl+D, then Enter",
+      keys: `qQ${CTRL_D}word${ENTER}`,
+      options: ONLY_ESCAPE,
+      entered: "enter",
+      leaving: "only Escape leaves",
+    },
+    {
+      typed: "a word, then Escape",
+      keys: `query${ESCAPE}`,
+      options: ONLY_ESCAPE,
+      entered: "escape",
+      leaving: "only Escape leaves",
+    },
+    // A function key whose sequence ends in a letter that alone would leave.
+    {
+      typed: "F2 (ESC O Q), then Enter",
+      keys: `${ESCAPE}OQ${ENTER}`,
+      options: ONLY_ESCAPE,
+      entered: "enter",
+      leaving: "only Escape leaves",
+    },
+  ] as const)(
+    "ends with $entered after $typed where $leaving",
+    async ({ keys, options, entered }) => {
+      watchScreen(80);
+      terminal.keysFor = () => keys;
+      expect(await waitForEnter("Press Enter.", options)).toBe(entered);
+    },
+  );
+});
+
 const MENU_QUESTION = "What do you want to do?";
 // Narrower than TEXT_WIDTH, so that lists, prompts and lines of the record wrap.
 const COLUMNS = 40;
@@ -166,9 +166,8 @@ const TYPED: Readonly<Record<string, string>> = {
   "Word number": "1",
   "Unicode code": "4E00",
   // The public test phrase's fingerprint and its first native SegWit address.
-  "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.)":
-    "73c5da0a",
-  "Bitcoin address (one of the first receiving ones)": "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
+  [FINGERPRINT_PROMPT]: TEST_FINGERPRINT,
+  "Bitcoin address (one of the first receiving ones)": TEST_ADDRESS,
   // The public test phrase\'s first address in each other coin.
   ...COIN_ADDRESS_ANSWERS,
   // A public test key: the recipient of a key that is thrown away.
@@ -362,7 +361,7 @@ describe("going back from an entry of the start menu", () => {
         ENTER,
         ENTER,
         ENTER,
-        `73c5da0a${ENTER}`,
+        `${TEST_FINGERPRINT}${ENTER}`,
         ESCAPE,
       ];
       let recorded: string[] = [];
@@ -378,11 +377,11 @@ describe("going back from an entry of the start menu", () => {
       await runMenu();
       const expected = screenOf(
         columns,
-        answerLine("Fingerprint", "73c5da0a · They do not reveal the phrase."),
+        answerLine("Fingerprint", `${TEST_FINGERPRINT} · They do not reveal the phrase.`),
       ).lines;
       expect(recorded).toEqual(expect.arrayContaining(expected.filter((line) => line !== "")));
       expect(written.join("")).toContain(
-        "\x1b[36m73c5da0a · \x1b[90mThey do not reveal the phrase.\x1b[0m",
+        `\x1b[36m${TEST_FINGERPRINT} · \x1b[90mThey do not reveal the phrase.\x1b[0m`,
       );
       expect(keys).toEqual([]);
     },
@@ -651,13 +650,12 @@ describe("what the menu does when a command cannot run or stops", () => {
 
   it("quits at Press Enter only with Escape, not with q or the rest of a paste", async () => {
     terminal.exit = async () => 1;
+    const lookUp = ["What do you want to do?", "What do you want to look up?", "Word"];
     const { asked } = await menuWith([...LOOK_UP, `q${CTRL_D}rest of a paste${ENTER}`, ESCAPE]);
-    expect(asked.map((question) => question.question)).toEqual([
-      "What do you want to do?",
-      "What do you want to look up?",
-      "Word",
-      "What do you want to do?",
-    ]);
+    expect(asked.map(({ question }) => question)).toEqual([...lookUp, "What do you want to do?"]);
+    // Escape at Press Enter quits: the menu asks nothing more.
+    const quit = await menuWith([...LOOK_UP, ESCAPE]);
+    expect(quit.asked.map(({ question }) => question)).toEqual(lookUp);
   });
 
   it("says that a command could not be started, and goes back on request", async () => {

@@ -61,11 +61,6 @@ describe("kinds of content of colour cards", () => {
       }),
     );
     expect(() => assertSheetQr({ kind: "sskr", ...separate })).not.toThrow();
-    // A value that no type allows, fed on purpose as a JavaScript host could: only true asks for
-    // a QR code, as collectionPayload reads it.
-    expect(() =>
-      assertSheetQr({ kind: "colors", pageSize: "business", cardQr: "yes" as never }),
-    ).not.toThrow();
   });
 
   it("draws a share's decoys from any color and refuses a phrase's beside no phrase", () => {

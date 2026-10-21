@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { encodeMnemonic, parseInput, parseDate } from "../src/core.js";
+import { DATE, replacedAt, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("Errors identify the position without echoing unrecognized input", () => {
   it.each(["private-user-token", "\u001b[31msecret", "very-personal@example.com"])(
@@ -7,9 +8,7 @@ describe("Errors identify the position without echoing unrecognized input", () =
     (token) => {
       let message = "";
       try {
-        encodeMnemonic(`abandon abandon ${token} ${"abandon ".repeat(8)}about`, [
-          parseDate("23-09-2026"),
-        ]);
+        encodeMnemonic(replacedAt(TEST_PHRASE, { 3: token }), [parseDate(DATE)]);
       } catch (error) {
         if (!(error instanceof Error)) throw error;
         message = error.message;

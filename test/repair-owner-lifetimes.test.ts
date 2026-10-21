@@ -10,9 +10,10 @@ import {
 import { ShareInput } from "../src/sskr/share-input.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { endLifetimeIfPresent as wipeIfPresent } from "./helpers/owner-lifetime.js";
+import { publicShare } from "./helpers/vectors.js";
 
 // Public vectors from sskr-v1.json/known-answers.ts; expected units are independent literals.
-const SHARE = "ur:sskr/goemjzaeadaejoinoyvotkwlptsskispvwbkbwjnamstlubnampf";
+const SHARE = publicShare();
 const COLORS = "#8B0C06 #B0D4F5 #0CF800 #FA41D6 #37B8CA #1F9121 #DB206C #4FD8A1 #1BF322 #750000";
 const OFFICIAL_UNICODE =
   "9805 968E 70AE 555F 4E?D 7642 6751 7686 7709 75C7 5354 77FD 97CB 964D 670D 5E7E 7FA4 5410 4EF2 6CB3 5BEC";
@@ -34,13 +35,15 @@ function readingOf(text: string, format: "colors" | "unicode"): MarkedReading {
 
 describe("Owned marked-reading lifetimes", () => {
   it.each([
-    { format: "colors", text: PARTLY_READ, first: 0x8b0c06, chosen: 0x37b8ca, mask: 0xffffff },
-    { format: "unicode", text: OFFICIAL_UNICODE, first: 526, chosen: 4, mask: 2047 },
+    // A colour's digits are bits: its reading has no candidates, so its choice is a copy.
+    { format: "colors", text: PARTLY_READ, first: 0x8b0c06, chosen: undefined },
+    { format: "unicode", text: OFFICIAL_UNICODE, first: 526, chosen: { value: 4, mask: 2047 } },
   ] as const)(
     "refuses retained $format data after disposal and keeps derived owners live",
     (test) => {
       const reading = readingOf(test.text, test.format);
-      const chosen = reading.withValues(new Map([[4, test.chosen]]));
+      // A reading for each value that the code at place 4 may take.
+      const chosen = reading.choicesAt([4]);
       try {
         const earlier = reading.values;
         expect(earlier[0]).toBe(test.first);
@@ -50,17 +53,17 @@ describe("Owned marked-reading lifetimes", () => {
           expect(reading.candidates?.[4]).toContain(4);
         }
         disposeIfPresent(reading);
-        expect(chosen.readBits?.[4]).toEqual({ value: test.chosen, mask: test.mask });
-        expect(chosen.values[0]).toBe(test.first);
+        expect(chosen.map((each) => each.readBits?.[4])).toContainEqual(test.chosen);
+        expect(chosen[0]!.values[0]).toBe(test.first);
         expect(() => reading.values).toThrow("has been wiped");
         expect(() => reading.readBits).toThrow("has been wiped");
         expect(() => reading.candidates).toThrow("has been wiped");
-        expect(() => reading.zeroFilled()).toThrow("has been wiped");
-        expect(() => reading.withValues(new Map())).toThrow("has been wiped");
+        expect(() => reading.valuesAt(0n)).toThrow("has been wiped");
+        expect(() => reading.choicesAt([4])).toThrow("has been wiped");
         expect(earlier[0]).toBe(test.first);
         wipeIfPresent(reading);
       } finally {
-        disposeIfPresent(chosen);
+        for (const each of chosen) disposeIfPresent(each);
         disposeIfPresent(reading);
       }
     },

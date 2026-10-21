@@ -59,10 +59,9 @@ describe("page size decides between a sheet and separate cards", () => {
     ]);
   });
 
-  it("gives one page per card for a card size, decoys after the codes", async () => {
+  it("gives a card size a 90 x 50 mm page for each code and one for a decoy", async () => {
     const cards = await pages("business-it", { pageSize: "business" });
-    expect(cards.length).toBeGreaterThan(colors.length);
-    expect(new Set(cards.map(String))).toEqual(new Set(["90,50"]));
+    expect(cards).toEqual(Array.from({ length: colors.length + 1 }, () => [90, 50]));
     // A material design is printed on sheets only (drawsSeparateCards).
     await expect(pages("material-tile", { pageSize: "business" })).rejects.toThrow(
       "printed on sheets only",
@@ -91,7 +90,10 @@ describe("page size decides between a sheet and separate cards", () => {
     expect(pageDimensions("a4", "landscape")).toEqual([297, 210]);
     expect(pageDimensions("a6")).toEqual([148, 105]);
     expect(pageDimensions("a6", "portrait")).toEqual([105, 148]);
+    expect(pageDimensions("a5", "portrait")).toEqual([148, 210]);
+    expect(pageDimensions("a5", "landscape")).toEqual([210, 148]);
     expect(pageDimensions("business", "portrait")).toEqual([50, 90]);
+    expect(pageDimensions("business", "landscape")).toEqual([90, 50]);
   });
 
   it.each(["business-it", "business-architect"])(

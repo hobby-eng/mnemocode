@@ -22,7 +22,6 @@ import {
 } from "../src/export/business-render-primitives.js";
 import { referencePlacement } from "../src/export/business-cards.js";
 import { PDFDocument as ScanPdfDocument, StandardFonts, type PDFPage } from "pdf-lib";
-import { zeroEntropyPhrase } from "../src/core/english-words.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { shareToColors } from "../src/sskr/transport.js";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -31,7 +30,7 @@ import { join } from "node:path";
 import { ENCODED_FORMATS } from "../src/core/types.js";
 import { representMnemonic } from "../src/core.js";
 import {
-  assertImageRenderer,
+  ImageRenderer,
   exportPageImages,
   IMAGE_FOLDER_TAKEN,
   claimImageFolder,
@@ -109,6 +108,7 @@ import type { RenderAsset, RenderPlatform } from "../src/export/platform.js";
 import { recordingQr } from "./helpers/recording-qr.js";
 import { publicShare, sskrVectors } from "./helpers/vectors.js";
 import { matching } from "./helpers/matchers.js";
+import { TEST_PHRASE } from "./helpers/test-phrase.js";
 // The public lists of candidates and the age files that hold them, typed as their JSON gives them.
 import candidateFile from "../vectors/candidates-v1.json" with { type: "json" };
 
@@ -117,7 +117,7 @@ const PUBLIC_SHARE = publicShare();
 
 describe("G1-033: every form of codes is written from the indexes", () => {
   it("writes a result and its indexes alike, whatever its stored words say", () => {
-    const result = representMnemonic(zeroEntropyPhrase(12));
+    const result = representMnemonic(TEST_PHRASE);
     for (const format of ENCODED_FORMATS) {
       const form = EncodedForm.of(format);
       expect(form.write(result)).toBe(form.codes(result.shiftedIndexes));
@@ -152,16 +152,14 @@ describe("G1-037: one layout of a raster pixel", () => {
   });
 });
 
-describe("G1-031 follow-up: the dates of a pattern are counted by month", () => {
+describe("G1-031 follow-up: the count of the dates of a pattern", () => {
   it("counts every date of the whole pattern, and a February of leap and common years", () => {
-    // 0001-01-01 through 9999-12-31: 9,999 years of 365 days and 2,424 leap days.
+    // 0001-01-01 through 9999-12-31: 9,999 years of 365 days and 2,424 leap days. Counted by
+    // month it takes milliseconds, date by date it took seconds at every start; no time is
+    // measured here, since it changes with the machine.
     expect(datePatternCandidateCount(parseDatePattern("??-??-????"))).toBe(3_652_059);
     // 29 February exists in 2000 and 2004, not in 2001-2003.
     expect(datePatternCandidateCount(parseDatePattern("29-02-200?"))).toBe(3);
-    const start = performance.now();
-    for (let run = 0; run < 3; run += 1) datePatternCandidateCount(parseDatePattern("??-??-????"));
-    // Counted by month it takes milliseconds; date by date it took seconds at every start.
-    expect(performance.now() - start).toBeLessThan(500);
   });
 });
 
@@ -419,7 +417,8 @@ describe("S104: one conversion to PDF points and one centring of text and of run
 
   /**
    * A square page of a new document, `heightMm` high, which records what is drawn on it instead of
-   * drawing it: the options of its text and of its images, and its operators as PDF writes them.
+   * drawing it: the options of its text and of its images, and its operators as PDF writes them,
+   * all of them or those pushed before the first image.
    */
   async function recordingPage(heightMm: number) {
     const document = await ScanPdfDocument.create();
@@ -431,6 +430,13 @@ describe("S104: one conversion to PDF points and one centring of text and of run
       text: () => text.mock.calls.map(([, options]) => options),
       images: () => images.mock.calls.map(([, options]) => options),
       operators: () => operators.mock.calls.flat().map(String),
+      operatorsBeforeImage: () => {
+        const [imageAt] = images.mock.invocationCallOrder;
+        return operators.mock.calls
+          .filter((_, call) => operators.mock.invocationCallOrder[call]! < imageAt!)
+          .flat()
+          .map(String);
+      },
     };
     return { document, page, drawn };
   }
@@ -470,9 +476,24 @@ describe("S104: one conversion to PDF points and one centring of text and of run
     const box = { x: 5, y: 5, width: 40, height: 20 };
     const png = nodeRenderPlatform.encodePng(createRasterImage(1, 1), ANY_DEFLATE_LEVEL);
     drawClippedArtwork(page, await document.embedPng(png), box);
-    expect(drawn.images()).toEqual([pdfRect(page, box)]);
-    expect(drawn.operators()[0]).toBe("q");
-    expect(drawn.operators().at(-1)).toBe("Q");
+    const rect = pdfRect(page, box);
+    expect(drawn.images()).toEqual([rect]);
+    // The clipping path: four rounded corners, each a curve, closed and made the clip (W).
+    const operators = drawn.operators();
+    expect(operators[0]).toBe("q");
+    expect(operators.filter((operator) => operator.endsWith(" c"))).toHaveLength(4);
+    // Its points span the card's box.
+    const numbers = operators.map((operator) => operator.split(" ").slice(0, -1).map(Number));
+    const xs = numbers.flatMap((values) => values.filter((_, index) => index % 2 === 0));
+    const ys = numbers.flatMap((values) => values.filter((_, index) => index % 2 === 1));
+    expect(Math.min(...xs)).toBeCloseTo(rect.x, 9);
+    expect(Math.max(...xs)).toBeCloseTo(rect.x + rect.width, 9);
+    expect(Math.min(...ys)).toBeCloseTo(rect.y, 9);
+    expect(Math.max(...ys)).toBeCloseTo(rect.y + rect.height, 9);
+    // The artwork is drawn while the clip holds: after W, and before Q drops it.
+    const before = drawn.operatorsBeforeImage();
+    expect(before.slice(-3)).toEqual(["h", "W", "n"]);
+    expect(operators.slice(before.length)).toEqual(["Q"]);
   });
 
   it("measures a caption at the least size its sheet prints it", async () => {
@@ -562,7 +583,7 @@ describe("S096: one rule decides between a separate card and a sheet", () => {
   });
 });
 
-describe("S097: one driver draws the collection sheet of every family", () => {
+describe("S097: one function draws the collection sheet of every family", () => {
   const presentation = {
     studioName: "Review Studio",
     slogan: "Print, done properly.",
@@ -642,7 +663,7 @@ describe("G1-036: the measures of a sheet come from its page size alone", () => 
 });
 
 describe("S098, S099: a separate card is one card centred on its page", () => {
-  it("centres the card, smaller only where the page is", () => {
+  it("centres the card, drawn smaller only where the page is smaller, and refuses a page size that no card has", () => {
     const { width, height } = BUSINESS_CARD_MM;
     expect(separateCardPage({}, width, height)).toEqual({
       width: 90,
@@ -665,6 +686,16 @@ describe("S098, S099: a separate card is one card centred on its page", () => {
       top: 80,
       scale: 1,
     });
+    // A business card upright is 50 mm wide: the card is drawn at 50/90 of its size, as wide as
+    // the page, and its 50 mm height becomes 250/9, centred in the 90 mm of the page.
+    const upright = separateCardPage(
+      { pageSize: "business", orientation: "portrait" },
+      width,
+      height,
+    );
+    expect(upright).toMatchObject({ width: 50, height: 90, x: 0 });
+    expect(upright.scale).toBeCloseTo(5 / 9, 12);
+    expect(upright.top).toBeCloseTo((90 - 250 / 9) / 2, 12);
     // A page size that no card has, given on purpose as a JavaScript host could.
     expect(() => separateCardPage({ pageSize: "wallet" as never }, width, height)).toThrow(
       "Page size must be",
@@ -719,7 +750,7 @@ describe("S146 follow-up: finish rows state their photograph once; one new-folde
   it("refuses an image folder that exists, before any page is rasterized", async (context) => {
     // exportPageImages asks for pdftocairo first; without Poppler, image export is not offered.
     if (
-      !(await assertImageRenderer().then(
+      !(await ImageRenderer.assert().then(
         () => true,
         () => false,
       ))

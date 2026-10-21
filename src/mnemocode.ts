@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { runCommandLine } from "./cli/command-line.js";
 import { menuAvailable, runMenu } from "./cli/menu.js";
-import { hardenProcess, relaunchProtected, underProtection } from "./cli/protection.js";
+import { ProcessProtection, relaunchProtected, underProtection } from "./cli/protection.js";
 import { endCancelled } from "./cli/interruption.js";
 import { dumbTerminalReason, terminalTooDumb } from "./cli/terminal-input.js";
 import { CANCELLED, type Cancelled } from "./cli/terminal-keys.js";
@@ -16,7 +16,7 @@ async function main(): Promise<Cancelled | undefined> {
     process.exitCode = await relaunchProtected(argv);
     return undefined;
   }
-  await hardenProcess();
+  await ProcessProtection.harden();
   // Started without arguments at a terminal, as by a double-click, MnemoCode shows its menu; a
   // script or a pipe gets the help, as before.
   if (argv.length === 0 && menuAvailable()) return runMenu();

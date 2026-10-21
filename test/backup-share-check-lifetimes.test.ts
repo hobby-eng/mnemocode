@@ -4,20 +4,16 @@ import { ShareSet } from "../src/sskr/share-set.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { ShareCombineRefusalError } from "../src/sskr/share-platform.js";
 import { ShareSplit } from "../src/sskr/split.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { parseDate } from "../src/core/dates.js";
+import { DATE, MASKED_WORDS, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { deferred } from "./helpers/deferred.js";
+import { WIPED_CODE } from "./helpers/owner-lifetime.js";
+import { publicShare, sskrVectors } from "./helpers/vectors.js";
 
-// Public bip39-128-2-of-3 shares and independently specified phrase from sskr-v1.json.
-const SHARES = [
-  "ur:sskr/goemjzaeadaejoinoyvotkwlptsskispvwbkbwjnamstlubnampf",
-  "ur:sskr/goemjzaeadadflihpkmhspcheycndschfhcmkelyvaveiesolrls",
-] as const;
+// Public bip39-128-2-of-3 shares from sskr-v1.json, and their independently specified phrase.
+const SHARES = [publicShare(), sskrVectors().deterministic[0]!.shares[1]!] as const;
 const SHARE_PHRASE = "abandon amount liar amount expire adjust cage candy arch gather drum buyer";
-// Public checksum-valid-seedshift-12 known answer, masked with 23-09-2026.
-const MASKED_PHRASE = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
-const DATE = { year: 2026, month: 9, day: 23 };
 const TEXTS = { decodeEntry: "Decode" };
-const WIPED_CODE = "core.secret-value.wiped";
 let maskedShares: readonly string[] = [];
 
 function observeSets() {
@@ -36,7 +32,7 @@ function observeSets() {
 beforeAll(async () => {
   // One tiny deterministic fixture of public data; no production randomness is replaced.
   const split = new ShareSplit(nodeSharePlatform, (bytes) => bytes.fill(7));
-  maskedShares = await split.split(MASKED_PHRASE, 2, 2);
+  maskedShares = await split.split(MASKED_WORDS, 2, 2);
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -157,33 +153,37 @@ describe("An independent restored-share snapshot", () => {
       using kept = KeptShares.of(maskedShares);
       using child = RestoredShares.of(set, kept);
       using sibling = RestoredShares.of(set, kept);
-      expect(set.mnemonic).toBe(MASKED_PHRASE);
-      expect(child.holds(MASKED_PHRASE)).toBe(true);
-      expect(child.unmasksTo(TEST_PHRASE, "seedshift", [DATE])).toBe(true);
-      expect(child.unmasksTo(SHARE_PHRASE, "seedshift", [DATE])).toBe(false);
+      expect(set.mnemonic).toBe(MASKED_WORDS);
+      expect(child.holds(MASKED_WORDS)).toBe(true);
+      expect(child.unmasksTo(TEST_PHRASE, "seedshift", [parseDate(DATE)])).toBe(true);
+      expect(child.unmasksTo(SHARE_PHRASE, "seedshift", [parseDate(DATE)])).toBe(false);
       child.wipe();
       child[Symbol.dispose]();
-      expect(() => child.holds(MASKED_PHRASE)).toThrow("has been wiped");
-      expect(() => child.unmasksTo(TEST_PHRASE, "seedshift", [DATE])).toThrow("has been wiped");
+      expect(() => child.holds(MASKED_WORDS)).toThrow("has been wiped");
+      expect(() => child.unmasksTo(TEST_PHRASE, "seedshift", [parseDate(DATE)])).toThrow(
+        "has been wiped",
+      );
       expect(child.unchecked).toEqual([]);
-      expect(set.mnemonic).toBe(MASKED_PHRASE);
+      expect(set.mnemonic).toBe(MASKED_WORDS);
       expect(kept.texts).toEqual(maskedShares);
-      expect(sibling.unmasksTo(TEST_PHRASE, "seedshift", [DATE])).toBe(true);
+      expect(sibling.unmasksTo(TEST_PHRASE, "seedshift", [parseDate(DATE)])).toBe(true);
 
       if (first === "set") set.wipe();
       else kept.wipe();
-      expect(sibling.holds(MASKED_PHRASE)).toBe(true);
-      expect(sibling.unmasksTo(TEST_PHRASE, "seedshift", [DATE])).toBe(true);
+      expect(sibling.holds(MASKED_WORDS)).toBe(true);
+      expect(sibling.unmasksTo(TEST_PHRASE, "seedshift", [parseDate(DATE)])).toBe(true);
       if (first === "set") expect(kept.texts).toEqual(maskedShares);
-      else expect(set.mnemonic).toBe(MASKED_PHRASE);
+      else expect(set.mnemonic).toBe(MASKED_WORDS);
 
       set.wipe();
       kept.wipe();
-      expect(sibling.holds(MASKED_PHRASE)).toBe(true);
-      expect(sibling.unmasksTo(TEST_PHRASE, "seedshift", [DATE])).toBe(true);
+      expect(sibling.holds(MASKED_WORDS)).toBe(true);
+      expect(sibling.unmasksTo(TEST_PHRASE, "seedshift", [parseDate(DATE)])).toBe(true);
       sibling.wipe();
-      expect(() => sibling.holds(MASKED_PHRASE)).toThrow("has been wiped");
-      expect(() => sibling.unmasksTo(TEST_PHRASE, "seedshift", [DATE])).toThrow("has been wiped");
+      expect(() => sibling.holds(MASKED_WORDS)).toThrow("has been wiped");
+      expect(() => sibling.unmasksTo(TEST_PHRASE, "seedshift", [parseDate(DATE)])).toThrow(
+        "has been wiped",
+      );
       expect(sibling.unchecked).toEqual([]);
     },
   );

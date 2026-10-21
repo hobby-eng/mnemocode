@@ -34,6 +34,26 @@ VALUES = (0.5, 0.75, 1)
 CANDIDATE_COUNT = len(HUE_DEGREES) * len(SATURATIONS) * len(VALUES)
 # The colours printed when no count is given.
 DEFAULT_COUNT = 8
+# The largest value of a colour channel's byte.
+CHANNEL_MAX = 255
+# The numbers of the rule as the owner approved them (2026-10-13), with
+# which the approved artwork was drawn. How strongly the coloured parts
+# of a design take a reference's colour: the factor of their
+# saturation, from the reference's saturation, and of their value; the
+# muted designs keep a quieter, darker tint.
+VIVID_MIN_SATURATION, VIVID_VALUE = 0.4, 1
+MUTED_MIN_SATURATION, MUTED_MAX_SATURATION = 0.3, 0.75
+MUTED_SATURATION_FACTOR, MUTED_VALUE = 0.8, 0.86
+# The share of the artwork's own brightness that every reference keeps;
+# the rest follows the reference's brightest channel.
+BRIGHTNESS_FLOOR = 0.35
+# Below this saturation a reference counts as grey: its artwork turns
+# grey, with this factor of its value.
+GREY_SATURATION = 0.08
+GREY_VALUE = 0.6
+# The saturation and value of a typical coloured pixel of the
+# photographs, measured on the approved artwork.
+TYPICAL_SATURATION, TYPICAL_VALUE = 0.9, 0.85
 
 
 def js_round(x):
@@ -90,31 +110,38 @@ def bytes_of_hsv(h, s, v):
         rgb = (second, 0, chroma)
     else:
         rgb = (chroma, 0, second)
-    return tuple(js_round((x + lift) * 255) for x in rgb)
+    return tuple(js_round((x + lift) * CHANNEL_MAX) for x in rgb)
 
 
 TINTS = {
-    "vivid": (lambda t: max(0.4, t), 1),
-    "muted": (lambda t: max(0.3, min(0.75, t * 0.8)), 0.86),
+    "vivid": (lambda t: max(VIVID_MIN_SATURATION, t), VIVID_VALUE),
+    "muted": (
+        lambda t: max(
+            MUTED_MIN_SATURATION,
+            min(MUTED_MAX_SATURATION, t * MUTED_SATURATION_FACTOR),
+        ),
+        MUTED_VALUE,
+    ),
 }
 
 
 def typical(hexcode, tint):
     rgb = bytes.fromhex(hexcode)
     hue, sat, _ = hsv(*rgb)
-    brightness = 0.35 + (1 - 0.35) * (max(rgb) / 255)
-    grey = sat < 0.08
+    peak = max(rgb) / CHANNEL_MAX
+    brightness = BRIGHTNESS_FLOOR + (1 - BRIGHTNESS_FLOOR) * peak
+    grey = sat < GREY_SATURATION
     turned = (((hue + hue - hue) % 1) + 1) % 1
     saturation, value = TINTS[tint]
-    tinted = 0 if grey else 0.9 * saturation(sat)
-    scale = 0.6 if grey else value
-    return bytes_of_hsv(turned, tinted, 0.85 * scale * brightness)
+    tinted = 0 if grey else TYPICAL_SATURATION * saturation(sat)
+    scale = GREY_VALUE if grey else value
+    return bytes_of_hsv(turned, tinted, TYPICAL_VALUE * scale * brightness)
 
 
 def views(hexcode):
-    full = tuple(b / 255 for b in bytes.fromhex(hexcode))
+    full = tuple(b / CHANNEL_MAX for b in bytes.fromhex(hexcode))
     typicals = (typical(hexcode, tint) for tint in ("vivid", "muted"))
-    seen = [oklab(*(b / 255 for b in rgb)) for rgb in typicals]
+    seen = [oklab(*(b / CHANNEL_MAX for b in rgb)) for rgb in typicals]
     return [oklab(*full)] + seen
 
 
@@ -133,9 +160,9 @@ def palette(count):
         for s in SATURATIONS:
             for v in VALUES:
                 rgb = bytes_of_hsv(degrees / 360, s, v)
+                channels = (min(1, max(0, b / CHANNEL_MAX)) for b in rgb)
                 hexcode = "".join(
-                    f"{js_round(min(1, max(0, b / 255)) * 255):02X}"
-                    for b in rgb
+                    f"{js_round(c * CHANNEL_MAX):02X}" for c in channels
                 )
                 candidates.append((hexcode, views(hexcode)))
     nearest = [math.inf] * len(candidates)

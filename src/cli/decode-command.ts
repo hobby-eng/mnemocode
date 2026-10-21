@@ -30,7 +30,7 @@ import { restoreFromShare } from "./sskr-restore-command.js";
 import { askAfterFailure, WHAT_NOW } from "./ask.js";
 import { askWalletEvidence } from "./wallet-question.js";
 import { searchLimit } from "./share-repair.js";
-import { WALLET_EVIDENCE_OPTIONS, type WalletPlace, givenWallet } from "./bitcoin-options.js";
+import { WALLET_EVIDENCE_OPTIONS, type GivenWallet, givenWallet } from "./bitcoin-options.js";
 import {
   askDates,
   dateMatchNotes,
@@ -321,36 +321,58 @@ const DECODE: DecodeUse = {
 };
 
 /** The answers that decode's options give its questions on the private screen. */
-interface GivenAnswers extends MissingCodesAnswers {
-  readonly place: WalletPlace;
-  /** Whether a BIP39 passphrase was given (GivenWallet.withPassphrase). */
-  readonly withPassphrase: boolean;
+interface GivenAnswers {
+  /**
+   * The wallet of the options, where another is looked for, and the owner of its BIP39 passphrase,
+   * which gives the passphrase to each search that takes it (CORE-24); the command disposes it.
+   */
+  readonly wallet: GivenWallet;
+  /** --encoded-fingerprint, which answers "Encoded fingerprint". */
+  readonly encodedFingerprint: string | undefined;
+  /** --list-candidates, which answers "List every candidate". */
+  readonly list: boolean;
+  /** --max-candidates: the combinations of codes and dates tried without asking. */
+  readonly maxCandidates: number | undefined;
   /** The most matches of a date search shown. */
   readonly maxResults: number;
 }
 
 /**
- * The answers of the options, each checked before the first question, so that none is lost to a
- * wrong value: the wallet and where another is looked for, its BIP39 passphrase, the encoded
- * fingerprint, whether to list the candidates, and the limits.
+ * The answers of the options besides `wallet`, the owner that givenWallet read from them, each
+ * checked before the first question, so that none is lost to a wrong value: the encoded
+ * fingerprint, whether to list the candidates, and the limits. Refuses --list-candidates beside a
+ * wallet (cli.decode-command.list-candidates-lists-candidates-instead-wallet-check), and a value
+ * as searchLimit, parseMasterFingerprint, maxCandidatesOf and maxResultsOf refuse it.
  */
-function givenAnswers(args: ParsedArguments): GivenAnswers {
-  const { evidence, place, passphrase, withPassphrase } = givenWallet(args);
+function givenAnswers(args: ParsedArguments, wallet: GivenWallet): GivenAnswers {
   // Read only by a restore from shares, after a share typed here: checked now all the same.
   searchLimit(args);
   const list = args["list-candidates"] === true;
-  if (list && evidence !== undefined)
+  if (list && wallet.evidence !== undefined)
     throw ERRORS.create("list-candidates-lists-candidates-instead-wallet-check", []);
   const fingerprint = value(args, "encoded-fingerprint");
   return {
-    evidence,
-    place,
-    passphrase,
-    withPassphrase,
+    wallet,
     encodedFingerprint: fingerprint === undefined ? undefined : parseMasterFingerprint(fingerprint),
     list,
     maxCandidates: maxCandidatesOf(args),
     maxResults: maxResultsOf(args),
+  };
+}
+
+/**
+ * What the options answer in the search of marked codes, with the BIP39 passphrase read from its
+ * owner for that search alone.
+ */
+function missingCodesAnswers(given: GivenAnswers): MissingCodesAnswers {
+  const { wallet } = given;
+  return {
+    place: wallet.place,
+    evidence: wallet.evidence,
+    passphrase: wallet.passphrase,
+    encodedFingerprint: given.encodedFingerprint,
+    list: given.list,
+    maxCandidates: given.maxCandidates,
   };
 }
 
@@ -373,7 +395,7 @@ function afterDates(dates: DatesAnswer): Step {
 function stepAfterCodes(backup: EncodedBackup, typedDates: DatesAnswer | undefined): Step {
   if (!Masking.of(backup.mode).masked) return "decode";
   showEncodedFingerprint(encodedFingerprintOf(backup));
-  return typedDates?.fitsPhrase(backup.indexes.length) === true ? afterDates(typedDates) : "dates";
+  return typedDates?.fitsPhrase(backup.words) === true ? afterDates(typedDates) : "dates";
 }
 
 /**
@@ -394,14 +416,15 @@ export async function decodeWithQuestions(
   assertOneEncodedSource(args);
   transformMode(args);
   givenInputFormat(args);
-  const given = givenAnswers(args);
+  using wallet = givenWallet(args);
+  const given = givenAnswers(args, wallet);
   const inputKind = inputKindOf(args);
   let backupArgs = args;
   let backup: EncodedBackup | undefined;
   // The mode that a record header named, for codes typed after it without one.
   let recordMode: MaskingMode | undefined;
   let typedDates: DatesAnswer | undefined;
-  let evidence: WalletEvidence | undefined = given.evidence;
+  let evidence: WalletEvidence | undefined = wallet.evidence;
   // "It cannot" at the wallet question, or --list-candidates, kept for dates typed again; a mode
   // that needs the wallet asks for it all the same.
   let withoutWallet = given.list;
@@ -441,7 +464,7 @@ export async function decodeWithQuestions(
         recordMode = read.recordMode ?? recordMode;
         if (read.kind === "missing") {
           markedCodes = read.codes;
-          const outcome = await searchMissingCodes(read.codes, given);
+          const outcome = await searchMissingCodes(read.codes, missingCodesAnswers(given));
           if (outcome === CANCELLED) return CANCELLED;
           if (outcome.kind !== "found") {
             step = outcome.kind === "shown" ? "done" : "backup";
@@ -460,7 +483,7 @@ export async function decodeWithQuestions(
         step = stepAfterCodes(backup, typedDates);
       } else if (step === "dates") {
         const asked = await askDates({
-          wordCount: defined(backup).indexes.length,
+          wordCount: defined(backup).words,
           patterns: use.searches,
         });
         if (asked === CANCELLED) return CANCELLED;
@@ -525,8 +548,8 @@ async function askedWallet(
     return { ...known, step: "search" };
   const answer = await askWalletEvidence({
     optional: !needed,
-    explanation: decodeWalletExplanation(backup.mode, given.withPassphrase),
-    place: given.place,
+    explanation: decodeWalletExplanation(backup.mode, given.wallet.withPassphrase),
+    place: given.wallet.place,
   });
   if (answer === CANCELLED) return CANCELLED;
   return {
@@ -591,7 +614,7 @@ async function searchAndShow(
     dates: typedDates,
     mode,
     evidence,
-    passphrase: given.passphrase,
+    passphrase: given.wallet.passphrase,
     limits: {
       maxResults,
       ...(given.maxCandidates === undefined ? {} : { maxCandidates: given.maxCandidates }),
@@ -609,8 +632,8 @@ async function searchAndShow(
     maxResults,
     again: backupChoice(backupArgs),
     wallet: {
-      explanation: decodeWalletExplanation(mode, given.withPassphrase),
-      place: given.place,
+      explanation: decodeWalletExplanation(mode, given.wallet.withPassphrase),
+      place: given.wallet.place,
     },
   });
   if (next === CANCELLED) return CANCELLED;

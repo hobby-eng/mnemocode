@@ -75,9 +75,16 @@ describe("The independent BIP39 word table", () => {
         expect(error).toHaveProperty("code", "core.words.word-table-lookup");
       }
     }
-    expect(() => WordTable.row(0)).toThrow("from 1 through 2048");
-    expect(() => WordTable.lookup("word", "abandon ability")).toThrow(
-      "not in the English BIP39 list",
-    );
+    for (const [refused, code, message] of [
+      [() => WordTable.row(0), "core.words.wordlist-index-from", "from 1 through 2048"],
+      [
+        () => WordTable.lookup("word", "abandon ability"),
+        "core.words.word-table-row-refused",
+        "not in the English BIP39 list",
+      ],
+    ] as const) {
+      expect(refused).toThrow(message);
+      expect(refused).toThrow(expect.objectContaining({ code }));
+    }
   });
 });

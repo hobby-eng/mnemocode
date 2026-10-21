@@ -1,11 +1,16 @@
 // sskr-combine and sskr-export with a wallet: what the wallet check said of the phrases it matched,
-// such as that a master fingerprint is only a filter, is said once, after the phrases, the shares
-// saved or the sets shown (AUD-037-SEC004), from the options with plain output and on the private
-// screen, with the terminal replaced (test/helpers/question-terminal.ts). Public test data only:
-// the shares of vectors/sskr-v1.json ("bip39-128-2-of-3") and the "abandon … about" phrase, also
-// masked with a public date.
+// such as that a master fingerprint is only a filter, is said once, after the phrases or the shares
+// saved (AUD-037-SEC004), from the options with plain output and on the private screen, with the
+// terminal replaced (test/helpers/question-terminal.ts). Public test data only: the shares of
+// vectors/sskr-v1.json ("bip39-128-2-of-3") and the "abandon … about" phrase, also masked with a
+// public date.
+//
+// Several sets that a fingerprint matched alike are not reached here: typed shares give a second
+// set only where a wrong combination of their marked units passes the 32-bit digest by chance,
+// about once in 2^32 combinations, which no test can search for. What a repair says of such sets
+// is tested on the steps that take the sets as data: the library's (share-repair-warning.test.ts)
+// and the command's (sskr-several-sets.test.ts).
 
-import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,14 +19,11 @@ import type { ParsedArguments } from "../src/cli/arguments.js";
 import { PrivateSteps } from "../src/cli/private-steps.js";
 import { runSskrCombine } from "../src/cli/sskr-restore-command.js";
 import { runSskrExport } from "../src/cli/sskr-export-command.js";
-import { encodeMnemonic, parseDate } from "../src/core.js";
 import { FINGERPRINT_WARNING } from "../src/core/wallet-check.js";
 import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
-import { ShareRestore, variantsMessage } from "../src/sskr/share-restore.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
-import { markUnits, testPhraseSet } from "./helpers/shares.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { MASKED_WORDS, TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -114,8 +116,7 @@ describe("sskr-combine with a wallet", () => {
   });
 
   it("says it once, after all the phrases that a fingerprint matched", async () => {
-    const masked = encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]).shiftedEnglish.join(" ");
-    const shares = await splitSskrMnemonic(masked, 2, 3);
+    const shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
     collision.phrase = TEST_PHRASE;
     // Every date of the search gives a phrase that the fingerprint matches, each on a screen of
     // its own, the next on Enter.
@@ -136,17 +137,14 @@ describe("sskr-combine with a wallet", () => {
 
 describe("sskr-export with a wallet", () => {
   /**
-   * Exports `shares` from a share file to a file of their own, with `options`, off the private
-   * screen.
+   * Exports the shares of SSKR_SET_VECTOR from a share file to a file of their own, with
+   * `options`, off the private screen.
    */
-  async function exportShares(
-    options: ParsedArguments,
-    shares: readonly string[] = SSKR_SET_VECTOR.shares,
-  ): Promise<string> {
+  async function exportShares(options: ParsedArguments): Promise<string> {
     PrivateSteps.close();
     const path = join(directory, "shares.txt");
     const output = join(directory, "exported.txt");
-    await writeFile(path, `${shares.join("\n")}\n`);
+    await writeFile(path, `${SSKR_SET_VECTOR.shares.join("\n")}\n`);
     await runSskrExport({ "share-file": path, output, ...options });
     return output;
   }
@@ -163,30 +161,5 @@ describe("sskr-export with a wallet", () => {
   it("says nothing of a filter where an address chose them", async () => {
     await exportShares({ "bitcoin-address": SET_ADDRESS });
     expect(warningPlaces()).toEqual([]);
-  });
-
-  it("says once, after the sets that a fingerprint matched alike, that it is a filter", async () => {
-    // A second set beside the one that the repair of the marked share finds: public shares of the
-    // test phrase, which the fingerprint matches too, as 32 bits let a wrong set do.
-    const other = await testPhraseSet();
-    const phrases = ShareRestore.phrases.bind(ShareRestore);
-    // Fault: the repair gives the phrase step a second set, which no shares typed can give: no two
-    // sets of real shares pass both the CRC-32 and the digest.
-    vi.spyOn(ShareRestore, "phrases").mockImplementation(async (unmasking, sets, places, run) =>
-      phrases(unmasking, [...sets, other], places, run),
-    );
-    collision.phrase = SSKR_SET_VECTOR.phrase;
-    const [first, second] = SSKR_SET_VECTOR.shares;
-    const output = await exportShares({ "master-fingerprint": SET_FINGERPRINT }, [
-      String(first),
-      markUnits(String(second), "colors", [5]),
-    ]);
-    expect(existsSync(output)).toBe(false);
-    // The fingerprint was given: the sets are told apart by an address, not by it again.
-    expect(seen.notices).toContain(variantsMessage(2, true));
-    expect(seen.notices).not.toContain(variantsMessage(2, false));
-    expect(seen.out.filter((line) => line.startsWith("Variant "))).toHaveLength(2);
-    expect(warningPlaces()).toHaveLength(1);
-    expect(warningPlaces()[0]).toBe(printed.length - 1);
   });
 });

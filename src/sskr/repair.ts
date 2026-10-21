@@ -12,7 +12,7 @@
 // such as #B5?0??, whose digits are bits, adds the bits read as equations of their own. A Unicode
 // code such as 4E?0, whose digits are not bits of its word number, is unknown as a whole, and the
 // words whose code fits are its candidates: a solution must be one of them (fits), and where that
-// shortens the search they are tried one by one, each as the code's bits (withValues).
+// shortens the search they are tried one by one, each as the code's bits (MarkedReading.choicesAt).
 //
 // MarkedReading and ReadingSpace (repair-owners.ts) are the classes of the repair: a way to read a
 // marked text, and the solutions of that reading on its own, which owns the share's secret arrays
@@ -65,7 +65,10 @@ export const LISTED_FREE_BITS = 4;
 /** Largest single-share listing budget: at most 256 solutions per solved reading. */
 export const MAX_LISTED_FREE_BITS = 8;
 
-/** A complete share, read in its form, as a repair gives it back with nothing filled in. */
+/**
+ * A complete share, read in its form, as a repair gives it back with nothing filled in; refused
+ * as readShare refuses it.
+ */
 export function unrepairedShare(text: string): ReadRepairableShare {
   return { ...readShare(text), repaired: false, filled: [] };
 }

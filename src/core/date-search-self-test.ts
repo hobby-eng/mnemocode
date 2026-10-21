@@ -12,7 +12,8 @@
 
 import { dateRecoveryCandidates } from "./date-recovery.js";
 import { DatesAnswer, DateSearch } from "./date-search.js";
-import { formatDate } from "./dates.js";
+import { BIP39_DICTIONARY_SIZE } from "./bip39-sizes.js";
+import { formatDate, parseDate } from "./dates.js";
 import { expectRefused, expectSame } from "./self-test-check.js";
 import { fingerprintWalletCheck, type PhraseFingerprint } from "./wallet-check.js";
 import { defined } from "./defined.js";
@@ -26,7 +27,7 @@ import {
 /** The masked phrase's word indexes, counted from 0. */
 const MASKED_INDEXES = MASKED_NUMBERS.split(" ").map((number) => Number(number) - 1);
 /** The masked phrase's date with its last digit forgotten. */
-const FORGOTTEN_LAST_DIGIT = "23-09-202?";
+const FORGOTTEN_LAST_DIGIT = `${MASKED_DATE.slice(0, -1)}?`;
 /** A phrase of twelve words takes four dates, one for every three words. */
 const TWELVE_WORDS = { wordCount: 12, patterns: true } as const;
 
@@ -50,8 +51,11 @@ const LATEST_DAY_FORGOTTEN =
 const LATEST_DAY_MASKED = [
   2002, 2, 2, 2003, 2, 2, 2004, 2, 2, 2005, 2, 2, 2006, 2, 2, 2007, 2, 2, 2008, 2, 2, 2031, 13, 304,
 ] as const;
-/** The masked phrase's date, and the same date 2,048 years later: the same shift. */
-const YEAR_AND_2048_LATER = "23-09-2026|4074";
+/**
+ * The masked phrase's date, and the same date 2,048 years later, a whole turn of the list of 2,048
+ * words: the same shift.
+ */
+const YEAR_AND_2048_LATER = `${MASKED_DATE}|${parseDate(MASKED_DATE).year + BIP39_DICTIONARY_SIZE}`;
 
 /**
  * Typed dates and the combinations they stand for, counted independently with Python's datetime:

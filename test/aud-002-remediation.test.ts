@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { matchBitcoinEvidence } from "../src/bitcoin-evidence.js";
 import { integerOption } from "../src/cli/arguments.js";
@@ -13,13 +13,14 @@ import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { runSskrSplit } from "../src/cli/sskr-split-command.js";
 import { TypedShares } from "../src/cli/share-repair.js";
 import { runTable } from "../src/cli/table-command.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { BUILT_CLI } from "./helpers/built-cli.js";
+import { TEST_ADDRESS, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const MAINNET_LOCATION = { network: "mainnet" as const, account: 0, branch: 0, index: 0 };
 
 async function runWithStdin(arguments_: readonly string[], input: Uint8Array) {
   return new Promise<{ code: number | null; stderr: string }>((resolvePromise, reject) => {
-    const child = spawn(process.execPath, [resolve("dist/mnemocode.js"), ...arguments_], {
+    const child = spawn(process.execPath, [BUILT_CLI, ...arguments_], {
       cwd: process.cwd(),
       stdio: ["pipe", "ignore", "pipe"],
     });
@@ -73,7 +74,7 @@ describe("AUD-002-API001 canonical integer options", () => {
     await expect(runTable({ index: "0x10" })).rejects.toThrow("base-10 integer");
     expect(() =>
       walletEvidence({
-        "bitcoin-address": "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
+        "bitcoin-address": TEST_ADDRESS,
         account: "1e3",
       }),
     ).toThrow("base-10 integer");

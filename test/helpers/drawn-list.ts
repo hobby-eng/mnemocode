@@ -6,6 +6,7 @@
 
 import { CANCELLED, type Cancelled } from "../../src/cli/terminal-keys.js";
 import { STYLE_CODES } from "../../src/cli/terminal-style.js";
+import { CTRL_C, DOWN, ENTER, ESCAPE } from "./keys.js";
 
 /** An entry of a list as it shows. */
 export interface DrawnEntry {
@@ -39,11 +40,8 @@ const ENTRY_LINE = /^(?<marker>[› ]) (?<digit>[\d ]) {2}(?<label>\S.*?)(?: {2,
 /** The grey line under an entry, indented past the labels: deeper than an entry starts. */
 const EXAMPLE_LINE = /^ {6,}(?<example>\S.*)$/u;
 /** The mark of the warning drawn above a question (markedLines), and the indent of its lines. */
-const WARNING_MARK = "! ";
-const WARNING_INDENT = "  ";
-
-/** The keys that answer a list: Escape, Ctrl+C, Enter and the down arrow (CSI B, xterm). */
-const LIST_KEYS = { escape: "\x1b", ctrlC: "\x03", enter: "\r", down: "\x1b[B" } as const;
+export const WARNING_MARK = "! ";
+export const WARNING_INDENT = "  ";
 
 /** An answer to a list question: the label of the entry to pick, undefined (Escape) or Ctrl+C. */
 export type ListAnswer = string | undefined | Cancelled;
@@ -113,8 +111,8 @@ function questionAbove(lines: readonly string[]): string {
  * entry of that label.
  */
 export function keysOfAnswer(list: DrawnList, answer: ListAnswer): string {
-  if (answer === undefined) return LIST_KEYS.escape;
-  if (answer === CANCELLED) return LIST_KEYS.ctrlC;
+  if (answer === undefined) return ESCAPE;
+  if (answer === CANCELLED) return CTRL_C;
   const place = list.entries.findIndex((entry) => entry.label === answer);
   if (place < 0) {
     const labels = list.entries.map((entry) => entry.label).join(", ");
@@ -123,5 +121,5 @@ export function keysOfAnswer(list: DrawnList, answer: ListAnswer): string {
   const { digit } = list.entries[place]!;
   if (digit !== undefined) return String(digit);
   const downs = (place - list.selected + list.entries.length) % list.entries.length;
-  return `${LIST_KEYS.down.repeat(downs)}${LIST_KEYS.enter}`;
+  return `${DOWN.repeat(downs)}${ENTER}`;
 }

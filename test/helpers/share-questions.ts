@@ -3,7 +3,7 @@
 
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
-import { seen } from "./question-terminal.js";
+import { promptsMatching } from "./question-terminal.js";
 import { markUnits } from "./shares.js";
 import { sskrVectors } from "./vectors.js";
 
@@ -40,9 +40,7 @@ export function marked(marks: readonly number[]): string {
 
 /** The prompts of the questions that read a line, in the order shown. */
 export function promptsShown(): string[] {
-  return [
-    ...seen.screen.matchAll(
-      /(Shamir shares[^:]*:|Share \d+ again, or its text file path:|More shares[^:]*:|Dates \([^:]*:|Original fingerprint of the wallet[^:]*:)/gu,
-    ),
-  ].map((match) => match[1]!);
+  return promptsMatching(
+    /Shamir shares[^:]*:|Share \d+ again, or its text file path:|More shares[^:]*:|Dates \([^:]*:|Original fingerprint of the wallet[^:]*:/gu,
+  );
 }

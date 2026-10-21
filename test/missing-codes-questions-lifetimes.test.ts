@@ -5,7 +5,7 @@ import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { recoverLegacyValidLastWords } from "../src/core/words.js";
 import { questionsOnPrivateScreen } from "./helpers/question-terminal.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { replacedAt, TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 const watchEdge = vi.hoisted((): { failure: Error | undefined } => ({ failure: undefined }));
@@ -40,7 +40,11 @@ describe("A list of more candidates than it holds", () => {
     const endings = recoverLegacyValidLastWords(TEST_PHRASE)
       .slice(0, MissingCodesSearch.MAX_LISTED + 1)
       .map(({ word }) => word);
-    using codes = MissingCodes.read("abandon ".repeat(11) + endings.join("|"), "english", "direct");
+    using codes = MissingCodes.read(
+      replacedAt(TEST_PHRASE, { 12: endings.join("|") }),
+      "english",
+      "direct",
+    );
     expect(new MissingCodesSearch(codes, () => "00000000").fits("list")).toBe(true);
     const said: string[] = [];
     vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {

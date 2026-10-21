@@ -116,7 +116,8 @@ export interface ReadingUnits {
   readonly readBits?: readonly (ReadBits | undefined)[];
   /**
    * For each partly read unit whose digits are no bits of it, such as a Unicode code, the values
-   * that fit the digits read: a solution must belong to the list, and withValues tries them.
+   * that fit the digits read: a solution must belong to the list, and MarkedReading.choicesAt
+   * tries them.
    */
   readonly candidates?: readonly (readonly number[] | undefined)[];
   /** Whether complete decoy cards follow these units, as a prefix of the text (addUnitModel). */

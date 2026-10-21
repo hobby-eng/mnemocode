@@ -16,7 +16,7 @@ import {
 import { matching } from "./helpers/matchers.js";
 import { runBuiltCli as run } from "./helpers/built-cli.js";
 import { LONGEST_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("date recovery patterns", () => {
   it("supports partial digits and several forgotten components", () => {
@@ -29,7 +29,7 @@ describe("date recovery patterns", () => {
     expect(expandDatePattern(parseDatePattern("??-??-2026"))).toHaveLength(365);
   });
 
-  it("counts a complete calendar without allocating every candidate", () => {
+  it("counts the 3,652,059 dates of a complete calendar", () => {
     expect(datePatternCandidateCount(parseDatePattern("??-??-????"))).toBe(3_652_059);
   });
 
@@ -55,7 +55,7 @@ describe("date recovery patterns", () => {
 
   it("finds the forgotten digits in the core, once per combination, without the command line", () => {
     const known = parseDate("10-07-1963");
-    const forgotten = parseDate("23-09-2026");
+    const forgotten = parseDate(DATE);
     const encoded = encodeMnemonic(TEST_PHRASE, [known, forgotten]);
     const patterns = [parseDatePattern("2?-09-2026")];
     const steps = [
@@ -67,7 +67,7 @@ describe("date recovery patterns", () => {
     // Checksum-valid Seedshift gives a valid phrase for every date; the wallet tells them apart.
     expect(found).toHaveLength(steps.length);
     const right = found.filter((candidate) => candidate.mnemonic === TEST_PHRASE);
-    expect(right.map((candidate) => candidate.dates.map(formatDate))).toEqual([["23-09-2026"]]);
+    expect(right.map((candidate) => candidate.dates.map(formatDate))).toEqual([[DATE]]);
   });
 
   it("tries a shift once: a year 2,048 years later gives the same phrase, which is found once", () => {
@@ -155,7 +155,7 @@ describe("date recovery patterns", () => {
       TEST_PHRASE,
       "--dates",
       "10-07-1963",
-      "23-09-2026",
+      DATE,
       "--format",
       "english",
     ]);
@@ -173,7 +173,7 @@ describe("date recovery patterns", () => {
       "100",
     ]);
     expect(recovered.stderr).toContain("Recovery search contains 30 date combinations.");
-    expect(recovered.stdout).toContain(`10-07-1963 23-09-2026\t${TEST_PHRASE}`);
+    expect(recovered.stdout).toContain(`10-07-1963 ${DATE}\t${TEST_PHRASE}`);
   });
 });
 

@@ -6,12 +6,11 @@ import { ShareRestore } from "../src/sskr/share-restore.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import type { RepairedShares } from "../src/sskr/joint-results.js";
-import { endLifetimeIfPresent } from "./helpers/owner-lifetime.js";
-import { sskrVectors } from "./helpers/vectors.js";
+import { endLifetimeIfPresent, WIPED_CODE } from "./helpers/owner-lifetime.js";
+import { publicShare, sskrVectors } from "./helpers/vectors.js";
 
 // Public bip39-128-2-of-3 vector; expected output is independent of export serialization.
-const FIRST_SHARE = "ur:sskr/goemjzaeadaejoinoyvotkwlptsskispvwbkbwjnamstlubnampf";
-const WIPED_CODE = "core.secret-value.wiped";
+const FIRST_SHARE = publicShare();
 
 /** An export that ShareExport.of made, with the shares and places it was made of. */
 interface ObservedExport {

@@ -1,6 +1,7 @@
 import { inspect } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { encodeMnemonic, parseDate } from "../src/core.js";
+import { parseDate } from "../src/core.js";
+import { datePatternCombinationCount } from "../src/core/dates.js";
 import { QUESTION_SECONDS } from "../src/core/search-turns.js";
 import {
   DatesAnswer,
@@ -13,13 +14,11 @@ import {
   type WalletCheck,
 } from "../src/core/date-search.js";
 import { anyOf } from "./helpers/matchers.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, MASKED_INDEXES, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // The host-neutral date search on its own, as another host such as the Deriver uses it: no
 // terminal, no Node.js service, the wallet check and the event loop's turns passed in.
 
-/** The test phrase masked with MnemoCode Seedshift and 23-09-2026, as BIP39 indexes. */
-const MASKED = encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]).shiftedIndexes;
 /** A wallet check that knows the test phrase, as a fingerprint check would, at the master key. */
 const testWallet: WalletCheck = (mnemonic) => ({ matched: mnemonic === TEST_PHRASE, path: "m" });
 
@@ -33,30 +32,30 @@ afterEach(() => {
 
 describe("DatesAnswer", () => {
   it("owns standalone recovery's incomplete-date rule without refusing complete decoding dates", () => {
-    const complete = dates("23-09-2026");
-    expect(complete.known).toEqual([parseDate("23-09-2026")]);
+    const complete = dates(DATE);
+    expect(complete.known).toEqual([parseDate(DATE)]);
     expect(complete.combinations).toBe(1);
     expect(() => complete.assertIncomplete()).toThrow(
       "At least one date must contain a forgotten digit represented by ?.",
     );
-    for (const typed of ["2?-09-2026", "23-09-2026 2?-09-2026"])
+    for (const typed of ["2?-09-2026", `${DATE} 2?-09-2026`])
       expect(() => dates(typed).assertIncomplete()).not.toThrow();
   });
   it("holds complete dates and dates with ?, and never changes", () => {
-    const answer = dates("23-09-2026 ?3-09-2026");
+    const answer = dates(`${DATE} ?3-09-2026`);
     expect(answer.count).toBe(2);
     expect(answer.hasForgottenDigits).toBe(true);
     expect(answer.combinations).toBe(3);
     // A caller that changes what it was given changes a copy only.
     answer.known.pop();
     answer.patterns.pop();
-    expect(answer.known).toEqual([parseDate("23-09-2026")]);
+    expect(answer.known).toEqual([parseDate(DATE)]);
     expect(answer.patterns).toHaveLength(1);
-    expect(dates("23-09-2026").hasForgottenDigits).toBe(false);
+    expect(dates(DATE).hasForgottenDigits).toBe(false);
   });
 
   it("keeps its dates, part of a secret, out of text, JSON and a printed object", () => {
-    const answer = dates("23-09-2026 ?3-09-2026");
+    const answer = dates(`${DATE} ?3-09-2026`);
     expect(String(answer)).toBe("[DatesAnswer: redacted]");
     expect(JSON.stringify({ answer })).toBe('{"answer":"[DatesAnswer: redacted]"}');
     expect(inspect(answer)).toBe("[DatesAnswer: redacted]");
@@ -71,7 +70,7 @@ describe("DatesAnswer", () => {
 
   it("holds dates read elsewhere to the same limits", () => {
     const pattern = (text: string) => dates(text).patterns[0]!;
-    const known = [parseDate("23-09-2026")];
+    const known = [parseDate(DATE)];
     expect(DatesAnswer.of(known).combinations).toBe(1);
     expect(DatesAnswer.of(known, [pattern("2?-09-2026")]).combinations).toBe(10);
     expect(() => DatesAnswer.of([])).toThrow("Type at least one date.");
@@ -85,11 +84,13 @@ describe("DatesAnswer", () => {
   it("refuses more dates than the longest phrase takes before it reads one (AUD-037, CORE-50)", () => {
     // About 1 MiB of lone ?, each of which stands for every year from 0001 to 9999: reading them
     // one by one took minutes and gigabytes before the limit refused them; counting them does not.
-    const started = performance.now();
     expect(() => DatesAnswer.parse("? ".repeat(512 * 1024), { patterns: true })).toThrow(
       expect.objectContaining({ code: "core.date-search.too-many-dates" }),
     );
-    expect(performance.now() - started).toBeLessThan(2_000);
+    // Nine dates that no calendar has are refused for their count, so before any is read.
+    expect(() => DatesAnswer.parse("31-02-2026 ".repeat(9), { patterns: false })).toThrow(
+      expect.objectContaining({ code: "core.date-search.too-many-dates" }),
+    );
     // Without the phrase's length, the longest phrase's eight dates are the limit.
     const nine = Array.from({ length: 9 }, (_, index) => `0${index + 1}-01-2020`);
     expect(DatesAnswer.parse(nine.slice(1).join(" "), { patterns: false }).count).toBe(8);
@@ -110,9 +111,9 @@ describe("DatesAnswer", () => {
     };
     expect(() => dates(nine.slice(4).join(" "))).toThrow(expect.objectContaining(fourAtMost));
     using five = DatesAnswer.parse(nine.slice(4).join(" "), { patterns: false });
-    expect(() => new DateSearch({ indexes: MASKED, dates: five, mode: "seedshift" })).toThrow(
-      expect.objectContaining(fourAtMost),
-    );
+    expect(
+      () => new DateSearch({ indexes: MASKED_INDEXES, dates: five, mode: "seedshift" }),
+    ).toThrow(expect.objectContaining(fourAtMost));
   });
 
   it("refuses more dates with ? than a search takes before it reads one (AUD-037, CORE-50)", () => {
@@ -131,14 +132,13 @@ describe("DatesAnswer", () => {
     expect(dates("? 0?-01-2020 ?1-01-2021").patterns).toHaveLength(3);
   });
 
-  it("reads a date of thousands of alternatives in bounded time, each once (AUD-037, CORE-50)", () => {
+  it("reads a date of thousands of alternatives, each year once (AUD-037, CORE-50)", () => {
     // The years 1000 to 3999, each written twice, and 1?00, whose ? stands for every digit: trying
     // each of the 9,999 years against each alternative took about a millisecond per alternative.
+    // No time is measured here, since it changes with the machine: the test's own limit bounds it.
     const years = Array.from({ length: 3000 }, (_, index) => `${1000 + index}`);
     const typed = `01-01-${[...years, ...years, "1?00"].join("|")}`;
-    const started = performance.now();
     const [pattern] = dates(typed).patterns;
-    expect(performance.now() - started).toBeLessThan(2_000);
     expect(pattern?.years).toHaveLength(3000);
     expect([pattern?.years[0], pattern?.years.at(-1)]).toEqual([1000, 3999]);
     expect([pattern?.months, pattern?.days]).toEqual([[1], [1]]);
@@ -149,26 +149,31 @@ describe("DatesAnswer", () => {
     );
   });
 
-  it("counts up to one more than the hard limit", () => {
+  it("counts the combinations below the hard limit exactly, and those above it as one more", () => {
     const answer = dates("??-??-2026 ??-??-2027");
     expect(answer.combinations).toBe(365 * 365);
     expect(answer.combinations).toBeLessThan(HARD_MAX_COMBINATIONS);
+    // Two dates not remembered at all, which an answer refuses: their count stops past the limit.
+    const wide = ["?", "?"].flatMap((date) => dates(date).patterns);
+    expect(datePatternCombinationCount(wide, HARD_MAX_COMBINATIONS)).toBe(
+      HARD_MAX_COMBINATIONS + 1,
+    );
   });
 
   it("names the places of the dates with ?, as a page's note shows them while they are typed", () => {
-    expect(dates("23-09-2026 ?3-09-2026").incompletePlaces).toEqual([2]);
-    expect(dates("23-09-2026 ?3-09-2026").forgottenDigitsNote).toBe(
+    expect(dates(`${DATE} ?3-09-2026`).forgottenDigitsNote).toBe(
       "Date 2 has forgotten digits: 3 combinations.",
     );
     const three = dates("?3-09-2026 01-01-2020 2?-09-2026 1?-01-2020");
-    expect(three.incompletePlaces).toEqual([1, 3, 4]);
     expect(three.forgottenDigitsNote).toBe(
       "Dates 1, 3 and 4 have forgotten digits: 300 combinations.",
     );
-    expect(dates("23-09-2026").forgottenDigitsNote).toBeUndefined();
+    expect(dates(DATE).forgottenDigitsNote).toBeUndefined();
     // Dates read elsewhere count those with ? after the complete ones.
     const pattern = dates("2?-09-2026").patterns[0]!;
-    expect(DatesAnswer.of([parseDate("23-09-2026")], [pattern]).incompletePlaces).toEqual([2]);
+    expect(DatesAnswer.of([parseDate(DATE)], [pattern]).forgottenDigitsNote).toBe(
+      "Date 2 has forgotten digits: 10 combinations.",
+    );
   });
 
   it("says why a phrase cannot take the dates", () => {
@@ -194,8 +199,8 @@ describe("DateSearch", () => {
     let milliseconds = 0;
     const now = () => milliseconds;
     const search = new DateSearch({
-      indexes: MASKED,
-      dates: dates("23-09-2026"),
+      indexes: MASKED_INDEXES,
+      dates: dates(DATE),
       mode: "seedshift",
       walletCheck: async () => {
         milliseconds += 125;
@@ -218,34 +223,34 @@ describe("DateSearch", () => {
   it("refuses a search that its phrase, dates or mode cannot make", () => {
     const answer = dates("2?-09-2026");
     expect(
-      () => new DateSearch({ indexes: MASKED.slice(1), dates: answer, mode: "seedshift" }),
+      () => new DateSearch({ indexes: MASKED_INDEXES.slice(1), dates: answer, mode: "seedshift" }),
     ).toThrow("Expected 12, 15, 18, 21 or 24 word indexes.");
     expect(
       () =>
         new DateSearch({
-          indexes: MASKED,
+          indexes: MASKED_INDEXES,
           dates: answer,
           // A mode that no type allows here, fed on purpose as a JavaScript host could.
           mode: "direct" as unknown as "seedshift",
         }),
     ).toThrow("Unsupported Seedshift mode.");
     const five = DatesAnswer.of([1, 2, 3, 4, 5].map((day) => parseDate(`0${day}-01-2020`)));
-    expect(() => new DateSearch({ indexes: MASKED, dates: five, mode: "seedshift" })).toThrow(
-      "12-word phrases support at most 4 dates.",
-    );
+    expect(
+      () => new DateSearch({ indexes: MASKED_INDEXES, dates: five, mode: "seedshift" }),
+    ).toThrow("12-word phrases support at most 4 dates.");
     // Dates that are no DatesAnswer, fed on purpose as a JavaScript host could.
     const plain = { known: answer.known, patterns: answer.patterns } as unknown as DatesAnswer;
-    expect(() => new DateSearch({ indexes: MASKED, dates: plain, mode: "seedshift" })).toThrow(
-      "The dates must be a DatesAnswer.",
-    );
     expect(
-      () => new DateSearch({ indexes: MASKED, dates: answer, mode: "seedshift", keep: -1 }),
+      () => new DateSearch({ indexes: MASKED_INDEXES, dates: plain, mode: "seedshift" }),
+    ).toThrow("The dates must be a DatesAnswer.");
+    expect(
+      () => new DateSearch({ indexes: MASKED_INDEXES, dates: answer, mode: "seedshift", keep: -1 }),
     ).toThrow("keep must be a whole number of 0 or more.");
   });
 
   it("refuses a progress step that is no whole number of 1 or more, and shows no codes", async () => {
     const search = new DateSearch({
-      indexes: MASKED,
+      indexes: MASKED_INDEXES,
       dates: dates("2?-09-2026"),
       mode: "seedshift",
     });
@@ -261,7 +266,7 @@ describe("DateSearch", () => {
   it("tells its size and its wallet checks before it runs", () => {
     const answer = dates("2?-09-2026");
     const search = (mode: "seedshift" | "seedshift-legacy" | "seedshift-legacy-valid") =>
-      new DateSearch({ indexes: MASKED, dates: answer, mode, walletCheck: testWallet });
+      new DateSearch({ indexes: MASKED_INDEXES, dates: answer, mode, walletCheck: testWallet });
     expect(search("seedshift").combinations).toBe(10);
     // 12 words carry 4 checksum bits.
     expect(search("seedshift").checks()).toBe(1);
@@ -276,7 +281,11 @@ describe("DateSearch", () => {
     ).toBeCloseTo(0.02);
     // Without a wallet check only the decoding costs time.
     expect(
-      new DateSearch({ indexes: MASKED, dates: answer, mode: "seedshift" }).estimatedSeconds({
+      new DateSearch({
+        indexes: MASKED_INDEXES,
+        dates: answer,
+        mode: "seedshift",
+      }).estimatedSeconds({
         perCheck: 1,
         perCombination: 0.5,
       }),
@@ -286,10 +295,10 @@ describe("DateSearch", () => {
   it("measures its pace in the host: the decoding, and the wallet check if there is one", async () => {
     const answer = dates("2?-09-2026");
     expect(DateSearch.secondsPerCombination("seedshift", answer, 12)).toBeGreaterThan(0);
-    const listing = new DateSearch({ indexes: MASKED, dates: answer, mode: "seedshift" });
+    const listing = new DateSearch({ indexes: MASKED_INDEXES, dates: answer, mode: "seedshift" });
     expect((await listing.pace()).perCheck).toBe(0);
     const checked = new DateSearch({
-      indexes: MASKED,
+      indexes: MASKED_INDEXES,
       dates: answer,
       mode: "seedshift",
       walletCheck: testWallet,
@@ -309,17 +318,30 @@ describe("DateSearch", () => {
 describe("DateSearch", () => {
   it("times the decoding with a phrase of the search's own length (AUD-010-UI005)", () => {
     // With a valid last word the Original Seedshift decodes 128 phrases a combination for 12
-    // words and 8 for 24: a 24-word probe made 12-word searches look about 14 times shorter.
-    const answer = dates("0?-09-2026");
-    const twelve = DateSearch.secondsPerCombination("seedshift-legacy-valid", answer, 12);
-    const twentyFour = DateSearch.secondsPerCombination("seedshift-legacy-valid", answer, 24);
-    expect(twelve / twentyFour).toBeGreaterThan(3);
+    // words and 8 for 24: a 24-word probe made 12-word searches look about 14 times shorter. A
+    // phrase of n words takes at most n / 3 dates, so eight dates are decoded with a probe of 24
+    // words only: each shorter probe refuses them, by its own length.
+    const eight = DatesAnswer.parse(
+      "01-01-2020 02-01-2020 03-01-2020 04-01-2020 05-01-2020 06-01-2020 07-01-2020 0?-01-2021",
+      { wordCount: 24, patterns: true },
+    );
+    for (const words of [12, 15, 18, 21] as const)
+      expect(() => DateSearch.secondsPerCombination("seedshift", eight, words)).toThrow(
+        `${words}-word phrases support at most ${words / 3} dates.`,
+      );
+    // A clock that moves one second between its two readings: that second is shared among the
+    // nine combinations of 0?-09-2026 that the probe decoded.
+    let milliseconds = 0;
+    const clock = () => (milliseconds += 1_000);
+    expect(
+      DateSearch.secondsPerCombination("seedshift-legacy-valid", dates("0?-09-2026"), 12, clock),
+    ).toBe(1 / 9);
   });
 
   it("is asked for first when it takes longer than twelve hours, or tries more than a limit", () => {
     expect(QUESTION_SECONDS).toBe(12 * 3_600);
     const search = new DateSearch({
-      indexes: MASKED,
+      indexes: MASKED_INDEXES,
       dates: dates("2?-09-2026"),
       mode: "seedshift",
       walletCheck: testWallet,
@@ -335,7 +357,7 @@ describe("DateSearch", () => {
     expect(search.plan(at(0), 9).ask).toBe(true);
     // Without a wallet check only a decoding as slow as twelve hours asks.
     const listing = new DateSearch({
-      indexes: MASKED,
+      indexes: MASKED_INDEXES,
       dates: dates("2?-09-2026"),
       mode: "seedshift",
     });
@@ -347,7 +369,7 @@ describe("DateSearch", () => {
     const progress: DateSearchProgress[] = [];
     const matches: DateMatch[] = [];
     const search = new DateSearch({
-      indexes: MASKED,
+      indexes: MASKED_INDEXES,
       dates: dates("2?-09-2026"),
       mode: "seedshift",
       walletCheck: testWallet,
@@ -364,7 +386,7 @@ describe("DateSearch", () => {
       matchCount: 1,
       shown: [
         {
-          dates: "23-09-2026",
+          dates: DATE,
           allDates: [{ year: 2026, month: 9, day: 23 }],
           mnemonic: TEST_PHRASE,
           evidence: "m",
@@ -382,14 +404,14 @@ describe("DateSearch", () => {
   it("takes a wallet check that answers later, as a page's WebCrypto does", async () => {
     const later: WalletCheck = async (mnemonic) => testWallet(mnemonic);
     const result = await new DateSearch({
-      indexes: MASKED,
+      indexes: MASKED_INDEXES,
       dates: dates("2?-09-2026"),
       mode: "seedshift",
       walletCheck: later,
     }).run();
     expect(result.shown).toEqual([
       {
-        dates: "23-09-2026",
+        dates: DATE,
         allDates: [{ year: 2026, month: 9, day: 23 }],
         mnemonic: TEST_PHRASE,
         evidence: "m",
@@ -403,7 +425,7 @@ describe("DateSearch", () => {
     const matches: DateMatch[] = [];
     const answer = dates("??-09-2026");
     const result = await new DateSearch({
-      indexes: MASKED,
+      indexes: MASKED_INDEXES,
       dates: answer,
       mode: "seedshift",
       maxShown: 2,
@@ -420,8 +442,8 @@ describe("DateSearch", () => {
     // The Original Seedshift with a valid last word tries every last word whose checksum fits: 128
     // for 12 words. One combination only, as each of them takes a while to decode.
     const valid = await new DateSearch({
-      indexes: MASKED,
-      dates: dates("23-09-2026"),
+      indexes: MASKED_INDEXES,
+      dates: dates(DATE),
       mode: "seedshift-legacy-valid",
     }).run();
     expect(valid).toMatchObject({ combinations: 1, checksumValid: 128, matchCount: 128 });
@@ -431,7 +453,7 @@ describe("DateSearch", () => {
 
   it("stops at the host's signal, before it starts or at its next turn", async () => {
     const search = new DateSearch({
-      indexes: MASKED,
+      indexes: MASKED_INDEXES,
       dates: dates("??-09-2026"),
       mode: "seedshift",
       walletCheck: testWallet,

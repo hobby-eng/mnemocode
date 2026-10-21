@@ -60,7 +60,12 @@ export class SskrRuntime {
     this.#read = read;
   }
 
-  /** A checked bridge, cached only after its exact generated JS and WASM bytes are verified. */
+  /**
+   * A checked bridge, cached only after its exact generated JS and WASM bytes are verified. Refuses
+   * a manifest or file that does not match its pin
+   * (sskr.runtime.sskr-dependency-integrity-check-failed-no-secret-was); what the reader throws
+   * passes on, and a later call tries again.
+   */
   load(): Promise<SskrBridge> {
     return (this.#pending ??= this.#load().catch((error) => {
       this.#pending = undefined;
@@ -96,7 +101,12 @@ export class SskrRuntime {
 
 const runtime = new SskrRuntime();
 
-/** The package's checked bridge; the same Node API and singleton cache as before. */
+/**
+ * The package's checked bridge, one per process, read with readBundledFile: refused as
+ * SskrRuntime.load refuses it, as when the bundled engine fails its pins
+ * (sskr.runtime.sskr-dependency-integrity-check-failed-no-secret-was), and tried again on the next
+ * call.
+ */
 export function sskrEngine(): Promise<SskrBridge> {
   return runtime.load();
 }

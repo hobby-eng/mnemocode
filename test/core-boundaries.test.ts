@@ -13,6 +13,7 @@ import {
   type DateShiftDate,
 } from "../src/core.js";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
+import { TEST_FINGERPRINT } from "./helpers/test-phrase.js";
 import { mnemocodeVectors } from "./helpers/vectors.js";
 // Independent BIP39 construction: integer entropy + SHA256 checksum, no library encoder.
 function phrase(entropy: bigint, bits: number): string {
@@ -128,6 +129,6 @@ describe("Core independent entropy and calendar boundaries", () => {
       );
     }
     expect(masterFingerprint(phrase(0n, 128))).toBe(vector.vectors[0]!.sourceFingerprint);
-    expect(vector.vectors[0]!.sourceFingerprint).toBe("73c5da0a");
+    expect(vector.vectors[0]!.sourceFingerprint).toBe(TEST_FINGERPRINT);
   });
 });

@@ -2,14 +2,18 @@
 // S001 to S015 and the steps of ShareRestore (S002, S123, S139) here, the others in the files
 // scan-fixes-*.test.ts. Public test data only: the BIP39 test phrase and the public SSKR vectors.
 
+import { entropyToMnemonic } from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseArguments } from "../src/cli/arguments.js";
 import { runDecode } from "../src/cli/decode-command.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { Masking, SPLIT_MODES_ONLY } from "../src/core/masking.js";
+import { duration } from "../src/core/search-plan.js";
+import { markUnits } from "./helpers/shares.js";
 import { publicShare, sskrVectors } from "./helpers/vectors.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, MASKED_WORDS, OTHER_PHRASE, TEST_PHRASE } from "./helpers/test-phrase.js";
 import type { MoreWithin, NextByte } from "../src/cli/terminal-keys.js";
 
 // The BIP39 library as it is, with the turning of a phrase into entropy watched: S005's case keeps
@@ -111,9 +115,8 @@ describe("S005: the candidate list is written by one library writer", () => {
     const turned = vi.mocked(mnemonicToEntropy);
     turned.mockClear();
     // A public BIP39 vector whose entropy is not zero (0x7f repeated), so that a wipe shows.
-    const first = "legal winner thank year wave sausage worth useful legal winner thank yellow";
     await expect(
-      new CandidateListWriter(new NoProtection()).writePhrases([first, "not a phrase"]),
+      new CandidateListWriter(new NoProtection()).writePhrases([OTHER_PHRASE, "not a phrase"]),
     ).rejects.toHaveProperty("code", "core.bip39-sizes.expected-word-indexes");
     const made = turned.mock.results[0];
     if (made?.type !== "return")
@@ -126,7 +129,6 @@ describe("S005: the candidate list is written by one library writer", () => {
   it("refuses a phrase that is none by the code of its condition, never naming a word", async () => {
     const { CandidateListWriter } = await import("../src/core/candidate-list-writer.js");
     const { NoProtection } = await import("../src/core/candidate-encryption.js");
-    const valid = "legal winner thank year wave sausage worth useful legal winner thank yellow";
     // What writing `phrase` ends with: its refusal, or "written", which no refusal below matches.
     const refusal = (phrase: string): Promise<unknown> =>
       new CandidateListWriter(new NoProtection()).writePhrases([phrase]).then(
@@ -134,20 +136,20 @@ describe("S005: the candidate list is written by one library writer", () => {
         (error: unknown) => error,
       );
     // @scure/bip39's own error names the word it does not know: neither it nor its text is kept.
-    const unknown = await refusal(valid.replace("wave", "wavx"));
+    const unknown = await refusal(OTHER_PHRASE.replace("wave", "wavx"));
     expect(unknown).toMatchObject({
       code: "core.english-words.word-not-english-bip39-list",
       message: "A word is not in the English BIP39 list.",
     });
     expect(unknown).not.toHaveProperty("cause");
-    const checksum = await refusal(valid.replace("yellow", "year"));
+    const checksum = await refusal(OTHER_PHRASE.replace("yellow", "year"));
     expect(checksum).toMatchObject({
       code: "core.candidate-list-writer.phrase-fails-bip39-checksum",
       message: "A candidate's phrase fails its BIP39 checksum.",
     });
     expect(checksum).not.toHaveProperty("cause");
     // Two spaces leave an empty word, as the library splits a phrase.
-    const spaced = await refusal(valid.replace(" ", "  "));
+    const spaced = await refusal(OTHER_PHRASE.replace(" ", "  "));
     expect(spaced).toHaveProperty("code", "core.bip39-sizes.expected-word-indexes");
   });
 });
@@ -224,14 +226,28 @@ describe("S002, S123: ShareRestore holds the steps of a restore and a repair", (
     return { input, restore: new ShareRestore(nodeSharePlatform), confirmed, limits };
   }
 
-  it("restores the phrase of complete shares, with the backup and no repair", async () => {
-    const { input, restore } = await restoreOf([first, second], false);
+  it("restores the vector's phrase from complete shares, with no repair and the backup in the form of the first share", async () => {
+    const { writeShare } = await import("../src/sskr/transport.js");
+    const { input, restore } = await restoreOf([writeShare(first, "indexes"), second], false);
     const outcome = await restore.restore({ input, mode: "direct", confirmed: false });
     expect(outcome.kind).toBe("phrases");
     if (outcome.kind !== "phrases") return;
+    const vector = sskrVectors().deterministic[0]!;
+    const phrase = entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
     expect(outcome.phrases).toHaveLength(1);
-    expect(outcome.phrases[0]!.repairs).toEqual([]);
-    expect(outcome.listed).toEqual([outcome.phrases[0]!.mnemonic]);
+    expect(outcome.phrases[0]).toMatchObject({
+      mnemonic: phrase,
+      repairs: [],
+      // The word numbers of the phrase, counted from 1, as the first share is written.
+      backup: {
+        form: "indexes",
+        text: phrase
+          .split(" ")
+          .map((word) => wordlist.indexOf(word) + 1)
+          .join(" "),
+      },
+    });
+    expect(outcome.listed).toEqual([phrase]);
   });
 
   it("asks before a search longer than its limits allow, and searches once confirmed", async () => {
@@ -277,14 +293,18 @@ describe("S002, S123: ShareRestore holds the steps of a restore and a repair", (
 const vectors = sskrVectors();
 const { shares } = vectors.deterministic[0]!;
 const [first, second] = [shares[0]!, shares[1]!];
-// Shares 1 and 3 of a 2-of-3 split of "abandon ... about" masked with Seedshift and 23-09-2026
-// (scripts/verify-terminal-input.py), and that masked phrase.
+// Shares 1 and 3 of a 2-of-3 split of "abandon ... about" masked with Seedshift and DATE, that is
+// of MASKED_WORDS (scripts/verify-terminal-input.py).
 const MASKED_SHARES = [
   "ur:sskr/gomuttaeadaernclmdemdtlftsswsospsrjnjpwzuetlfhdltahh",
   "ur:sskr/gomuttaeadaojytnhyvtpaqdmobwreoyykutjtkofedicanladwm",
 ];
-const MASKED = `${"wool abuse actual ".repeat(3)}wool abuse congress`;
 const noWallet = () => ({ matched: false });
+// The bytes of a share of a 16-byte secret in UR form, as markUnits counts them: the head of the
+// byte string (0), the identifier (1, 2), the rest of the metadata (3 to 5), the secret (6 to 21)
+// and the checksum (22 to 25).
+const UR_IDENTIFIER_UNIT = 1;
+const UR_CHECKSUM_UNITS = [22, 23, 24, 25];
 
 // Imported here, as the block above does: other blocks reset the modules, and a class checked
 // with instanceof (DatesAnswer) must come from the same load as the restore that checks it.
@@ -341,13 +361,14 @@ async function countWipes() {
   ) {
     const made = await plan.apply(this, args);
     const index = wipes.push(0) - 1;
-    return {
-      ...made,
+    const wipe = made.wipe;
+    // The plan itself, its wipe counted: a search, a caller or its disposal wipes through it.
+    return Object.assign(made, {
       wipe: () => {
         wipes[index]! += 1;
-        made.wipe();
+        wipe();
       },
-    };
+    });
   });
   return { wipes, restore: () => spy.mockRestore() };
 }
@@ -356,14 +377,14 @@ describe("S123, S139: the command line takes ShareRestore's steps", () => {
   it("unmasks the phrases with the phrase held, the backup and the repairs", async () => {
     const { ShareRestore, ShareUnmasking, DatesAnswer } = await modules();
     const read = await maskedSet();
-    const dates = DatesAnswer.parse("23-09-2026", { patterns: true });
+    const dates = DatesAnswer.parse(DATE, { patterns: true });
     const unmasking = new ShareUnmasking({ mode: "seedshift", dates });
     const result = await ShareRestore.phrases(unmasking, [read.set], read.places);
     expect(result.kind).toBe("phrases");
     if (result.kind !== "phrases") return;
     expect(result.phrases.map((phrase) => phrase.mnemonic)).toEqual([TEST_PHRASE]);
-    expect(result.phrases[0]!.held).toBe(MASKED);
-    expect(result.phrases[0]!.backup).toEqual({ form: "english", text: MASKED });
+    expect(result.phrases[0]!.held).toBe(MASKED_WORDS);
+    expect(result.phrases[0]!.backup).toEqual({ form: "english", text: MASKED_WORDS });
     expect(result.phrases[0]!.repairs).toEqual([]);
     expect(result.sets).toEqual([read.set]);
     expect(result.listed).toEqual([TEST_PHRASE]);
@@ -375,7 +396,7 @@ describe("S123, S139: the command line takes ShareRestore's steps", () => {
     const read = await maskedSet();
     const whole = new ShareUnmasking({
       mode: "seedshift",
-      dates: DatesAnswer.parse("23-09-2026", { patterns: true }),
+      dates: DatesAnswer.parse(DATE, { patterns: true }),
       walletCheck: noWallet,
     });
     expect(whole.searchedCombinations).toBeUndefined();
@@ -425,7 +446,7 @@ describe("S123, S139: the command line takes ShareRestore's steps", () => {
       question: read.report.searchQuestion(work),
     });
     expect(read.report.searchExtent()).toBe(
-      `The search takes 65,536 checks, ${read.report.duration()}.`,
+      `The search takes 65,536 checks, ${duration(read.report.seconds())}.`,
     );
     releaseRead(read);
   });
@@ -483,7 +504,7 @@ describe("S123, S139: the command line takes ShareRestore's steps", () => {
     if (read.kind !== "marked") throw new Error("Expected marked shares.");
     const work = { combinations: 10, secondsEach: 0.001 };
     expect(allowedBy(read.report.searchExtent(work), [["max-tries", 65_536]])).toBe(
-      `The search takes 65,536 checks, ${read.report.duration(work)}. Allow it with --max-tries 65536.`,
+      `The search takes 65,536 checks, ${duration(read.report.seconds(work))}. Allow it with --max-tries 65536.`,
     );
     expect(
       allowedBy(read.report.searchExtent(work), [
@@ -491,7 +512,7 @@ describe("S123, S139: the command line takes ShareRestore's steps", () => {
         ["max-candidates", 10],
       ]),
     ).toBe(
-      `The search takes 65,536 checks, ${read.report.duration(work)}. Allow it with --max-tries 65536 and --max-candidates 10.`,
+      `The search takes 65,536 checks, ${duration(read.report.seconds(work))}. Allow it with --max-tries 65536 and --max-candidates 10.`,
     );
     releaseRead(read);
   });
@@ -564,29 +585,35 @@ describe("S123, S139: the command line takes ShareRestore's steps", () => {
     ]);
     const other = vectors.deterministic[1]!.shares[0]!;
     const mixed = { shares: [first, other].map(unrepairedShare), unsettled: [] };
+    // The same message as the same shares typed to be written again.
+    const typed = inputOf([first, other]).rewritten();
+    if (typed.kind !== "trouble") throw new Error("Expected shares of two sets.");
     expect(ShareInput.checkedExport(mixed, [1, 2], undefined)).toMatchObject({
       kind: "trouble",
-      trouble: {
-        message: ShareInput.looseSetTrouble([
-          { place: 1, ur: first },
-          { place: 2, ur: other },
-        ])!.message,
-      },
+      trouble: { message: typed.trouble.message },
     });
-    // A repair says so in one message: why none is written, then why each is left out.
-    const spy = vi.spyOn(ShareInput, "checkedExport").mockReturnValue(none);
-    try {
-      expect(
-        await restorer.repair({
-          input: inputOf([first, second]),
-          mode: "direct",
-          confirmed: true,
-          fingerprintOf,
-        }),
-      ).toEqual({ kind: "trouble", message: [NO_SHARE_SETTLED, ...leftOut].join(" "), lines: [] });
-    } finally {
-      spy.mockRestore();
-    }
+    // A repair says so in one message: why none is written, then why each is left out. The first
+    // byte of the identifier and the four bytes of the checksum are marked on both shares: the
+    // checksum settles nothing, and the identifier, the same on both, changes neither the secret
+    // nor its digest, so no value of it is told apart and every share keeps an unsettled element.
+    const marks = [UR_IDENTIFIER_UNIT, ...UR_CHECKSUM_UNITS];
+    expect(
+      await restorer.repair({
+        input: inputOf([first, second].map((share) => markUnits(share, "ur", marks))),
+        mode: "direct",
+        confirmed: true,
+        fingerprintOf,
+      }),
+    ).toMatchObject({
+      kind: "trouble",
+      message: [
+        NO_SHARE_SETTLED,
+        ...[1, 2].map(
+          (share) =>
+            `Share ${share} cannot be settled and is left out: read more of it, or use another copy.`,
+        ),
+      ].join(" "),
+    });
   });
 });
 
@@ -600,7 +627,11 @@ describe("S123, S139: the command line takes ShareRestore's steps", () => {
       shares: [first, second].map(unrepairedShare),
       unsettled: [],
     };
-    const masked = { mnemonic: MASKED, shares: MASKED_SHARES.map(unrepairedShare), unsettled: [] };
+    const masked = {
+      mnemonic: MASKED_WORDS,
+      shares: MASKED_SHARES.map(unrepairedShare),
+      unsettled: [],
+    };
     // Two phrases of the masked set, as a date search may find, then the plain set.
     const phrases = [
       { set: masked, mnemonic: TEST_PHRASE },
@@ -646,7 +677,7 @@ describe("S123, S139: the command line takes ShareRestore's steps", () => {
       await restorer.repair({
         input: inputOf(MASKED_SHARES),
         mode: "seedshift",
-        dates: DatesAnswer.parse("23-09-2026", { patterns: true }),
+        dates: DatesAnswer.parse(DATE, { patterns: true }),
         confirmed: true,
         fingerprintOf,
       }),

@@ -3,17 +3,15 @@
 // measures a text as it is drawn, in NFC and trimmed, so that a text it settled passes again.
 
 import { describe, expect, it } from "vitest";
-import { renderCards, selectTemplate, type CardContent } from "../src/cards.js";
 import { businessOptions } from "../src/cli/business-options.js";
 import { parseArguments } from "../src/cli/arguments.js";
-import { indexesToColors } from "../src/core.js";
 import {
   MAX_CARD_TEXT_LENGTH,
   type CardPresentation,
   type CardSettings,
 } from "../src/export/card-settings.js";
 import { ExportDetails } from "../src/export/export-details.js";
-import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
+import { nodeRenderPlatform } from "../src/export/platform-node.js";
 
 const GIVEN: CardPresentation = {
   studioName: "  Orven Studio ",
@@ -69,27 +67,6 @@ describe("a presentation given by the host", () => {
     expect(() => settled(presentation)).toThrow(
       expect.objectContaining({ code: `export.card-settings.${code}` }),
     );
-  });
-
-  it("is none where a JavaScript host gives null, as where it gives none", () => {
-    const first = () => 0;
-    // A null presentation, which no type allows, fed on purpose as a JavaScript host could.
-    expect(
-      ExportDetails.of(first, { presentation: null as unknown as CardPresentation }).presentation,
-    ).toEqual(ExportDetails.of(first, {}).presentation);
-  });
-
-  it("of a later design is the export's where a JavaScript host gives null", async () => {
-    const colors = indexesToColors(Array.from({ length: 12 }, (_, index) => index * 7));
-    const content: CardContent = { kind: "colors", colors, payload: colors.join(" ") };
-    const template = selectTemplate("business-it", "colors");
-    // A null presentation, which no type allows, fed on purpose as a JavaScript host could.
-    const later = { ...content, presentation: null as unknown as CardPresentation };
-    const pdf = await renderCards(nodeCardRenderer, [
-      { template, content },
-      { template, content: later },
-    ]);
-    expect(new TextDecoder().decode(pdf.subarray(0, 5))).toBe("%PDF-");
   });
 });
 

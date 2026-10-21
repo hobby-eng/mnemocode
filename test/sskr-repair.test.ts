@@ -180,23 +180,22 @@ describe("Several unreadable SSKR elements", () => {
   const share = vectors.deterministic[4]!.shares[0]!;
 
   it("fills in up to three word numbers, Unicode codes, Bytewords or UR letters, and says what", () => {
-    for (const format of ["ur", "words", "indexes", "unicode"] as const) {
+    /** Marks the units at `places` of the share in `format`, and expects each filled in. */
+    const expectFilled = (format: ShareFormat, places: readonly number[]) => {
       const parts = shareUnits(share, format);
-      const places = [1, Math.floor(parts.length / 2), parts.length - 2];
       const marked = [...parts];
-      for (const place of places.slice(0, 2)) marked[place] = "?";
-      const two = readRepairableShare(joinUnits(marked, format));
-      expect(two.ur).toBe(share);
-      expect(two.filled).toEqual(
-        places.slice(0, 2).map((place) => ({ position: place + 1, value: parts[place] })),
+      for (const place of places) marked[place] = "?";
+      const read = readRepairableShare(joinUnits(marked, format));
+      expect(read.ur, format).toBe(share);
+      expect(read.filled, format).toEqual(
+        places.map((place) => ({ position: place + 1, value: parts[place] })),
       );
-    }
-    // Three: alone they may leave variants, which are listed, never chosen.
-    for (const format of ["ur", "words"] as const) {
-      const parts = shareUnits(share, format);
-      const marked = [...parts];
-      for (const place of [1, 9, parts.length - 2]) marked[place] = "?";
-      expect(readRepairableShare(joinUnits(marked, format)).ur).toBe(share);
+    };
+    for (const format of ["ur", "words", "indexes", "unicode"] as const) {
+      const length = shareUnits(share, format).length;
+      expectFilled(format, [1, Math.floor(length / 2)]);
+      // Three alone may leave variants, which are listed, never chosen; at these places one fits.
+      expectFilled(format, [1, 9, length - 2]);
     }
   });
 

@@ -32,7 +32,7 @@ describe("Marked assessment ownership where terminal output fails", () => {
     using shares = new TypedShares();
     const records = [SHARES[0], marked([5])];
     shares.input.add(records);
-    // This public wrapper still returns its real read and plan; only terminal output fails.
+    // ShareRestore's public read still returns its real read and plan; only terminal output fails.
     const reads = vi.spyOn(ShareRestore.prototype, "read");
     const failure = Object.assign(new Error("Synthetic terminal reporting failure."), {
       code: "EIO",

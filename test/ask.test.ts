@@ -21,18 +21,14 @@ import { LAST_NORMAL_INDEX } from "../src/core/bip32-limits.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
 import { recordDrawnCuts, takeCutNotes } from "./helpers/cut-notes.js";
 import { drawnList, keysOfAnswer, type DrawnList, type ListAnswer } from "./helpers/drawn-list.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { CTRL_C, CTRL_D, ESCAPE } from "./helpers/keys.js";
+import { FINGERPRINT_PROMPT, WALLET_QUESTION } from "./helpers/prompts.js";
+import { DATE, TEST_ADDRESS, TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { Keyboard, keyboardAsStandardInput } from "./helpers/terminal-streams.js";
 
-/** The public test phrase's first native SegWit receiving address, m/84'/0'/0'/0/0. */
-const FIRST_ADDRESS = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
 /** A valid testnet address (BIP173's example), which mainnet refuses by name. */
 const TESTNET_ADDRESS = "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx";
-const CTRL_C = "\x03";
-const CTRL_D = "\x04";
-const ESCAPE = "\x1b";
-/** The list questions of the wallet, as askWalletEvidence asks them. */
-const WALLET_QUESTION = "How can MnemoCode recognise the wallet?";
+/** The other list question of the wallet, as askWalletEvidence asks it. */
 const COIN_QUESTION = "Which coin is the address for?";
 
 /** A question to answer once it shows: a typed one by its prompt, a list one by its question. */
@@ -121,10 +117,8 @@ describe("questions asked again until the answer can be used", () => {
   it("asks again after an empty answer and after Ctrl+D, with one line", async () => {
     at("Dates:", "   \r");
     at("Dates:", CTRL_D);
-    at("Dates:", "23-09-2026\r");
-    expect(await askSecretUntil("Dates:", (answer) => answer, { what: "the dates" })).toBe(
-      "23-09-2026",
-    );
+    at("Dates:", `${DATE}\r`);
+    expect(await askSecretUntil("Dates:", (answer) => answer, { what: "the dates" })).toBe(DATE);
     expect(notices).toEqual([
       "Type the dates, or press Ctrl+C to stop.",
       "Type the dates, or press Ctrl+C to stop.",
@@ -159,8 +153,8 @@ describe("questions asked again until the answer can be used", () => {
   it("drops what was typed before the question showed, and cancels at a Ctrl+C among it", async () => {
     // A second Enter and the rest of a paste, typed while nothing read the terminal.
     keyboard.type("\rleft over\r");
-    at("Dates:", "23-09-2026\r");
-    expect(await askSecretUntil("Dates:", (answer) => answer)).toBe("23-09-2026");
+    at("Dates:", `${DATE}\r`);
+    expect(await askSecretUntil("Dates:", (answer) => answer)).toBe(DATE);
     expect(notices).toEqual([]);
     keyboard.type(`typed ahead${CTRL_C}`);
     expect(await askSecretUntil("Dates:", (answer) => answer)).toBe(CANCELLED);
@@ -206,13 +200,13 @@ describe("questions asked again until the answer can be used", () => {
 
   it("asks for a visible value until it can be used; Escape goes back", async () => {
     at("Fingerprint:", "\r");
-    at("Fingerprint:", "73c5da0a\r");
+    at("Fingerprint:", `${TEST_FINGERPRINT}\r`);
     expect(await askValueUntil("Fingerprint:", (answer) => answer, { what: "it" })).toBe(
-      "73c5da0a",
+      TEST_FINGERPRINT,
     );
     expect(notices).toEqual(["Type it, or press Esc to go back."]);
     // The value shows as it is typed, also off the private screen.
-    expect(screen).toContain("73c5da0a");
+    expect(screen).toContain(TEST_FINGERPRINT);
     at("Fingerprint:", ESCAPE);
     expect(await askValueUntil("Fingerprint:", (answer) => answer)).toBeUndefined();
   });
@@ -237,24 +231,18 @@ describe("questions asked again until the answer can be used", () => {
 describe("questions asked again until the answer can be used", () => {
   it("asks for the wallet and checks each value at once, as bitcoin-evidence.ts does", async () => {
     pick(WALLET_QUESTION, "Fingerprint");
-    at(
-      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
-      "zz\r",
-    );
-    at(
-      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
-      "73C5DA0A\r",
-    );
+    at(`${FINGERPRINT_PROMPT}:`, "zz\r");
+    at(`${FINGERPRINT_PROMPT}:`, `${TEST_FINGERPRINT.toUpperCase()}\r`);
     expect(await askWalletEvidence({ optional: false })).toEqual({
       kind: "wallet",
-      evidence: { kind: "master-fingerprint", value: "73c5da0a", network: "mainnet" },
+      evidence: { kind: "master-fingerprint", value: TEST_FINGERPRINT, network: "mainnet" },
     });
     expect(notices).toEqual(["A master fingerprint must be eight hexadecimal characters."]);
     notices = [];
     pick(WALLET_QUESTION, "Address");
     pick(COIN_QUESTION, "Bitcoin");
     at("Bitcoin address (one of the first receiving ones):", `${TESTNET_ADDRESS}\r`);
-    at("Bitcoin address (one of the first receiving ones):", `${FIRST_ADDRESS}\r`);
+    at("Bitcoin address (one of the first receiving ones):", `${TEST_ADDRESS}\r`);
     // How many of the first addresses it is compared with: Enter takes the first 20.
     at("Compare with how many addresses from the first (Enter: 20):", "\r");
     const answer = await askWalletEvidence({ optional: false });
@@ -262,7 +250,7 @@ describe("questions asked again until the answer can be used", () => {
       kind: "wallet",
       evidence: {
         kind: "address",
-        value: FIRST_ADDRESS,
+        value: TEST_ADDRESS,
         location: { network: "mainnet", account: 0, branch: 0, index: 0 },
         addresses: 20,
       },
@@ -273,7 +261,7 @@ describe("questions asked again until the answer can be used", () => {
     notices = [];
     pick(WALLET_QUESTION, "Address");
     pick(COIN_QUESTION, "Bitcoin");
-    at("Bitcoin address (one of the first receiving ones):", `${FIRST_ADDRESS}\r`);
+    at("Bitcoin address (one of the first receiving ones):", `${TEST_ADDRESS}\r`);
     at("Compare with how many addresses from the first (Enter: 20):", "0\r");
     at("Compare with how many addresses from the first (Enter: 20):", "1001\r");
     at("Compare with how many addresses from the first (Enter: 20):", "50\r");
@@ -288,7 +276,7 @@ describe("questions asked again until the answer can be used", () => {
     // --scan-gap answers the count, which is then not asked.
     pick(WALLET_QUESTION, "Address");
     pick(COIN_QUESTION, "Bitcoin");
-    at("Bitcoin address (one of the first 5 receiving ones):", `${FIRST_ADDRESS}\r`);
+    at("Bitcoin address (one of the first 5 receiving ones):", `${TEST_ADDRESS}\r`);
     expect(
       await askWalletEvidence({
         optional: false,
@@ -297,10 +285,7 @@ describe("questions asked again until the answer can be used", () => {
     ).toMatchObject({ evidence: { kind: "address", addresses: 5 } });
     // Escape at the value goes back to the list; Escape there goes back from the question.
     pick(WALLET_QUESTION, "Fingerprint");
-    at(
-      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
-      ESCAPE,
-    );
+    at(`${FINGERPRINT_PROMPT}:`, ESCAPE);
     pick(WALLET_QUESTION, undefined);
     expect(await askWalletEvidence({ optional: true })).toEqual({ kind: "back" });
     pick(WALLET_QUESTION, "It cannot");
@@ -318,7 +303,7 @@ describe("questions asked again until the answer can be used", () => {
     pick(COIN_QUESTION, "Bitcoin");
     at(
       `Bitcoin address (one of the addresses from m/.../0'/0/${LAST_NORMAL_INDEX}):`,
-      `${FIRST_ADDRESS}\r`,
+      `${TEST_ADDRESS}\r`,
     );
     at(`Compare with how many addresses from m/.../0'/0/${LAST_NORMAL_INDEX} (Enter: 1):`, "\r");
     expect(
@@ -364,13 +349,10 @@ describe("questions asked again until the answer can be used", () => {
       profiles: BITCOIN_PROFILES,
     });
     pick(WALLET_QUESTION, "Fingerprint");
-    at(
-      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
-      "73c5da0a\r",
-    );
+    at(`${FINGERPRINT_PROMPT}:`, `${TEST_FINGERPRINT}\r`);
     expect(
       await askWalletEvidence({ optional: false, place: walletPlaceOf(fingerprint, {}) }),
-    ).toEqual({ kind: "wallet", evidence: { ...fingerprint, value: "73c5da0a" } });
+    ).toEqual({ kind: "wallet", evidence: { ...fingerprint, value: TEST_FINGERPRINT } });
     expect(walletPlaceOf(undefined, {})).toEqual({
       location: { network: "mainnet", account: 0, branch: 0, index: 0 },
       profiles: BITCOIN_PROFILES,

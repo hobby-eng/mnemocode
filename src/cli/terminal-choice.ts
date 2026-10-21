@@ -232,10 +232,12 @@ function recordRows(lines: readonly AnswerLine[]): number {
  * The record of answers: one line for each question that choose and askLine asked since it
  * started, the question's label and the answer given, so that the questions asked so far read as
  * a short summary. A question erases itself once it is answered or left, so only these lines stay
- * on the screen between the questions of the menu. The lines are kept in order, so that
- * eraseSince can count their rows at the width the terminal has then, as a list is counted anew
- * at each redraw, and draw them again. One record for the process, whose questions are asked one
- * at a time.
+ * on the screen between the questions of the menu: the start menu is CORE-39's exception, whose
+ * questions stand under its heading with this record as their summary, since they build a command,
+ * while a command's private screen gives each step a screen of its own (PrivateSteps). The lines
+ * are kept in order, so that eraseSince can count their rows at the width the terminal has then,
+ * as a list is counted anew at each redraw, and draw them again. One record for the process, whose
+ * questions are asked one at a time.
  */
 export class AnswerRecord {
   static readonly #lines: AnswerLine[] = [];

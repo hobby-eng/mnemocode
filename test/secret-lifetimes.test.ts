@@ -8,6 +8,7 @@ import { SecretValue } from "../src/core/secret-value.js";
 import { CandidateListWriter } from "../src/core/candidate-list-writer.js";
 import { NoProtection } from "../src/core/candidate-encryption.js";
 import { decodeCandidateList } from "../src/core/candidate-list.js";
+import { WIPED_CODE } from "./helpers/owner-lifetime.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 afterEach(() => vi.restoreAllMocks());
@@ -138,7 +139,7 @@ describe("Retained secret lifetimes", () => {
     );
     reencoding.wipe();
     finish!({ matched: true });
-    await expect(pending).rejects.toHaveProperty("code", "core.secret-value.wiped");
+    await expect(pending).rejects.toHaveProperty("code", WIPED_CODE);
     expect(reencoding.confirmation).toBeUndefined();
   });
 
@@ -177,20 +178,19 @@ describe("Retained secret lifetimes", () => {
   });
 
   it("wipes returned protection bytes and publishes no list after the writer was disposed", async () => {
-    let returned: Uint8Array | undefined;
-    using writer = new CandidateListWriter({
-      encrypted: false,
-      description: "public test adapter",
-      protect: async (plain) => {
-        returned = Uint8Array.from(plain);
-        writer.wipe();
-        return returned;
-      },
-    });
-    await expect(writer.writePhrases([TEST_PHRASE])).rejects.toHaveProperty(
-      "code",
-      "core.secret-value.wiped",
-    );
-    expect(returned!.every((byte) => byte === 0)).toBe(true);
+    using protection = new PassphraseProtection("public test list passphrase");
+    // Watched only: the protection encrypts as it is.
+    const protect = vi.spyOn(protection, "protect");
+    using writer = new CandidateListWriter(protection);
+    const written = writer.writePhrases([TEST_PHRASE]);
+    // The writer ends while the protection encrypts the list.
+    expect(protect).toHaveBeenCalledOnce();
+    writer.wipe();
+    await expect(written).rejects.toHaveProperty("code", WIPED_CODE);
+    const result = protect.mock.results[0]!;
+    if (result.type !== "return") throw new Error("The protection must return its promise.");
+    const returned = await result.value;
+    expect(returned.length).toBeGreaterThan(0);
+    expect(returned.every((byte) => byte === 0)).toBe(true);
   });
 });

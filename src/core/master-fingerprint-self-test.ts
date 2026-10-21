@@ -6,7 +6,7 @@
 // From the host it needs, for the full check only, its PBKDF2-HMAC-SHA512; the quick part gives
 // published seeds in place of it, so that it needs nothing. It holds public test data, no secret.
 //
-// Host-neutral: it imports only core/master-fingerprint.ts and core/self-test-check.ts.
+// Host-neutral: it imports only other core modules.
 
 import { Bip39Seed, MasterFingerprintCheck, type Pbkdf2HmacSha512 } from "./master-fingerprint.js";
 import {
@@ -17,7 +17,7 @@ import {
   hexOfBytes,
 } from "./self-test-check.js";
 import { ErrorCatalog } from "./error-catalog.js";
-import { PUBLIC_MNEMONIC } from "./self-test-vectors.js";
+import { PUBLIC_FINGERPRINT, PUBLIC_MNEMONIC } from "./self-test-vectors.js";
 
 const ERRORS = new ErrorCatalog("core.master-fingerprint-self-test", {
   "bip39-seed-was-asked-other-parameters": () =>
@@ -69,10 +69,7 @@ const DECOMPOSED_SALT = "mnemoniccafe\u0301";
  * TREZOR.
  */
 const BIP39_VECTORS: readonly (readonly [string, string])[] = [
-  [
-    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
-    "c55257c360c07c72029aebc1b53c05ed0362ada38ead3e3e9efa3708e53495531f09a6987599d18264c1e1c92f2cf141630c7a3c4ab7c81b2f001698e7463b04",
-  ],
+  [PUBLIC_MNEMONIC, TREZOR_SEED],
   [
     "legal winner thank year wave sausage worth useful legal winner thank yellow",
     "2e8905819b8723fe2c1d161860e5ee1830318dbf49a83bd451cfb8440c28bd6fa457fe1296106559a3c80937a1c1069be3a3a5bd381ee6260e8d9739fce1f607",
@@ -241,7 +238,7 @@ export function checkMasterFingerprintStartup(): void {
     "A host seed of 32 bytes",
   );
   expectRefused(
-    () => fingerprints.match(PUBLIC_MNEMONIC, "73c5da0", VECTOR_PASSPHRASE),
+    () => fingerprints.match(PUBLIC_MNEMONIC, PUBLIC_FINGERPRINT.slice(1), VECTOR_PASSPHRASE),
     /eight hexadecimal/u,
     "A fingerprint of seven characters",
   );

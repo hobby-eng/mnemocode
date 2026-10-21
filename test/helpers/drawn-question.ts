@@ -7,7 +7,7 @@
 
 import { ERASE_BELOW } from "../../src/cli/terminal.js";
 import { SGR_RESET, STYLE, STYLE_CODES } from "../../src/cli/terminal-style.js";
-import { drawnList, type DrawnList } from "./drawn-list.js";
+import { drawnList, WARNING_INDENT, WARNING_MARK, type DrawnList } from "./drawn-list.js";
 
 /** A question as it shows. */
 export interface DrawnQuestion {
@@ -29,9 +29,6 @@ export interface DrawnQuestion {
 
 /** The prompt of a typed question, which its answer follows: "Word: ", "File (Enter: a.txt): ". */
 const PROMPT = /^(?<question>.+?)(?: \(Enter: (?<enter>[^)]*)\))?: $/u;
-/** The mark of the warning drawn above a question (markedLines), and the indent of its lines. */
-const WARNING_MARK = "! ";
-const WARNING_INDENT = "  ";
 /**
  * How a line of the record of answers starts in colour: its indent, then the grey label padded to
  * its column (factLine, as paint starts a grey text), which SGR_RESET ends. Only colour tells where

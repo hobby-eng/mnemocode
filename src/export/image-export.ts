@@ -12,7 +12,9 @@ import {
   DEFAULT_DOCUMENT_FORMAT,
   DEFAULT_IMAGE_FORMAT,
   DOCUMENT_FORMAT_FACTS,
+  DOCUMENT_FORMATS,
   IMAGE_DPI,
+  isImageFormat,
   parseImageFormat,
   type DocumentFormat,
   type ImageFormat,
@@ -20,6 +22,7 @@ import {
 import { errorCode } from "../core/refusal.js";
 import { MILLISECONDS_PER_SECOND } from "../core/search-turns.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { isOneOf } from "../core/one-of.js";
 
 const ERRORS = new ErrorCatalog("export.image-export", {
   "png-jpeg-export-requires-local-poppler-pdftocairo-program": () =>
@@ -59,17 +62,34 @@ const RENDERER_OUTPUT_BYTES = 64 * 1024;
  */
 const IMAGE_BYTES_PER_PIXEL = 2 * RGBA_CHANNELS;
 
-let renderer: Promise<string> | undefined;
-
 /**
- * The local Poppler renderer by its absolute name, found and answering for its version
- * (foundRenderer) once; never downloads a renderer or sends data online.
+ * The local Poppler renderer that draws the pages as images, by its absolute name: found and
+ * answering for its version (foundRenderer) once for the process; never downloads a renderer or
+ * sends data online. A class, because it owns the program found and its one rule: a search that
+ * fails is forgotten, so that the next export looks again.
  */
-function imageRenderer(): Promise<string> {
-  return (renderer ??= foundRenderer().catch((error: unknown) => {
-    renderer = undefined;
-    throw error;
-  }));
+export class ImageRenderer {
+  /** The search for the renderer, from its start for the rest of the process unless it fails. */
+  static #found: Promise<string> | undefined;
+
+  /**
+   * The renderer's absolute name, from the first search that did not fail; refuses as assert
+   * does.
+   */
+  static find(): Promise<string> {
+    return (ImageRenderer.#found ??= foundRenderer().catch((error: unknown) => {
+      ImageRenderer.#found = undefined;
+      throw error;
+    }));
+  }
+
+  /**
+   * Refuses image export where no local Poppler renderer can be run (foundRenderer;
+   * export.image-export.png-jpeg-export-requires-local-poppler-pdftocairo-program).
+   */
+  static async assert(): Promise<void> {
+    await ImageRenderer.find();
+  }
 }
 
 /**
@@ -112,14 +132,6 @@ function isRunnable(file: string): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Refuses image export where no local Poppler renderer can be run (foundRenderer;
- * export.image-export.png-jpeg-export-requires-local-poppler-pdftocairo-program).
- */
-export async function assertImageRenderer(): Promise<void> {
-  await imageRenderer();
 }
 
 /** Why an image folder is refused: something is there already. */
@@ -279,21 +291,22 @@ export async function writeRenderedDocument(
   basePath: string,
   format: DocumentFormat = DEFAULT_DOCUMENT_FORMAT,
 ): Promise<number> {
-  if (format === "pdf") {
-    await writeNewPrivateFile(pageFileName(basePath, 0, 1, format), bytes);
+  // A JavaScript host may pass any value: one that names no format is read as a person's answer
+  // for an image is, so that jpeg is jpg and any other is refused.
+  const chosen = isOneOf(DOCUMENT_FORMATS, format) ? format : parseImageFormat(format);
+  if (!isImageFormat(chosen)) {
+    await writeNewPrivateFile(pageFileName(basePath, 0, 1, chosen), bytes);
     return 1;
   }
-  // A JavaScript host may pass any value: it is read as a person's answer is.
-  const image = parseImageFormat(format);
-  const program = await imageRenderer();
+  const program = await ImageRenderer.find();
   const pages = (await PDFDocument.load(bytes)).getPages();
   if (!pages.length) throw ERRORS.create("local-pdf-renderer-produced-no-images", []);
   try {
     // Pages can differ in size, so each one is rendered with its own image size.
     for (const [index, page] of pages.entries()) {
       // The page shows what the document shows: its bytes are wiped once written.
-      await wipedAfterAsync(await drawnPage(program, bytes, page, index + 1, image), (drawn) =>
-        writeNewPrivateFile(pageFileName(basePath, index, pages.length, image), drawn),
+      await wipedAfterAsync(await drawnPage(program, bytes, page, index + 1, chosen), (drawn) =>
+        writeNewPrivateFile(pageFileName(basePath, index, pages.length, chosen), drawn),
       );
     }
     return pages.length;
@@ -309,7 +322,7 @@ export async function writeRenderedDocument(
  * returns how many image files it wrote. The pages are written into a staging folder beside
  * `directory`, and published together under its name only once every page is written
  * (NewFolder.publish). Refuses, before anything is written, a computer without the local Poppler
- * renderer (assertImageRenderer;
+ * renderer (ImageRenderer.assert;
  * export.image-export.png-jpeg-export-requires-local-poppler-pdftocairo-program), then a folder
  * that exists already (IMAGE_FOLDER_TAKEN, export.private-file.absent-path-refused) or is blank
  * (export.private-file.new-folder-path-empty-one-refused), as claimImageFolder refuses it. Then
@@ -320,7 +333,7 @@ export async function exportPageImages(
   directory: string,
   format: ImageFormat = DEFAULT_IMAGE_FORMAT,
 ): Promise<number> {
-  await assertImageRenderer();
+  await ImageRenderer.assert();
   const folder = await claimImageFolder(directory);
   return folder.publish(".mnemocode-images-", (staging) =>
     writeRenderedDocument(bytes, join(staging, "page"), format),

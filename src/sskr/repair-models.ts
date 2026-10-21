@@ -555,9 +555,10 @@ function addColorUnicodeDigitModel(models: UnitModel[], text: string): void {
   });
 }
 
-/** Code points of the Color Unicode codes (core/colors.ts). */
-const COLOR_UNICODE_CODE = (token: string): boolean =>
-  WHOLE_CODE.test(token) && isColorUnicodePoint(parseInt(token, 16));
+/** Whether `token` is a whole code of the Color Unicode codes' code points (core/colors.ts). */
+function isColorUnicodeCode(token: string): boolean {
+  return WHOLE_CODE.test(token) && isColorUnicodePoint(parseInt(token, 16));
+}
 
 /** A form written as codes apart, with what markProblem and markCount ask of it. */
 export interface CodeForm {
@@ -638,7 +639,7 @@ const REPAIR_FORMS: Readonly<Record<ShareFormat, RepairForm>> = Object.freeze({
       name: "code",
       plural: "Color Unicode codes",
       digits: CODE_DIGITS,
-      reads: COLOR_UNICODE_CODE,
+      reads: isColorUnicodeCode,
     },
   },
 });

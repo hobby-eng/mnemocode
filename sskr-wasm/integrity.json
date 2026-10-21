@@ -5,7 +5,7 @@
   "rust/rust-toolchain.toml": "58036485dea1e5bb8ccb7ca06d881ac7ea052a17e3c5b879a70259292c036797",
   "generated/recovery_sskr_wasm_bg.wasm.d.ts": "1f6e5b11c744324af89ae32b2d7980644543def7cc26995592c411f989f5db04",
   "generated/recovery_sskr_wasm.d.ts": "4fe377e3834fbd460e5aeaa668cd16c343c50bd50606cf9390a2491797bdb2ac",
-  "generated/recovery_sskr_wasm_bg.wasm": "01a347e9c231fcb7058c2e8ba9f55e26c1405f1d133d084021e7e929c1db9bd9",
+  "generated/recovery_sskr_wasm_bg.wasm": "3002e11f327e59f894fab68f3f8e2114390d5e98512f3fd286d3b2b1c9b9b05a",
   "generated/recovery_sskr_wasm.js": "e1b79a3c40e92704034b8bb72c4f8dff54746c53219d93eb01f952909f6c0f2c",
   "rust/src/lib.rs": "91cc350d3a1a11a66378faddf3faa78596567ce082b33bb647f54b1e5da8d710",
   "rust/src/refusal.rs": "225db70a0b9c2737d9a25a3114cb59a0bb33d6342fdcfac029e606cbd60bca37",
@@ -31,5 +31,5 @@
   "rust/vendor/bc-shamir-0.13.0/src/lib.rs": "8da1461a0526add4864754a5a342d1a4b8f1371f0ce7baf84c54fba0ea064b1a",
   "rust/vendor/bc-shamir-0.13.0/src/recovery_secret.rs": "bdc3e1c0d72ffb6411c6720e4cf163d508e77a0decc728cab273f3bee27aa0b9",
   "rust/vendor/bc-shamir-0.13.0/src/shamir.rs": "a3c0327301038028c1523466ec432ca9493c0fdde1cacde9625893e062681de6",
-  "rust/src/share_text.rs": "b01f84b5982f1b1ae6ea50c0982a56dcb614a04fccf64bc0dcae6ef11ca913e8"
+  "rust/src/share_text.rs": "0413b0f8b75bf60fb4907e997d6f8547b4355f8f2309888c2309174c42a0848a"
 }

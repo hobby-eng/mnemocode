@@ -25,7 +25,6 @@ import { ExportDetails } from "./export-details.js";
 import {
   type CardSettings,
   assertPageSettings,
-  assertSeparateCardSize,
   cardTitle,
   SEPARATE_CARD_SIZE,
   SHEET_PAGE_SIZE,
@@ -38,14 +37,10 @@ import {
   type SskrCardContent,
   type SskrCardLayout,
   parseSskrLayout,
+  SSKR_LAYOUT_RULES,
 } from "./sskr-content.js";
 import { joinedDocuments, type NamedDocument } from "./pdf-documents.js";
-import {
-  assertSeparateCards,
-  designOfStyle,
-  type CardStyle,
-  type CatalogEntry,
-} from "./template-catalog.js";
+import { designOfStyle, type CardStyle, type CatalogEntry } from "./template-catalog.js";
 import { codeColors } from "./card-palette.js";
 import { ownCards, keptIndividualCards } from "./card-decoys.js";
 import { withPlannedDecoys, type SheetShaper } from "./card-plan.js";
@@ -189,18 +184,19 @@ export class ShareCardSet extends Redacted implements Disposable {
     parseShareFormat(format);
     assertShareFormatHasCards(format);
     const layout = resolveSskrLayout(requested.layout, requested.pageSize);
+    const rules = SSKR_LAYOUT_RULES[layout];
     const options: ResolvedOptions = {
       ...requested,
       layout,
       // Sheets are A6 when no size is given, in every design, as ordinary cards are (render.ts);
       // separate cards have the business size.
-      ...(requested.pageSize === undefined && layout !== "individual"
+      ...(requested.pageSize === undefined && !rules.separateCards
         ? { pageSize: SHEET_PAGE_SIZE }
         : {}),
     };
     const design = designOfStyle(options.style);
     if (design === undefined) throw ERRORS.create("unsupported-sskr-card-style", []);
-    if (layout === "individual") assertSeparateCards(design);
+    rules.assertDesign(design);
     // The details first, then the shares: the order in which the random choices are made. Copies
     // of what the caller gave (ExportDetails), so that every card rendered later shows them as they
     // were.
@@ -208,7 +204,7 @@ export class ShareCardSet extends Redacted implements Disposable {
     const shares = Share.readSet(records, false);
     const members: Member[] = [];
     try {
-      const separate = options.layout === "individual";
+      const separate = rules.separateCards;
       const shaper: SheetShaper = (shapeDrawing, cards, pageSize) =>
         catalogSheetShape(design, shapeDrawing, cards, pageSize);
       for (const read of shares) {
@@ -218,8 +214,8 @@ export class ShareCardSet extends Redacted implements Disposable {
           kind: "sskr",
           ...shareCardFace(read, format),
           collectionReference: reference,
-          qrCard: options.layout === "qr",
-          cardQr: options.layout === "qr" || options.cardQr === true,
+          qrCard: rules.wholeShareQr,
+          cardQr: rules.wholeShareQr || options.cardQr === true,
           presentation,
           profile,
           ...(title === undefined ? {} : { title }),
@@ -260,8 +256,10 @@ export class ShareCardSet extends Redacted implements Disposable {
     this.#assertLive();
     if (requested === null || typeof requested !== "object" || Array.isArray(requested))
       throw ERRORS.create("individual-settings-object", []);
-    if (this.#options.layout === "qr") throw ERRORS.create("qr-cards-cannot-become-fragments", []);
-    assertSeparateCards(this.#design);
+    if (SSKR_LAYOUT_RULES[this.#options.layout].wholeShareQr)
+      throw ERRORS.create("qr-cards-cannot-become-fragments", []);
+    const separate = SSKR_LAYOUT_RULES.individual;
+    separate.assertDesign(this.#design);
     // Read the host's settings once. Undefined deliberately replaces any sheet orientation.
     const pageSize = requested.pageSize;
     const individual = {
@@ -272,7 +270,7 @@ export class ShareCardSet extends Redacted implements Disposable {
       qrCard: false,
     };
     assertPageSettings(individual);
-    assertSeparateCardSize(individual.pageSize);
+    separate.assertPageSize(individual.pageSize);
     const options: ResolvedOptions = { ...this.#options, ...individual };
     const members: Member[] = [];
     try {
@@ -314,7 +312,7 @@ export class ShareCardSet extends Redacted implements Disposable {
    */
   get qrCodes(): readonly ShareQrCode[] {
     this.#assertLive();
-    if (this.#options.layout === "individual") return [];
+    if (SSKR_LAYOUT_RULES[this.#options.layout].separateCards) return [];
     return this.#members
       .filter((member) => member.owned.settings.cardQr === true)
       .map((member) =>
@@ -424,11 +422,11 @@ export class ShareCardSet extends Redacted implements Disposable {
   /** The document `index` of `member`: a separate card, a collection sheet or a QR card. */
   async #render(member: Member, index: number): Promise<Uint8Array> {
     this.#assertLive();
-    const { layout } = this.#options;
+    const { separateCards, designByMember } = SSKR_LAYOUT_RULES[this.#options.layout];
     // Only separate cards are asked for by their index; a sheet and a QR card are one document.
-    const fragment = layout === "individual" ? index : undefined;
+    const fragment = separateCards ? index : undefined;
     // On QR cards the mixed style starts each share's sheet at another design, by its member.
-    const businessOffset = layout === "qr" ? member.memberIndex : 0;
+    const businessOffset = designByMember ? member.memberIndex : 0;
     try {
       const bytes = await renderCatalogDesign(
         this.#design,

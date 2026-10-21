@@ -6,8 +6,8 @@
 
 import { BackupReading } from "../core/backup-reading.js";
 import { SHARE_SEPARATOR } from "../sskr/share-input.js";
-import { EncodedBackup, MissingChecksumError } from "../core/encoded-backup.js";
-import { MissingCodes } from "../core/missing-codes.js";
+import { type EncodedBackup, MissingChecksumError } from "../core/encoded-backup.js";
+import type { MissingCodes } from "../core/missing-codes.js";
 import { Masking, PHRASE_WORDS, type MaskingMode } from "../core/masking.js";
 import { masterFingerprint } from "../bitcoin-evidence.js";
 import { parseRecord } from "../record.js";
@@ -27,6 +27,7 @@ import {
   detectedFormat,
   phraseWords,
   SHARE_READER,
+  ENCODED_INPUT_FILE,
 } from "./input.js";
 import { readBoundedTextFile } from "./text-file.js";
 import { MENU_ENTRY_NAMES } from "./menu-entries.js";
@@ -53,6 +54,15 @@ const ERRORS = new ErrorCatalog("cli.backup-questions", {
 });
 
 // The encoded seed phrase, before its dates.
+
+/** The answer that types the encoded seed phrase, after a file that could not be used. */
+export const TYPE_ENCODED_LABEL = "Type the encoded seed phrase";
+/** The answer that types the encoded seed phrase again, after one typed. */
+export const TYPE_ENCODED_AGAIN_LABEL = `${TYPE_ENCODED_LABEL} again`;
+/** The answer that types the codes again, after codes that cannot be the right ones. */
+export const CODES_AGAIN_LABEL = "Type the codes again";
+/** The answer that reads another file of the encoded seed phrase. */
+const READ_ANOTHER_FILE = "Read another file";
 
 /** What askEncodedBackup asks for. */
 export interface BackupQuestion {
@@ -179,8 +189,8 @@ class BackupSource {
   /** The choice that asks for the phrase again, for the questions after a problem. */
   againChoice(): Choice<"again"> {
     return this.#typed
-      ? { label: "Type the encoded seed phrase again", value: "again" }
-      : { label: "Read another file", note: "or type the encoded seed phrase", value: "again" };
+      ? { label: TYPE_ENCODED_AGAIN_LABEL, value: "again" }
+      : { label: READ_ANOTHER_FILE, note: "or type the encoded seed phrase", value: "again" };
   }
 
   /** Resolves a record/option conflict using the record or reading this source again. */
@@ -203,12 +213,12 @@ class BackupSource {
         recordText,
         {
           what: "the encoded seed phrase or its record",
-          textFile: "The encoded input file",
+          textFile: ENCODED_INPUT_FILE,
           hints: EncodedForm.typedWords,
           pastedLineBreak: this.#shares ? SHARE_SEPARATOR : " ",
         },
       );
-      // Display pasted boundaries as ; without moving the editing cursor to another row. Keep
+      // Display pasted line breaks as ; without moving the editing cursor to another row. Keep
       // them as line breaks for the library: English words still use whitespace, shares stay apart.
       return typed === CANCELLED || !this.#shares ? typed : typed.replaceAll(SHARE_SEPARATOR, "\n");
     }
@@ -229,8 +239,8 @@ class BackupSource {
       if (problem !== undefined) terminalNotice(problem, "warning");
       problem = undefined;
       const next = await askOrCancel(WHAT_NOW, [
-        { label: "Read another file", value: "file" },
-        { label: "Type the encoded seed phrase", note: "or paste it", value: "typed" },
+        { label: READ_ANOTHER_FILE, value: "file" },
+        { label: TYPE_ENCODED_LABEL, note: "or paste it", value: "typed" },
       ] as const);
       if (next === CANCELLED) return CANCELLED;
       if (next === "typed") {
@@ -406,9 +416,9 @@ async function markedBackup(
 /**
  * The codes of `reading`, `marked` or complete, read by `read` in their settled form, with their
  * mode, `settled` or asked once they read; Again where the form, the codes or the mode are refused
- * or left with Escape.
+ * or left with Escape. Codes that are not handed out are wiped.
  */
-async function codesAndMode<Codes>(
+async function codesAndMode<Codes extends Disposable>(
   reading: BackupReading,
   settled: MaskingMode | "ask",
   question: BackupQuestion,
@@ -433,8 +443,7 @@ async function codesAndMode<Codes>(
     handedOut = true;
     return { codes, mode };
   } finally {
-    if (!handedOut && (codes instanceof EncodedBackup || codes instanceof MissingCodes))
-      codes.wipe();
+    if (!handedOut) codes[Symbol.dispose]();
   }
 }
 

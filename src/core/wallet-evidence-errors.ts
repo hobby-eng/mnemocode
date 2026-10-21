@@ -9,8 +9,6 @@ export const ERRORS = new ErrorCatalog("core.wallet-evidence", {
   "only-address-address-another-coin-compressed-public-key": () =>
     "Only an address, an address of another coin, a compressed public key or a WIF is compared with several addresses.",
   "unsupported-bitcoin-evidence-kind": () => "Unsupported Bitcoin evidence kind.",
-  "unable-derive-private-key-wif-comparison": () =>
-    "Unable to derive the private key for WIF comparison.",
   "bitcoin-network": (value0: string) => `Bitcoin network must be ${value0}.`,
   "at-least-one-bitcoin-address-profile-selected": () =>
     "At least one Bitcoin address profile must be selected.",

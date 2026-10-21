@@ -35,6 +35,7 @@ import { ShareCardSet } from "../src/export/sskr-render.js";
 import type { CardStyle } from "../src/export/template-catalog.js";
 import { CARD_TEMPLATES, type CardTemplate } from "../src/export/templates.js";
 import { SHARE_FORMATS, shareFormatHasCards } from "../src/sskr/transport.js";
+import { DRAWING_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 import { sskrVectors } from "./helpers/vectors.js";
 
 // The reader of card PDFs that a host without Poppler, such as a browser page, paints cards with
@@ -46,11 +47,6 @@ import { sskrVectors } from "./helpers/vectors.js";
 // with public dates, and the public SSKR vectors.
 
 const SHARES: readonly string[] = sskrVectors().deterministic[0]!.shares;
-/**
- * The limit of each test here, above the one of vitest.config.ts: each renders and reads the cards
- * of every design or family, which takes minutes on a loaded machine or a hosted CI runner.
- */
-const DRAWING_TIME_LIMIT_MS = 300_000;
 
 const steps = (page: CardPageDrawing, kind: DrawingStep["do"]) =>
   page.steps.filter((step) => step.do === kind);
@@ -91,7 +87,7 @@ describe("Card pages read back as drawing steps (export/card-drawing.ts)", () =>
       expect(reader.pageCount).toBe(CARD_TEMPLATES.length);
       await expectCardPages(pdf, "every design");
     },
-    DRAWING_TIME_LIMIT_MS,
+    DRAWING_TEST_TIME_LIMIT_MS,
   );
 
   it(
@@ -114,7 +110,7 @@ describe("Card pages read back as drawing steps (export/card-drawing.ts)", () =>
         }
       }
     },
-    DRAWING_TIME_LIMIT_MS,
+    DRAWING_TEST_TIME_LIMIT_MS,
   );
 
   it(
@@ -129,7 +125,7 @@ describe("Card pages read back as drawing steps (export/card-drawing.ts)", () =>
         expect(pages, template.id).toHaveLength(1);
       }
     },
-    DRAWING_TIME_LIMIT_MS,
+    DRAWING_TEST_TIME_LIMIT_MS,
   );
 
   it(
@@ -151,7 +147,7 @@ describe("Card pages read back as drawing steps (export/card-drawing.ts)", () =>
           }
         }
     },
-    DRAWING_TIME_LIMIT_MS,
+    DRAWING_TEST_TIME_LIMIT_MS,
   );
 
   it(
@@ -166,7 +162,7 @@ describe("Card pages read back as drawing steps (export/card-drawing.ts)", () =>
         await expectCardPages(await cards.renderShare(0), shareFormat);
       }
     },
-    DRAWING_TIME_LIMIT_MS,
+    DRAWING_TEST_TIME_LIMIT_MS,
   );
 });
 

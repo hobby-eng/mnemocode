@@ -378,8 +378,11 @@ export class WrittenCodes extends Redacted implements Disposable {
 
   /**
    * Whether these codes and `dates` restore `mnemonic`, without handing out what they restore.
-   * Throws when they cannot be undone, and for a mode that leaves several phrases, the Original
-   * Seedshift with a valid last word, which only a search undoes.
+   * Throws when they cannot be undone, as EncodedBackup.withMode refuses them
+   * (MissingChecksumError, code missing-checksum), and as EncodedBackup.decode refuses a mode that
+   * leaves several phrases, the Original Seedshift with a valid last word, which only a search
+   * undoes (core.encoded-backup.original-seedshift-valid-last-word-gives-several-phrases), and the
+   * dates (what Masking.undo refuses of them).
    */
   restores(mnemonic: string, dates: readonly DateShiftDate[]): boolean {
     // The mode is taken only here: read as direct, a mistyped code is named by its place instead
@@ -467,7 +470,7 @@ export class EncodedBackupCheck implements BackupCheck {
    * are counted and placed in the form the codes were written in, as they were typed: colours by
    * the place they were typed at, in Color Unicode each of their two codes (AUD-037-FUN003).
    */
-  compareCodes(codes: WrittenCodes): BackupFinding | undefined {
+  #compareCodes(codes: WrittenCodes): BackupFinding | undefined {
     this.#secrets.assertLive();
     const typed = codes.indexes;
     const original = this.#codes.value;
@@ -496,7 +499,7 @@ export class EncodedBackupCheck implements BackupCheck {
   }
 
   /** How dates that can be read differ from the dates of the result. */
-  compareDates(dates: readonly DateShiftDate[]): BackupFinding | undefined {
+  #compareDates(dates: readonly DateShiftDate[]): BackupFinding | undefined {
     return compareDateLists(dates, this.#secrets.dates ?? []);
   }
 
@@ -545,8 +548,8 @@ export class EncodedBackupCheck implements BackupCheck {
       dated: this.dated,
       wordCount: this.wordCount,
       readDates: (line) => this.#readDates(line),
-      compare: (codes) => this.compareCodes(codes),
-      compareDates: (_codes, dates) => this.compareDates(dates),
+      compare: (codes) => this.#compareCodes(codes),
+      compareDates: (_codes, dates) => this.#compareDates(dates),
       compareRestored: (codes, dates) => this.#compareRestored(codes, dates),
     };
   }

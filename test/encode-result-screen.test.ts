@@ -11,11 +11,10 @@ import { SHARES, SHARES_PROMPT } from "./helpers/share-questions.js";
 import { askValueUntil } from "../src/cli/ask.js";
 import { PrivateSteps } from "../src/cli/private-steps.js";
 import { CLEAR_SCREEN, terminalResultHeader, terminalWork } from "../src/cli/terminal.js";
-import { ExportFileName } from "../src/export/file-name.js";
+import { checkedExportFileName } from "../src/export/file-name.js";
 import { keyedQuestions, watchScreen } from "./helpers/terminal-screen.js";
 import { terminal } from "./helpers/keyed-terminal.js";
-import { DATE, MASKED } from "./helpers/phrase-questions.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, MASKED, MASKED_WORDS, TEST_NUMBERS, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/keyed-terminal.js"));
 vi.mock("../src/cli/terminal-input.js", async (original) =>
@@ -44,7 +43,6 @@ describe("Encode result visibility while the real backup question waits", () => 
     ["one encoded copy", false],
     ["shares", true],
   ])("shows the Seedshift words beside %s only when they are requested", async (_, sskr) => {
-    const maskedWords = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
     for (const show of [false, true]) {
       const screen = watchScreen(120);
       vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
@@ -60,7 +58,7 @@ describe("Encode result visibility while the real backup question waits", () => 
         ...(show ? { "show-masked-words": true } : {}),
       });
       const visible = screen.lines().join("\n");
-      expect(visible.includes(maskedWords)).toBe(show);
+      expect(visible.includes(MASKED_WORDS)).toBe(show);
       expect(visible).not.toContain(TEST_PHRASE);
     }
   });
@@ -87,7 +85,7 @@ describe("Encode result visibility while the real backup question waits", () => 
         });
         const visible = screen.lines().join("\n");
         expect(visible.includes(TEST_PHRASE), choice).toBe(choice !== "codes");
-        expect(visible.includes("1 1 1 1 1 1 1 1 1 1 1 4"), choice).toBe(choice !== "words");
+        expect(visible.includes(TEST_NUMBERS), choice).toBe(choice !== "words");
         expect(visible).toContain("no shares or dates are needed");
         expect(visible).toContain("SSKR share 3 of 3");
       }
@@ -212,7 +210,7 @@ describe("Encode result stays on the private screen through follow-up questions"
         }),
       ).toBeUndefined();
       expect(atCheck).toContain("Check the backup now?");
-      expect(atCheck).toContain(mode === "direct" ? "1 1 1 1 1 1 1 1 1 1 1 4" : MASKED);
+      expect(atCheck).toContain(mode === "direct" ? TEST_NUMBERS : MASKED);
       // The result is a step of its own (CORE-39): the secret prompts, and the dates typed at one,
       // were cleared away before it.
       expect(atCheck).not.toContain("Seed phrase (English BIP39 words):");
@@ -220,9 +218,7 @@ describe("Encode result stays on the private screen through follow-up questions"
       expect(atCheck).not.toContain(DATE);
       if (shares)
         for (const number of [1, 2, 3]) expect(atCheck).toContain(`SSKR share ${number} of 3`);
-      expect(screen.lines().join("\n")).toContain(
-        mode === "direct" ? "1 1 1 1 1 1 1 1 1 1 1 4" : MASKED,
-      );
+      expect(screen.lines().join("\n")).toContain(mode === "direct" ? TEST_NUMBERS : MASKED);
     },
   );
 
@@ -271,7 +267,7 @@ describe("Encode result stays on the private screen through follow-up questions"
     terminal.onFirstKey = () => {
       if (answers.length === 0) atRetry = screen.lines().join("\n");
     };
-    expect(await askValueUntil("New name:", (answer) => ExportFileName.checked(answer))).toBe(
+    expect(await askValueUntil("New name:", (answer) => checkedExportFileName(answer))).toBe(
       "backup",
     );
     expect(atRetry).toContain("Public retained result");

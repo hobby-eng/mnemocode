@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { printableText, printCodes, ProgressLine, terminalPhrase } from "../src/cli/terminal.js";
+import {
+  printableText,
+  printCodes,
+  ProgressLine,
+  terminalFailure,
+  terminalHint,
+  terminalNotice,
+  terminalPhrase,
+} from "../src/cli/terminal.js";
 import { STYLE_CODES } from "../src/cli/terminal-style.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { TEST_PHRASE, TEST_UNICODE } from "./helpers/test-phrase.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 /** Standard error as a terminal of `columns` columns, or as a pipe, for the length of a test. */
@@ -84,7 +92,7 @@ describe("the layout of results on a terminal (terminal.ts)", () => {
     expect(written).toBe("");
   });
 
-  it("shows a phrase numbered, four words to a row, then on one line, only in colour", () => {
+  it("shows a phrase numbered, four words to a row, then on one line, only on a terminal", () => {
     expect(terminalPhrase(TEST_PHRASE)).toBe(false);
     expect(out).toEqual([]);
     vi.stubEnv("NO_COLOR", "");
@@ -116,19 +124,17 @@ describe("the layout of results on a terminal (terminal.ts)", () => {
   });
 
   it("shows codes written joined apart, then joined, and one line in a pipe", () => {
-    // The public phrase in Unicode codes, which are written joined.
-    const unicode = `${"7684".repeat(11)}5728`;
-    printCodes(unicode, "unicode");
-    expect(out).toEqual([unicode]);
+    printCodes(TEST_UNICODE, "unicode");
+    expect(out).toEqual([TEST_UNICODE]);
     out.length = 0;
     vi.stubEnv("NO_COLOR", "");
     vi.stubEnv("CLICOLOR_FORCE", "1");
     streamsAsTerminal();
-    printCodes(unicode, "unicode");
+    printCodes(TEST_UNICODE, "unicode");
     expect(out.map((line) => line.replace(STYLE_CODES, ""))).toEqual([
       `${"7684 ".repeat(11)}5728`,
       "Joined, for copying:",
-      unicode,
+      TEST_UNICODE,
     ]);
     // A share's Unicode codes, written apart, also get the joined line.
     out.length = 0;
@@ -138,10 +144,58 @@ describe("the layout of results on a terminal (terminal.ts)", () => {
     printCodes("E000E064E13AE191", "colors-unicode");
     // Code by code, as a ? stands for one code in every reader.
     expect(out[0]!.replace(STYLE_CODES, "")).toBe("E000 E064 E13A E191");
-    // Forms written apart already are shown as they are.
+  });
+
+  it("wraps codes separated by spaces at those spaces on a terminal, never inside a code (CORE-36)", () => {
+    // The public 24-word vector, whose one line of words is wider than an 80-column terminal.
+    const words =
+      "letter advice cage absurd amount doctor acoustic avoid letter advice cage absurd amount doctor acoustic avoid letter advice cage absurd amount doctor acoustic bless";
+    printCodes(words, "english");
+    expect(out).toEqual([words]);
     out.length = 0;
-    printCodes(TEST_PHRASE, "english");
-    expect(out).toEqual([TEST_PHRASE]);
+    streamsAsTerminal();
+    printCodes(words, "english");
+    expect(out).toEqual([
+      "letter advice cage absurd amount doctor acoustic avoid letter advice cage",
+      "absurd amount doctor acoustic avoid letter advice cage absurd amount doctor",
+      "acoustic bless",
+    ]);
+    // Word numbers and colours alike; a line that fits stays whole.
+    out.length = 0;
+    printCodes(`${"0001 ".repeat(11)}0004`, "indexes");
+    expect(out).toEqual([`${"0001 ".repeat(11)}0004`]);
+    out.length = 0;
+    printCodes(Array.from({ length: 12 }, () => "#a1b2c3").join(" "), "colors");
+    expect(out).toEqual([
+      Array.from({ length: 9 }, () => "#a1b2c3").join(" "),
+      Array.from({ length: 3 }, () => "#a1b2c3").join(" "),
+    ]);
+  });
+
+  it("paints the plain form of a pipe where colour is forced, and keeps that form (CORE-38)", () => {
+    vi.stubEnv("NO_COLOR", "");
+    vi.stubEnv("CLICOLOR_FORCE", "1");
+    terminalFailure("There is no such command.");
+    terminalNotice("Only 32 bits.", "warning");
+    terminalNotice("Saved: public.txt", "success");
+    terminalHint("Compare an address.");
+    expect(errors).toEqual([
+      "\x1b[1;31mmnemocode:\x1b[0m There is no such command.",
+      "\x1b[1;33mOnly 32 bits.\x1b[0m",
+      "Saved: public.txt",
+      "\x1b[90mCompare an address.\x1b[0m",
+    ]);
+    // Without forced colour the pipe gets the same lines, plain.
+    errors.length = 0;
+    vi.stubEnv("CLICOLOR_FORCE", "");
+    terminalFailure("There is no such command.");
+    terminalNotice("Only 32 bits.", "warning");
+    terminalHint("Compare an address.");
+    expect(errors).toEqual([
+      "mnemocode: There is no such command.",
+      "Only 32 bits.",
+      "Compare an address.",
+    ]);
   });
 });
 

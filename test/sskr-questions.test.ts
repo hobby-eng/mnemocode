@@ -6,7 +6,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ParsedArguments } from "../src/cli/arguments.js";
 import { masterFingerprint } from "../src/bitcoin-evidence.js";
-import { encodeMnemonic, parseDate } from "../src/core.js";
 import { runSskrCombine } from "../src/cli/sskr-restore-command.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 import { errorCode } from "../src/core/refusal.js";
@@ -15,6 +14,7 @@ import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { markUnits, VALUE_BYTE, wrongValue } from "./helpers/shares.js";
 import { STYLE_CODES } from "../src/cli/terminal-style.js";
+import { DECODE_DATES_PROMPT, FINGERPRINT_PROMPT } from "./helpers/prompts.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
 import {
   marked,
@@ -24,7 +24,14 @@ import {
   SHARES,
   SHARES_PROMPT,
 } from "./helpers/share-questions.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  ENCODED_FINGERPRINT,
+  MASKED_WORDS,
+  TEST_FINGERPRINT,
+  TEST_NUMBERS,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
@@ -32,9 +39,6 @@ vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOr
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
 );
-
-const TEST_DATE = "23-09-2026";
-const DATES_PROMPT = "Dates (up to 4, DD-MM-YYYY, ? for what is forgotten, separated by spaces):";
 
 /** `share` with one Bytewords pair of its UR replaced: its checksum then fails. */
 function misread(share: string): string {
@@ -54,17 +58,16 @@ function combine(options: ParsedArguments = {}): Promise<Cancelled | undefined> 
   return runSskrCombine({ "ask-secrets": true, ...options });
 }
 
-const masked = encodeMnemonic(TEST_PHRASE, [parseDate(TEST_DATE)]).shiftedEnglish.join(" ");
 let shares: string[];
 
 /** The fingerprint of the masked phrase, in the words that encode shows it with. */
 const encodedLine = (): string =>
-  `Encoded BIP32 master fingerprint of the masked phrase (empty BIP39 passphrase): ${masterFingerprint(masked)}`;
+  `Encoded BIP32 master fingerprint of the masked phrase (empty BIP39 passphrase): ${ENCODED_FINGERPRINT}`;
 
 /** Splits the masked phrase into new shares before each test. */
 function splitSharesBeforeEach(): void {
   beforeEach(async () => {
-    shares = await splitSskrMnemonic(masked, 2, 3);
+    shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
   });
 }
 
@@ -163,7 +166,7 @@ describe("shares on the private screen", () => {
 
   it("names an encoded seed phrase given as a share on the command line", async () => {
     // "abandon … about" as word numbers.
-    await expect(runSskrCombine({ share: "1 1 1 1 1 1 1 1 1 1 1 4" })).rejects.toThrow(
+    await expect(runSskrCombine({ share: TEST_NUMBERS })).rejects.toThrow(
       "Share 1 is an encoded seed phrase, not a Shamir share: Decode numbers, codes or colors back into a seed phrase reads it.",
     );
   });
@@ -373,10 +376,7 @@ describe("shares on the private screen", () => {
       "Which shares to change?",
       "What now?",
     ]);
-    expect(promptsShown()).toEqual([
-      SHARES_PROMPT,
-      "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
-    ]);
+    expect(promptsShown()).toEqual([SHARES_PROMPT, `${FINGERPRINT_PROMPT}:`]);
     expect(seen.out).toContain(PHRASE);
   });
 
@@ -410,7 +410,7 @@ describe("shares on the private screen", () => {
     splitSharesBeforeEach();
 
     it("shows the encoded fingerprint once the shares are read, before the dates", async () => {
-      terminal.answers = [`${shares[0]};${shares[1]}\r`, "23-09-2O26\r", `${TEST_DATE}\r`];
+      terminal.answers = [`${shares[0]};${shares[1]}\r`, "23-09-2O26\r", `${DATE}\r`];
       await combine({ mode: "seedshift" });
       const shown = seen.notices.indexOf(encodedLine());
       expect(shown).toBeGreaterThanOrEqual(0);
@@ -422,7 +422,7 @@ describe("shares on the private screen", () => {
       );
       // Drawn once, then kept above the dates each time they are asked, on a screen of its own
       // (PrivateSteps).
-      const datesAsked = promptsShown().filter((prompt) => prompt === DATES_PROMPT).length;
+      const datesAsked = promptsShown().filter((prompt) => prompt === DECODE_DATES_PROMPT).length;
       expect(seen.notices.filter((line) => line.startsWith("Encoded BIP32"))).toHaveLength(
         1 + datesAsked,
       );
@@ -430,32 +430,32 @@ describe("shares on the private screen", () => {
     });
 
     it("shows the encoded fingerprint with the dates typed, only on the private screen", async () => {
-      terminal.answers = [`${shares[0]};${shares[2]}\r`, `${TEST_DATE}\r`];
+      terminal.answers = [`${shares[0]};${shares[2]}\r`, `${DATE}\r`];
       await combine({ mode: "seedshift" });
       expect(seen.notices).toContain(encodedLine());
       expect(seen.out).toContain(TEST_PHRASE);
       // From the command line, as decode, and without Seedshift, none is shown.
       seen.notices = [];
-      await runSskrCombine({ share: [shares[0]!, shares[2]!], mode: "seedshift", date: TEST_DATE });
+      await runSskrCombine({ share: [shares[0]!, shares[2]!], mode: "seedshift", date: DATE });
       expect(seen.notices.some((line) => line.startsWith("Encoded BIP32"))).toBe(false);
       terminal.answers = [`${shares[0]};${shares[2]}\r`];
       await combine();
       expect(seen.notices.some((line) => line.startsWith("Encoded BIP32"))).toBe(false);
-      expect(seen.out).toContain(masked);
+      expect(seen.out).toContain(MASKED_WORDS);
     });
 
     it("shows each part of the result apart on a colour terminal, each phrase with its fingerprint", async () => {
       vi.stubEnv("NO_COLOR", "");
       vi.stubEnv("CLICOLOR_FORCE", "1");
       streamsAsTerminal();
-      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${TEST_DATE}\r`];
+      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${DATE}\r`];
       await combine({ mode: "seedshift" });
       const shown = seen.out.map(withoutColour);
       const parts = [
         "\nMnemoCode · Restored from shares",
         "\nEnglish BIP39 words of the masked phrase (decoy)",
-        masked,
-        `Encoded fingerprint (of the masked phrase)  ${masterFingerprint(masked)}  (empty BIP39 passphrase)`,
+        MASKED_WORDS,
+        `Encoded fingerprint (of the masked phrase)  ${ENCODED_FINGERPRINT}  (empty BIP39 passphrase)`,
         "\nThe original seed phrase, the wallet's",
         "    1. abandon      2. abandon      3. abandon      4. abandon",
         "    9. abandon     10. abandon     11. abandon     12. about",
@@ -473,11 +473,11 @@ describe("shares on the private screen", () => {
       vi.stubEnv("NO_COLOR", "");
       vi.stubEnv("CLICOLOR_FORCE", "1");
       streamsAsTerminal();
-      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${TEST_DATE}\r`];
+      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${DATE}\r`];
       await combine({ mode: "seedshift" });
       const plain = seen.notices.map((line) => line.replace(STYLE_CODES, ""));
       expect(plain).toContain(
-        `✓ Encoded fingerprint (of the masked phrase) ${masterFingerprint(masked)}`,
+        `✓ Encoded fingerprint (of the masked phrase) ${ENCODED_FINGERPRINT}`,
       );
       expect(plain).toContain("Fingerprint uses an empty BIP39 passphrase.");
     });
@@ -488,13 +488,13 @@ describe("shares on the private screen", () => {
       await combine({ mode: "seedshift" });
       expect(promptsShown()).toEqual([
         SHARES_PROMPT,
-        "Dates (up to 4, DD-MM-YYYY, ? for what is forgotten, separated by spaces):",
-        "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; They do not reveal the phrase.):",
+        DECODE_DATES_PROMPT,
+        `${FINGERPRINT_PROMPT}:`,
       ]);
       expect(
         seen.notices.some((line) => line.startsWith("The search tries 10 date combinations:")),
       ).toBe(true);
-      expect(seen.out).toContain(`Original seed phrase, the wallet's (dates ${TEST_DATE}):`);
+      expect(seen.out).toContain(`Original seed phrase, the wallet's (dates ${DATE}):`);
       expect(seen.out).toContain(TEST_PHRASE);
     });
   });
@@ -547,7 +547,7 @@ describe("shares on the private screen", () => {
     });
 
     it("asks for a date again that cannot be read, keeping the shares", async () => {
-      terminal.answers = [`${shares[0]};${shares[1]}\r`, "23-09-2O26\r", `${TEST_DATE}\r`];
+      terminal.answers = [`${shares[0]};${shares[1]}\r`, "23-09-2O26\r", `${DATE}\r`];
       await combine({ mode: "seedshift" });
       expect(seen.notices).toContain(
         "Date 1: use DD-MM-YYYY with a four-digit year, for example 23-09-2026.",
@@ -584,15 +584,15 @@ describe("shares on the private screen", () => {
 
     it("says why the dates are asked again when they are more than the phrase takes", async () => {
       const typed = "24-09-2026 25-09-2026 26-09-2026 27-09-2026 28-09-2026";
-      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${typed}\r`, `${TEST_DATE}\r`];
+      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${typed}\r`, `${DATE}\r`];
       await combine({ mode: "seedshift" });
       expect(seen.notices.some((line) => /at most 4 dates/u.test(line))).toBe(true);
-      expect(promptsShown()).toEqual([SHARES_PROMPT, DATES_PROMPT, DATES_PROMPT]);
+      expect(promptsShown()).toEqual([SHARES_PROMPT, DECODE_DATES_PROMPT, DECODE_DATES_PROMPT]);
       expect(seen.out).toContain(TEST_PHRASE);
     });
 
     it("takes Seedshift when the wallet shows that the phrase was masked with it", async () => {
-      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${TEST_DATE}\r`];
+      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${DATE}\r`];
       terminal.choices = ["It was masked with Seedshift"];
       await combine({ "master-fingerprint": TEST_FINGERPRINT });
       expect(seen.notices).toContain(
@@ -604,7 +604,7 @@ describe("shares on the private screen", () => {
         "It was masked with Seedshift",
         "Stop",
       ]);
-      expect(promptsShown()).toEqual([SHARES_PROMPT, DATES_PROMPT]);
+      expect(promptsShown()).toEqual([SHARES_PROMPT, DECODE_DATES_PROMPT]);
       // Shown once the phrase is taken as masked, before its dates.
       expect(seen.notices).toContain(encodedLine());
       expect(seen.out).toContain(TEST_PHRASE);
@@ -612,7 +612,7 @@ describe("shares on the private screen", () => {
 
     it("leaves Seedshift when the wallet shows that the phrase was not masked", async () => {
       const plain = await splitSskrMnemonic(TEST_PHRASE, 2, 3);
-      terminal.answers = [`${plain[0]};${plain[2]}\r`, `${TEST_DATE}\r`];
+      terminal.answers = [`${plain[0]};${plain[2]}\r`, `${DATE}\r`];
       terminal.choices = ["It was not masked with Seedshift"];
       await combine({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT });
       expect(terminal.labels[0]).toEqual([
@@ -622,12 +622,12 @@ describe("shares on the private screen", () => {
         "It was not masked with Seedshift",
         "Stop",
       ]);
-      expect(promptsShown()).toEqual([SHARES_PROMPT, DATES_PROMPT]);
+      expect(promptsShown()).toEqual([SHARES_PROMPT, DECODE_DATES_PROMPT]);
       expect(seen.out).toContain(TEST_PHRASE);
     });
 
     it("refuses dates from the command line beside --ask-secrets (AUD-010-SEC001)", async () => {
-      await expect(combine({ mode: "seedshift", date: TEST_DATE })).rejects.toThrow(
+      await expect(combine({ mode: "seedshift", date: DATE })).rejects.toThrow(
         "--ask-secrets cannot be combined with --dates.",
       );
       expect(promptsShown()).toEqual([]);

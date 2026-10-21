@@ -6,7 +6,8 @@ import fontkit from "@pdf-lib/fontkit";
 import { afterEach, describe, expect, it } from "vitest";
 import { renderIndividualCards } from "../src/export/render.js";
 import { exportIndividualCards } from "../src/export/individual-cards.js";
-import { nodeCardRenderer } from "../src/export/platform-node.js";
+import { CardRenderer } from "../src/export/card-renderer.js";
+import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
 import { SELF_TEST_CARD_DETAILS } from "../src/export/self-test-cards.js";
 import { validateProfile } from "../src/export/card-settings.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
@@ -96,9 +97,17 @@ describe("AUD-026 export ownership and admission without PDF painting", () => {
   );
 
   it("rejects explicit null share format before assets or randomness", async () => {
+    const read: string[] = [];
+    const drawing = new CardRenderer({
+      ...nodeRenderPlatform,
+      readAsset: (path) => {
+        read.push(path);
+        return nodeRenderPlatform.readAsset(path);
+      },
+    });
     await expect(
       ShareCardSet.create(
-        nodeCardRenderer,
+        drawing,
         [SSKR_VECTOR.shares[0]!],
         // A null format, which no type allows, fed on purpose as a JavaScript host could.
         { style: "it", shareFormat: null as never, ...SELF_TEST_CARD_DETAILS },
@@ -107,6 +116,7 @@ describe("AUD-026 export ownership and admission without PDF painting", () => {
         },
       ),
     ).rejects.toThrow("share format");
+    expect(read).toEqual([]);
   });
 
   it("covers accepted Latin diacritics and punctuation in the bundled font", () => {

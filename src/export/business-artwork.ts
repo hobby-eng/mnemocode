@@ -16,6 +16,12 @@ import { defined } from "../core/defined.js";
 
 /** Pixels per millimetre of the business artwork: 254 dpi, 900 x 500 on a business card. */
 const ARTWORK_PIXELS_PER_MM = 10;
+/**
+ * The deflate level of the recoloured artwork's PNG: zlib's default level (Z_DEFAULT_COMPRESSION
+ * is 6), its balance of size against time, as recoloured encodes the artwork anew for each
+ * reference.
+ */
+const ARTWORK_DEFLATE_LEVEL = 6;
 
 /** The approved photograph of a design, decoded, as cards draw it: resampled to a card. */
 function resampled(original: RasterImage): RasterImage {
@@ -91,7 +97,7 @@ export class BusinessArtwork {
         out.data[p + 1] = green;
         out.data[p + 2] = blue;
       }
-      const png = this.#codec.encodePng(out, 6);
+      const png = this.#codec.encodePng(out, ARTWORK_DEFLATE_LEVEL);
       // Detach an accidental host alias before retiring the borrowed recoloured pixels.
       return png.buffer === out.data.buffer ? Uint8Array.from(png) : png;
     } finally {

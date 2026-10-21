@@ -147,8 +147,10 @@ describe("single-page design studies", () => {
     "keeps the artwork and the QR of design %s together on a %s sheet, %s",
     async (id, pageSize, orientation) => {
       const template = CARD_TEMPLATES.find((item) => item.id === id)!;
+      const images = vi.spyOn(PDFPage.prototype, "drawImage");
+      const { renderer, payloads, reads, modules } = recordingQr();
       const document = await PDFDocument.load(
-        await template.render(nodeCardRenderer, {
+        await template.render(renderer, {
           kind: "colors",
           colors,
           payload,
@@ -159,6 +161,11 @@ describe("single-page design studies", () => {
         }),
       );
       expect(document.getPageCount()).toBe(1);
+      // On that one page: the artwork, which is drawn as images, and the QR code of the whole
+      // payload, every module of it once.
+      expect(images).toHaveBeenCalled();
+      expect(payloads).toEqual([payload]);
+      expect(reads).toEqual(modules);
     },
   );
 

@@ -2,10 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Decrypter, Encrypter } from "age-encryption";
 import {
   assertCandidateEncryptionReady,
+  checkCandidateEncryptionQuick,
   createSessionIdentity,
   encryptCandidates,
   PassphraseProtection,
 } from "../src/core/candidate-encryption.js";
+import { WIPED_CODE } from "./helpers/owner-lifetime.js";
 import { candidateVectors } from "./helpers/vectors.js";
 import { MnemoCodeSelfTest } from "../src/core/self-test.js";
 
@@ -14,7 +16,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("the first candidate encryption operation", () => {
   it("fails closed on a fast known-answer failure before encrypting caller material", async () => {
     vi.spyOn(Decrypter.prototype, "addIdentity").mockImplementationOnce(() => {
-      throw new Error("Synthetic known-answer backend failure.");
+      throw new Error("Synthetic known-answer failure of the age library.");
     });
     const writes = vi.spyOn(Encrypter.prototype, "encrypt");
     const plain = Uint8Array.of(1, 2, 3);
@@ -37,6 +39,15 @@ describe("the first candidate encryption operation", () => {
 
   it("retries a failed first check and shares the passing result across concurrent operations", async () => {
     const reads = vi.spyOn(Decrypter.prototype, "addIdentity");
+    // Fault: the cipher fails its first known answer, which no input can cause.
+    reads.mockImplementationOnce(() => {
+      throw new Error("Synthetic known-answer failure of the age library.");
+    });
+    await expect(createSessionIdentity()).rejects.toHaveProperty(
+      "code",
+      "core.candidate-encryption.self-test-failed",
+    );
+    reads.mockClear();
     const results = await Promise.all([
       createSessionIdentity(),
       createSessionIdentity(),
@@ -44,9 +55,13 @@ describe("the first candidate encryption operation", () => {
     ]);
     expect(results.every((pair) => pair.recipient.startsWith("age1"))).toBe(true);
     const checked = reads.mock.calls.length;
-    expect(checked).toBeGreaterThan(0);
     await createSessionIdentity();
     expect(reads).toHaveBeenCalledTimes(checked);
+    // The three operations together read as many identities as one forced run of the checks.
+    reads.mockClear();
+    await checkCandidateEncryptionQuick();
+    expect(checked).toBe(reads.mock.calls.length);
+    expect(checked).toBeGreaterThan(0);
   });
 
   it("refuses a missing protection kind instead of silently enabling a different feature", async () => {
@@ -69,7 +84,7 @@ describe("the first candidate encryption operation", () => {
     const input = Uint8Array.of(1, 2, 3);
     const pending = protection.protect(input);
     protection.wipe();
-    await expect(pending).rejects.toHaveProperty("code", "core.secret-value.wiped");
+    await expect(pending).rejects.toHaveProperty("code", WIPED_CODE);
     expect(encryption).not.toHaveBeenCalled();
     expect([...input]).toEqual([1, 2, 3]);
     input.fill(0);

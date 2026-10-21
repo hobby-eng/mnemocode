@@ -1,13 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { WordCandidate, WordCandidateSearch } from "../src/core/candidates.js";
 import type { WalletMatch } from "../src/core/wallet-check.js";
-import { endLifetimeIfPresent as endLifetime } from "./helpers/owner-lifetime.js";
+import { endLifetimeIfPresent as endLifetime, WIPED_CODE } from "./helpers/owner-lifetime.js";
+import { ONE_WORD_MISSING, replacedAt, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // Public BIP39/candidates-v1.json answers, fixed independently of the search under test.
-const ELEVEN = "abandon ".repeat(11);
-const FIRST_PHRASE = `${ELEVEN}about`;
-const SMALL_SEARCH = `${ELEVEN}about|actual`;
-const WIPED_CODE = "core.secret-value.wiped";
+const SMALL_SEARCH = replacedAt(TEST_PHRASE, { 12: "about|actual" });
 
 describe("Owned word-candidate lifetimes", () => {
   it.each(["wipe", "dispose"] as const)(
@@ -18,9 +16,7 @@ describe("Owned word-candidate lifetimes", () => {
       try {
         words[1] = 2047;
         const snapshot = candidate.words;
-        expect(candidate.phrase).toBe(
-          "abandon ability abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
-        );
+        expect(candidate.phrase).toBe(replacedAt(TEST_PHRASE, { 2: "ability" }));
         expect(candidate.checksumBits).toBe("0011");
         const entropy = candidate.entropy();
         try {
@@ -46,7 +42,7 @@ describe("Owned word-candidate lifetimes", () => {
     "ends a %s search without taking back a candidate already transferred to its caller",
     (kind) => {
       const search = WordCandidateSearch.parse(
-        kind === "unknown-words" ? SMALL_SEARCH : `${"abandon ".repeat(10)}about`,
+        kind === "unknown-words" ? SMALL_SEARCH : ONE_WORD_MISSING,
         kind,
       );
       const candidates = search.candidates();
@@ -56,14 +52,14 @@ describe("Owned word-candidate lifetimes", () => {
       const candidate = first.value;
       try {
         expect(candidate.number).toBe(1);
-        expect(candidate.phrase).toBe(FIRST_PHRASE);
+        expect(candidate.phrase).toBe(TEST_PHRASE);
         expect(search.placesOf(candidate)).toEqual(kind === "unknown-words" ? [11] : [0]);
         endLifetime(search, "dispose");
         expect(() => search.expected).toThrow("has been wiped");
         expect(() => search.placesOf(candidate)).toThrow("has been wiped");
         expect(() => candidates.next()).toThrow("has been wiped");
         expect(() => search.candidates().next()).toThrow("has been wiped");
-        expect(candidate.phrase).toBe(FIRST_PHRASE);
+        expect(candidate.phrase).toBe(TEST_PHRASE);
         endLifetime(candidate);
         expect(() => candidate.phrase).toThrow("has been wiped");
         endLifetime(search);
@@ -85,7 +81,7 @@ describe("Owned word-candidate lifetimes", () => {
     const onProgress = vi.fn();
     const pending = search.run({ walletCheck, keep: 2, onProgress, now: () => 0 });
     try {
-      expect(walletCheck).toHaveBeenCalledExactlyOnceWith(FIRST_PHRASE);
+      expect(walletCheck).toHaveBeenCalledExactlyOnceWith(TEST_PHRASE);
       endLifetime(search);
       finish!({ matched: true, path: "m" });
       await expect(pending).rejects.toHaveProperty("code", WIPED_CODE);

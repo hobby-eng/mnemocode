@@ -10,8 +10,9 @@ import { ShareInput } from "../src/sskr/share-input.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { ShareRestore } from "../src/sskr/share-restore.js";
 import { writeShare } from "../src/sskr/transport.js";
+import { WIPED_CODE } from "./helpers/owner-lifetime.js";
 
-const WIPED = { code: "core.secret-value.wiped" };
+const WIPED = { code: WIPED_CODE };
 const [FIRST, SECOND] = SSKR_SET_VECTOR.shares;
 
 /** The input of the vector's first two shares, the second with colour 6 marked when `marked`. */

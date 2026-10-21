@@ -14,6 +14,7 @@ from terminal_answers import (
     FINGERPRINT,
     MASK_DATE,
     TEST_PHRASE,
+    TEST_WORDS,
 )
 
 NAVIGATION = "Home/End"
@@ -25,6 +26,14 @@ PAGE_OF = re.compile(r"Page (\d+)/(\d+)")
 PAGE_DOWN = "\x1b[6~"
 PAGE_UP = "\x1b[5~"
 VT220_HOME, VT220_END = "\x1b[1~", "\x1b[4~"
+# The sizes, rows and columns, that the result checks run at: a common
+# terminal of 80 columns by 24 rows, and a narrow window of 32 by 12,
+# where a result must still fit or page.
+FULL_SCREEN = (24, 80)
+NARROW_SCREEN = (12, 32)
+# A taller terminal, 80 by 30, where the eight candidates of recover-word
+# fit as one row each but not as parts of their own.
+CANDIDATE_SCREEN = (30, 80)
 
 
 def assert_closed_descriptor(descriptor):
@@ -76,80 +85,84 @@ def check_private_result_pages():
     """Shares and missing-code candidates remain revisitable in finite
     and narrow frames.
     """
-    previous = terminal.TERMINAL_ROWS, terminal.TERMINAL_COLUMNS
-    try:
-        for height, width in ((24, 80), (12, 32)):
-            terminal.TERMINAL_ROWS, terminal.TERMINAL_COLUMNS = height, width
-            session = terminal.Session((
-                "encode", "--sskr", "--ask-secrets", "--mode", "direct",
-                "--threshold", "16", "--shares", "16",
-                "--share-format", "words", "--backup-check", "no",
-            ))
-            try:
-                session.wait_for("Seed phrase (English BIP39 words):")
-                session.type(TEST_PHRASE + terminal.ENTER)
-                titles = [
-                    f"SSKR share {number} of 16" for number in range(1, 17)
-                ]
-                # The result is a page of its own, under its heading
-                # (CORE-39).
-                navigate(session, "MnemoCode · SSKR export", titles)
-                session.type(terminal.ENTER)
-                session.wait_for(CLEAR_PROMPT)
-                # The end of the result stays, its last line the
-                # fingerprints' note, without the keys of the pages
-                # (AUD-037-UI004).
-                end = ("They do not reveal the phrase.",)
-                gone = ("Page ", NAVIGATION)
-                terminal.assert_private_result_visible(
-                    session, end, absent=gone
-                )
-                session.type(terminal.ENTER)
-                assert session.wait_for_exit() == 0
-                terminal.assert_kept_private(
-                    session, (TEST_PHRASE, "SSKR share 1 of 16")
-                )
-            finally:
-                session.close()
-            print(
-                "private share pages: Home/End and PageUp/PageDown at "
-                f"{width}x{height}"
-            )
-
-        terminal.TERMINAL_ROWS, terminal.TERMINAL_COLUMNS = 24, 80
-        prefix = "mnemocode-public-candidates-"
-        with tempfile.TemporaryDirectory(prefix=prefix) as folder:
-            path = Path(folder) / "public-codes.txt"
-            path.write_text("abandon " * 23 + "?", encoding="utf-8")
-            session = terminal.Session((
-                "decode", "--ask-secrets", "--mode", "direct",
-                "--format", "english", "--input-kind", "codes",
-                "--list-candidates", "--words", "24",
-                "--input-file", str(path),
-            ))
-            try:
-                navigate(
-                    session,
-                    "Code 24 cannot be read",
-                    ("Candidate 1", "Candidate 8"),
-                )
-                session.type(terminal.CTRL_C)
-                assert session.wait_for_exit() == CANCELLED
-                terminal.assert_kept_private(
-                    session, ("Candidate 1", "abandon abandon")
-                )
-            finally:
-                descriptor = session.fd if not terminal.WINDOWS else None
-                session.close()
-                session.close()
-            if descriptor is not None:
-                assert_closed_descriptor(descriptor)
+    for size in (FULL_SCREEN, NARROW_SCREEN):
+        with terminal.terminal_size(*size):
+            check_private_share_pages()
+        height, width = size
         print(
-            "private candidate pages: revisitable, Ctrl+C exits 130, PTY "
-            "closed twice safely"
+            "private share pages: Home/End and PageUp/PageDown at "
+            f"{width}x{height}"
+        )
+    with terminal.terminal_size(*FULL_SCREEN):
+        check_private_candidate_pages()
+    print(
+        "private candidate pages: revisitable, Ctrl+C exits 130, PTY "
+        "closed twice safely"
+    )
+
+
+def check_private_share_pages():
+    """The 16 shares of a set, each on a page of its own result, at the
+    size of the pseudo-terminal.
+    """
+    session = terminal.Session((
+        "encode", "--sskr", "--ask-secrets", "--mode", "direct",
+        "--threshold", "16", "--shares", "16",
+        "--share-format", "words", "--backup-check", "no",
+    ))
+    try:
+        session.wait_for("Seed phrase (English BIP39 words):")
+        session.type(TEST_PHRASE + terminal.ENTER)
+        titles = [f"SSKR share {number} of 16" for number in range(1, 17)]
+        # The result is a page of its own, under its heading (CORE-39).
+        navigate(session, "MnemoCode · SSKR export", titles)
+        session.type(terminal.ENTER)
+        session.wait_for(CLEAR_PROMPT)
+        # The end of the result stays, its last line the fingerprints'
+        # note, without the keys of the pages (AUD-037-UI004).
+        end = ("They do not reveal the phrase.",)
+        gone = ("Page ", NAVIGATION)
+        terminal.assert_private_result_visible(session, end, absent=gone)
+        session.type(terminal.ENTER)
+        assert session.wait_for_exit() == 0
+        terminal.assert_kept_private(
+            session, (TEST_PHRASE, "SSKR share 1 of 16")
         )
     finally:
-        terminal.TERMINAL_ROWS, terminal.TERMINAL_COLUMNS = previous
+        session.close()
+
+
+def check_private_candidate_pages():
+    """The candidates of a forgotten code, revisitable on their pages
+    until Ctrl+C, and a pseudo-terminal that closes twice safely.
+    """
+    prefix = "mnemocode-public-candidates-"
+    with tempfile.TemporaryDirectory(prefix=prefix) as folder:
+        path = Path(folder) / "public-codes.txt"
+        path.write_text("abandon " * 23 + "?", encoding="utf-8")
+        session = terminal.Session((
+            "decode", "--ask-secrets", "--mode", "direct",
+            "--format", "english", "--input-kind", "codes",
+            "--list-candidates", "--words", "24",
+            "--input-file", str(path),
+        ))
+        try:
+            navigate(
+                session,
+                "Code 24 cannot be read",
+                ("Candidate 1", "Candidate 8"),
+            )
+            session.type(terminal.CTRL_C)
+            assert session.wait_for_exit() == CANCELLED
+            terminal.assert_kept_private(
+                session, ("Candidate 1", "abandon abandon")
+            )
+        finally:
+            descriptor = session.fd if not terminal.WINDOWS else None
+            session.close()
+            session.close()
+        if descriptor is not None:
+            assert_closed_descriptor(descriptor)
 
 
 def check_share_pages():
@@ -160,47 +173,43 @@ def check_share_pages():
     shares, before the backup question and after its answer
     (AUD-037-UI002, UI004).
     """
-    previous = terminal.TERMINAL_ROWS, terminal.TERMINAL_COLUMNS
     sets = (("2", "3", "words", "direct"), ("3", "3", "words", "direct"))
-    sizes = ((24, 80), (12, 32))
+    sizes = (FULL_SCREEN, NARROW_SCREEN)
     runs = [
         *((size, True, case, ()) for size in sizes for case in sets),
-        ((12, 32), True, ("2", "3", "ur", "direct"), ()),
+        (NARROW_SCREEN, True, ("2", "3", "ur", "direct"), ()),
         (
-            (24, 80),
+            FULL_SCREEN,
             True,
             ("2", "3", "unicode", "seedshift"),
             ("--format", "english"),
         ),
         (
-            (24, 80),
+            FULL_SCREEN,
             True,
             ("2", "3", "words", "direct"),
             ("--show-original", "words"),
         ),
-        *(((24, 80), False, case, ()) for case in sets),
+        *((FULL_SCREEN, False, case, ()) for case in sets),
     ]
-    try:
-        for size, colour, case, options in runs:
-            height, width = size
-            threshold, count, form, mode = case
-            terminal.TERMINAL_ROWS, terminal.TERMINAL_COLUMNS = height, width
-            arguments = (
-                *("encode", "--sskr", "--ask-secrets", "--mode", mode),
-                *("--threshold", threshold),
-                *("--shares", count, "--share-format", form, *options),
-            )
+    for size, colour, case, options in runs:
+        threshold, count, form, mode = case
+        arguments = (
+            *("encode", "--sskr", "--ask-secrets", "--mode", mode),
+            *("--threshold", threshold),
+            *("--shares", count, "--share-format", form, *options),
+        )
+        # The screen is read at the size that the session started with.
+        with terminal.terminal_size(*size):
             session = terminal.Session(arguments, colour=colour)
             try:
                 read_share_set(session, mode, count, colour)
             finally:
                 session.close()
-        print(
-            "share sets: every share on the screen or on a page, at 80x24 and "
-            "32x12"
-        )
-    finally:
-        terminal.TERMINAL_ROWS, terminal.TERMINAL_COLUMNS = previous
+    print(
+        "share sets: every share on the screen or on a page, at 80x24 and "
+        "32x12"
+    )
 
 
 def read_share_set(session, mode, count, colour):
@@ -247,3 +256,79 @@ def read_share_set(session, mode, count, colour):
     )
     session.type(terminal.ENTER)
     assert session.wait_for_exit() == 0
+
+
+def check_word_result_under_question():
+    """recover-word asks what comes next under its result, which stays
+    on the screen with every warning it gave (CORE-39): when no
+    candidate matched the wallet, and when the candidates are too many
+    to show, at 80x24.
+    """
+    cases = (
+        (
+            ("--master-fingerprint", "00000000"),
+            " ".join([*TEST_WORDS[:-1], "a*"]),
+            ("Matched 0 of 8 candidates", "only 32 bits"),
+        ),
+        (
+            (),
+            " ".join([*TEST_WORDS[:-2], "a*", "a*"]),
+            ("do not fit on this screen", "does not prove the wallet"),
+        ),
+    )
+    with terminal.terminal_size(*FULL_SCREEN):
+        for options, words, warnings in cases:
+            check_word_result(options, words, warnings)
+    print(
+        "recover-word: What now? under the result and every warning, "
+        "at 80x24"
+    )
+
+
+def check_word_result(options, words, warnings):
+    """recover-word with `options` and the marked `words`: its result
+    and `warnings` under its question What now?, at the size of the
+    pseudo-terminal.
+    """
+    session = terminal.Session(("recover-word", "--ask-secrets", *options))
+    try:
+        session.wait_for("? for each forgotten word:")
+        session.type(words + terminal.ENTER)
+        session.wait_for("What now?")
+        shown = ("MnemoCode · Missing word recovery", *warnings)
+        terminal.assert_private_result_visible(
+            session, (*shown, "What now?")
+        )
+        session.type(terminal.CTRL_C)
+        assert session.wait_for_exit() == CANCELLED
+        terminal.assert_kept_private(session, (words,))
+    finally:
+        session.close()
+
+
+def check_word_candidate_pages():
+    """recover-word shows a short list of candidates whole, each a part
+    of its own, by pages where the parts are taller than the screen: the
+    eight candidates of a last word that starts with a, at 80x30, where
+    they fit as one row each. The wallet check is offered only for a
+    longer list (check_word_result_under_question).
+    """
+    words = " ".join([*TEST_WORDS[:-1], "a*"])
+    with terminal.terminal_size(*CANDIDATE_SCREEN):
+        session = terminal.Session(("recover-word", "--ask-secrets"))
+        try:
+            session.wait_for("? for each forgotten word:")
+            session.type(words + terminal.ENTER)
+            titles = [f"Candidate {number}" for number in range(1, 9)]
+            navigate(session, "Missing word recovery", titles)
+            session.type(terminal.ENTER)
+            session.wait_for(CLEAR_PROMPT)
+            shown = ("does not prove the wallet",)
+            gone = ("Page ", NAVIGATION, "do not fit", "What now?")
+            terminal.assert_private_result_visible(session, shown, absent=gone)
+            session.type(terminal.ENTER)
+            assert session.wait_for_exit() == 0
+            terminal.assert_kept_private(session, (words, "Candidate 1"))
+        finally:
+            session.close()
+    print("recover-word: eight candidates read by pages at 80x30")

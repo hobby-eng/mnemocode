@@ -13,9 +13,20 @@ import { decodeCandidateList } from "../src/core/candidate-list.js";
 import { runRecoverWord } from "../src/cli/recover-word-command.js";
 import { PrivateSteps } from "../src/cli/private-steps.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
+import { CTRL_C } from "./helpers/keys.js";
 import { matching } from "./helpers/matchers.js";
+import { promptsShown } from "./helpers/phrase-questions.js";
+import { WALLET_QUESTION } from "./helpers/prompts.js";
 import { questionsOnPrivateScreen, seen, terminal, windowOf } from "./helpers/question-terminal.js";
-import { TEST_FINGERPRINT } from "./helpers/test-phrase.js";
+import {
+  LAST_WORD_FORGOTTEN,
+  LIST_PASSPHRASE,
+  ONE_WORD_MISSING,
+  replacedAt,
+  TEST_FINGERPRINT,
+  TEST_PHRASE,
+  TEST_WORDS,
+} from "./helpers/test-phrase.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
@@ -27,28 +38,15 @@ vi.mock("node:fs/promises", async (importOriginal) =>
   harness.replacedFiles(await importOriginal()),
 );
 
-const ELEVEN = "abandon ".repeat(11);
-/** The test phrase with its last word forgotten: 128 checksum-valid candidates. */
-const LAST_FORGOTTEN = `${ELEVEN}?`;
 const PHRASE_PROMPT = "Seed phrase or text file path, ? for each forgotten word:";
 const LIST_PROMPT = "Enter the candidate list encryption passphrase (not the BIP39 passphrase):";
 const REPEAT_LIST_PROMPT =
   "Repeat the candidate list encryption passphrase (not the BIP39 passphrase):";
-const LIST_PASSPHRASE = "public candidate test passphrase";
 
 let directory: string;
 
 function recover(options: Record<string, string | boolean>): Promise<Cancelled | undefined> {
   return runRecoverWord({ "ask-secrets": true, ...options });
-}
-
-/** The prompts shown, in order. */
-function promptsShown(): string[] {
-  return [
-    ...seen.screen.matchAll(
-      /(Seed phrase or text file path, \? for each forgotten word:|Enter the candidate list encryption passphrase \(not the BIP39 passphrase\):|Repeat the candidate list encryption passphrase \(not the BIP39 passphrase\):)/gu,
-    ),
-  ].map((match) => match[1]!);
 }
 
 questionsOnPrivateScreen();
@@ -63,9 +61,9 @@ describe("recover-word on the private screen", () => {
   it("checks the phrase before the list's passphrase, which is asked again without a limit", async () => {
     const path = join(directory, "candidates.age");
     terminal.answers = [
-      `${"abandon ".repeat(10)}abandom ?\r`,
-      `? ? ? ${"abandon ".repeat(9)}\r`,
-      `${LAST_FORGOTTEN}\r`,
+      `${replacedAt(TEST_PHRASE, { 11: "abandom", 12: "?" })}\r`,
+      `${replacedAt(TEST_PHRASE, { 1: "?", 2: "?", 3: "?", 12: "abandon" })}\r`,
+      `${LAST_WORD_FORGOTTEN}\r`,
       "short\r",
       `${LIST_PASSPHRASE}\r`,
       "a different passphrase\r",
@@ -82,7 +80,7 @@ describe("recover-word on the private screen", () => {
         `Saved 128 candidate phrases, encrypted with the passphrase: ${path} (record N is candidate N).`,
       ]),
     );
-    expect(promptsShown()).toEqual([
+    expect(promptsShown(PHRASE_PROMPT, LIST_PROMPT, REPEAT_LIST_PROMPT)).toEqual([
       PHRASE_PROMPT,
       PHRASE_PROMPT,
       PHRASE_PROMPT,
@@ -99,25 +97,40 @@ describe("recover-word on the private screen", () => {
   });
 
   it("refuses a list that surely holds too many candidates before any passphrase", async () => {
-    terminal.answers = [`? abandon|ability|able ${"abandon ".repeat(9)}?\r`, `${LAST_FORGOTTEN}\r`];
-    const path = join(directory, "open.mncl");
-    await recover({ "candidates-file": path, "plaintext-candidates": true });
+    terminal.answers = [
+      `${replacedAt(TEST_PHRASE, { 1: "?", 2: "abandon|ability|able", 12: "?" })}\r`,
+      `${LAST_WORD_FORGOTTEN}\r`,
+      `${LIST_PASSPHRASE}\r`,
+      `${LIST_PASSPHRASE}\r`,
+    ];
+    const path = join(directory, "candidates.age");
+    await recover({ "candidates-file": path });
     expect(seen.notices).toEqual(
       expect.arrayContaining([
         "More than 524,288 candidates, more than one list holds: give more of the words, or a few letters of them.",
-        `Saved 128 candidate phrases, NOT encrypted: ${path} (record N is candidate N).`,
+        `Saved 128 candidate phrases, encrypted with the passphrase: ${path} (record N is candidate N).`,
       ]),
     );
+    // The list's passphrase is asked only for the words that a list holds.
+    expect(promptsShown(PHRASE_PROMPT, LIST_PROMPT, REPEAT_LIST_PROMPT)).toEqual([
+      PHRASE_PROMPT,
+      PHRASE_PROMPT,
+      LIST_PROMPT,
+      REPEAT_LIST_PROMPT,
+    ]);
   });
 
   it("lets Ctrl+C at the list's passphrase cancel at once", async () => {
-    terminal.answers = [`${LAST_FORGOTTEN}\r`, "public\x03"];
+    terminal.answers = [`${LAST_WORD_FORGOTTEN}\r`, `public${CTRL_C}`];
     expect(await recover({ "candidates-file": join(directory, "c.age") })).toBe(CANCELLED);
     expect(seen.notices.join("\n")).not.toContain("Try again");
   });
 
   it("offers to type the words again when no phrase fits them", async () => {
-    terminal.answers = [`${ELEVEN}abandon|ability\r`, `${LAST_FORGOTTEN}\r`];
+    terminal.answers = [
+      `${replacedAt(TEST_PHRASE, { 12: "abandon|ability" })}\r`,
+      `${LAST_WORD_FORGOTTEN}\r`,
+    ];
     terminal.choices = ["Type the words again"];
     await recover({});
     expect(seen.notices).toContain(
@@ -141,13 +154,14 @@ describe("recover-word on the private screen", () => {
 
 describe("recover-word on the private screen", () => {
   it("offers a wallet check when the candidates are too many to show", async () => {
-    terminal.answers = [`a* ${"abandon ".repeat(10)}?\r`];
+    terminal.answers = [`${replacedAt(TEST_PHRASE, { 1: "a*", 12: "?" })}\r`];
     terminal.choices = ["Done"];
     await recover({});
     expect(seen.notices.some((line) => line.includes("candidates are too many to show"))).toBe(
       true,
     );
     expect(terminal.questions).toEqual(["What now?"]);
+    expect(terminal.labels[0]).toContain("Check them against the wallet");
     expect(seen.out).toEqual([]);
   });
 
@@ -156,16 +170,16 @@ describe("recover-word on the private screen", () => {
     // window of 40 rows, without scrollback, would show only the last of them.
     terminal.stdoutTerminal = true;
     windowOf(40, 80);
-    terminal.answers = [`${"abandon ".repeat(10)}about\r`, `${TEST_FINGERPRINT}\r`];
+    terminal.answers = [`${ONE_WORD_MISSING}\r`, `${TEST_FINGERPRINT}\r`];
     terminal.choices = ["Check them against the wallet", "Fingerprint"];
     await recover({ "missing-word": true });
     expect(seen.notices).toContain(
       "1,497 candidates do not fit on this screen: check them against the wallet's fingerprint or an address, or give a few letters of the words.",
     );
-    expect(terminal.questions).toEqual(["What now?", "How can MnemoCode recognise the wallet?"]);
+    expect(terminal.questions).toEqual(["What now?", WALLET_QUESTION]);
     // Then only the candidate of the wallet is shown, with its number among all of them.
     expect(seen.out.filter((line) => !line.startsWith("candidate\t"))).toEqual([
-      matching(/^\d+\t\d+\tabandon\t1\tmatched at m\t(abandon ){11}about$/u),
+      matching(new RegExp(`^\\d+\\t\\d+\\tabandon\\t1\\tmatched at m\\t${TEST_PHRASE}$`, "u")),
     ]);
   });
 
@@ -173,14 +187,14 @@ describe("recover-word on the private screen", () => {
     // 128 rows of two lines each fit in a window of 300 rows, but not in one of 40.
     terminal.stdoutTerminal = true;
     windowOf(300, 80);
-    terminal.answers = [`${LAST_FORGOTTEN}\r`];
+    terminal.answers = [`${LAST_WORD_FORGOTTEN}\r`];
     await recover({});
     expect(seen.out).toHaveLength(129);
     expect(terminal.questions).toEqual([]);
 
     seen.out = [];
     windowOf(40, 80);
-    terminal.answers = [`${LAST_FORGOTTEN}\r`];
+    terminal.answers = [`${LAST_WORD_FORGOTTEN}\r`];
     terminal.choices = ["Done"];
     await recover({});
     expect(seen.out).toEqual([]);
@@ -189,16 +203,17 @@ describe("recover-word on the private screen", () => {
     // Standard output in a file keeps every row, whatever the window.
     seen.out = [];
     terminal.stdoutTerminal = false;
-    terminal.answers = [`${LAST_FORGOTTEN}\r`];
+    terminal.answers = [`${LAST_WORD_FORGOTTEN}\r`];
     await recover({});
     expect(seen.out).toHaveLength(129);
   });
 
-  it("heads the table with the forgotten places, or with a missing word at any position", async () => {
-    // The heading's facts are printed only on a terminal (terminalLayout).
+  it("heads the candidates with the forgotten places, or with a missing word at any position", async () => {
+    // The heading's facts are printed only on a terminal (terminalLayout), and each candidate as
+    // a part with its facts as grey labels, the phrase wrapped at its spaces (CORE-36).
     streamsAsTerminal();
     terminal.stdoutTerminal = true;
-    windowOf(300, 80);
+    windowOf(1000, 80);
     const shown = async (answer: string, options: Record<string, string | boolean> = {}) => {
       seen.out = [];
       terminal.answers = [`${answer}\r`];
@@ -206,25 +221,50 @@ describe("recover-word on the private screen", () => {
       return seen.out.join("\n");
     };
 
-    const last = await shown(LAST_FORGOTTEN);
+    const last = await shown(LAST_WORD_FORGOTTEN);
     expect(last).toMatch(/Position\D*12\n/u);
-    expect(last).toContain("candidate\tword\tword-index\tchecksum-bits\tmnemonic");
-    const two = await shown(`ab* ${"abandon ".repeat(10)}abo*`);
+    expect(last).toContain(
+      [
+        "\nCandidate 1",
+        "  Word          about",
+        "  Word number   4",
+        "  Checksum bits 0011",
+        `  Phrase        ${TEST_WORDS.slice(0, 7).join(" ")}`,
+        `${" ".repeat(16)}${TEST_WORDS.slice(7).join(" ")}`,
+      ].join("\n"),
+    );
+    expect(last).not.toContain("\t");
+    const two = await shown(replacedAt(TEST_PHRASE, { 1: "ab*", 12: "abo*" }));
     expect(two).toMatch(/Positions\D*1, 12\n/u);
-    expect(two).toContain("candidate\twords\tmnemonic");
-    expect(two).toContain(`1\t1:abandon 12:about\t${ELEVEN}about`);
-    // 1,497 candidates do not fit in the window: the rows that match the wallet are listed.
-    const missing = await shown(`${"abandon ".repeat(10)}about`, {
+    expect(two).toContain(
+      [
+        "\nCandidate 1",
+        "  Words  1:abandon 12:about",
+        `  Phrase ${TEST_WORDS.slice(0, 8).join(" ")}`,
+        `${" ".repeat(9)}${TEST_WORDS.slice(8).join(" ")}`,
+      ].join("\n"),
+    );
+    // 1,497 candidates do not fit in the window: those that match the wallet are listed.
+    const missing = await shown(ONE_WORD_MISSING, {
       "missing-word": true,
       "master-fingerprint": TEST_FINGERPRINT,
     });
     expect(missing).toMatch(/Missing word\W*at any position\n/u);
-    expect(missing).toContain("candidate\tposition\tword\tword-index\tevidence\tmnemonic");
-    expect(missing).toContain(`1\t1\tabandon\t1\tmatched at m\t${ELEVEN}about`);
+    expect(missing).toContain(
+      [
+        "\nCandidate 1",
+        "  Position    1",
+        "  Word        abandon",
+        "  Word number 1",
+        "  Wallet      matched at m",
+        `  Phrase      ${TEST_WORDS.slice(0, 8).join(" ")}`,
+        `${" ".repeat(14)}${TEST_WORDS.slice(8).join(" ")}`,
+      ].join("\n"),
+    );
   });
 
   it("lets the wallet change when none of the candidates matched it", async () => {
-    terminal.answers = [`${LAST_FORGOTTEN}\r`, `${TEST_FINGERPRINT}\r`];
+    terminal.answers = [`${LAST_WORD_FORGOTTEN}\r`, `${TEST_FINGERPRINT}\r`];
     terminal.choices = ["Change the wallet", "Fingerprint"];
     await recover({ "master-fingerprint": "00000000" });
     expect(seen.notices).toEqual(
@@ -233,13 +273,13 @@ describe("recover-word on the private screen", () => {
         "Matched 1 of 128 candidates against the requested master fingerprint locally.",
       ]),
     );
-    expect(terminal.questions).toEqual(["What now?", "How can MnemoCode recognise the wallet?"]);
+    expect(terminal.questions).toEqual(["What now?", WALLET_QUESTION]);
   });
 
   it("saves the list once, for the last words, when none matched the wallet", async () => {
     // Another wallet: the same candidates, saved once after the search that matched.
     const path = join(directory, "list.mncl");
-    terminal.answers = [`${LAST_FORGOTTEN}\r`, `${TEST_FINGERPRINT}\r`];
+    terminal.answers = [`${LAST_WORD_FORGOTTEN}\r`, `${TEST_FINGERPRINT}\r`];
     terminal.choices = ["Change the wallet", "Fingerprint"];
     const wrongWallet = { "plaintext-candidates": true, "master-fingerprint": "00000000" };
     await recover({ "candidates-file": path, ...wrongWallet });
@@ -256,7 +296,10 @@ describe("recover-word on the private screen", () => {
     seen.notices = [];
     terminal.questions = [];
     const other = join(directory, "other.mncl");
-    terminal.answers = [`${LAST_FORGOTTEN}\r`, `${ELEVEN}about|abandon\r`];
+    terminal.answers = [
+      `${LAST_WORD_FORGOTTEN}\r`,
+      `${replacedAt(TEST_PHRASE, { 12: "about|abandon" })}\r`,
+    ];
     terminal.choices = ["Type the words again"];
     await recover({ "candidates-file": other, ...wrongWallet });
     expect(seen.notices.filter(saved)).toEqual([
@@ -274,7 +317,7 @@ describe("recover-word on the private screen", () => {
     // A folder without the right to write, the usual failure (AUD-024-ARC002).
     terminal.saveFailures = 1;
     terminal.saveFailureCode = "EACCES";
-    terminal.answers = [`${LAST_FORGOTTEN}\r`, `${other}\r`];
+    terminal.answers = [`${LAST_WORD_FORGOTTEN}\r`, `${other}\r`];
     terminal.choices = ["Another file name"];
     await recover({ "candidates-file": path, "plaintext-candidates": true });
     expect(seen.notices).toEqual(
@@ -288,7 +331,7 @@ describe("recover-word on the private screen", () => {
     seen.notices = [];
     terminal.saveFailures = 2;
     terminal.saveFailureCode = "ENOSPC";
-    terminal.answers = [`${LAST_FORGOTTEN}\r`];
+    terminal.answers = [`${LAST_WORD_FORGOTTEN}\r`];
     terminal.choices = ["Try again", "Skip"];
     await recover({
       "candidates-file": join(directory, "skipped.mncl"),
@@ -303,7 +346,7 @@ describe("recover-word on the private screen", () => {
     terminal.saveFailureCode = "EPERM";
     await expect(
       runRecoverWord({
-        mnemonic: LAST_FORGOTTEN,
+        mnemonic: LAST_WORD_FORGOTTEN,
         "candidates-file": join(directory, "plain.mncl"),
         "plaintext-candidates": true,
       }),

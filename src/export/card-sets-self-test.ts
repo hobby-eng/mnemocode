@@ -37,6 +37,8 @@ import { plannedCardJob, renderCards } from "./render.js";
 import { selectTemplate, type CardDrawing } from "./templates.js";
 import { SELF_TEST_CARD_DETAILS } from "./self-test-cards.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { defined } from "../core/defined.js";
+import { PUBLIC_UNICODE_CODES } from "../core/self-test-vectors.js";
 
 const ERRORS = new ErrorCatalog("export.card-sets-self-test", {
   "set-cards-no-decoy": () => "A set of cards has no decoy.",
@@ -54,11 +56,11 @@ const MIN_APART = 60_000;
 const FIRST_COLORS = "#468080 #060680 #FFFF0D #FF0DFF #800606 #FF490D #0DFFFF #5A47FF";
 /** The OKLab of sRGB red that CSS Color 4 publishes, to three decimals. */
 const OKLAB_RED = "0.628 0.225 0.126";
-/** The Unicode code of the first BIP39 word, "abandon", and of "about" (core/words.ts). */
-const ABANDON = "7684";
-const ABOUT = "5728";
 /** The public phrase "abandon … about" as Unicode codes. */
-const PHRASE_CODES = [...Array<string>(11).fill(ABANDON), ABOUT];
+const PHRASE_CODES = PUBLIC_UNICODE_CODES;
+/** The Unicode code of its first word, "abandon", which is the first BIP39 word, and of "about". */
+const ABANDON = defined(PHRASE_CODES[0]);
+const ABOUT = defined(PHRASE_CODES.at(-1));
 
 /**
  * The quick known answers: the colours of a set and a code printed twice, the brightness of

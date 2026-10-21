@@ -22,9 +22,9 @@ import { PrivatePage } from "./private-page.js";
 import { PrivateSteps } from "./private-steps.js";
 import { PrivateSummary, type SummaryLine } from "./private-summary.js";
 import { factLine, headingLine } from "./terminal-style.js";
-import { protectionSummary } from "./protection.js";
+import { ProcessProtection } from "./protection.js";
 import { CANCELLED_EXIT_CODE } from "./exit-codes.js";
-import { interruptible } from "./interruption.js";
+import { Interruption } from "./interruption.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 
 /** What the private screen asks before it is cleared, after a blank line. */
@@ -55,15 +55,15 @@ export function onPrivateScreen(): boolean {
 }
 
 /**
- * Shows on the private screen what protects this process now (protectionSummary): first when the
- * screen opens, and again once a command has given up rights after its questions.
+ * Shows on the private screen what protects this process now (ProcessProtection.summary): first
+ * when the screen opens, and again once a command has given up rights after its questions.
  */
 export function showProtection(): void {
   if (!PrivateSteps.active) return;
   // Kept on the screen of the first question that follows, which would otherwise clear it.
   PrivateSteps.keep(() =>
     console.error(
-      `${factLine(process.stderr, "Protection", protectionSummary(), ANSWER_LABEL_WIDTH)}\n`,
+      `${factLine(process.stderr, "Protection", ProcessProtection.summary(), ANSWER_LABEL_WIDTH)}\n`,
     ),
   );
 }
@@ -137,7 +137,7 @@ export async function withPrivateScreen<T>(
   };
   // A SIGINT at any time until the screen is left, also at the prompt after the result, leaves the
   // private screen before the command ends.
-  return interruptible(
+  return Interruption.run(
     async () => {
       let cleared = false;
       try {

@@ -8,11 +8,17 @@ import { decodeCandidateList } from "../src/core/candidate-list.js";
 import { EncodedForm } from "../src/core/encoded-form.js";
 import { createSessionIdentity, decryptCandidates } from "../src/core/candidate-encryption.js";
 import { containing } from "./helpers/matchers.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  LAST_WORD_FORGOTTEN,
+  LIST_PASSPHRASE,
+  ONE_WORD_MISSING,
+  replacedAt,
+  TEST_FINGERPRINT,
+  TEST_PHRASE,
+  TEST_UNICODE,
+} from "./helpers/test-phrase.js";
 import { runBuiltCli as run } from "./helpers/built-cli.js";
 
-const INCOMPLETE_PHRASE =
-  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon ?";
 const INVALID_LEGACY_PHRASE =
   "mosquito dust hotel maximum rich kitten hair mother salute dream flush hospital";
 
@@ -20,7 +26,7 @@ describe("recover-word CLI", () => {
   it("points codes typed in place of words to Decode, which reads them with ?", async () => {
     // The public phrase's Unicode codes with its third code unreadable (owner, 2026-10-13).
     const codes = EncodedForm.of("unicode")
-      .apartCodes(EncodedForm.of("unicode").codes([...Array<number>(11).fill(0), 3]))!
+      .apartCodes(TEST_UNICODE)!
       .map((code, place) => (place === 2 ? "?" : code));
     await expect(run(["recover-word", "--mnemonic", codes.join(" ")])).rejects.toMatchObject({
       stderr: containing(
@@ -30,7 +36,7 @@ describe("recover-word CLI", () => {
   });
 
   it("prints every checksum-valid candidate with word and checksum metadata", async () => {
-    const result = await run(["recover-word", "--mnemonic", INCOMPLETE_PHRASE]);
+    const result = await run(["recover-word", "--mnemonic", LAST_WORD_FORGOTTEN]);
     const lines = result.stdout.trim().split("\n");
 
     expect(lines).toHaveLength(129);
@@ -48,7 +54,7 @@ describe("recover-word CLI", () => {
         run([
           "recover-word",
           "--mnemonic",
-          INCOMPLETE_PHRASE,
+          LAST_WORD_FORGOTTEN,
           "--candidates-file",
           file,
           ...protection,
@@ -98,11 +104,11 @@ describe("recover-word CLI", () => {
       const path = join(dir, "checked.age");
       const passphraseFile = join(dir, "passphrase.txt");
       // A byte order mark and spaces at the ends are not part of the passphrase.
-      writeFileSync(passphraseFile, "\uFEFF  public candidate test passphrase \n");
+      writeFileSync(passphraseFile, `\uFEFF  ${LIST_PASSPHRASE} \n`);
       const result = await run([
         "recover-word",
         "--mnemonic",
-        INCOMPLETE_PHRASE,
+        LAST_WORD_FORGOTTEN,
         "--master-fingerprint",
         TEST_FINGERPRINT,
         "--candidates-file",
@@ -113,9 +119,7 @@ describe("recover-word CLI", () => {
       const matchedRow = result.stdout.split("\n").find((row) => row.includes("\tmatched at"))!;
       const number = Number(matchedRow.split("\t")[0]);
       const list = decodeCandidateList(
-        await decryptCandidates(readFileSync(path), {
-          passphrase: "public candidate test passphrase",
-        }),
+        await decryptCandidates(readFileSync(path), { passphrase: LIST_PASSPHRASE }),
       );
       expect(list.records).toHaveLength(128);
       expect(entropyToMnemonic(list.records[number - 1]!.entropy, wordlist)).toBe(TEST_PHRASE);
@@ -137,21 +141,24 @@ describe("recover-word CLI", () => {
   });
 
   it("finds several forgotten words, and a missing word at an unknown place", async () => {
-    const two = await run(["recover-word", "--mnemonic", `ab* ${"abandon ".repeat(10)}abo*`]);
+    const two = await run([
+      "recover-word",
+      "--mnemonic",
+      replacedAt(TEST_PHRASE, { 1: "ab*", 12: "abo*" }),
+    ]);
     const lines = two.stdout.trim().split("\n");
     expect(lines[0]).toBe("candidate\twords\tmnemonic");
     expect(lines).toContain(`1\t1:abandon 12:about\t${TEST_PHRASE}`);
-    const missing = await run([
-      "recover-word",
-      "--missing-word",
-      "--mnemonic",
-      `${"abandon ".repeat(10)}about`,
-    ]);
+    const missing = await run(["recover-word", "--missing-word", "--mnemonic", ONE_WORD_MISSING]);
     const rows = missing.stdout.trim().split("\n");
     expect(rows[0]).toBe("candidate\tposition\tword\tword-index\tmnemonic");
     expect(rows[1]).toBe(`1\t1\tabandon\t1\t${TEST_PHRASE}`);
     // Two forgotten words in 12: 262,144 candidates, too many to show without a list or a wallet.
-    const many = await run(["recover-word", "--mnemonic", `? ${"abandon ".repeat(10)}?`]);
+    const many = await run([
+      "recover-word",
+      "--mnemonic",
+      replacedAt(TEST_PHRASE, { 1: "?", 12: "?" }),
+    ]);
     expect(many.stdout.trim()).toBe("");
     expect(many.stderr).toContain("262,144 candidates are too many to show");
   });
@@ -160,7 +167,7 @@ describe("recover-word CLI", () => {
     const result = await run([
       "recover-word",
       "--mnemonic",
-      INCOMPLETE_PHRASE,
+      LAST_WORD_FORGOTTEN,
       "--master-fingerprint",
       TEST_FINGERPRINT,
     ]);
@@ -189,11 +196,11 @@ describe("recover-word CLI", () => {
 
 describe("recover-word CLI", () => {
   it("rejects input without a placeholder, and searches that are too large", async () => {
+    await expect(run(["recover-word", "--mnemonic", TEST_PHRASE])).rejects.toMatchObject({
+      stderr: containing("Mark each forgotten word"),
+    });
     await expect(
-      run(["recover-word", "--mnemonic", INCOMPLETE_PHRASE.replace("?", "about")]),
-    ).rejects.toMatchObject({ stderr: containing("Mark each forgotten word") });
-    await expect(
-      run(["recover-word", "--mnemonic", `? ? ${"abandon ".repeat(9)}?`]),
+      run(["recover-word", "--mnemonic", replacedAt(TEST_PHRASE, { 1: "?", 2: "?", 12: "?" })]),
     ).rejects.toMatchObject({ stderr: containing("combinations") });
   });
 });

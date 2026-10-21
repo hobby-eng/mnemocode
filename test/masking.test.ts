@@ -17,16 +17,25 @@ import { EncodedBackup, MissingChecksumError } from "../src/core/encoded-backup.
 import { Masking } from "../src/core/masking.js";
 import { parseRecord, serializeRecord } from "../src/record.js";
 import { Share, writeShare } from "../src/sskr/transport.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  ENCODED_FINGERPRINT,
+  MASKED,
+  MASKED_INDEXES,
+  MASKED_WORDS,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 import { publicShare } from "./helpers/vectors.js";
 
 // The parts that read and write an encoded seed phrase, each on its own, as another host such as
 // the Deriver uses them: the Seedshift modes (Masking), the codes in every form with their record
 // (EncodedBackup), and how a backup as given is read (BackupReading). Public test data only.
 
-const DATE = parseDate("23-09-2026");
-const MASKED = encodeMnemonic(TEST_PHRASE, [DATE]);
-const LEGACY = encodeMnemonicLegacy(TEST_PHRASE, [DATE]);
+/** DATE as the transformations take it. */
+const MASKING_DATE = parseDate(DATE);
+/** TEST_PHRASE masked with MnemoCode Seedshift and DATE, as encodeMnemonic gives it. */
+const ENCODED = encodeMnemonic(TEST_PHRASE, [MASKING_DATE]);
+const LEGACY = encodeMnemonicLegacy(TEST_PHRASE, [MASKING_DATE]);
 /**
  * The first share of the first published SSKR vector, 2 of 3 in one group (vectors/sskr-v1.json).
  */
@@ -75,25 +84,25 @@ describe("Masking", () => {
 
   it("writes and undoes each mode as the transformations do", () => {
     expect(Masking.of("direct").encode(TEST_PHRASE, [])).toEqual(representMnemonic(TEST_PHRASE));
-    expect(Masking.of("seedshift").encode(TEST_PHRASE, [DATE])).toEqual(MASKED);
-    expect(Masking.of("seedshift-legacy").encode(TEST_PHRASE, [DATE])).toEqual(LEGACY);
+    expect(Masking.of("seedshift").encode(TEST_PHRASE, [MASKING_DATE])).toEqual(ENCODED);
+    expect(Masking.of("seedshift-legacy").encode(TEST_PHRASE, [MASKING_DATE])).toEqual(LEGACY);
     const valid = legacyChecksumValidResult(LEGACY);
-    expect(Masking.of("seedshift-legacy-valid").encode(TEST_PHRASE, [DATE])).toEqual(valid);
+    expect(Masking.of("seedshift-legacy-valid").encode(TEST_PHRASE, [MASKING_DATE])).toEqual(valid);
 
-    expect(Masking.of("seedshift").undo(MASKED.shiftedIndexes, [DATE])).toEqual([
-      decodeIndexes(MASKED.shiftedIndexes, [DATE]),
+    expect(Masking.of("seedshift").undo(MASKED_INDEXES, [MASKING_DATE])).toEqual([
+      decodeIndexes(MASKED_INDEXES, [MASKING_DATE]),
     ]);
-    expect(Masking.of("seedshift-legacy").undo(LEGACY.shiftedIndexes, [DATE])).toEqual([
-      decodeIndexesLegacy(LEGACY.shiftedIndexes, [DATE]),
+    expect(Masking.of("seedshift-legacy").undo(LEGACY.shiftedIndexes, [MASKING_DATE])).toEqual([
+      decodeIndexesLegacy(LEGACY.shiftedIndexes, [MASKING_DATE]),
     ]);
-    expect(Masking.of("seedshift-legacy-valid").undo(valid.shiftedIndexes, [DATE])).toEqual(
-      decodeIndexesLegacyValid(valid.shiftedIndexes, [DATE]),
+    expect(Masking.of("seedshift-legacy-valid").undo(valid.shiftedIndexes, [MASKING_DATE])).toEqual(
+      decodeIndexesLegacyValid(valid.shiftedIndexes, [MASKING_DATE]),
     );
-    const [direct] = Masking.of("direct").undo(MASKED.shiftedIndexes, []);
-    expect(direct!.recoveredMnemonic).toBe(MASKED.shiftedEnglish.join(" "));
+    const [direct] = Masking.of("direct").undo(MASKED_INDEXES, []);
+    expect(direct!.recoveredMnemonic).toBe(MASKED_WORDS);
     // Without Seedshift the codes must still be a phrase's, and each a BIP39 index.
     expect(() => Masking.of("direct").undo([1, 2, 3], [])).toThrow("Expected 12, 15, 18, 21");
-    expect(() => Masking.of("direct").undo([...MASKED.shiftedIndexes.slice(1), 2048], [])).toThrow(
+    expect(() => Masking.of("direct").undo([...MASKED_INDEXES.slice(1), 2048], [])).toThrow(
       "Every BIP39 index must be an integer from 0 through 2047.",
     );
   });
@@ -118,17 +127,17 @@ describe("Masking", () => {
 describe("EncodedBackup writes its codes back", () => {
   it("writes them in every form that encode writes and as an MNC1 record, in no other", () => {
     for (const format of ["english", "indexes", "unicode", "colors", "colors-unicode"] as const) {
-      const backup = EncodedBackup.of(MASKED.shiftedIndexes, format, "seedshift");
-      expect(backup.text()).toBe(formatEncoded(MASKED, format));
+      const backup = EncodedBackup.of(MASKED_INDEXES, format, "seedshift");
+      expect(backup.text()).toBe(formatEncoded(ENCODED, format));
       expect(parseRecord(backup.record())).toEqual({
         version: 1,
         mode: "seedshift",
         format,
-        payload: formatEncoded(MASKED, format),
+        payload: formatEncoded(ENCODED, format),
       });
     }
     // A form that no type allows, fed on purpose as a JavaScript host could.
-    expect(() => EncodedBackup.of(MASKED.shiftedIndexes, "json" as never, "direct")).toThrow(
+    expect(() => EncodedBackup.of(MASKED_INDEXES, "json" as never, "direct")).toThrow(
       expect.objectContaining({
         code: "core.encoded-form.unsupported-encoded-format",
         message: "Unsupported encoded format.",
@@ -137,10 +146,10 @@ describe("EncodedBackup writes its codes back", () => {
   });
 
   it("gives the encoded fingerprint from a host that answers later, as a promise", async () => {
-    const backup = EncodedBackup.of(MASKED.shiftedIndexes, "indexes", "seedshift");
-    const later = vi.fn(async () => "0d05289e");
-    await expect(backup.fingerprint(later)).resolves.toBe("0d05289e");
-    expect(later).toHaveBeenCalledWith(MASKED.shiftedEnglish.join(" "));
+    const backup = EncodedBackup.of(MASKED_INDEXES, "indexes", "seedshift");
+    const later = vi.fn(async () => ENCODED_FINGERPRINT);
+    await expect(backup.fingerprint(later)).resolves.toBe(ENCODED_FINGERPRINT);
+    expect(later).toHaveBeenCalledWith(MASKED_WORDS);
   });
 });
 
@@ -148,14 +157,14 @@ describe("BackupReading", () => {
   const rules = { seedshiftOnly: false, shareReader: "The Shares tab" };
 
   it("reads a record header, which names the mode and the form", () => {
-    const record = EncodedBackup.of(MASKED.shiftedIndexes, "indexes", "seedshift").record();
+    const record = EncodedBackup.of(MASKED_INDEXES, "indexes", "seedshift").record();
     const reading = BackupReading.of(record, rules);
     expect(reading.hasRecord).toBe(true);
     expect(reading.mode()).toBe("seedshift");
     expect(reading.mode("direct")).toBe("seedshift");
     expect(reading.formats()).toEqual(["indexes"]);
     expect(reading.formats("english")).toEqual(["indexes"]);
-    expect(reading.codes("indexes").indexes).toEqual(MASKED.shiftedIndexes);
+    expect(reading.codes("indexes").indexes).toEqual(MASKED_INDEXES);
     // What differs from what the host was given is said, and the host offers the record's.
     expect(reading.modeConflict("seedshift")).toBeUndefined();
     expect(reading.modeConflict("seedshift-legacy")).toBe(
@@ -163,7 +172,7 @@ describe("BackupReading", () => {
     );
     expect(reading.formatConflict("colors")).toBe("The record holds indexes codes, not colors.");
     expect(() => BackupReading.of("MNC2:seedshift:indexes:1 2", rules)).toThrow(
-      "Unsupported MnemoCode record version: 2.",
+      "Unsupported MnemoCode record version. A newer MnemoCode reads it.",
     );
     expect(() => BackupReading.of("MNC1:shifted:indexes:1 2", rules)).toThrow(
       "Malformed MnemoCode record header.",
@@ -171,7 +180,7 @@ describe("BackupReading", () => {
   });
 
   it("leaves the mode to the host for codes without a header, and tells the forms that fit", () => {
-    const reading = BackupReading.of(formatEncoded(MASKED, "indexes"), rules);
+    const reading = BackupReading.of(MASKED, rules);
     expect(reading.hasRecord).toBe(false);
     expect(reading.mode()).toBeUndefined();
     expect(reading.mode("seedshift-legacy")).toBe("seedshift-legacy");
@@ -193,7 +202,7 @@ describe("BackupReading", () => {
       expect(() => BackupReading.of(writeShare(SHARE, form), rules)).toThrow(
         "This is a Shamir share, not an encoded seed phrase: The Shares tab reads it.",
       );
-    const direct = EncodedBackup.of(MASKED.shiftedIndexes, "indexes", "direct").record();
+    const direct = EncodedBackup.of(MASKED_INDEXES, "indexes", "direct").record();
     expect(BackupReading.of(direct, rules).mode()).toBe("direct");
     expect(() => BackupReading.of(direct, { ...rules, seedshiftOnly: true })).toThrow(
       "Date recovery is available only for records created with Seedshift.",
@@ -209,7 +218,6 @@ describe("Share", () => {
       expect(share.format).toBe(form);
       expect(share.write()).toBe(writeShare(SHARE, form));
       expect(share.write("ur")).toBe(SHARE);
-      expect(share.sameAs(Share.read(SHARE))).toBe(true);
       expect(String(share)).toBe("[Share: redacted]");
       expect(JSON.stringify({ share })).toBe('{"share":"[Share: redacted]"}');
     }

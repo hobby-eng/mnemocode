@@ -109,6 +109,12 @@ describe("platform-neutral card rendering", () => {
         patterns.some((pattern) => pattern.test(path)),
         path,
       ).toBe(true);
+    // And the other way: every path that a renderer requests is a listed file.
+    for (const [place, pattern] of patterns.entries())
+      expect(
+        RENDER_ASSETS.some((path) => pattern.test(path)),
+        [...requested][place],
+      ).toBe(true);
   });
 });
 

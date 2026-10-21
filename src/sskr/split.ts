@@ -3,9 +3,10 @@
 // Needs from the host: a ShareSplitPlatform (share-platform.ts) for its SSKR library, createShares and
 // combineShares, and a function that fills a buffer with secure random bytes, for the seed of the
 // split (crypto.getRandomValues in a browser, nodeFillRandom in Node.js).
-// Does not: run the SSKR self-test (the Node.js wrapper in shares.ts does, before it splits), or
-// write the shares in a form other than their UR (transport.ts writes them). A backup is masked
-// first in its mode (splitBackup, through core/masking.ts), so that every host splits alike.
+// Does not: run the SSKR self-test (the share functions for Node.js in shares.ts do, before they
+// split), or write the shares in a form other than their UR (transport.ts writes them). A backup
+// is masked first in its mode (splitBackup, through core/masking.ts), so that every host splits
+// alike.
 
 import { entropyToMnemonic, mnemonicToEntropy } from "@scure/bip39";
 import { englishWordlist as wordlist } from "../core/english-words.js";

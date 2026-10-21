@@ -10,6 +10,7 @@ import { readBundledFile } from "../src/bundled-files.js";
 import { bytesOfHex } from "../src/core/bits.js";
 import { PROTECTION_FLAGS } from "../src/cli/protection.js";
 import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
+import { BUILT_CLI } from "./helpers/built-cli.js";
 import { PublicCliFiles } from "./helpers/public-cli-files.js";
 import { UNREACHED_FAULT_EXIT } from "./helpers/unreached-fault.js";
 import { RUN_OUTPUT_BYTES } from "./helpers/limits.js";
@@ -79,7 +80,7 @@ async function protectedCli(
         ...PROTECTION_FLAGS,
         "--import",
         `data:text/javascript,${encodeURIComponent(corruptEngineRead)}`,
-        resolve("dist/mnemocode.js"),
+        BUILT_CLI,
         ...material.arguments,
       ],
       {

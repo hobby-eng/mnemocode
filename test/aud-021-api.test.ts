@@ -16,16 +16,18 @@ import { NOT_CONFIRMED, ReEncoding } from "../src/core/re-encoding.js";
 import type { DecodedResult } from "../src/core/types.js";
 import { FINGERPRINT_WARNING } from "../src/core/wallet-check.js";
 import { holes } from "./helpers/holes.js";
+import {
+  DATE,
+  MASKED_WORDS,
+  OTHER_PHRASE,
+  TEST_PHRASE,
+  TEST_UNICODE,
+  WRONG_DATE,
+} from "./helpers/test-phrase.js";
 import vectors from "../vectors/candidates-v1.json" with { type: "json" };
 
 const PUBLIC_LIST = vectors.lists.find((list) => list.name === "three phrases")!;
 const ENTROPY_BYTES = BIP39_ENTROPY_BYTES[0]!;
-const PHRASE = PUBLIC_LIST.records[0]!.phrase;
-const OTHER_PHRASE = PUBLIC_LIST.records[1]!.phrase;
-/** Published MnemoCode vector checksum-valid-seedshift-12, with 23-09-2026. */
-const MASKED_WORDS = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
-/** BIP39 Chinese codes for abandon (U+7684) and about (U+5728), as the CLI writes them. */
-const PUBLIC_UNICODE = `${"7684".repeat(11)}5728`;
 
 function maskedBackup(): EncodedBackup {
   return EncodedBackup.read(MASKED_WORDS, "english", "seedshift");
@@ -42,7 +44,7 @@ function refuseResultMutation(result: DecodedResult): void {
   expect(Reflect.set(result.recoveredIndexes, "length", 0)).toBe(false);
   expect(Reflect.set(result.shifts, 0, 0)).toBe(false);
   expect(Reflect.set(result.shifts, "length", 0)).toBe(false);
-  expect(Reflect.set(result.dates, 0, parseDate("24-09-2026"))).toBe(false);
+  expect(Reflect.set(result.dates, 0, parseDate(WRONG_DATE))).toBe(false);
   expect(Reflect.set(result.dates, "length", 0)).toBe(false);
   for (const part of ["year", "month", "day"])
     expect(Reflect.set(result.dates[0]!, part, 1)).toBe(false);
@@ -212,12 +214,16 @@ describe("AUD-021-API001: candidate entropy is byte data", () => {
 
 describe("AUD-021-API002: confirmation owns the decoded phrase", () => {
   it("owns a decoded snapshot without freezing or retaining the decoder's mutable fields", () => {
-    const dates = [parseDate("23-09-2026")];
+    const dates = [parseDate(DATE)];
     const backup = maskedBackup();
-    const decoded = backup.decode(dates);
-    const expected = structuredClone(decoded);
-    vi.spyOn(backup, "decode").mockReturnValue(decoded);
+    // Watched only: the backup decodes as it is, and the test keeps what it gave.
+    const decode = vi.spyOn(backup, "decode");
     const reEncoding = ReEncoding.of(backup, dates);
+    expect(decode).toHaveBeenCalledOnce();
+    const result = decode.mock.results[0]!;
+    if (result.type !== "return") throw new Error("The backup must return what it decoded.");
+    const decoded = result.value;
+    const expected = structuredClone(decoded);
     expect(reEncoding.result).not.toBe(decoded);
     expect(reEncoding.result.recoveredIndexes).not.toBe(decoded.recoveredIndexes);
     expect(reEncoding.result.shifts).not.toBe(decoded.shifts);
@@ -231,11 +237,11 @@ describe("AUD-021-API002: confirmation owns the decoded phrase", () => {
     expect(Reflect.set(dates[0]!, "day", 24)).toBe(true);
     expect(reEncoding.result).toEqual(expected);
     reEncoding.confirmByPerson();
-    expect(reEncoding.confirmedPhrase()).toBe(PHRASE);
+    expect(reEncoding.confirmedPhrase()).toBe(TEST_PHRASE);
   });
 
   it("refuses mutations before, inside, during and after an awaited wallet confirmation", async () => {
-    const reEncoding = ReEncoding.of(maskedBackup(), [parseDate("23-09-2026")]);
+    const reEncoding = ReEncoding.of(maskedBackup(), [parseDate(DATE)]);
     const expected = structuredClone(reEncoding.result);
     const result = reEncoding.result;
     refuseResultMutation(result);
@@ -251,9 +257,9 @@ describe("AUD-021-API002: confirmation owns the decoded phrase", () => {
       refuseResultMutation(result);
       await waiting;
       refuseResultMutation(result);
-      return { matched: phrase === PHRASE, path: "m", warning: FINGERPRINT_WARNING };
+      return { matched: phrase === TEST_PHRASE, path: "m", warning: FINGERPRINT_WARNING };
     });
-    expect(checkedPhrase).toBe(PHRASE);
+    expect(checkedPhrase).toBe(TEST_PHRASE);
     refuseResultMutation(reEncoding.result);
     expect(() => reEncoding.confirmedPhrase()).toThrow(NOT_CONFIRMED);
     release();
@@ -270,7 +276,7 @@ describe("AUD-021-API002: confirmation owns the decoded phrase", () => {
   });
 
   it("refuses mutations before and after personal confirmation and keeps the encoded output", () => {
-    const reEncoding = ReEncoding.of(maskedBackup(), [parseDate("23-09-2026")]);
+    const reEncoding = ReEncoding.of(maskedBackup(), [parseDate(DATE)]);
     const expected = structuredClone(reEncoding.result);
     refuseResultMutation(reEncoding.result);
     reEncoding.confirmByPerson();
@@ -278,15 +284,15 @@ describe("AUD-021-API002: confirmation owns the decoded phrase", () => {
     expect(reEncoding.result).toEqual(expected);
     expect(reEncoding.confirmation).toEqual({ by: "person" });
     expect(Reflect.set(reEncoding.confirmation!, "by", "wallet")).toBe(false);
-    expect(reEncoding.confirmedPhrase()).toBe(PHRASE);
+    expect(reEncoding.confirmedPhrase()).toBe(TEST_PHRASE);
     const encoded = EncodedBackup.encode(reEncoding.confirmedPhrase(), [], "unicode", "direct");
-    expect(encoded.backup.text()).toBe(PUBLIC_UNICODE);
+    expect(encoded.backup.text()).toBe(TEST_UNICODE);
   });
 });
 
 describe("AUD-021-API002: confirmation owns the decoded phrase", () => {
   it("never confirms a different wallet after mutation attempts", async () => {
-    const reEncoding = ReEncoding.of(maskedBackup(), [parseDate("23-09-2026")]);
+    const reEncoding = ReEncoding.of(maskedBackup(), [parseDate(DATE)]);
     const match = await reEncoding.confirmByWallet(async (phrase) => {
       refuseResultMutation(reEncoding.result);
       await Promise.resolve();
@@ -296,11 +302,11 @@ describe("AUD-021-API002: confirmation owns the decoded phrase", () => {
     expect(match.matched).toBe(false);
     expect(reEncoding.confirmation).toBeUndefined();
     expect(() => reEncoding.confirmedPhrase()).toThrow(NOT_CONFIRMED);
-    expect(reEncoding.phrase).toBe(PHRASE);
+    expect(reEncoding.phrase).toBe(TEST_PHRASE);
   });
 
   it("keeps personal confirmation while an awaited wallet check refuses the same phrase", async () => {
-    const reEncoding = ReEncoding.of(maskedBackup(), [parseDate("23-09-2026")]);
+    const reEncoding = ReEncoding.of(maskedBackup(), [parseDate(DATE)]);
     let release!: () => void;
     const waiting = new Promise<void>((resolve) => {
       release = resolve;
@@ -315,12 +321,12 @@ describe("AUD-021-API002: confirmation owns the decoded phrase", () => {
     release();
     expect((await confirming).matched).toBe(false);
     expect(reEncoding.confirmation).toEqual({ by: "person" });
-    expect(reEncoding.confirmedPhrase()).toBe(PHRASE);
+    expect(reEncoding.confirmedPhrase()).toBe(TEST_PHRASE);
   });
 
   it("owns the selected last-word candidate with the same immutable views", () => {
-    const dates = [parseDate("23-09-2026")];
-    const backup = EncodedBackup.encode(PHRASE, dates, "indexes", "seedshift-legacy", {
+    const dates = [parseDate(DATE)];
+    const backup = EncodedBackup.encode(TEST_PHRASE, dates, "indexes", "seedshift-legacy", {
       validLastWord: true,
     }).backup;
     const reEncoding = ReEncoding.of(backup, dates, "about");
@@ -329,6 +335,6 @@ describe("AUD-021-API002: confirmation owns the decoded phrase", () => {
     refuseResultMutation(reEncoding.result);
     reEncoding.confirmByPerson();
     expect(reEncoding.result).toEqual(expected);
-    expect(reEncoding.confirmedPhrase()).toBe(PHRASE);
+    expect(reEncoding.confirmedPhrase()).toBe(TEST_PHRASE);
   });
 });

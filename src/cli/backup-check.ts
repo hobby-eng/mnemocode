@@ -31,8 +31,9 @@ import { assertSskrSelfTest } from "../sskr/self-test.js";
 import { type ParsedArguments, choiceOption } from "./arguments.js";
 import { askAfterFailure, askSecretUntil, WHAT_NOW } from "./ask.js";
 import { askDates, DATES_AGAIN_LABEL } from "./date-search.js";
+import { CODES_AGAIN_LABEL } from "./backup-questions.js";
 import { MENU_ENTRY_NAMES } from "./menu-entries.js";
-import { clearPrivateScreen, onPrivateScreen } from "./private-screen.js";
+import { clearPrivateScreen, onPrivateScreen, privateScreenAvailable } from "./private-screen.js";
 import { choose } from "./terminal-choice.js";
 import { terminalNotice } from "./terminal.js";
 import { SHARE_SEPARATOR, SHARE_WORD_HINTS, ShareInput } from "../sskr/share-input.js";
@@ -44,8 +45,8 @@ import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
 
 const ERRORS = new ErrorCatalog("cli.backup-check", {
-  "backup-check-answers-question-ask-secrets-after-result": () =>
-    "--backup-check answers a question of --ask-secrets, after the result.",
+  "backup-check-answers-question-private-screen": () =>
+    "--backup-check answers a question of the private screen after the result, which needs a terminal.",
   "backup-check-nothing-check-record-replaced-last-word": () =>
     "--backup-check has nothing to check: a record with a replaced last word cannot be checked.",
 });
@@ -55,7 +56,7 @@ const SHARE_CHECK_TEXTS = { decodeEntry: MENU_ENTRY_NAMES.decode.label };
 
 /** The answer that types a part of the backup again. */
 const AGAIN: Readonly<Record<BackupPart, string>> = {
-  codes: "Type the codes again",
+  codes: CODES_AGAIN_LABEL,
   dates: DATES_AGAIN_LABEL,
   shares: "Type the shares again",
 };
@@ -151,14 +152,18 @@ const BACKUP_CHECK_ANSWERS = Object.freeze(["yes", "no"] as const);
 export type BackupCheckAnswer = (typeof BACKUP_CHECK_ANSWERS)[number] | undefined;
 
 /**
- * --backup-check, checked before any secret is asked: it answers a question of the private screen,
- * and a record with a replaced last word has no check to answer.
+ * --backup-check, checked before any secret is asked. It answers a question of the private screen,
+ * where the check is offered (offerEncodedCheck, offerShareCheck) with --ask-secrets and with a
+ * phrase read from a file alike; without that screen (privateScreenAvailable) it is refused
+ * (CORE-41). Its codes, of cli.backup-check: backup-check-answers-question-private-screen, and
+ * backup-check-nothing-check-record-replaced-last-word for a record with a replaced last word,
+ * which has no check to answer; a value other than yes or no is refused as choiceOption refuses it.
  */
 export function backupCheckAnswer(args: ParsedArguments): BackupCheckAnswer {
   const given = choiceOption(args, "backup-check", BACKUP_CHECK_ANSWERS);
   if (given === undefined) return undefined;
-  if (args["ask-secrets"] !== true)
-    throw ERRORS.create("backup-check-answers-question-ask-secrets-after-result", []);
+  if (!privateScreenAvailable())
+    throw ERRORS.create("backup-check-answers-question-private-screen", []);
   if (args["legacy-valid-last-word"] === true)
     throw ERRORS.create("backup-check-nothing-check-record-replaced-last-word", []);
   return given;

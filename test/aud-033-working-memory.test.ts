@@ -7,6 +7,7 @@ import { backupCardContent } from "../src/export/backup-cards.js";
 import { renderBusinessCards } from "../src/export/business-cards.js";
 import { CardRenderer } from "../src/export/card-renderer.js";
 import { nodeRenderPlatform } from "../src/export/platform-node.js";
+import { WIPED_CODE } from "./helpers/owner-lifetime.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
 
 afterEach(() => vi.restoreAllMocks());
@@ -57,7 +58,7 @@ describe("run-owned code candidates", () => {
       });
       if (outcome === "failure") await expect(pending).rejects.toBe(fault);
       else if (outcome === "disposed")
-        await expect(pending).rejects.toHaveProperty("code", "core.secret-value.wiped");
+        await expect(pending).rejects.toHaveProperty("code", WIPED_CODE);
       else {
         const result = await pending;
         try {

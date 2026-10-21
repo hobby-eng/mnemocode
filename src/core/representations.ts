@@ -62,7 +62,10 @@ export function detectInputFormats(value: string): Array<EncodedFormat> {
  * The codes of `result` in `format` (EncodedForm.write), or JSON with every form and the shifts.
  * Every form in the JSON is written from the indexes too, as EncodedForm writes each, so that the
  * JSON and the text of one result cannot disagree, whatever its stored words say (AUD-014-API007).
- * Indexes that are no phrase are refused in every form (core.bip39-sizes.*, AUD-037-API008).
+ * Indexes that are no phrase are refused in every form (core.bip39-sizes.*, AUD-037-API008). For
+ * JSON, a date of result.dates that the calendar does not have is refused as formatDate refuses it
+ * (core.dates.assert-calendar-date-refused, assert-calendar-date-refused-2,
+ * day-outside-selected-calendar-month).
  */
 export function formatEncoded(result: EncodedResult, format: OutputFormat): string {
   if (format !== "json") return EncodedForm.of(format).write(result);

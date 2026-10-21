@@ -492,7 +492,9 @@ export class MissingCodesSearch {
    * The codes whose phrase, with `dates`, matches the wallet. Dates with forgotten digits are
    * searched for each candidate of the codes (DateSearch), so that codes and dates are found
    * together; without dates the codes were not masked.
-   * An incomplete date answer is borrowed: keep it live through this way's plan and run.
+   * An incomplete date answer is borrowed: keep it live through this way's plan and run. Refuses
+   * dates with forgotten digits for codes that were not masked
+   * (core.missing-codes-search.codes-were-not-masked-no-dates-search).
    */
   byWallet(walletCheck: WalletCheck, dates?: DatesAnswer): MissingCodesWaySearch {
     return dates?.hasForgottenDigits === true
@@ -501,8 +503,10 @@ export class MissingCodesSearch {
   }
 
   /**
-   * Every candidate with its phrase, complete `dates` and fingerprint. Refuses with list-overflow
-   * if the actual count exceeds MAX_LISTED, even when the estimate permitted this way.
+   * Every candidate with its phrase, complete `dates` and fingerprint. Refuses at once codes whose
+   * estimated rows exceed MAX_LISTED, as whyNot says (core.missing-codes-search.operation-refused),
+   * and dates as ownedDates and DatesAnswer.of refuse them; its run refuses with list-overflow if
+   * the actual count exceeds MAX_LISTED, even when the estimate permitted this way.
    */
   listed(dates: readonly DateShiftDate[]): MissingCodesWaySearch {
     return new ListWay(this.#codes, this.#fingerprint, dates);

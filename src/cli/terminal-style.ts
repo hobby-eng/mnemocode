@@ -184,12 +184,11 @@ export function runningLines(stream: ColorStream, text: string): string[] {
 }
 
 /**
- * Advice that can be read and passed over: on a terminal wrapped, and grey where it gets colour;
- * for a file, a pipe or TERM=dumb as it is (runningLines).
+ * Advice that can be read and passed over: on a terminal wrapped, for a file, a pipe or TERM=dumb
+ * as it is (runningLines); grey wherever the stream gets colour, CLICOLOR_FORCE included.
  */
 export function hintLines(stream: ColorStream, message: string): string[] {
-  const lines = runningLines(stream, message);
-  return streamCanRedraw(stream) ? lines.map((line) => paint(stream, STYLE.muted, line)) : lines;
+  return runningLines(stream, message).map((line) => paint(stream, STYLE.muted, line));
 }
 
 /**
@@ -208,13 +207,15 @@ export function markedLines(
 }
 
 /**
- * The lines of a notice: for a file, a pipe or TERM=dumb the message as it is, one line; on a
- * terminal news as a hint, a success or a warning after its mark (markedLines), with colour where
- * it gets colour. NO_COLOR and CLICOLOR take only the colour away (AUD-037-UI006).
+ * The lines of a notice: for a file, a pipe or TERM=dumb the message as it is, one line, news grey
+ * and a warning yellow where CLICOLOR_FORCE gives the stream colour; on a terminal news as a hint,
+ * a success or a warning after its mark (markedLines), with colour where it gets colour. NO_COLOR
+ * and CLICOLOR take only the colour away, CLICOLOR_FORCE only adds it (AUD-037-UI006).
  */
 export function noticeLines(stream: ColorStream, message: string, kind: NoticeKind): string[] {
-  if (!streamCanRedraw(stream)) return [message];
-  return kind === "info" ? hintLines(stream, message) : markedLines(stream, message, kind);
+  if (kind === "info") return hintLines(stream, message);
+  if (streamCanRedraw(stream)) return markedLines(stream, message, kind);
+  return [kind === "warning" ? paint(stream, NOTICE_MARKS.warning.code, message) : message];
 }
 
 /**
@@ -232,12 +233,12 @@ export function statusLine(stream: ColorStream, label: string, value: string, go
 }
 
 /**
- * An error after "✗ Error:" on a terminal, red where it gets colour, wrapped beside the mark to
- * TEXT_WIDTH as in `mhfe`, its lines joined by line breaks; or after "`program`:", on one line,
- * for a file, a pipe or TERM=dumb.
+ * An error after "✗ Error:" on a terminal, wrapped beside the mark to TEXT_WIDTH as in `mhfe`, its
+ * lines joined by line breaks; or after "`program`:", on one line, for a file, a pipe or
+ * TERM=dumb. The mark is red wherever the stream gets colour, CLICOLOR_FORCE included.
  */
 export function failureLine(stream: ColorStream, program: string, message: string): string {
   const text = printableText(message);
-  if (!streamCanRedraw(stream)) return `${program}: ${text}`;
+  if (!streamCanRedraw(stream)) return `${paint(stream, STYLE.bad, `${program}:`)} ${text}`;
   return besideMark(`${paint(stream, STYLE.bad, ERROR_MARK)} `, ERROR_MARK_WIDTH, text).join("\n");
 }

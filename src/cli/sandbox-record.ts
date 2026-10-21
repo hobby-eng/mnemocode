@@ -47,16 +47,16 @@ export interface SystemSandbox {
   missing(): readonly string[];
   /**
    * Core dumps, where the system can switch them off: no secret is asked while they failed
-   * (protection.ts, assertProtected).
+   * (protection.ts, ProcessProtection.assert).
    */
   coreDumps(): CoreDumps;
 }
 
-/** What a probe of one boundary found: it holds, a probe got through, or it could not tell. */
+/** What a probe of one protection found: it holds, a probe got through, or it could not tell. */
 export type Found = "holds" | "broken" | "unknown";
 
 /**
- * What a sandbox enforced, read back, and what it did not, and why: a boundary that the system
+ * What a sandbox enforced, read back, and what it did not, and why: a protection that the system
  * did not give, one that a probe got through, or a step that threw, such as a call to a function
  * that an older system lacks.
  */
@@ -64,12 +64,12 @@ export class SandboxRecord {
   readonly #held: string[] = [];
   readonly #reasons: string[] = [];
 
-  /** Records `boundary` as holding. */
-  hold(boundary: string): void {
-    this.#held.push(boundary);
+  /** Records `protection` as holding. */
+  hold(protection: string): void {
+    this.#held.push(protection);
   }
 
-  /** Records why a boundary is not enforced. */
+  /** Records why a protection is not enforced. */
   lack(reason: string): void {
     this.#reasons.push(reason);
   }
@@ -105,13 +105,13 @@ export class SandboxRecord {
   }
 
   /**
-   * Records `boundary` as holding when its probe `found` so; otherwise why not: what got through
+   * Records `protection` as holding when its probe `found` so; otherwise why not: what got through
    * (`broken`), or that no probe could tell.
    */
-  claim(boundary: string, found: Found, broken: string): void {
-    if (found === "holds") this.hold(boundary);
-    else if (found === "broken") this.lack(`${boundary} did not hold: ${broken}`);
-    else this.lack(`${boundary} could not be checked`);
+  claim(protection: string, found: Found, broken: string): void {
+    if (found === "holds") this.hold(protection);
+    else if (found === "broken") this.lack(`${protection} did not hold: ${broken}`);
+    else this.lack(`${protection} could not be checked`);
   }
 
   get held(): readonly string[] {

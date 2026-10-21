@@ -32,7 +32,7 @@ interface KeyedTerminal {
    * changed, so that the core self-test refuses it at the start of the menu.
    */
   wordListDamaged: boolean;
-  /** Whether this process cannot be protected (assertProtected) at the start of the menu. */
+  /** Whether this process cannot be protected (ProcessProtection.assert) at the start of the menu. */
   protectionFails: boolean;
   /** Whether standard input and standard error are taken for a terminal (terminalAvailable). */
   atTerminal: boolean;
@@ -97,9 +97,14 @@ export function replacedChildProcess(actual: typeof ChildProcess) {
 export function replacedProtection(actual: Protection): Protection {
   return {
     ...actual,
-    dropForMenu: () => undefined,
-    assertProtected: () => {
-      if (terminal.protectionFails) throw new Error("Core dumps could not be switched off.");
+    ProcessProtection: class extends actual.ProcessProtection {
+      static override dropForMenu(): void {
+        // The menu of a test keeps the rights of the test process.
+      }
+
+      static override assert(): void {
+        if (terminal.protectionFails) throw new Error("Core dumps could not be switched off.");
+      }
     },
     runInOwnProcess: () => terminal.exit(),
   };
@@ -107,7 +112,14 @@ export function replacedProtection(actual: Protection): Protection {
 
 /** The images of cards, whose renderer is there. */
 export function replacedImageExport(actual: ImageExport): ImageExport {
-  return { ...actual, assertImageRenderer: async () => undefined };
+  return {
+    ...actual,
+    ImageRenderer: class extends actual.ImageRenderer {
+      static override async assert(): Promise<void> {
+        // Taken as found, as on a computer with pdftocairo.
+      }
+    },
+  };
 }
 
 /**

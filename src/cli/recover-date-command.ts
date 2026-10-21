@@ -17,7 +17,7 @@ import {
 import type { EncodedBackup } from "../core/encoded-backup.js";
 import { integerOption, type ParsedArguments, value } from "./arguments.js";
 import { askWalletEvidence } from "./wallet-question.js";
-import { type WalletPlace, givenWallet } from "./bitcoin-options.js";
+import { type GivenWallet, givenWallet } from "./bitcoin-options.js";
 import { CandidatesFile } from "./candidates-file.js";
 import {
   askDates,
@@ -75,10 +75,11 @@ interface Settings {
   /** The combinations searched without asking (--max-candidates); without it, twelve hours. */
   readonly maxCandidates: number | undefined;
   readonly target: CandidatesFile | undefined;
-  readonly evidence: WalletEvidence | undefined;
-  /** Where a wallet asked on the private screen is looked for: as the one given, if any. */
-  readonly place: WalletPlace;
-  readonly passphrase: string;
+  /**
+   * The wallet given with the options, if any, where a wallet asked on the private screen is
+   * looked for, and the owner of the BIP39 passphrase.
+   */
+  readonly wallet: GivenWallet;
 }
 
 /**
@@ -95,28 +96,22 @@ async function settingsOf(args: ParsedArguments): Promise<Settings> {
   });
   const maxCandidates = maxCandidatesOf(args);
   const target = await CandidatesFile.of(args);
+  let wallet: GivenWallet | undefined;
   try {
     // A record may name another mode or format; askEncodedCodes and backupFromOptions settle that.
     if (value(args, "mode") !== undefined && !Masking.isMaskedMode(transformMode(args)))
       throw ERRORS.create("seedshift-mode-only", []);
     givenInputFormat(args);
-    const { evidence, place, passphrase } = givenWallet(args);
+    wallet = givenWallet(args);
     if (args["ask-secrets"] !== true && value(args, "mode") !== undefined) {
       // From the command line nothing can be asked later; a record names its own mode.
-      assertEvidenceGiven(transformMode(args), evidence);
+      assertEvidenceGiven(transformMode(args), wallet.evidence);
     }
-    target?.assertListable(passphrase);
-    return {
-      maxResults,
-      progressEvery,
-      maxCandidates,
-      target,
-      evidence,
-      place,
-      passphrase,
-    };
+    target?.assertListable(wallet.passphrase);
+    return { maxResults, progressEvery, maxCandidates, target, wallet };
   } catch (error) {
     target?.wipe();
+    wallet?.wipe();
     throw error;
   }
 }
@@ -132,6 +127,7 @@ export async function runRecoverDate(arguments_: ParsedArguments): Promise<Cance
     return await recoverFromOptions(arguments_, settings);
   } finally {
     settings.target?.wipe();
+    settings.wallet.wipe();
   }
 }
 
@@ -154,31 +150,31 @@ async function recoverFromOptions(
   using backup = read.backup;
   const { mode } = read;
   if (!Masking.isMaskedMode(mode)) throw ERRORS.create("seedshift-mode-only", []);
-  assertEvidenceGiven(mode, settings.evidence);
-  const indexes = backup.indexes;
+  const { evidence } = settings.wallet;
+  assertEvidenceGiven(mode, evidence);
   const dateValues = dateInputText(args);
   if (dateValues.length === 0)
     throw ERRORS.create("provide-dates-including-at-least-one-pattern-containing", []);
   using dates = DatesAnswer.parse(dateValues, {
-    wordCount: indexes.length,
+    wordCount: backup.words,
     patterns: true,
   });
   requireIncompleteDate(dates);
-  if ((await settings.target?.prepare(settings.passphrase)) === CANCELLED) return CANCELLED;
-  const result = await search(indexes, dates, mode, settings.evidence, settings);
+  if ((await settings.target?.prepare(settings.wallet.passphrase)) === CANCELLED) return CANCELLED;
+  const result = await search(backup.indexes, dates, mode, evidence, settings);
   if (result === CANCELLED) return CANCELLED;
   // Asked on the private screen whether to make a search longer than allowed, the person said no.
   if (result === undefined) {
     if (settings.target !== undefined) settings.target.discard();
     return CANCELLED;
   }
-  reportDateMatches(result, { mode, evidence: settings.evidence, maxResults: settings.maxResults });
+  reportDateMatches(result, { mode, evidence, maxResults: settings.maxResults });
   if (result.matchCount === 0) return settings.target?.saveEntropies([]);
   if (settings.target !== undefined) {
     if (!candidateListHolds(result.matchCount)) throw new TooManyForListError(NARROW_DATE_SEARCH);
     if ((await saveList(settings, result)) === CANCELLED) return CANCELLED;
   }
-  dateMatchNotes(settings.evidence, result.warning);
+  dateMatchNotes(evidence, result.warning);
   return undefined;
 }
 
@@ -198,7 +194,7 @@ function search(
     dates,
     mode,
     evidence,
-    passphrase: settings.passphrase,
+    passphrase: settings.wallet.passphrase,
     limits: { maxResults: settings.maxResults, maxCandidates: settings.maxCandidates },
     target: settings.target,
     report: { progressEvery: settings.progressEvery },
@@ -207,7 +203,7 @@ function search(
 
 /** Saves every match as a candidate list; CANCELLED when the person cancelled the save. */
 function saveList(settings: Settings, result: DateSearchResult): Promise<Cancelled | undefined> {
-  return defined(settings.target).savePhrases(result.kept, settings.passphrase);
+  return defined(settings.target).savePhrases(result.kept, settings.wallet.passphrase);
 }
 
 /** What is asked next on the private screen. */
@@ -231,7 +227,7 @@ async function recoverWithQuestions(
   // The mode that a record header named, for codes typed after it without one.
   let recordMode: MaskingMode | undefined;
   let dates: DatesAnswer | undefined;
-  let evidence = settings.evidence;
+  let evidence = settings.wallet.evidence;
   // Whether the list was saved, and how many matched the last search, for a list that was not.
   let listed = false;
   let lastMatches = 0;
@@ -245,7 +241,7 @@ async function recoverWithQuestions(
         recordMode = read.recordMode ?? recordMode;
         showEncodedFingerprint(encodedFingerprintOf(backup));
         // Dates kept from before still count if the new phrase takes as many.
-        step = dates?.fitsPhrase(backup.indexes.length) === true ? "wallet" : "dates";
+        step = dates?.fitsPhrase(backup.words) === true ? "wallet" : "dates";
       } else if (step === "dates") {
         const asked = await askRecoveryDates(defined(backup));
         if (asked === CANCELLED) return CANCELLED;
@@ -258,7 +254,7 @@ async function recoverWithQuestions(
           const answer = await askWalletEvidence({
             optional: false,
             explanation: walletExplanation(defined(backup).mode),
-            place: settings.place,
+            place: settings.wallet.place,
           });
           if (answer === CANCELLED) return CANCELLED;
           if (answer.kind === "wallet") evidence = answer.evidence;
@@ -267,7 +263,8 @@ async function recoverWithQuestions(
       } else {
         const { mode } = defined(backup);
         Masking.assertMaskedMode(mode);
-        if ((await settings.target?.prepare(settings.passphrase)) === CANCELLED) return CANCELLED;
+        if ((await settings.target?.prepare(settings.wallet.passphrase)) === CANCELLED)
+          return CANCELLED;
         const result = await search(
           defined(backup).indexes,
           defined(dates),
@@ -296,7 +293,7 @@ async function recoverWithQuestions(
           mode,
           maxResults: settings.maxResults,
           again: backupChoice(backupArgs),
-          wallet: { explanation: walletExplanation(mode), place: settings.place },
+          wallet: { explanation: walletExplanation(mode), place: settings.wallet.place },
           listing: settings.target !== undefined,
         });
         if (next === CANCELLED) return CANCELLED;
@@ -322,7 +319,7 @@ async function recoverWithQuestions(
 
 /** Asks for the dates with ? until they can be used; CANCELLED when the person cancelled. */
 async function askRecoveryDates(backup: EncodedBackup): Promise<DatesAnswer | Cancelled> {
-  const wordCount = backup.indexes.length;
+  const wordCount = backup.words;
   return askDates({
     wordCount,
     patterns: true,

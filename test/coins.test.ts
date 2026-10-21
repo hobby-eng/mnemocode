@@ -2,7 +2,6 @@
 // where the wallets of the public test phrase put each address, what is refused and why, the case
 // rules and the standard forms. Public test phrases and public or independently computed vectors
 // only.
-import { pbkdf2Sync } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { HDKey } from "@scure/bip32";
 import { bech32, bech32m } from "@scure/base";
@@ -17,19 +16,21 @@ import {
 } from "../src/core/wallet-evidence.js";
 import {
   matchBitcoinEvidence,
+  nodePbkdf2HmacSha512,
   walletCheckOf,
   assertBitcoinEvidence,
 } from "../src/bitcoin-evidence.js";
 import { locationOf } from "../src/core/coins/coin-self-test.js";
+import { allWiped } from "./helpers/made-arrays.js";
 import { matching } from "./helpers/matchers.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { TEST_ADDRESS, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** The BIP39 test vector of entropy ff…ff: another wallet. */
 const ZOO = "zoo ".repeat(11) + "wrong";
+/** TEST_ADDRESS with a changed checksum character, its last. */
+const DAMAGED_ADDRESS = `${TEST_ADDRESS.slice(0, -1)}v`;
 
-const nodePbkdf2 = ((password, salt, rounds, bytes) =>
-  Uint8Array.from(pbkdf2Sync(password, salt, rounds, bytes, "sha512"))) satisfies Pbkdf2HmacSha512;
-const check = new WalletEvidenceCheck(nodePbkdf2, COINS);
+const check = new WalletEvidenceCheck(nodePbkdf2HmacSha512, COINS);
 
 /**
  * Where the wallets of the public test phrase put each address: coin, BIP39 passphrase, path,
@@ -43,7 +44,7 @@ const check = new WalletEvidenceCheck(nodePbkdf2, COINS);
 const ADDRESSES: readonly (readonly [CoinId, string, string, string])[] = [
   ["bitcoin", "", "m/44'/0'/0'/0/0", "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA"],
   ["bitcoin", "", "m/49'/0'/0'/0/0", "37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf"],
-  ["bitcoin", "", "m/84'/0'/0'/0/0", "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu"],
+  ["bitcoin", "", "m/84'/0'/0'/0/0", TEST_ADDRESS],
   ["bitcoin", "", "m/84'/0'/0'/0/1", "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g"],
   ["bitcoin", "", "m/84'/0'/0'/1/0", "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el"],
   [
@@ -151,28 +152,32 @@ describe("the coins that a host offers (a host of one coin family)", () => {
   const evidence = coinAddress(ethereum[0], ethereum[3], locationOf(ethereum[2]));
 
   it("compares an address of an offered coin only", () => {
-    const bitcoinOnly = new WalletEvidenceCheck(nodePbkdf2, [coinById("bitcoin")]);
+    const bitcoinOnly = new WalletEvidenceCheck(nodePbkdf2HmacSha512, [coinById("bitcoin")]);
     expect(() => bitcoinOnly.assert(evidence)).toThrow("Unknown coin; the coins are bitcoin.");
     expect(() => assertWalletEvidence(evidence, [coinById("bitcoin")])).toThrow("Unknown coin");
     const offered = [coinById("bitcoin"), coinById("ethereum")];
     expect(
-      new WalletEvidenceCheck(nodePbkdf2, offered).match(TEST_PHRASE, evidence, ethereum[1]),
+      new WalletEvidenceCheck(nodePbkdf2HmacSha512, offered).match(
+        TEST_PHRASE,
+        evidence,
+        ethereum[1],
+      ),
     ).toMatchObject({
       matched: true,
       path: ethereum[2],
     });
     expect(() => assertWalletEvidence(evidence, offered)).not.toThrow();
-    expect(() => new WalletEvidenceCheck(nodePbkdf2, [coinById("dash")]).assert(evidence)).toThrow(
-      "the coins are dash.",
-    );
+    expect(() =>
+      new WalletEvidenceCheck(nodePbkdf2HmacSha512, [coinById("dash")]).assert(evidence),
+    ).toThrow("the coins are dash.");
   });
 
   it("refuses a list that holds no coin or a coin twice", () => {
     // An object that is no coin, fed on purpose as a JavaScript host could.
-    expect(() => new WalletEvidenceCheck(nodePbkdf2, [{ id: "ethereum" } as never])).toThrow(
-      TypeError,
-    );
-    expect(() => new WalletEvidenceCheck(nodePbkdf2, [COINS[0]!, COINS[0]!])).toThrow(
+    expect(
+      () => new WalletEvidenceCheck(nodePbkdf2HmacSha512, [{ id: "ethereum" } as never]),
+    ).toThrow(TypeError);
+    expect(() => new WalletEvidenceCheck(nodePbkdf2HmacSha512, [COINS[0]!, COINS[0]!])).toThrow(
       "each be given once",
     );
   });
@@ -205,7 +210,7 @@ describe("addresses of every coin, where the wallets of the public phrase put th
     using ownedCheck = walletCheckOf(evidence)!;
     expect(ownedCheck(TEST_PHRASE)).toEqual(expected);
     const later = new WalletEvidenceCheck(
-      async (...parameters) => nodePbkdf2(...parameters),
+      async (...parameters) => nodePbkdf2HmacSha512(...parameters),
       COINS,
     );
     await expect(later.matchAsync(TEST_PHRASE, evidence)).resolves.toEqual(expected);
@@ -261,7 +266,7 @@ describe("addresses of every coin, where the wallets of the public phrase put th
 
 describe("addresses of every coin, where the wallets of the public phrase put them", () => {
   it("are not found elsewhere, with another passphrase or in another wallet", () => {
-    const address = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
+    const address = TEST_ADDRESS;
     const notFound = { matched: false, kind: "coin-address" };
     const first = { account: 0, branch: 0, index: 0 };
     for (const location of [
@@ -278,22 +283,23 @@ describe("addresses of every coin, where the wallets of the public phrase put th
   });
 
   it("are compared on the paths of their type, coin types and network", () => {
+    // The paths of the branch that holds the address at index 7.
     const paths = (coin: CoinId, text: string, location = { account: 3, branch: 1, index: 7 }) =>
-      coinById(coin).parse(text).pathsAt(location);
+      coinById(coin).parse(text).branchPathsAt(location);
     expect(paths("bitcoin-cash", "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA")).toEqual([
-      "m/44'/145'/3'/1/7",
-      "m/44'/0'/3'/1/7",
+      "m/44'/145'/3'/1",
+      "m/44'/0'/3'/1",
     ]);
     expect(paths("ethereum-classic", "0x9858EfFD232B4033E47d90003D41EC34EcaEda94")).toEqual([
-      "m/44'/61'/3'/1/7",
-      "m/44'/60'/3'/1/7",
+      "m/44'/61'/3'/1",
+      "m/44'/60'/3'/1",
     ]);
-    expect(paths("bitcoin", "2Mww8dCYPUpKHofjgcXcBCEGmniw9CoaiD2")).toEqual(["m/49'/1'/3'/1/7"]);
+    expect(paths("bitcoin", "2Mww8dCYPUpKHofjgcXcBCEGmniw9CoaiD2")).toEqual(["m/49'/1'/3'/1"]);
     expect(paths("injective", "inj1npvwllfr9dqr8erajqqr6s0vxnk2ak55re90dz")).toEqual([
-      "m/44'/60'/3'/1/7",
+      "m/44'/60'/3'/1",
     ]);
     expect(paths("dash", "dash1krma5z3ttj75la4m93xcndna9ullamq9y5e9n5rs")).toEqual([
-      "m/9'/5'/17'/3'/1'/7",
+      "m/9'/5'/17'/3'/1'",
     ]);
   });
 });
@@ -304,7 +310,7 @@ describe("the comparison", () => {
   it("wipes the seed and every key it derives, on the way to each address too", async () => {
     const seeds: Uint8Array[] = [];
     const host: Pbkdf2HmacSha512 = (...parameters) => {
-      const seed = nodePbkdf2(...parameters);
+      const seed = nodePbkdf2HmacSha512(...parameters);
       seeds.push(seed);
       return seed;
     };
@@ -330,17 +336,17 @@ describe("the comparison", () => {
     expect(nodes).toHaveLength(2 * (1 + 10 + 1 + 6));
     for (const node of nodes) expect(node.privateKey).toBeNull();
     expect(seeds).toHaveLength(4);
-    for (const seed of seeds) expect(seed.every((byte) => byte === 0)).toBe(true);
+    expect(allWiped(seeds)).toBe(true);
   });
 
   it("refuses evidence that no wallet can match before the host's PBKDF2 is called", () => {
     const calls: unknown[] = [];
     const recording = new WalletEvidenceCheck((...parameters) => {
       calls.push(parameters);
-      return nodePbkdf2(...parameters);
+      return nodePbkdf2HmacSha512(...parameters);
     }, COINS);
     const first = { account: 0, branch: 0, index: 0 };
-    const address = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
+    const address = TEST_ADDRESS;
     // Each refusal's code: one for each condition.
     const place = "core.coins.coin.assert-address-location-refused";
     const refused: readonly [WalletEvidence, string, string][] = [
@@ -525,12 +531,12 @@ describe("addresses out of reach", () => {
 
   it("are refused when damaged, too short or of another coin", () => {
     for (const [coin, text] of [
-      ["bitcoin", "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyv"], // checksum changed
+      ["bitcoin", DAMAGED_ADDRESS], // checksum changed
       ["bitcoin", "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabB"], // checksum changed
       ["bitcoin", "bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3"], // P2WSH
       ["bitcoin", "ltc1qcr8te4kr609gcawutmrza0j4xv80jy8zkvrefp"], // another coin
       ["bitcoin", "LUWPbpM43E2p7ZSh8cyTBEkvpHmr3cB8Ez"], // another coin
-      ["litecoin", "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu"], // another coin
+      ["litecoin", TEST_ADDRESS], // another coin
       ["tron", "0x9858EfFD232B4033E47d90003D41EC34EcaEda94"], // another coin
       ["ethereum", "TUEZSdKsoDHQMeZwihtdoBiN46zxhGWYdH"], // another coin
       ["ethereum", "0x9858EfFD232B4033E47d90003D41EC34EcaEda"], // too short
@@ -550,7 +556,7 @@ describe("addresses out of reach", () => {
 describe("the case of an address", () => {
   it("may be all capitals for Bech32 and CashAddr, never mixed", () => {
     for (const [coin, lower] of [
-      ["bitcoin", "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu"],
+      ["bitcoin", TEST_ADDRESS],
       ["bitcoin", "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr"],
       ["bitcoin", "tb1q6rz28mcfaxtmd6v789l9rrlrusdprr9pqcpvkl"],
       ["litecoin", "ltc1qnnphcvq5zgyf4f0uepust6d7gyt2zl69vftnz2"],
@@ -629,7 +635,7 @@ describe("parseCoinAddress", () => {
   it("gives each condition of a refused address its own code (TS-06, CORE-23)", () => {
     const refused: readonly (readonly [CoinId, string, string])[] = [
       // A changed checksum character.
-      ["bitcoin", "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyv", "core.coins.coin.address-damaged"],
+      ["bitcoin", DAMAGED_ADDRESS, "core.coins.coin.address-damaged"],
       [
         "bitcoin-cash",
         "bitcoincash:Qqyx49mu0kkn9ftfj6hje6g2wfer34yfnq5tahq3q6",
@@ -728,7 +734,7 @@ describe("an address of another coin (AUD-010-API003)", () => {
     bitcoin: [
       "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA",
       "37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf",
-      "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
+      TEST_ADDRESS,
     ],
     "bitcoin-cash": ["bitcoincash:qqyx49mu0kkn9ftfj6hje6g2wfer34yfnq5tahq3q6"],
     cosmos: ["cosmos19rl4cm2hmr8afy4kldpxz3fka4jguq0auqdal4"],
@@ -774,9 +780,7 @@ describe("an address of another coin (AUD-010-API003)", () => {
     expect(() => coinById("dash").parse("XoJA8qE3N2Y3jMLEtZ3vcN42qseZ8LvFf6")).toThrow(
       "its checksum or format is wrong",
     );
-    expect(() => coinById("xrp").parse("bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyv")).toThrow(
-      "its checksum or format is wrong",
-    );
+    expect(() => coinById("xrp").parse(DAMAGED_ADDRESS)).toThrow("its checksum or format is wrong");
     expect(() => coinById("bitcoin-cash").parse("37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf")).toThrow(
       "it is not the address of a single key",
     );

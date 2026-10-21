@@ -1,14 +1,13 @@
-import { pbkdf2Sync } from "node:crypto";
 import { inspect } from "node:util";
-import { describe, expect, it } from "vitest";
-import { walletCheckOf } from "../src/bitcoin-evidence.js";
+import { HDKey } from "@scure/bip32";
+import { describe, expect, it, vi } from "vitest";
+import { nodePbkdf2HmacSha512, walletCheckOf } from "../src/bitcoin-evidence.js";
 import { WalletEvidenceCheck, type WalletEvidence } from "../src/core/wallet-evidence.js";
 import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
-import { TEST_PHRASE as PHRASE } from "./helpers/test-phrase.js";
+import { OTHER_PHRASE, TEST_ADDRESS, TEST_PHRASE as PHRASE } from "./helpers/test-phrase.js";
 
-// BIP84's first receiving key and address for the public BIP39 test phrase.
+// BIP84's first receiving key for the public BIP39 test phrase.
 const WIF = "KyZpNDKnfs94vbrwhJneDi77V6jF64PWPF8x5cdJb8ifgg2DUc9d";
-const FIRST_ADDRESS = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
 // The public key of that WIF's key, which a match gives instead of the private key.
 const PUBLIC_KEY = "0330d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c";
 const evidence = (): WalletEvidence => ({
@@ -17,10 +16,33 @@ const evidence = (): WalletEvidence => ({
   profiles: ["native-segwit"],
   location: { network: "mainnet", account: 0, branch: 0, index: 0 },
 });
-const pbkdf2 = (password: string, salt: string, rounds: number, bytes: number) =>
-  pbkdf2Sync(password, salt, rounds, bytes, "sha512");
 
 describe("A retained wallet comparison's lifetime", () => {
+  it("compares a WIF by its public key and reads no private key of a derived wallet", () => {
+    // A spy that calls through: @scure/bip32 itself never reads this getter, only a comparison
+    // that takes a derived node's private key does (CORE-49).
+    const privateKeyReads = vi.spyOn(HDKey.prototype, "privateKey", "get");
+    try {
+      using owner = new WalletEvidenceCheck(nodePbkdf2HmacSha512, [BITCOIN]).prepare({
+        kind: "wif",
+        value: WIF,
+        profiles: ["native-segwit", "legacy"],
+        location: { network: "mainnet", account: 0, branch: 0, index: 0 },
+        addresses: 20,
+      });
+      expect(owner.match(PHRASE)).toEqual({
+        matched: true,
+        kind: "wif",
+        derived: PUBLIC_KEY,
+        path: "m/84'/0'/0'/0/0",
+      });
+      expect(owner.match(OTHER_PHRASE)).toEqual({ matched: false, kind: "wif" });
+      expect(privateKeyReads).not.toHaveBeenCalled();
+    } finally {
+      privateKeyReads.mockRestore();
+    }
+  });
+
   it("ends the Node callback without changing its callable contract", () => {
     const check = walletCheckOf(evidence())!;
     expect(check(PHRASE)).toMatchObject({
@@ -54,7 +76,7 @@ describe("A retained wallet comparison's lifetime", () => {
   });
 
   it("keeps the host-neutral prepared comparison independent of another owner", async () => {
-    const check = new WalletEvidenceCheck(pbkdf2, [BITCOIN]);
+    const check = new WalletEvidenceCheck(nodePbkdf2HmacSha512, [BITCOIN]);
     using first = check.prepare(evidence());
     using other = check.prepare(evidence());
     first.wipe();
@@ -81,7 +103,7 @@ describe("A retained wallet comparison's lifetime", () => {
       async (...parameters) => {
         entered!();
         await ready;
-        returned = pbkdf2(...parameters);
+        returned = nodePbkdf2HmacSha512(...parameters);
         return returned;
       },
       [BITCOIN],
@@ -114,10 +136,10 @@ describe("A retained wallet comparison's lifetime", () => {
     expect(check(PHRASE)).toMatchObject({ matched: true, path: "m/84'/0'/0'/0/0" });
     using noPassphrase = walletCheckOf({
       kind: "address",
-      value: FIRST_ADDRESS,
+      value: TEST_ADDRESS,
       profiles: ["native-segwit"],
       location: { network: "mainnet", account: 0, branch: 0, index: 0 },
     })!;
-    expect(noPassphrase(PHRASE)).toMatchObject({ matched: true, derived: FIRST_ADDRESS });
+    expect(noPassphrase(PHRASE)).toMatchObject({ matched: true, derived: TEST_ADDRESS });
   });
 });

@@ -11,8 +11,10 @@ import { errorCode } from "../src/core/refusal.js";
 import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
+import { ShareSplit } from "../src/sskr/split.js";
+import { CTRL_C } from "./helpers/keys.js";
 import { matching } from "./helpers/matchers.js";
-import { DATE, MASKED, masked, ORIGINAL, promptsShown } from "./helpers/phrase-questions.js";
+import { ORIGINAL, promptsShown } from "./helpers/phrase-questions.js";
 import {
   keptAbove,
   questionsOnPrivateScreen,
@@ -20,7 +22,14 @@ import {
   terminal,
 } from "./helpers/question-terminal.js";
 import { wrongValue } from "./helpers/shares.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  MASKED,
+  MASKED_WORDS,
+  replacedAt,
+  TEST_PHRASE,
+  WRONG_DATE,
+} from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -52,14 +61,13 @@ describe("encode, decode and the backup check on the private screen", () => {
     });
 
     it("names the codes and the date that differ, and asks only that part again", async () => {
-      const codes = MASKED.split(" ");
-      codes[2] = "25";
+      const codes = replacedAt(MASKED, { 3: "25" });
       terminal.answers = [
         "\r",
         "1 2 3\r",
-        `${codes.join(" ")}\r`,
+        `${codes}\r`,
         `${MASKED}\r`,
-        "24-09-2026\r",
+        `${WRONG_DATE}\r`,
         `${DATE}\r`,
       ];
       terminal.choices = ["Yes", "Type the codes again", "Type the dates again"];
@@ -117,10 +125,10 @@ describe("encode, decode and the backup check on the private screen", () => {
       expect(() => backupCheckAnswer({ "backup-check": "maybe" })).toThrow(
         "--backup-check must be yes or no.",
       );
-      // It answers a question of the private screen, which a record with a new last word lacks.
-      expect(() => backupCheckAnswer({ "backup-check": "yes" })).toThrow(
-        "--backup-check answers a question of --ask-secrets",
-      );
+      // It answers a question of the private screen, which shows at this terminal with
+      // --ask-secrets or without (test/backup-check-option.test.ts refuses it without a terminal),
+      // and which a record with a new last word lacks.
+      expect(backupCheckAnswer({ "backup-check": "yes" })).toBe("yes");
       expect(() =>
         backupCheckAnswer({
           "backup-check": "no",
@@ -161,13 +169,13 @@ describe("encode, decode and the backup check on the private screen", () => {
     });
 
     it("types an unreadable share again alone, and keeps the others", async () => {
-      const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
+      const shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
       terminal.answers = [
         `${shares[0]}\r`,
         `${shares[0]};not a share\r`,
         "still none\r",
         `${shares[2]}\r`,
-        "24-09-2026\r",
+        `${WRONG_DATE}\r`,
         `${DATE}\r`,
       ];
       terminal.choices = ["Yes", "Type the dates again"];
@@ -186,7 +194,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     });
 
     it("refuses a share typed again by the code of its condition (CORE-23)", async () => {
-      const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
+      const shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
       terminal.answers = [
         `${shares[0]};not a share\r`,
         "still none\r",
@@ -206,7 +214,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     });
 
     it("keeps an abbreviation at the start of a share's problem", async () => {
-      const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
+      const shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
       // One byte of share 2 changed to another, a valid minimal byteword (its first and last
       // letters): the share reads, but its checksum does not match.
       const body = shares[1]!.slice(SSKR_UR_PREFIX.length);
@@ -226,8 +234,8 @@ describe("encode, decode and the backup check on the private screen", () => {
     });
 
     it("tells shares of another phrase from wrong dates without the dates of the result", async () => {
-      const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
-      terminal.answers = [`${shares[0]};${shares[1]}\r`, "24-09-2026\r", `${DATE}\r`];
+      const shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
+      terminal.answers = [`${shares[0]};${shares[1]}\r`, `${WRONG_DATE}\r`, `${DATE}\r`];
       terminal.choices = ["Yes", "Type the dates again"];
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined);
       expect(seen.notices.filter((line) => line !== "")).toEqual([
@@ -251,7 +259,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     });
 
     it("lets a fault of the host's SSKR library through instead of asking for the shares again (AUD-037-API002)", async () => {
-      const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
+      const shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
       const fault = new Error("The host's SSKR library stopped.");
       const combine = nodeSharePlatform.combineShares;
       // Fault: the host's SSKR library stops with an error of its own at the shares typed, not a
@@ -269,7 +277,10 @@ describe("encode, decode and the backup check on the private screen", () => {
     });
 
     it("asks for the shares again after the engine refused to combine them (AUD-037-API002)", async () => {
-      const shares = await splitSskrMnemonic(masked.shiftedEnglish.join(" "), 2, 3);
+      // A fixed split, not a random one: a wrong value passes the engine's 32-bit digest for about
+      // one split in 2^32, and the outcome of this one was seen once and stays.
+      const split = new ShareSplit(nodeSharePlatform, (bytes) => bytes.fill(7));
+      const shares = await split.split(MASKED_WORDS, 2, 3);
       // Share 2 with a wrong value whose checksum holds: the engine's digest refuses the pair.
       terminal.answers = [
         `${shares[0]};${wrongValue(shares[1]!)}\r`,
@@ -295,7 +306,7 @@ describe("encode, decode and the backup check on the private screen", () => {
 describe("encode, decode and the backup check on the private screen", () => {
   describe("the backup check", () => {
     it("stops at Ctrl+C inside the check", async () => {
-      terminal.answers = ["12\x03"];
+      terminal.answers = [`12${CTRL_C}`];
       terminal.choices = ["Yes"];
       expect(await offerEncodedCheck(ORIGINAL, () => undefined, undefined)).toBe(CANCELLED);
     });

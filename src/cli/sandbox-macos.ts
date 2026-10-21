@@ -81,7 +81,7 @@ export function macSandboxProfile(needs: SandboxNeeds): string {
 
 /** macOS's protections, as described at the top. */
 export class MacSandbox implements SystemSandbox {
-  /** The boundaries that the sandbox enforces and a probe confirmed, and what it did not. */
+  /** The protections that the sandbox enforces and a probe confirmed, and what it did not. */
   readonly #record = new SandboxRecord();
   /** The system library with node:ffi, which reads what it returns; undefined without either. */
   readonly #reach: Reach | undefined;

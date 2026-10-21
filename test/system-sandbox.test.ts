@@ -161,12 +161,12 @@ describe("the sandbox of this system, in a protected process", () => {
       ...(runsPrograms ? { "images-dir": "images" } : {}),
     });
     const script = `
-      import("./dist/cli/protection.js").then(async (protection) => {
-        await protection.hardenProcess();
-        protection.dropUnneeded(false, ${args});
+      import("./dist/cli/protection.js").then(async ({ ProcessProtection }) => {
+        await ProcessProtection.harden();
+        ProcessProtection.dropUnneeded(false, ${args});
         console.log(JSON.stringify({
-          summary: protection.protectionSummary(),
-          report: protection.sandboxReport(),
+          summary: ProcessProtection.summary(),
+          report: ProcessProtection.sandboxReport(),
           ffi: process.permission.has("ffi"),
         }));
       });`;
@@ -215,8 +215,8 @@ describe("the sandbox of this system, in a protected process", () => {
     // ends in a crash where mlockall succeeds (as root, or with CAP_IPC_LOCK). The child reports
     // its locked memory, which states the property on every machine, and has to exit cleanly.
     const script = `
-      import("./dist/cli/protection.js").then(async (protection) => {
-        await protection.hardenProcess();
+      import("./dist/cli/protection.js").then(async ({ ProcessProtection }) => {
+        await ProcessProtection.harden();
         if (process.platform === "linux") {
           const { readFileSync } = await import("node:fs");
           console.log(readFileSync("/proc/self/status", "utf8").match(/^VmLck:.*$/mu)?.[0]);

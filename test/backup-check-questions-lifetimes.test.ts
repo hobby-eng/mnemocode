@@ -8,10 +8,19 @@ import {
   type EncodedOriginal,
 } from "../src/core/backup-check.js";
 import { DatesAnswer } from "../src/core/date-search.js";
+import { parseDate } from "../src/core/dates.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { ShareSplit } from "../src/sskr/split.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  MASKED_INDEXES,
+  MASKED_WORDS,
+  replacedAt,
+  TEST_PHRASE,
+  WRONG_DATE,
+} from "./helpers/test-phrase.js";
+import { publicShare, sskrVectors } from "./helpers/vectors.js";
 
 interface ReadEdges {
   reads: number;
@@ -36,23 +45,16 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) => {
   return { ...input, TerminalKeys: ObservedKeys };
 });
 
-// Independent checksum-valid-seedshift-12 literals from vectors/mnemocode-v1.json.
-const MASKED_PHRASE = "wool abuse actual wool abuse actual wool abuse actual wool abuse congress";
-const MASKED_INDEXES = [2026, 9, 23, 2026, 9, 23, 2026, 9, 23, 2026, 9, 376];
-const WRONG_CODES = "wool abuse wool wool abuse actual wool abuse actual wool abuse congress";
-const DATE = { year: 2026, month: 9, day: 23 };
-const DATE_LINE = "23-09-2026";
-const OTHER_DATE = "24-09-2026";
+const WRONG_CODES = replacedAt(MASKED_WORDS, { 3: "wool" });
 const RESTORES = "The backup restores this seed phrase.";
 // Public bip39-128-2-of-3 shares restore a different phrase from this backup's mask.
-const OTHER_SHARES =
-  "ur:sskr/goemjzaeadaejoinoyvotkwlptsskispvwbkbwjnamstlubnampf;ur:sskr/goemjzaeadadflihpkmhspcheycndschfhcmkelyvaveiesolrls";
+const OTHER_SHARES = [publicShare(), sskrVectors().deterministic[0]!.shares[1]!].join(";");
 const ORIGINAL: EncodedOriginal = {
   mnemonic: TEST_PHRASE,
   format: "english",
   mode: "seedshift",
   codes: MASKED_INDEXES,
-  dates: [DATE],
+  dates: [parseDate(DATE)],
 };
 type BackupKind = "codes" | "shares";
 type WrittenOwner = WrittenCodes | RestoredShares;
@@ -85,23 +87,23 @@ function observeAnswers() {
 function expectLive(owner: WrittenOwner | undefined): void {
   if (owner === undefined) throw new Error("The real public reader must have returned its owner.");
   if (owner instanceof WrittenCodes) expect(owner.indexes).toEqual(MASKED_INDEXES);
-  else expect(owner.holds(MASKED_PHRASE)).toBe(true);
+  else expect(owner.holds(MASKED_WORDS)).toBe(true);
 }
 
 function expectClosed(owner: WrittenOwner | undefined): void {
   if (owner === undefined) throw new Error("The real public reader must have returned its owner.");
   if (owner instanceof WrittenCodes) expect(() => owner.indexes).toThrow("has been wiped");
-  else expect(() => owner.holds(MASKED_PHRASE)).toThrow("has been wiped");
+  else expect(() => owner.holds(MASKED_WORDS)).toThrow("has been wiped");
 }
 
 function correctAnswer(kind: BackupKind): string {
-  return kind === "codes" ? MASKED_PHRASE : maskedShares.join(";");
+  return kind === "codes" ? MASKED_WORDS : maskedShares.join(";");
 }
 
 function offer(kind: BackupKind) {
   return kind === "codes"
     ? offerEncodedCheck(ORIGINAL, () => undefined, "yes")
-    : offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, "yes", [DATE]);
+    : offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, "yes", [parseDate(DATE)]);
 }
 
 questionsOnPrivateScreen();
@@ -112,7 +114,7 @@ beforeEach(() => {
 beforeAll(async () => {
   // A single two-share fixture of the public masked phrase; real split and recovery services.
   const split = new ShareSplit(nodeSharePlatform, (bytes) => bytes.fill(7));
-  maskedShares = await split.split(MASKED_PHRASE, 2, 2);
+  maskedShares = await split.split(MASKED_WORDS, 2, 2);
 });
 
 describe("Backup-check children through the public terminal questions", () => {
@@ -123,8 +125,8 @@ describe("Backup-check children through the public terminal questions", () => {
       terminal.answers = [
         `${kind === "codes" ? WRONG_CODES : OTHER_SHARES}\r`,
         `${correctAnswer(kind)}\r`,
-        `${OTHER_DATE}\r`,
-        `${DATE_LINE}\r`,
+        `${WRONG_DATE}\r`,
+        `${DATE}\r`,
       ];
       terminal.choices = [
         kind === "codes" ? "Type the codes again" : "Type the shares again",
@@ -163,7 +165,7 @@ describe("Backup-check children through the public terminal questions", () => {
     "closes acquired %s and date owners when the mismatch question is cancelled",
     async (kind) => {
       const observed = observeAnswers();
-      terminal.answers = [`${correctAnswer(kind)}\r`, `${OTHER_DATE}\r`];
+      terminal.answers = [`${correctAnswer(kind)}\r`, `${WRONG_DATE}\r`];
       terminal.choices = [CANCELLED];
       edges.beforeRead = (read) => {
         if (read === 2) expectLive(observed.written(kind)[0]);
@@ -185,7 +187,7 @@ describe("Backup-check children through the public terminal questions", () => {
         if (line.includes(RESTORES)) throw failure;
         seen.notices.push(line);
       });
-      terminal.answers = [`${correctAnswer(kind)}\r`, `${DATE_LINE}\r`];
+      terminal.answers = [`${correctAnswer(kind)}\r`, `${DATE}\r`];
       await expect(offer(kind)).rejects.toBe(failure);
       expect(observed.written(kind)).toHaveLength(1);
       expect(observed.dates()).toHaveLength(1);

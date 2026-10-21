@@ -211,7 +211,7 @@ Word and code searches allow up to **16,777,216 combinations**. A BIP39 checksum
 
 A wallet check marks matching candidates. Nonmatches remain visible when there are at most 2,048 candidates; checking hundreds of thousands can take minutes. With no wallet reference, use a [candidate list for discovery](#candidate-lists-for-discovery).
 
-For an invalid Original Seedshift last word, `--legacy-valid-last-word` lists valid replacement words for the **stored** phrase. The `preserved` row keeps the old data bits. Dates are still needed to recover the original phrase.
+For an invalid Original Seedshift last word, `--legacy-valid-last-word` lists valid replacement words for the **stored** phrase. The candidate marked `preserved` keeps the old data bits. Dates are still needed to recover the original phrase.
 
 ## Codes that cannot be read
 

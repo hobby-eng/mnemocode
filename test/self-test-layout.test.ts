@@ -1,17 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { STYLE_CODES, TEXT_WIDTH } from "../src/cli/terminal-style.js";
+import { LONGEST_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 // The report of the self-test command on a person's terminal, from the real checks: only the
 // process protection, which a test process cannot have, is taken as granted.
 
-vi.mock("../src/cli/protection.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../src/cli/protection.js")>()),
-  assertProtected: () => undefined,
-}));
-
-/** The time the whole self-test may take here: its card exports alone take some seconds. */
-const SELF_TEST_TIME_LIMIT_MS = 120_000;
+vi.mock("../src/cli/protection.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/cli/protection.js")>();
+  return {
+    ...actual,
+    ProcessProtection: class extends actual.ProcessProtection {
+      static override assert(): void {
+        // Granted: a test process runs outside the permission model.
+      }
+    },
+  };
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -42,6 +47,6 @@ describe("the self-test's report on a terminal", () => {
       expect(lines[card + 1]).toMatch(new RegExp(`^ {${detailColumn}}\\S`, "u"));
       expect(lines.at(-1)).toMatch(/^✓ Passed: \d+ public vectors;/u);
     },
-    SELF_TEST_TIME_LIMIT_MS,
+    LONGEST_TEST_TIME_LIMIT_MS,
   );
 });

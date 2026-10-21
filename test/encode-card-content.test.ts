@@ -20,9 +20,9 @@ import { codeColors } from "../src/export/card-palette.js";
 import { fakeImageRenderer, numberedCodes, PAGE_IMAGES } from "./helpers/drawn-cards.js";
 import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 import { testFolder } from "./helpers/test-folders.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 
-const DATES = [parseDate("23-09-2026")];
+const DATES = [parseDate(DATE)];
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -88,7 +88,7 @@ describe("the cards of Encode", () => {
   );
 
   it("prints Unicode codes in colors that decorate them, and refuses a form without cards", () => {
-    const dates = [parseDate("23-09-2026")];
+    const dates = [parseDate(DATE)];
     const unicode = EncodedBackup.encode(TEST_PHRASE, dates, "unicode", "seedshift").backup;
     const content = backupCardContent(unicode);
     expect(content.labels).toEqual(EncodedForm.of("unicode").cardCodes(unicode.indexes));

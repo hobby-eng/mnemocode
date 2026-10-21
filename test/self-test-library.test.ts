@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { pbkdf2Sync } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { nodePbkdf2HmacSha512 } from "../src/bitcoin-evidence.js";
 import { COIN_ADDRESS_SELF_TEST } from "../src/core/coins-self-test.js";
-import { MasterFingerprintCheck, type Pbkdf2HmacSha512 } from "../src/core/master-fingerprint.js";
+import { MasterFingerprintCheck } from "../src/core/master-fingerprint.js";
 import { MnemoCodeSelfTest, type SelfTestFeature } from "../src/core/self-test.js";
 import { WALLET_EVIDENCE_SELF_TEST } from "../src/core/wallet-evidence-self-test.js";
 import { heirSheetSelfTest } from "../src/export/heir-sheet-self-test.js";
@@ -12,9 +12,7 @@ import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { mnemocodeVectors } from "./helpers/vectors.js";
 
 // The host services a page would give, here from Node.js, and the published vectors file.
-const pbkdf2: Pbkdf2HmacSha512 = (password, salt, rounds, bytes) =>
-  new Uint8Array(pbkdf2Sync(password, salt, rounds, bytes, "sha512"));
-const fingerprints = new MasterFingerprintCheck(pbkdf2);
+const fingerprints = new MasterFingerprintCheck(nodePbkdf2HmacSha512);
 const publicVectors: unknown = mnemocodeVectors();
 /** The rows of the library's own checks, in order, with a share platform. */
 const LIBRARY_ROWS = [
@@ -53,7 +51,7 @@ describe("The self-test as a library (core/self-test.ts)", () => {
       // An answer that comes later, as a page's WebCrypto gives it.
       fingerprint: async (mnemonic) => fingerprints.fingerprint(mnemonic),
       publicVectors,
-      pbkdf2: async (...parameters) => pbkdf2(...parameters),
+      pbkdf2: async (...parameters) => nodePbkdf2HmacSha512(...parameters),
       sharePlatform: nodeSharePlatform,
       features: FEATURES,
       before: [{ name: "Host first", detail: "", run: () => void order.push("first") }],
@@ -126,7 +124,8 @@ describe("The self-test as a library (core/self-test.ts)", () => {
       fingerprint: (mnemonic) => fingerprints.fingerprint(mnemonic),
       publicVectors,
       // The passphrase left out of the salt: the seed of another wallet.
-      pbkdf2: (password, _salt, rounds, bytes) => pbkdf2(password, "mnemonic", rounds, bytes),
+      pbkdf2: (password, _salt, rounds, bytes) =>
+        nodePbkdf2HmacSha512(password, "mnemonic", rounds, bytes),
     });
     await expect(wrongSeeds.run()).rejects.toThrow(/BIP39 seed vector mismatch/u);
   });

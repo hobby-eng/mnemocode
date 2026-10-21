@@ -28,9 +28,13 @@ FULL_PATH = str(Path(PROGRAM).resolve())
 COMMAND = [NODE, FULL_PATH] if PROGRAM.endswith(".js") else [FULL_PATH]
 WINDOWS = sys.platform == "win32"
 
-# The size of the pseudo-terminal: 40 rows of 120 columns, so that no
-# line of the menu wraps.
-TERMINAL_ROWS, TERMINAL_COLUMNS = 40, 120
+# The size of the pseudo-terminal, rows and columns, unless a check asks
+# for another (terminal_size): 40 rows of 120 columns, so that no line of
+# the menu wraps.
+DEFAULT_TERMINAL_SIZE = (40, 120)
+# The size that sessions start with and that their screens are read at;
+# only terminal_size changes it.
+terminal_rows, terminal_columns = DEFAULT_TERMINAL_SIZE
 # Bytes written to the pseudo-terminal at a time (Session.type).
 TYPING_PIECE = 256
 # Seconds that typing waits for the tool to take more input before the
@@ -74,17 +78,17 @@ LEAVE_ALTERNATE_SCREEN = "\x1b[?1049l"
 @contextmanager
 def terminal_size(rows, columns=None):
     """The size of the pseudo-terminals that sessions start with inside
-    it, `columns` unchanged unless given: for a check whose result must
-    fit on one screen.
+    it, and that their screens are read at, `columns` unchanged unless
+    given: for a check whose result must fit on one screen.
     """
-    global TERMINAL_ROWS, TERMINAL_COLUMNS
-    previous = TERMINAL_ROWS, TERMINAL_COLUMNS
-    TERMINAL_ROWS = rows
-    TERMINAL_COLUMNS = TERMINAL_COLUMNS if columns is None else columns
+    global terminal_rows, terminal_columns
+    previous = terminal_rows, terminal_columns
+    terminal_rows = rows
+    terminal_columns = terminal_columns if columns is None else columns
     try:
         yield
     finally:
-        TERMINAL_ROWS, TERMINAL_COLUMNS = previous
+        terminal_rows, terminal_columns = previous
 
 
 class Session:
@@ -118,7 +122,7 @@ class Session:
                 command,
                 cwd=folder,
                 env=environment,
-                dimensions=(TERMINAL_ROWS, TERMINAL_COLUMNS),
+                dimensions=(terminal_rows, terminal_columns),
             )
             # pywinpty's read waits until the tool writes something, so
             # it is read on a thread of its own: a tool that stops
@@ -143,7 +147,7 @@ class Session:
                     os.dup2(os.open(stdout_file, flags, 0o600), 1)
                 os.execvpe(command[0], command, environment)
             size = struct.pack(
-                "HHHH", TERMINAL_ROWS, TERMINAL_COLUMNS, 0, 0
+                "HHHH", terminal_rows, terminal_columns, 0, 0
             )
             fcntl.ioctl(self.fd, termios.TIOCSWINSZ, size)
             # Writes take what the terminal takes and never wait
@@ -312,8 +316,9 @@ class Screen:
     """The rows that a terminal `columns` wide shows after `text`, for
     what the menu draws: text, which waits at the right edge before it
     wraps, carriage return, line feed, and the sequences for cursor up,
-    cursor down, cursor right, home and screen erasure; colours and
-    bold, which change no cell, are skipped. Rows scroll only when a
+    cursor down, cursor right, home, screen erasure and the erasure of
+    the line that a search's progress rewrites; colours and bold, which
+    change no cell, are skipped. Rows scroll only when a
     finite height is supplied. Any other escape sequence fails the
     check.
     """
@@ -390,6 +395,8 @@ class Screen:
             self._move(0, 0)
         elif final == "J" and parameters == "2":
             self.rows = [[] for _ in range(self.row + 1)]
+        elif final == "K" and parameters == "2":
+            self.rows[self.row] = []
         else:
             raise AssertionError(
                 f"unexpected sequence ESC [ {parameters}{final}"
@@ -429,7 +436,7 @@ def private_frame(session):
     start = session.output.rfind(ENTER_ALTERNATE_SCREEN)
     assert start >= 0, "the private screen was not opened"
     text = session.output[start + len(ENTER_ALTERNATE_SCREEN) :]
-    rows = Screen(TERMINAL_COLUMNS, text, TERMINAL_ROWS).lines()
+    rows = Screen(terminal_columns, text, terminal_rows).lines()
     return " ".join(" ".join(rows).split())
 
 
@@ -448,7 +455,7 @@ def screen_at_exit(session):
     """The screen once the tool has ended and everything it wrote has
     been read.
     """
-    return Screen(TERMINAL_COLUMNS, read_to_end(session)).lines()
+    return Screen(terminal_columns, read_to_end(session)).lines()
 
 
 def main_screen_text(output):

@@ -140,6 +140,8 @@ export interface DatesRules {
 
 /** The dates are split at spaces; a comma or a semicolon between them is taken as one too. */
 const DATE_SEPARATORS = /[\s,;]+/u;
+/** The lists of values of a date pattern, which DatesAnswer keeps in a row: years, months, days. */
+const PATTERN_PARTS = 3;
 
 /** The words of a BIP39 phrase, or undefined for a count that is none. */
 function phraseLength(wordCount: number | undefined): Bip39WordCount | undefined {
@@ -236,6 +238,7 @@ export class DatesAnswer extends Redacted {
     let patternValues: SecretValue<readonly (readonly number[])[]> | undefined;
     let patternKeys: SecretValue<readonly string[]> | undefined;
     try {
+      // PATTERN_PARTS lists for each pattern, in the order that `patterns` reads them back.
       patternValues = SecretValue.numberLists(
         ownPatterns.flatMap(({ years, months, days }) => [years, months, days]),
       );
@@ -330,14 +333,16 @@ export class DatesAnswer extends Redacted {
   /** The dates with ? for forgotten digits, in the order typed; none when every date is whole. */
   get patterns(): DatePattern[] {
     const values = this.#patternValues.value;
-    return this.#patternKeys.value.map((key, index) =>
-      Object.freeze({
+    return this.#patternKeys.value.map((key, index) => {
+      const at = index * PATTERN_PARTS;
+      const [years, months, days] = values.slice(at, at + PATTERN_PARTS);
+      return Object.freeze({
         key,
-        years: defined(values[index * 3]),
-        months: defined(values[index * 3 + 1]),
-        days: defined(values[index * 3 + 2]),
-      }),
-    );
+        years: defined(years),
+        months: defined(months),
+        days: defined(days),
+      });
+    });
   }
 
   /** How many dates the answer holds, complete or not. */
@@ -369,18 +374,13 @@ export class DatesAnswer extends Redacted {
     return this.#combinations;
   }
 
-  /** The places, counted from 1 among the dates typed, of the dates that hold ?. */
-  get incompletePlaces(): number[] {
-    return [...this.#incompletePlaces.value];
-  }
-
   /**
    * The line that a page shows while the dates are typed: which dates hold ? and the combinations
    * they stand for, such as "Dates 2 and 3 have forgotten digits: 3,650 combinations."; undefined
    * when every date is whole.
    */
   get forgottenDigitsNote(): string | undefined {
-    const places = this.incompletePlaces;
+    const places = this.#incompletePlaces.value;
     if (places.length === 0) return undefined;
     const verb = places.length === 1 ? "has" : "have";
     return `${placesNamed("Date", places)} ${verb} forgotten digits: ${counted(this.combinations, "combination")}.`;
@@ -405,7 +405,7 @@ export class DatesAnswer extends Redacted {
 
   /** A separate owner, preserving custom pattern keys and the original typed positions. */
   copy(): DatesAnswer {
-    return new DatesAnswer(this.known, this.patterns, this.incompletePlaces);
+    return new DatesAnswer(this.known, this.patterns, this.#incompletePlaces.value);
   }
 
   /** Overwrites this answer's retained dates, pattern values, keys and typed positions. */
@@ -679,7 +679,12 @@ export class DateSearch extends Redacted {
     );
   }
 
-  /** Runs the search; the host's callbacks and signal come in with `run`. */
+  /**
+   * Runs the search; the host's callbacks and signal come in with `run`. Refuses a progressEvery
+   * that is no whole number of 1 or more (keptCount: core.search-turns.whole-number-more, a
+   * RangeError) and a search wiped before or while it runs (core.secret-value.wiped); what the
+   * wallet check throws passes on, and a malformed answer of it is refused as askWallet refuses it.
+   */
   async run(run: DateSearchRun = {}): Promise<DateSearchResult> {
     this.#indexes.assertLive();
     const progressEvery = progressStep(run.progressEvery);

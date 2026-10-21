@@ -17,6 +17,7 @@ import {
 } from "./types.js";
 import { defined } from "./defined.js";
 import { EncodedForm } from "./encoded-form.js";
+import { MASKED_DATE } from "./self-test-vectors.js";
 
 /** A known answer of the forms of codes: a phrase of `words` words written in every form. */
 export interface Answer {
@@ -195,7 +196,7 @@ export function checkRepresentationStartup(): void {
     "Bad direct checksum",
   );
   expectRefused(
-    () => Masking.of("seedshift").undo(invalid, [parseDate("23-09-2026")]),
+    () => Masking.of("seedshift").undo(invalid, [parseDate(MASKED_DATE)]),
     /checksum/u,
     "Bad Seedshift container",
   );
@@ -230,7 +231,7 @@ function checkLegacyValidAnswers(): void {
   // docs/audits/AUD-026-harnesses/legacy-valid-oracles.py computes these from SHA-256 and
   // integer packing, using only the published BIP39 word list, never MnemoCode's encoders.
   const mode = Masking.of("seedshift-legacy-valid");
-  const dates = [parseDate("23-09-2026")];
+  const dates = [parseDate(MASKED_DATE)];
   for (const { words, sourceLast, storedLast, candidates } of LEGACY_VALID_ANSWERS) {
     const source = "abandon ".repeat(words - 1) + sourceLast;
     const stored = "wool abuse actual ".repeat(words / 3 - 1) + `wool abuse ${storedLast}`;

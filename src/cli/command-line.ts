@@ -11,9 +11,9 @@ import { runRecoverDate } from "./recover-date-command.js";
 import { runRecoverWord } from "./recover-word-command.js";
 import { assertCoreSelfTest, runSelfTest } from "./self-test.js";
 import { runTable } from "./table-command.js";
-import { interruptible } from "./interruption.js";
+import { Interruption } from "./interruption.js";
 import { showProtection, withPrivateScreen } from "./private-screen.js";
-import { assertProtected, dropUnneeded } from "./protection.js";
+import { ProcessProtection } from "./protection.js";
 import { swapWarning } from "./swap-check.js";
 import { warnOfCloudCopies } from "./cloud-folders.js";
 import { terminalWarningWithMore } from "./terminal.js";
@@ -117,12 +117,16 @@ export async function runCommandLine(argv: readonly string[]): Promise<CommandEn
   const arguments_ = parseArguments(rest);
   const facts = COMMAND_FACTS[command];
   // Before anything is read: what this command does not need is given up for good.
-  dropUnneeded(facts.alwaysWrites, arguments_, facts.asksOutputs?.(arguments_) === true);
+  ProcessProtection.dropUnneeded(
+    facts.alwaysWrites,
+    arguments_,
+    facts.asksOutputs?.(arguments_) === true,
+  );
   assertAllowedArguments(arguments_, command, COMMAND_OPTIONS[command]);
   assertPrivateFileSources(arguments_);
   if (facts.coreSelfTest) assertCoreSelfTest();
   const run = async (): Promise<CommandEnd> => (await HANDLERS[command](arguments_)) ?? undefined;
-  return interruptible(() =>
+  return Interruption.run(() =>
     facts.secret ? withSecrets(arguments_, run, command) : withOutputs(arguments_, run),
   );
 }
@@ -150,7 +154,7 @@ async function withSecrets(
   run: () => Promise<CommandEnd>,
   command: CommandName,
 ): Promise<CommandEnd> {
-  assertProtected();
+  ProcessProtection.assert();
   return withPrivateScreen<undefined>(async () => {
     showProtection();
     const swap = swapWarning();

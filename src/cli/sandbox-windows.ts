@@ -140,8 +140,8 @@ export class WindowsSandbox implements SystemSandbox {
   }
 
   /** Sets the mitigation `policy` to `flags` and reads it back. */
-  #policy(kernel32: Kernel32, policy: number, flags: number, boundary: string): void {
-    this.#record.attempt(boundary, () => {
+  #policy(kernel32: Kernel32, policy: number, flags: number, protection: string): void {
+    this.#record.attempt(protection, () => {
       const wanted = Buffer.alloc(POLICY_BYTES);
       wanted.writeUInt32LE(flags, 0);
       if (kernel32.SetProcessMitigationPolicy(policy, wanted, BigInt(POLICY_BYTES)) === 0)
@@ -151,7 +151,7 @@ export class WindowsSandbox implements SystemSandbox {
       if (kernel32.GetProcessMitigationPolicy(current, policy, read, BigInt(POLICY_BYTES)) === 0)
         throw ERRORS.create("not-readable-error", [`${kernel32.GetLastError()}`]);
       if ((read.readUInt32LE(0) & flags) !== flags) throw ERRORS.create("not-force", []);
-      this.#record.hold(boundary);
+      this.#record.hold(protection);
     });
   }
 

@@ -47,7 +47,10 @@ import { ENTER_ALTERNATE_SCREEN, LEAVE_ALTERNATE_SCREEN } from "../src/cli/termi
 /** The answer as typed: the secret questions take a reading of it, here none. */
 const typed = (answer: string) => answer;
 import { CANCELLED, type MoreWithin, type NextByte } from "../src/cli/terminal-keys.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { BUILT_CLI } from "./helpers/built-cli.js";
+import { BACKSPACE, CTRL_C } from "./helpers/keys.js";
+import { DATES_PROMPT, DECODE_DATES_PROMPT } from "./helpers/prompts.js";
+import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 let written: string[];
 
@@ -74,7 +77,7 @@ describe("secret input", () => {
     // The heading of the private screen and the summary left after it.
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     // The answer, then Enter, which clears the private screen.
-    terminal.answers = "test onlz\x7fy\r\r";
+    terminal.answers = `test onlz${BACKSPACE}y\r\r`;
     expect(await withPrivateScreen(() => askSecretUntil("Seed phrase:", typed))).toBe("test only");
     // Backspace redraws the answer after the prompt (13 columns): back to its start, cleared,
     // written again; then y is added.
@@ -88,7 +91,7 @@ describe("secret input", () => {
     expect(terminal.answers).toBe("");
   });
 
-  it("works the same on every system: no system program is asked", async () => {
+  it("reads the same answer on Linux, macOS and Windows", async () => {
     for (const platform of ["linux", "darwin", "win32"] as const) {
       vi.spyOn(process, "platform", "get").mockReturnValue(platform);
       terminal.answers = "test only\r";
@@ -117,7 +120,7 @@ describe("secret input", () => {
   });
 
   it("stops at Ctrl+C", async () => {
-    terminal.answers = "test\x03";
+    terminal.answers = `test${CTRL_C}`;
     expect(await askSecretUntil("Seed phrase:", typed)).toBe(CANCELLED);
   });
 
@@ -129,9 +132,9 @@ describe("secret input", () => {
       const words = join(directory, "public-mnemonic.txt");
       const dates = join(directory, "public-dates.txt");
       await writeFile(words, TEST_PHRASE, "utf8");
-      await writeFile(dates, "23-09-2026", "utf8");
+      await writeFile(dates, DATE, "utf8");
       await promisify(execFile)(process.execPath, [
-        "dist/mnemocode.js",
+        BUILT_CLI,
         "encode",
         "--mnemonic-file",
         words,
@@ -142,14 +145,12 @@ describe("secret input", () => {
         "--output",
         record,
       ]);
-      terminal.answers = "23-09-2026\r";
+      terminal.answers = `${DATE}\r`;
       await runDecode(parseArguments(["--ask-secrets", "--input-file", record]));
       expect(printed).toHaveBeenCalledWith(TEST_PHRASE);
       // The record's 12 words take up to 4 dates, and the question says so; decode searches a
       // date with ? for a forgotten digit.
-      expect(written.join("")).toContain(
-        "Dates (up to 4, DD-MM-YYYY, ? for what is forgotten, separated by spaces):",
-      );
+      expect(written.join("")).toContain(DECODE_DATES_PROMPT);
       expect(written.join("")).not.toContain("Encoded seed phrase");
     } finally {
       await rm(directory, { recursive: true, force: true });
@@ -157,7 +158,7 @@ describe("secret input", () => {
   });
 
   it("names the most dates a seed phrase takes: one for every three words", () => {
-    expect(datesPrompt(12)).toBe("Dates (up to 4, DD-MM-YYYY, separated by spaces):");
+    expect(datesPrompt(12)).toBe(DATES_PROMPT);
     expect(datesPrompt(24)).toBe("Dates (up to 8, DD-MM-YYYY, separated by spaces):");
     // A count that is not a BIP39 length, or none yet, leaves the number out.
     expect(datesPrompt(13)).toBe("Dates (DD-MM-YYYY, separated by spaces):");

@@ -778,6 +778,12 @@ describe("the rules that read TypeScript and the tests (typescript-rules.mjs)", 
       '  if (text === "") throw ERRORS.create("refused", []);\n  return text;\n}\n';
     expect(rulesBroken({ "src/core/a.ts": read("Reads a text.") })).toEqual(["CORE-20"]);
     expect(rulesBroken({ "src/cli/a.ts": read("Reads a text.") })).toEqual([]);
+    // A catalog that a module of the feature's errors holds counts as the file's own.
+    const imported = read("Reads a text.").replace(
+      catalog,
+      'import { ERRORS } from "./a-errors.js";\n',
+    );
+    expect(rulesBroken({ "src/core/a.ts": imported })).toEqual(["CORE-20"]);
     expect(
       rulesBroken({
         "src/core/a.ts": read("Reads a text; an empty one is refused (core.a.refused)."),

@@ -28,7 +28,7 @@ import { planJointRepair } from "../src/sskr/joint-repair.js";
 import { repairCandidates } from "../src/sskr/repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { writeShare, type ShareFormat } from "../src/sskr/transport.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { runBuiltCli } from "./helpers/built-cli.js";
 import { LONG_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 import { sskrVectors } from "./helpers/vectors.js";
@@ -143,13 +143,8 @@ describe("AUD-022-API002: a last word is refused where the backup gives one phra
   it("refuses it for a backup without Seedshift and one of MnemoCode Seedshift", () => {
     const direct = EncodedBackup.read(TEST_PHRASE, "english", "direct");
     expect(() => ReEncoding.of(direct, [], "zoo")).toThrow(LAST_WORD_NOT_TAKEN);
-    const masked = EncodedBackup.encode(
-      TEST_PHRASE,
-      [parseDate("23-09-2026")],
-      "indexes",
-      "seedshift",
-    );
-    expect(() => ReEncoding.of(masked.backup, [parseDate("23-09-2026")], "about")).toThrow(
+    const masked = EncodedBackup.encode(TEST_PHRASE, [parseDate(DATE)], "indexes", "seedshift");
+    expect(() => ReEncoding.of(masked.backup, [parseDate(DATE)], "about")).toThrow(
       LAST_WORD_NOT_TAKEN,
     );
     expect(ReEncoding.of(direct, []).phrase).toBe(TEST_PHRASE);
@@ -302,7 +297,7 @@ describe("AUD-022-FUN004: card refusals come before any secret is asked", () => 
     ).rejects.toThrow("sheets only");
   });
 
-  it("is the library's own check, which a page asks as the command line does", async () => {
+  it("refuses in the library a card detail that cannot be printed for every seed phrase, and passes cards that fit", async () => {
     // business-it, as --template takes it; a detail that fits passes.
     const style = "it" as const;
     await expect(
@@ -342,7 +337,7 @@ describe("AUD-022-FUN001: one share below its threshold with its first elements 
     elements.join(separator).replace(/#{2,}/gu, "#");
 
   it(
-    "asks for more shares, and its repairs hold the share, in every form, length and separator",
+    "asks for more shares, and its repairs hold the share, in word numbers, Unicode codes, colors and Color Unicode, every length and separator",
     async () => {
       for (const set of SHARE_SETS)
         for (const ur of set.shares)

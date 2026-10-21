@@ -31,12 +31,6 @@ vi.mock("node:fs/promises", async (original) => {
     },
   };
 });
-// The check that the external program pdftocairo runs is the other edge that is stubbed. Every
-// rendering, publication, claim and preflight is the real one.
-vi.mock("../src/export/image-export.js", async (original) => ({
-  ...(await original<typeof import("../src/export/image-export.js")>()),
-  assertImageRenderer: vi.fn(async () => undefined),
-}));
 
 import { assertAllowedArguments, parseArguments } from "../src/cli/arguments.js";
 import { cloudServiceOf } from "../src/cli/cloud-folders.js";
@@ -51,7 +45,7 @@ import { preflightOutputs } from "../src/cli/output-saving.js";
 import { runPreview } from "../src/cli/preview-command.js";
 import { PROTECTION_FLAGS } from "../src/cli/protection.js";
 import { swapWarning, unencryptedSwap } from "../src/cli/swap-check.js";
-import { assertImageRenderer, IMAGE_FOLDER_TAKEN } from "../src/export/image-export.js";
+import { IMAGE_FOLDER_TAKEN, ImageRenderer } from "../src/export/image-export.js";
 import { plannedCardJob } from "../src/export/render.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { selectTemplate } from "../src/export/templates.js";
@@ -68,7 +62,6 @@ function scratch(): Promise<string> {
 afterEach(() => {
   files.beforeLink = undefined;
   vi.restoreAllMocks();
-  vi.mocked(assertImageRenderer).mockClear();
 });
 
 /**
@@ -291,24 +284,32 @@ describe("AUD-014-FUN003: a PDF is never saved over a name taken after the prefl
 });
 
 describe("AUD-014 recommendation 35: one owner of the image-folder preflight", () => {
+  /**
+   * The check that the external program pdftocairo runs, the other edge that is stubbed: taken as
+   * found, each call noted. Every rendering, publication, claim and preflight is the real one.
+   */
+  const rendererFound = () => vi.spyOn(ImageRenderer, "assert").mockResolvedValue(undefined);
+
   it("claims a new image folder once, then checks the renderer", async () => {
     const root = await scratch();
     const images = join(root, "pages");
     const claim = vi.spyOn(NewFolder, "claim");
+    const renderer = rendererFound();
     await preflightOutputs({ "images-dir": images });
     expect(claim.mock.calls.filter(([path]) => path === images)).toHaveLength(1);
-    expect(assertImageRenderer).toHaveBeenCalledTimes(1);
+    expect(renderer).toHaveBeenCalledTimes(1);
     // A claim only checks: nothing is made.
     expect(await readdir(root)).toEqual([]);
   });
 
   it("refuses a taken folder before the renderer is asked", async () => {
     const root = await scratch();
+    const renderer = rendererFound();
     await expect(preflightOutputs({ "images-dir": root })).rejects.toThrow(IMAGE_FOLDER_TAKEN);
-    expect(assertImageRenderer).not.toHaveBeenCalled();
+    expect(renderer).not.toHaveBeenCalled();
     // Without image outputs the renderer is not needed.
     await preflightOutputs({ pdf: join(root, "cards.pdf") });
-    expect(assertImageRenderer).not.toHaveBeenCalled();
+    expect(renderer).not.toHaveBeenCalled();
   });
 });
 

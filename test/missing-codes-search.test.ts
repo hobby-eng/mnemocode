@@ -9,7 +9,6 @@ import {
   formatEncoded,
   legacyChecksumValidResult,
   parseDate,
-  representMnemonic,
 } from "../src/core.js";
 import { defined } from "../src/core/defined.js";
 import { DatesAnswer } from "../src/core/date-search.js";
@@ -21,12 +20,19 @@ import {
 } from "../src/core/missing-codes-search.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
 import type { WalletCheck } from "../src/core/wallet-check.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  MASKED,
+  MASKED_INDEXES,
+  MASKED_ONE_DIGIT_FORGOTTEN,
+  MASKED_TWO_DIGITS_FORGOTTEN,
+  MASKED_WORDS,
+  replacedAt,
+  TEST_NUMBERS,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 
 // Public test data only: the phrase "abandon ... about", masked with one public date.
-const DATE = "23-09-2026";
-const ENCODED = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]);
-const ENCODED_PHRASE = ENCODED.shiftedEnglish.join(" ");
 
 /** A stand-in for the host's fingerprint, which answers later as a page's WebCrypto does. */
 const fingerprint: PhraseFingerprint = async (mnemonic) =>
@@ -34,29 +40,10 @@ const fingerprint: PhraseFingerprint = async (mnemonic) =>
 /** The wallet of the test phrase, known by its phrase. */
 const wallet: WalletCheck = async (mnemonic) => ({ matched: mnemonic === TEST_PHRASE, path: "m" });
 
-/** The codes of `result` as word numbers, with those at `places` (from 0) marked with ?. */
-function marked(codes: string, places: readonly number[]): string {
-  const parts = codes.split(" ");
-  for (const place of places) parts[place] = "?";
-  return parts.join(" ");
-}
-
-/**
- * The masked codes with the last digit of the second and the third forgotten: 10 and 24 become
- * 1? and 2?, a hundred combinations of which a few keep the checksum, few enough to list.
- */
-const FEW = "2027 1? 2? 2027 10 24 2027 10 24 2027 10 377";
-/**
- * The masked codes with the last digit of the third forgotten: one candidate keeps the checksum.
- */
-const ONE = "2027 10 2? 2027 10 24 2027 10 24 2027 10 377";
-
-const MASKED_TEXT = formatEncoded(ENCODED, "indexes");
-
 describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
   it("offers the ways that fit the codes, and says what cannot be read", () => {
     const one = new MissingCodesSearch(
-      MissingCodes.read(marked(MASKED_TEXT, [2]), "indexes", "seedshift"),
+      MissingCodes.read(replacedAt(MASKED, { 3: "?" }), "indexes", "seedshift"),
       fingerprint,
     );
     expect(one.unreadable).toBe("Code 3 cannot be read: 2,048 combinations, about 128 candidates.");
@@ -64,26 +51,25 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     expect(one.ways.map(({ way }) => way)).toEqual(["encoded", "wallet"]);
     expect(one.fits("list")).toBe(false);
     // A forgotten digit leaves few candidates, which a list shows.
-    const few = new MissingCodesSearch(MissingCodes.read(FEW, "indexes", "seedshift"), fingerprint);
+    const few = new MissingCodesSearch(
+      MissingCodes.read(MASKED_TWO_DIGITS_FORGOTTEN, "indexes", "seedshift"),
+      fingerprint,
+    );
     expect(few.ways.map(({ way }) => way)).toEqual(["encoded", "wallet", "list"]);
     // Without Seedshift the encoded fingerprint is the wallet's own: it is not offered, but fits.
-    const plain = MissingCodes.read(
-      marked(formatEncoded(representMnemonic(TEST_PHRASE), "indexes"), [2]),
-      "indexes",
-      "direct",
-    );
+    const plain = MissingCodes.read(replacedAt(TEST_NUMBERS, { 3: "?" }), "indexes", "direct");
     const direct = new MissingCodesSearch(plain, fingerprint);
     expect(direct.ways.map(({ way }) => way)).toEqual(["wallet"]);
     expect(direct.fits("encoded")).toBe(true);
     expect(direct.needsDates).toBe(false);
     // The Original Seedshift keeps no checksum: no fingerprint of the codes tells them.
     const legacy = new MissingCodesSearch(
-      MissingCodes.read(marked(MASKED_TEXT, [2]), "indexes", "seedshift-legacy"),
+      MissingCodes.read(replacedAt(MASKED, { 3: "?" }), "indexes", "seedshift-legacy"),
       fingerprint,
     );
     expect(legacy.fits("encoded")).toBe(false);
     // The last digit of three codes forgotten, few enough to search.
-    const digits = MASKED_TEXT.split(" ").map((code, place) =>
+    const digits = MASKED.split(" ").map((code, place) =>
       [1, 5, 8].includes(place) ? `${code.slice(0, -1)}?` : code,
     );
     const three = MissingCodes.read(digits.join(" "), "indexes", "seedshift");
@@ -94,10 +80,10 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
 
   it("finds the codes by the encoded fingerprint, without dates", async () => {
     const search = new MissingCodesSearch(
-      MissingCodes.read(marked(MASKED_TEXT, [2]), "indexes", "seedshift"),
+      MissingCodes.read(replacedAt(MASKED, { 3: "?" }), "indexes", "seedshift"),
       fingerprint,
     );
-    const way = search.byEncodedFingerprint(await fingerprint(ENCODED_PHRASE));
+    const way = search.byEncodedFingerprint(await fingerprint(MASKED_WORDS));
     const plan = await way.plan();
     expect(plan).toMatchObject({ size: "128 candidates", count: 128, ask: false });
     // A limit below the candidates asks first.
@@ -106,20 +92,20 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     const found = await way.run({ onProgress: ({ checked }) => progress.push(checked) });
     expect(found.kind).toBe("found");
     if (found.kind !== "found") return;
-    expect(found.backup.indexes).toEqual(ENCODED.shiftedIndexes);
+    expect(found.backup.indexes).toEqual(MASKED_INDEXES);
     expect(found.dates).toBeUndefined();
     const none = await search.byEncodedFingerprint("00000000").run();
     expect(none).toEqual({ kind: "none", message: MISSING_CODES_TEXTS.noneByFingerprint });
     // A fingerprint as a person types it, in capitals and with spaces, is read as every one is
     // (scan finding S004); one that is no fingerprint is refused when the way is made.
-    const typed = ` ${(await fingerprint(ENCODED_PHRASE)).toUpperCase()} `;
+    const typed = ` ${(await fingerprint(MASKED_WORDS)).toUpperCase()} `;
     expect((await search.byEncodedFingerprint(typed).run()).kind).toBe("found");
     expect(() => search.byEncodedFingerprint("not hex")).toThrow("eight hexadecimal characters");
   });
 
   it("finds the codes and the forgotten digit of the date together by the wallet", async () => {
     const search = new MissingCodesSearch(
-      MissingCodes.read(ONE, "indexes", "seedshift"),
+      MissingCodes.read(MASKED_ONE_DIGIT_FORGOTTEN, "indexes", "seedshift"),
       fingerprint,
     );
     const dates = DatesAnswer.parse("23-09-202?", { wordCount: 12, patterns: true });
@@ -130,7 +116,7 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     const found = await way.run();
     expect(found).toMatchObject({ kind: "found", foundDates: DATE });
     if (found.kind !== "found") return;
-    expect(found.backup.indexes).toEqual(ENCODED.shiftedIndexes);
+    expect(found.backup.indexes).toEqual(MASKED_INDEXES);
     expect(found.dates).toEqual([parseDate(DATE)]);
     // With the dates complete, the codes alone are searched.
     const known = DatesAnswer.parse(DATE, { wordCount: 12, patterns: true });
@@ -150,7 +136,7 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
 describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
   it("counts two sets of dates of one set of codes as two sets, either first (AUD-037-FUN001)", async () => {
     const search = new MissingCodesSearch(
-      MissingCodes.read(ONE, "indexes", "seedshift"),
+      MissingCodes.read(MASKED_ONE_DIGIT_FORGOTTEN, "indexes", "seedshift"),
       fingerprint,
     );
     const dates = (): DatesAnswer =>
@@ -233,7 +219,11 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     const known = ["01-01-2001", "01-01-2002", "01-01-2003"];
     const encoded = encodeMnemonic(TEST_PHRASE, [...known, "09-12-2030"].map(parseDate));
     const search = new MissingCodesSearch(
-      MissingCodes.read(marked(formatEncoded(encoded, "indexes"), [11]), "indexes", "seedshift"),
+      MissingCodes.read(
+        replacedAt(formatEncoded(encoded, "indexes"), { 12: "?" }),
+        "indexes",
+        "seedshift",
+      ),
       fingerprint,
     );
     const dates = DatesAnswer.parse([...known, "0?-12-2030"].join(" "), {
@@ -250,7 +240,7 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
 
   it("lists every candidate with its phrase and fingerprint where they are few", async () => {
     const search = new MissingCodesSearch(
-      MissingCodes.read(FEW, "indexes", "seedshift"),
+      MissingCodes.read(MASKED_TWO_DIGITS_FORGOTTEN, "indexes", "seedshift"),
       fingerprint,
     );
     const listed = await search.listed([parseDate(DATE)]).run();
@@ -259,10 +249,10 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
     // Of the hundred combinations, five keep the checksum of MnemoCode Seedshift.
     expect(listed.rows).toHaveLength(5);
     const right = listed.rows.find((row) => row.phrase === TEST_PHRASE)!;
-    expect(right.codes).toBe(MASKED_TEXT);
+    expect(right.codes).toBe(MASKED);
     expect(right.fingerprint).toBe(await fingerprint(TEST_PHRASE));
     const many = new MissingCodesSearch(
-      MissingCodes.read(marked(MASKED_TEXT, [2]), "indexes", "seedshift"),
+      MissingCodes.read(replacedAt(MASKED, { 3: "?" }), "indexes", "seedshift"),
       fingerprint,
     );
     expect(() => many.listed([])).toThrow("at most 16 candidates");
@@ -271,7 +261,7 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
   it("says when several sets fit, which the wallet tells apart", async () => {
     // Every candidate fits a check that takes them all.
     const search = new MissingCodesSearch(
-      MissingCodes.read(FEW, "indexes", "seedshift"),
+      MissingCodes.read(MASKED_TWO_DIGITS_FORGOTTEN, "indexes", "seedshift"),
       fingerprint,
     );
     const everyone: WalletCheck = () => ({ matched: true });
@@ -285,7 +275,7 @@ describe("MissingCodesSearch (core/missing-codes-search.ts)", () => {
 
   it("stops at the host's signal", async () => {
     const search = new MissingCodesSearch(
-      MissingCodes.read(marked(MASKED_TEXT, [2]), "indexes", "seedshift"),
+      MissingCodes.read(replacedAt(MASKED, { 3: "?" }), "indexes", "seedshift"),
       fingerprint,
     );
     const stop = new AbortController();

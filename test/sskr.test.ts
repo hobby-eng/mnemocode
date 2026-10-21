@@ -10,8 +10,8 @@ import {
   validateShareSet,
 } from "../src/sskr/transport.js";
 import { SSKR_SET_VECTOR, SSKR_VECTOR } from "../src/sskr/known-answers.js";
-import { encodeMnemonic, decodeInput, parseDate } from "../src/core.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { decodeInput, parseDate } from "../src/core.js";
+import { DATE, MASKED_WORDS, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 describe("Standalone SSKR", () => {
   it.each([16, 20, 24, 28, 32])(
@@ -92,9 +92,8 @@ describe("Standalone SSKR", () => {
 
   it("rejects an invalid BIP39 source and restores a date-shifted source in two stages", async () => {
     await expect(splitSskrMnemonic("abandon ".repeat(12), 2, 3)).rejects.toThrow(/checksum/u);
-    const dates = [parseDate("23-09-2026")];
-    const shifted = encodeMnemonic(TEST_PHRASE, dates).shiftedEnglish.join(" ");
-    const shares = await splitSskrMnemonic(shifted, 2, 3);
+    const dates = [parseDate(DATE)];
+    const shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
     const restored = await combineSskrShares(shares.slice(0, 2));
     expect(decodeInput(restored, "english", dates).recoveredMnemonic).toBe(TEST_PHRASE);
   });

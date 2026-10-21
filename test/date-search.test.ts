@@ -38,53 +38,74 @@ function made(result: DateSearchResult | undefined | Cancelled): DateSearchResul
   return result;
 }
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
-import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import {
+  DATE,
+  MASKED,
+  replacedAt,
+  TEST_ADDRESS,
+  TEST_FINGERPRINT,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 
-/** The test phrase masked with MnemoCode Seedshift and 23-09-2026, as word numbers. */
-const MASKED = "2027 10 24 2027 10 24 2027 10 24 2027 10 377";
 /** The test phrase masked with the original Seedshift and 10-07-1963 and 23-09-2026. */
 const LEGACY_MASKED =
   "voice abstract access wool abuse actual voice abstract access wool abuse addict";
 
 describe("dates of one answer", () => {
   it("reads complete dates and, where they can be searched, dates with ?", () => {
-    const answer = DatesAnswer.parse("23-09-2026, 2026-09-24 ?3-09-2026", {
+    const answer = DatesAnswer.parse(`${DATE}, 2026-09-24 ?3-09-2026`, {
       wordCount: 12,
       patterns: true,
     });
-    expect(answer.known).toEqual([parseDate("23-09-2026"), parseDate("24-09-2026")]);
+    expect(answer.known).toEqual([parseDate(DATE), parseDate("24-09-2026")]);
     expect(answer.patterns.map((pattern) => pattern.days)).toEqual([[3, 13, 23]]);
     expect(answer.combinations).toBe(3);
-    expect(DatesAnswer.parse("23-09-2026", { patterns: false }).combinations).toBe(1);
+    expect(DatesAnswer.parse(DATE, { patterns: false }).combinations).toBe(1);
   });
+
+  /** Expects `line` refused with `message`, in one line that repeats no date as typed. */
+  function refusedInOneLine(line: string, patterns: boolean, message: string): void {
+    const thrown = refusalOf(() => DatesAnswer.parse(line, { wordCount: 12, patterns }));
+    expect(thrown.message).toContain(message);
+    expect(thrown.message).not.toContain("\n");
+    for (const date of line.split(/[\s,;]+/u).filter(Boolean))
+      expect(thrown.message).not.toContain(date);
+  }
+
+  it.each([
+    // The example in the message is the public README date, not one typed.
+    ["24-09-2026 24-09-26", true, "Date 2: use DD-MM-YYYY with a four-digit year"],
+    ["31-02-2020", true, "Date 1: the day is outside the selected calendar month."],
+    [`${DATE} 2?-13-2026`, true, "Date 2: the date pattern cannot match a valid month."],
+    [`${DATE} 2?-09-26`, true, "Date 2: use DD-MM-YYYY with ? for each forgotten digit"],
+  ])(
+    "refuses %j (patterns %s) in one line that names the date by its place",
+    (line, patterns, message) => refusedInOneLine(line, patterns, message),
+  );
 
   it.each([
     ["", true, "Type at least one date."],
     [" ,; ", true, "Type at least one date."],
-    ["23-09-2026 23-09-2026 23-09-2026 23-09-2026 23-09-2026", true, "at most 4 dates."],
-    // The example in the message is the public README date, not one typed.
-    ["24-09-2026 24-09-26", true, "Date 2: use DD-MM-YYYY with a four-digit year"],
-    ["31-02-2020", true, "Date 1: the day is outside the selected calendar month."],
-    ["23-09-2026 2?-13-2026", true, "Date 2: the date pattern cannot match a valid month."],
-    ["23-09-2026 2?-09-26", true, "Date 2: use DD-MM-YYYY with ? for each forgotten digit"],
+    [Array<string>(5).fill(DATE).join(" "), true, "at most 4 dates."],
     ["?1-01-2020 ?2-01-2020 ?3-01-2020 ?4-01-2020", true, "at most 3 incomplete dates."],
     ["? ?", true, "exceeds the safety limit"],
     ["2?-09-2026", false, "? and | stand for what is forgotten only where MnemoCode can search"],
-  ])(
-    "refuses %j (patterns %s) in one line that names the date by its place",
-    (line, patterns, message) => {
-      const thrown = refusalOf(() => DatesAnswer.parse(line, { wordCount: 12, patterns }));
-      expect(thrown.message).toContain(message);
-      // The line never repeats a date as typed.
-      for (const date of line.split(/[\s,;]+/u).filter(Boolean))
-        expect(thrown.message).not.toContain(date);
-    },
+  ])("refuses %j (patterns %s) in one line that repeats no date", (line, patterns, message) =>
+    refusedInOneLine(line, patterns, message),
   );
 
   it("counts the combinations up to the limit", () => {
     const wide = DatesAnswer.parse("??-??-2026 ??-??-2027", { patterns: true });
     expect(wide.combinations).toBe(365 * 365);
     expect(wide.combinations).toBeLessThan(HARD_MAX_COMBINATIONS);
+  });
+});
+
+describe("the original Seedshift", () => {
+  it("masks the test phrase with 10-07-1963 and 23-09-2026 into its own output, which the searches below start from", () => {
+    // LEGACY_MASKED, the fixture above, is the original Seedshift's own output for these dates.
+    const legacy = encodeMnemonicLegacy(TEST_PHRASE, [parseDate("10-07-1963"), parseDate(DATE)]);
+    expect(legacy.shiftedEnglish.join(" ")).toBe(LEGACY_MASKED);
   });
 });
 
@@ -112,7 +133,7 @@ describe("the date search", () => {
   recordLinesOfEachTest();
 
   it("returns the matches, the checksum-valid candidates and every match for a list", async () => {
-    const encoded = encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]);
+    const encoded = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]);
     const dates = DatesAnswer.parse("2?-09-2026", { wordCount: 12, patterns: true });
     const search = {
       indexes: encoded.shiftedIndexes,
@@ -139,7 +160,7 @@ describe("the date search", () => {
     expect(matched).toMatchObject({ checksumValid: 10, matchCount: 1, kept: [TEST_PHRASE] });
     expect(matched.shown).toEqual([
       {
-        dates: "23-09-2026",
+        dates: DATE,
         allDates: [{ year: 2026, month: 9, day: 23 }],
         mnemonic: TEST_PHRASE,
         evidence: "m",
@@ -156,7 +177,7 @@ describe("the date search", () => {
   });
 
   it("asks for a search longer than twelve hours, which needs --max-candidates without a screen", async () => {
-    const encoded = encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]);
+    const encoded = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]);
     const search = {
       indexes: encoded.shiftedIndexes,
       dates: DatesAnswer.parse("2?-09-2026", { wordCount: 12, patterns: true }),
@@ -242,7 +263,7 @@ describe("the date search", () => {
   });
 
   it("opens a step screen of its own before it says the size of the search", async () => {
-    const encoded = encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]);
+    const encoded = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]);
     PrivateSteps.open(
       () => lines.push("step screen"),
       () => undefined,
@@ -291,8 +312,8 @@ describe("the date search", () => {
         "err Detected input format: english.",
         "err Recovery search contains 30 date combinations.",
         "err Checked 30/30 date combinations; found 2 matches.",
-        `out 10-07-1963 22-09-2026\t${"abandon ".repeat(5)}ability ${"abandon ".repeat(5)}above`,
-        `out 10-07-1963 23-09-2026\t${TEST_PHRASE}`,
+        `out 10-07-1963 22-09-2026\t${replacedAt(TEST_PHRASE, { 6: "ability", 12: "above" })}`,
+        `out 10-07-1963 ${DATE}\t${TEST_PHRASE}`,
         "err A valid checksum does not prove the date: compare an address.",
         "err More: https://github.com/hobby-eng/mnemocode#exact-local-recovery-checks",
       ],
@@ -317,7 +338,7 @@ describe("the date search", () => {
         "err Checked 4/10 date combinations; found 1 match.",
         "err Checked 8/10 date combinations; found 1 match.",
         "err Checked 10/10 date combinations; found 1 match.",
-        `out 23-09-2026\t${TEST_PHRASE}\tmatched at m`,
+        `out ${DATE}\t${TEST_PHRASE}\tmatched at m`,
         "err Each displayed candidate matched the requested master fingerprint locally.",
         `err ${FINGERPRINT_WARNING}`,
       ],
@@ -331,7 +352,7 @@ describe("the date search", () => {
         LEGACY_MASKED,
         "--dates",
         "??-07-1963",
-        "23-09-2026",
+        DATE,
         "--max-results",
         "1",
       ],
@@ -339,7 +360,7 @@ describe("the date search", () => {
         "err Detected input format: english.",
         "err Recovery search contains 31 date combinations.",
         "err Checked 31/31 date combinations; found 3 matches.",
-        `out 08-07-1963\tabandon abandon able ${"abandon ".repeat(5)}able abandon abandon about`,
+        `out 08-07-1963\t${replacedAt(TEST_PHRASE, { 3: "able", 9: "able" })}`,
         "err Displayed 1 of 3 checksum-valid candidates.",
         "err A valid checksum does not prove the date: compare an address.",
         "err More: https://github.com/hobby-eng/mnemocode#exact-local-recovery-checks",
@@ -374,7 +395,7 @@ describe("the date search", () => {
         "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
       ]),
     );
-    expect(lines).toContain(`out 23-09-2026\t${TEST_PHRASE}\tmatched at m/44'/60'/0'/0/0`);
+    expect(lines).toContain(`out ${DATE}\t${TEST_PHRASE}\tmatched at m/44'/60'/0'/0/0`);
     expect(lines).toContain(
       "err Each displayed candidate matched the requested address of Ethereum and EVM networks locally.",
     );
@@ -436,7 +457,7 @@ describe("the date search", () => {
         ]),
       );
     await search();
-    expect(lines).toContain(`out 23-09-2026\t${TEST_PHRASE}\tmatched at m/84'/0'/0'/0/1`);
+    expect(lines).toContain(`out ${DATE}\t${TEST_PHRASE}\tmatched at m/84'/0'/0'/0/1`);
     lines.length = 0;
     await search("--scan-gap", "1");
     expect(lines.filter((line) => line.startsWith("out "))).toEqual([
@@ -500,12 +521,7 @@ describe("the date search", () => {
     );
     // The first 20 addresses never pass the last index: a high --index compares those left.
     lines.length = 0;
-    await search(
-      "--bitcoin-address",
-      "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
-      "--index",
-      "2147483640",
-    );
+    await search("--bitcoin-address", TEST_ADDRESS, "--index", "2147483640");
     expect(lines.filter((line) => line.startsWith("out "))).toEqual([
       "out None of the 10 checksum-valid candidates matched the requested address.",
     ]);
@@ -542,15 +558,6 @@ describe("the date search", () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
-  });
-
-  it("checks the masked words that the original Seedshift needs as before", () => {
-    // The fixture above is the original Seedshift's own output for these dates.
-    const legacy = encodeMnemonicLegacy(TEST_PHRASE, [
-      parseDate("10-07-1963"),
-      parseDate("23-09-2026"),
-    ]);
-    expect(legacy.shiftedEnglish.join(" ")).toBe(LEGACY_MASKED);
   });
 
   it("refuses options that cannot be used before it reads anything", async () => {

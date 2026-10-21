@@ -3,6 +3,7 @@ import { BackupReading } from "../src/core/backup-reading.js";
 import { askEncodedBackup } from "../src/cli/backup-questions.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 import { questionsOnPrivateScreen, terminal } from "./helpers/question-terminal.js";
+import { LAST_WORD_FORGOTTEN } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -19,7 +20,7 @@ describe("Backup reading lifetime across an asynchronous question", () => {
       const made = vi.spyOn(BackupReading, "of");
       let accept: ((value: string | Cancelled) => void) | undefined;
       let refuse: ((error: Error) => void) | undefined;
-      terminal.answers = ["abandon ".repeat(11) + "?\r"];
+      terminal.answers = [`${LAST_WORD_FORGOTTEN}\r`];
       terminal.choices = [
         new Promise<string | Cancelled>((resolve, reject) => {
           accept = resolve;

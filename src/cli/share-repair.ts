@@ -90,6 +90,8 @@ const SHARE_SEPARATOR_HINT = `separate shares with ${SHARE_SEPARATOR}`;
 export const SHARE_ANSWER_HINT = `${SHARE_SEPARATOR_HINT}, ? for each unreadable code or digit`;
 /** The question for every share at once; a line break in a paste separates shares too (ask.ts). */
 const SHARES_PROMPT = `Shamir shares or text file path (${SHARE_ANSWER_HINT}):`;
+/** What a refusal of a file of shares names it by. */
+const SHARE_FILE = "The share file";
 /** The question for shares added to those typed. */
 const MORE_SHARES_PROMPT = `More shares or text file path (${SHARE_SEPARATOR_HINT}):`;
 
@@ -163,7 +165,7 @@ export class TypedShares implements Disposable {
         const text =
           path === "-"
             ? textInput({ "input-file": "-" }, "input")
-            : readBoundedTextFile(path, "The share file");
+            : readBoundedTextFile(path, SHARE_FILE);
         input.add(input.sharesOfText(text, "The file holds"));
       }
       for (const path of values(args, "share-qr")) input.add([await decodeQrPngFile(path)]);
@@ -221,7 +223,7 @@ export class TypedShares implements Disposable {
       (answer) => this.input.sharesOfAnswer(answer),
       {
         what: "the shares or their text file path",
-        textFile: "The share file",
+        textFile: SHARE_FILE,
         pastedLineBreak: SHARE_SEPARATOR,
         hints: SHARE_WORD_HINTS,
       },
@@ -249,7 +251,7 @@ export class TypedShares implements Disposable {
     this.#fromQr = false;
     return askSecretUntil(MORE_SHARES_PROMPT, (answer) => this.input.sharesOfAnswer(answer, true), {
       what: "the shares to add",
-      textFile: "The share file",
+      textFile: SHARE_FILE,
       hints: SHARE_WORD_HINTS,
       pastedLineBreak: SHARE_SEPARATOR,
     });
@@ -328,7 +330,7 @@ export class TypedShares implements Disposable {
         },
         {
           what: `share ${place} or its text file path`,
-          textFile: "The share file",
+          textFile: SHARE_FILE,
           hints: SHARE_WORD_HINTS,
         },
       );

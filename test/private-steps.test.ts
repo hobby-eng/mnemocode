@@ -134,3 +134,53 @@ describe("the step screens of the private screen", () => {
     expect(drawn).toEqual(["swap warning"]);
   });
 });
+
+describe("the warnings on the step screens of the private screen (CORE-39)", () => {
+  it("carry every warning of the last step to the next step screen, not only the latest", () => {
+    const drawn = opened();
+    PrivateSteps.begin();
+    PrivateSteps.remember("Matched 0 of 8 candidates.");
+    PrivateSteps.remember("A master fingerprint is only 32 bits.");
+    PrivateSteps.begin();
+    expect(drawn.slice(1)).toEqual([
+      "title",
+      "! Matched 0 of 8 candidates.",
+      "! A master fingerprint is only 32 bits.",
+    ]);
+    // The warnings of a later step replace them, as a refusal asked again replaces the one before.
+    PrivateSteps.remember("A date is not valid.");
+    PrivateSteps.begin();
+    expect(drawn.slice(4)).toEqual(["title", "! A date is not valid."]);
+  });
+
+  it("take a warning given on a new page, before any question, as its step's", () => {
+    const drawn = opened();
+    // A result's page opened before its saves, as sskr-split opens it with --mnemonic-file.
+    PrivateSteps.newPage();
+    PrivateSteps.remember("The record could not be saved as public.txt: the disk is full.");
+    PrivateSteps.begin();
+    expect(drawn).toEqual([
+      "title",
+      "! The record could not be saved as public.txt: the disk is full.",
+    ]);
+    // Saved by another try: no later step screen says it failed.
+    PrivateSteps.endWarnings();
+    PrivateSteps.begin();
+    expect(drawn.slice(2)).toEqual(["title"]);
+  });
+
+  it("keep a warning given before the first step screen on every step screen", () => {
+    const drawn = opened();
+    PrivateSteps.remember("Dropbox keeps a copy of public.txt.");
+    PrivateSteps.begin();
+    PrivateSteps.endWarnings();
+    PrivateSteps.newPage();
+    PrivateSteps.begin();
+    expect(drawn).toEqual([
+      "title",
+      "! Dropbox keeps a copy of public.txt.",
+      "title",
+      "! Dropbox keeps a copy of public.txt.",
+    ]);
+  });
+});

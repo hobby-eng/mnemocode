@@ -8,25 +8,19 @@ import { AnswerRecord, askLine, choose } from "../src/cli/terminal-choice.js";
 import { TEXT_WIDTH } from "../src/cli/terminal-style.js";
 import { displayWidth } from "../src/cli/terminal-geometry.js";
 import { terminal } from "./helpers/keyed-terminal.js";
+import { BACKSPACE, CTRL_A, CTRL_D, CTRL_U, ENTER, ESCAPE, HOME, LEFT } from "./helpers/keys.js";
 import {
   answer,
   answerLine,
-  BACKSPACE,
   BEFORE,
-  CTRL_A,
-  CTRL_D,
-  CTRL_U,
-  ENTER,
-  ESCAPE,
   expectScreen,
-  HOME,
   keyedQuestions,
-  LEFT,
   LONG_ANSWER,
   screenOf,
   watchScreen,
   type Reported,
 } from "./helpers/terminal-screen.js";
+import { TEST_FINGERPRINT } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/keyed-terminal.js"));
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
@@ -152,19 +146,19 @@ describe("a typed answer leaves only its line in the record of answers", () => {
     const keys: (string | Buffer)[] = [
       ENTER,
       Buffer.from([0x61, 0xff, 0x0d]),
-      `73c5da0${ENTER}`,
-      `73c5da0a${ENTER}`,
+      `${TEST_FINGERPRINT.slice(0, -1)}${ENTER}`,
+      `${TEST_FINGERPRINT}${ENTER}`,
     ];
     terminal.keysFor = () => keys.shift()!;
     const given = await askLine("Fingerprint", "Fingerprint", {
       what: "the eight characters of the fingerprint",
       check: (typed) => {
-        if (typed !== "73c5da0a")
+        if (typed !== TEST_FINGERPRINT)
           throw new Error("A master fingerprint must be eight hexadecimal characters.");
         return typed;
       },
     });
-    expect(given).toBe("73c5da0a");
+    expect(given).toBe(TEST_FINGERPRINT);
     const warnings = [
       "Type the eight characters of the fingerprint, or press Esc to go back.",
       "The answer is not valid UTF-8 text.",
@@ -175,7 +169,7 @@ describe("a typed answer leaves only its line in the record of answers", () => {
       [""],
       ...warnings.map((warning) => ["", `! ${warning}`]),
     ]);
-    expectScreen(screen, screenOf(80, BEFORE + answerLine("Fingerprint", "73c5da0a")));
+    expectScreen(screen, screenOf(80, BEFORE + answerLine("Fingerprint", TEST_FINGERPRINT)));
     // Escape still goes back from a question asked again.
     const left = await answer([`x${ENTER}`, `${LONG_ANSWER}${ESCAPE}`], 20, {
       check: (typed) => {

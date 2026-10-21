@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { decodeQrPngFile } from "../src/cli/qr-input.js";
 import { containing, matching } from "./helpers/matchers.js";
 import { runBuiltCli as run } from "./helpers/built-cli.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /** The limit of the one test that starts the command line fifteen times. */
 const FIFTEEN_STARTS_TIME_LIMIT_MS = 300_000;
@@ -163,7 +163,7 @@ describe("CLI records", () => {
           "--mnemonic",
           TEST_PHRASE,
           "--dates",
-          "23-09-2026",
+          DATE,
           "--format",
           "3",
           "--template",
@@ -201,7 +201,7 @@ describe("CLI records", () => {
         "--mnemonic",
         TEST_PHRASE,
         "--dates",
-        "23-09-2026",
+        DATE,
         "--format",
         "5",
         "--qr",
@@ -212,7 +212,7 @@ describe("CLI records", () => {
       expect(qr).toBe(raw);
       expect(qr).not.toContain("MNC1");
       expect(qr).not.toContain("seedshift");
-      const decoded = await run(["decode", "--qr-file", path, "--dates", "23-09-2026"]);
+      const decoded = await run(["decode", "--qr-file", path, "--dates", DATE]);
       expect(decoded.stdout.trim()).toBe(TEST_PHRASE);
       expect(decoded.stderr).toContain("Detected input format: colors.");
     } finally {
@@ -358,7 +358,7 @@ describe("CLI records", () => {
         stderr: containing("The record holds unicode codes, not colors."),
       });
       await expect(
-        run(["decode", "--input-file", path, "--mode", "seedshift", "--dates", "23-09-2026"]),
+        run(["decode", "--input-file", path, "--mode", "seedshift", "--dates", DATE]),
       ).rejects.toMatchObject({
         stderr: containing("The record was made with no Seedshift, not with MnemoCode Seedshift."),
       });
@@ -422,7 +422,7 @@ describe("CLI records", () => {
         "--mnemonic",
         TEST_PHRASE,
         "--dates",
-        "23-09-2026",
+        DATE,
         "--format",
         "1",
       ]);
@@ -435,14 +435,14 @@ describe("CLI records", () => {
         "--mnemonic",
         TEST_PHRASE,
         "--dates",
-        "23-09-2026",
+        DATE,
         "--format",
         "1",
         "--output",
         path,
       ]);
       expect(await readFile(path, "utf8")).toMatch(/^MNC1:seedshift-legacy-valid:english:/u);
-      const recovered = await run(["decode", "--input-file", path, "--dates", "23-09-2026"]);
+      const recovered = await run(["decode", "--input-file", path, "--dates", DATE]);
       expect(recovered.stdout).toContain(TEST_PHRASE);
       expect(recovered.stderr).toContain("128 checksum-valid candidates");
     } finally {

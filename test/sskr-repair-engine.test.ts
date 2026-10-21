@@ -7,7 +7,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
-import { encodeMnemonic, parseDate } from "../src/core.js";
 import { hexUnits } from "../src/core/code-text.js";
 import { DatesAnswer, DateSearch, type DateSearchProgress } from "../src/core/date-search.js";
 import { placeOf } from "../src/core/places.js";
@@ -42,8 +41,8 @@ import {
   writeShare,
   type ShareFormat,
 } from "../src/sskr/transport.js";
-import { markUnits, shareUnits } from "./helpers/shares.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { markDigits, markUnits, shareUnits } from "./helpers/shares.js";
+import { MASKED_INDEXES, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { sskrVectors } from "./helpers/vectors.js";
 
 const vectors = sskrVectors();
@@ -226,11 +225,19 @@ describe("S041: a reading and its space are classes", () => {
     const reading = MarkedReading.of(text).find((each) => each.format === "indexes")!;
     expect(reading.holes).toEqual([2, 7]);
     expect(Object.isFrozen(reading.holes)).toBe(true);
-    const chosen = reading.withValues(new Map([[2, 5]]));
-    expect(chosen).not.toBe(reading);
-    expect(chosen.readBits?.[2]).toEqual({ value: 5, mask: 2047 });
-    expect(reading.readBits).toBeUndefined();
     expect(reading.unitMask(1)).toBe(2047n << 11n);
+    // A Unicode code read in part: a reading for each word whose code fits the digits read.
+    const partly = MarkedReading.of(markDigits(SHARE, "unicode", { 2: [3] })).find(
+      (each) => each.format === "unicode",
+    )!;
+    const values = partly.candidates![2]!;
+    const chosen = partly.choicesAt([2]);
+    expect(chosen).toHaveLength(values.length);
+    expect(chosen).not.toContain(partly);
+    expect(chosen.map((each) => each.readBits?.[2])).toEqual(
+      values.map((value) => ({ value, mask: 2047 })),
+    );
+    expect(partly.readBits?.[2]).toBeUndefined();
   });
 
   it("hands out a payload only as a new array, and wipes its own", () => {
@@ -301,7 +308,7 @@ describe("S048: one progress and one way to turn for every search", () => {
 
   it("tells a date search's progress at its turns when no step is given", async () => {
     const search = new DateSearch({
-      indexes: encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2026")]).shiftedIndexes,
+      indexes: MASKED_INDEXES,
       dates: DatesAnswer.parse("2?-09-2026", { wordCount: 12, patterns: true }),
       mode: "seedshift",
     });
@@ -428,14 +435,16 @@ describe("S120: one wording for each refusal, and shares named by their places",
   });
 
   it("words a conflict of shares named by place from the same table as the refusal", () => {
-    const trouble = ShareInput.looseSetTrouble([
-      { place: 1, ur: SHARE },
-      { place: 2, ur: vectors.deterministic[1]!.shares[1]! },
-    ]);
-    expect(trouble).toEqual({
-      kind: "refused",
-      code: "shares-of-different-sets",
-      message: `Shares 1 and 2 ${SET_CONFLICT_TEXTS.set.between}, and nothing tells which is right.`,
+    // Shares written again, which need no quorum, as an export reads them.
+    const input = new ShareInput({ decodeEntry: "The Decode tab" });
+    input.add([SHARE, vectors.deterministic[1]!.shares[1]!]);
+    expect(input.rewritten()).toEqual({
+      kind: "trouble",
+      trouble: {
+        kind: "refused",
+        code: "shares-of-different-sets",
+        message: `Shares 1 and 2 ${SET_CONFLICT_TEXTS.set.between}, and nothing tells which is right.`,
+      },
     });
   });
 

@@ -17,7 +17,7 @@ import { TEXT_FILE_INPUT_CHECK } from "../src/cli/self-test.js";
 import { SHARE_FORMATS, writeShare } from "../src/sskr/transport.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
 import { PHRASE, SHARES } from "./helpers/share-questions.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, replacedAt, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -141,22 +141,21 @@ it.each(SHARE_FORMATS)(
 );
 
 it.each(ENCODED_FORMATS)("keeps the metadata of an exported %s record", async (format) => {
-  const date = "23-09-2026";
-  const encoded = encodeMnemonic(TEST_PHRASE, [parseDate(date)]);
+  const encoded = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]);
   const record = serializeRecord("seedshift", format, formatEncoded(encoded, format));
-  terminal.answers = [`${await file(`${record}\n`)}\r`, `${date}\r`];
+  terminal.answers = [`${await file(`${record}\n`)}\r`, `${DATE}\r`];
   expect(await runDecode({ "ask-secrets": true })).toBeUndefined();
   expect(seen.out).toContain(TEST_PHRASE);
   expect(terminal.questions).toEqual([]);
 });
 
 it("reads forgotten-word patterns from a seed phrase text file", async () => {
-  terminal.answers = [`${await file(TEST_PHRASE.replace(/about$/u, "abo*"))}\r`];
+  terminal.answers = [`${await file(replacedAt(TEST_PHRASE, { 12: "abo*" }))}\r`];
   expect(await runRecoverWord({ "ask-secrets": true })).toBeUndefined();
   expect(seen.out.join("\n")).toContain(TEST_PHRASE);
 });
 
-it("runs the file-input part of the full self-test without generating documents", async () => {
+it("passes the file-input part of the full self-test", async () => {
   await TEXT_FILE_INPUT_CHECK.run();
 });
 

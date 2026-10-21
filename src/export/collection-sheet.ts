@@ -434,7 +434,8 @@ export function collectionPayload(content: CollectionContent): string | undefine
  * The separate card that a renderer is asked for: `index`, or undefined, a sheet, where the content
  * asks for a share's whole-share QR code, which only a sheet prints. Every family of cards decides
  * with it whether it draws a separate card or a sheet. An index that is not one of the `count`
- * cards is refused first, also where the sheet is drawn, so that every family answers it alike.
+ * cards is refused first (assertCardIndex: export.card-codes.there-no-card-cards-1), also where
+ * the sheet is drawn, so that every family answers it alike.
  */
 export function separateCardIndex(
   content: CollectionContent,

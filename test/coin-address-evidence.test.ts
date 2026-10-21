@@ -3,16 +3,14 @@
 // follow, with a PBKDF2 that answers at once and one that answers later, and what it refuses
 // before the host's PBKDF2 is called. Public test phrase and published vectors only: BIP84's
 // receiving addresses 0 and 1 and change address 0, and DIP17's first Dash Platform address.
-import { pbkdf2Sync } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { nodePbkdf2HmacSha512 } from "../src/bitcoin-evidence.js";
 import { CoinAddressCheck, type CoinAddressEvidence } from "../src/core/coin-address-evidence.js";
 import { BITCOIN } from "../src/core/coins/bitcoin-like.js";
 import { DASH } from "../src/core/coins/dash.js";
 import type { Pbkdf2HmacSha512 } from "../src/core/master-fingerprint.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { TEST_ADDRESS, TEST_PHRASE } from "./helpers/test-phrase.js";
 
-/** BIP84's first receiving address, m/84'/0'/0'/0/0. */
-const RECEIVING_0 = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
 /** BIP84's second receiving address, m/84'/0'/0'/0/1. */
 const RECEIVING_1 = "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g";
 /** BIP84's first change address, m/84'/0'/0'/1/0. */
@@ -21,15 +19,13 @@ const CHANGE_0 = "bc1q8c6fshw2dlwun7ekn9qwf37cu2rn755upcp6el";
 const PLATFORM_0 = "dash1krma5z3ttj75la4m93xcndna9ullamq9y5e9n5rs";
 const FIRST = { account: 0, branch: 0, index: 0 } as const;
 
-const nodePbkdf2 = ((password, salt, rounds, bytes) =>
-  Uint8Array.from(pbkdf2Sync(password, salt, rounds, bytes, "sha512"))) satisfies Pbkdf2HmacSha512;
-/** The same PBKDF2, answering later, as WebCrypto does in a page. */
-const laterPbkdf2: Pbkdf2HmacSha512 = async (...parameters) => nodePbkdf2(...parameters);
+/** Node's PBKDF2, answering later, as WebCrypto does in a page. */
+const laterPbkdf2: Pbkdf2HmacSha512 = async (...parameters) => nodePbkdf2HmacSha512(...parameters);
 
 /** The comparisons of `evidence` with a PBKDF2 that answers at once and with one that answers later. */
 async function bothMatches(evidence: CoinAddressEvidence): Promise<unknown[]> {
   return [
-    new CoinAddressCheck(nodePbkdf2).match(TEST_PHRASE, evidence),
+    new CoinAddressCheck(nodePbkdf2HmacSha512).match(TEST_PHRASE, evidence),
     await new CoinAddressCheck(laterPbkdf2).matchAsync(TEST_PHRASE, evidence),
   ];
 }
@@ -37,7 +33,7 @@ async function bothMatches(evidence: CoinAddressEvidence): Promise<unknown[]> {
 describe("an address of one coin", () => {
   it("is found at its place, with a PBKDF2 that answers at once or later", async () => {
     for (const [coin, value, path] of [
-      [BITCOIN, RECEIVING_0, "m/84'/0'/0'/0/0"],
+      [BITCOIN, TEST_ADDRESS, "m/84'/0'/0'/0/0"],
       [BITCOIN, CHANGE_0, "m/84'/0'/0'/1/0"],
       [DASH, PLATFORM_0, "m/9'/5'/17'/0'/0'/0"],
     ] as const) {
@@ -67,7 +63,7 @@ describe("an address of one coin", () => {
     expect(() =>
       new CoinAddressCheck(laterPbkdf2).match(TEST_PHRASE, {
         coin: BITCOIN,
-        value: RECEIVING_0,
+        value: TEST_ADDRESS,
         location: FIRST,
       }),
     ).toThrow(
@@ -81,25 +77,25 @@ describe("an address of one coin", () => {
     const calls: unknown[] = [];
     const recording = new CoinAddressCheck((...parameters) => {
       calls.push(parameters);
-      return nodePbkdf2(...parameters);
+      return nodePbkdf2HmacSha512(...parameters);
     });
     const refused: readonly (readonly [CoinAddressEvidence, string])[] = [
       [
-        { coin: BITCOIN, value: `${RECEIVING_0.slice(0, -1)}v`, location: FIRST },
+        { coin: BITCOIN, value: `${TEST_ADDRESS.slice(0, -1)}v`, location: FIRST },
         "core.coins.coin.address-damaged",
       ],
       [
-        { coin: BITCOIN, value: RECEIVING_0, location: { ...FIRST, account: 2 ** 31 } },
+        { coin: BITCOIN, value: TEST_ADDRESS, location: { ...FIRST, account: 2 ** 31 } },
         "core.coins.coin.assert-address-location-refused",
       ],
       [
-        { coin: BITCOIN, value: RECEIVING_0, location: FIRST, addresses: 0 },
+        { coin: BITCOIN, value: TEST_ADDRESS, location: FIRST, addresses: 0 },
         "core.address-scan.address-count-refused",
       ],
       [
         {
           coin: BITCOIN,
-          value: RECEIVING_0,
+          value: TEST_ADDRESS,
           location: { ...FIRST, index: 2 ** 31 - 1 },
           addresses: 2,
         },

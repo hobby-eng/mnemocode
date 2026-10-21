@@ -299,7 +299,7 @@ function writtenCbor(units: ShareUnits, prefix: readonly number[], cbor: Uint8Ar
   }
 }
 
-/** The share of `bytes` written as a UR; refuses bytes that are no share. */
+/** The share of `bytes` written as a UR; refuses bytes that are no share, as shareInfo does. */
 export function transportToUr(bytes: Uint8Array): string {
   shareInfo(bytes);
   // A UR's type supplies the CBOR tag. Standard Bytewords contains the tag explicitly.
@@ -382,7 +382,12 @@ function parseColorValues(value: string): number[] {
   return codes.map((code) => defined(SHARE_UNITS.colors.valueOf(code)));
 }
 
-/** The share of `value` written in colors, as a UR; refuses colors that are no share. */
+/**
+ * The share of `value` written in colors, as a UR; refuses colors that are no share: text that is
+ * no #RRGGBB codes or too long
+ * (sskr.transport.invalid-sskr-rgb-codes-preserve-their-printed-order), colors that hold no share
+ * (mixed-share-refused), and bytes of no share, as shareInfo refuses them.
+ */
 export function colorsToShare(value: string): string {
   return mixedToShare(COLOR_FORM, parseColorValues(value));
 }
@@ -664,8 +669,14 @@ export interface ReadShare {
 
 /**
  * A share in any form MnemoCode writes, as its UR, and the form it was written in. Refuses text
- * that is no share, with the refusal of the first form it looks like (readOrder), or
- * not-sskr-share.
+ * that is no share with the refusal of the first form it looks like (readOrder): a UR as
+ * urToTransport refuses it, Bytewords as bytewordsToUr, colors as colorsToShare and Color Unicode
+ * as unicodeToColorCodes and colorsToShare; word numbers that run together
+ * (sskr.transport.word-numbers-run-together), that are no word numbers or too many
+ * (word-numbers-share-whole-numbers-from), Unicode codes as unicodeIndexesOf refuses them or too
+ * long (unicode-codes-share-too-long), and word numbers or Unicode codes that hold no share
+ * (mixed-share-refused, or as shareInfo refuses their bytes). Blank text, which looks like no
+ * form, is refused with not-sskr-share.
  */
 export function readShare(value: string): ReadShare {
   const text = value.trim();
@@ -682,7 +693,7 @@ export function readShare(value: string): ReadShare {
   throw firstError instanceof Error ? firstError : ERRORS.create("not-sskr-share", []);
 }
 
-/** The share of `value`, in any form, as a UR; refuses a text that is no share. */
+/** The share of `value`, in any form, as a UR; refuses what readShare refuses. */
 export function normalizeShare(value: string): string {
   return readShare(value).ur;
 }
@@ -760,7 +771,7 @@ export class Share extends Redacted {
   /** The forms that a share is written in (SHARE_FORMATS). */
   static readonly FORMATS: readonly ShareFormat[] = SHARE_FORMATS;
 
-  /** Reads a share in any of its forms; throws why it cannot be read, without repeating it. */
+  /** Reads a share in any of its forms; throws what readShare refuses, without repeating it. */
   static read(text: string): Share {
     const { ur, format } = readShare(text);
     return new Share(ur, format);
@@ -824,10 +835,6 @@ export class Share extends Redacted {
     return writeShare(this.#ur.value, format);
   }
 
-  /** Whether `other` is the same share, however either of them was written. */
-  sameAs(other: Share): boolean {
-    return other.#ur.value === this.#ur.value;
-  }
   /** Overwrites this share's retained UR bytes; returned text copies cannot be recalled. */
   wipe(): void {
     this.#ur.wipe();

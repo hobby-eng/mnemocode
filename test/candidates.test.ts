@@ -38,6 +38,15 @@ import {
 import { crc32 } from "../src/sskr/checksum.js";
 import { Decrypter } from "age-encryption";
 import vectors from "../vectors/candidates-v1.json" with { type: "json" };
+import { WIPED_CODE } from "./helpers/owner-lifetime.js";
+import {
+  LAST_WORD_FORGOTTEN,
+  LIST_PASSPHRASE,
+  ONE_WORD_MISSING,
+  OTHER_PHRASE,
+  replacedAt,
+  TEST_PHRASE,
+} from "./helpers/test-phrase.js";
 import { hexBytes } from "./helpers/vectors.js";
 
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString("hex");
@@ -54,9 +63,6 @@ function firstCandidate(search: WordCandidateSearch): WordCandidate {
   if (next.done === true) throw new Error("Expected a candidate.");
   return next.value;
 }
-const ELEVEN = "abandon ".repeat(11);
-/** A public passphrase for the tests of list encryption. */
-const LIST_PASSPHRASE = "public candidate test passphrase";
 
 describe("Candidate searches", () => {
   it.each(vectors.searches.map((search) => [search.name, search] as const))(
@@ -94,18 +100,22 @@ describe("Candidate searches", () => {
   });
 
   it("reads places as words, ?, prefixes and choices, and refuses the rest", () => {
-    const search = parseUnknownWords(`ABANDON ab* ${"abandon ".repeat(9)}zoo|zone`);
+    const search = parseUnknownWords(
+      replacedAt(TEST_PHRASE, { 1: "ABANDON", 2: "ab*", 12: "zoo|zone" }),
+    );
     expect(search.kind === "unknown-words" && search.places[1]!.length).toBe(10);
     expect(() => parseUnknownWords("abandon ".repeat(12))).toThrow(/Mark each/u);
-    expect(() => parseUnknownWords("abandon ".repeat(11))).toThrow(/12, 15/u);
-    expect(() => parseUnknownWords(`xyz* ${"abandon ".repeat(10)}?`)).toThrow(/place 1/u);
-    expect(() => parseUnknownWords(`abandon|abandonx ${"abandon ".repeat(10)}?`)).toThrow(
+    expect(() => parseUnknownWords(ONE_WORD_MISSING)).toThrow(/12, 15/u);
+    expect(() => parseUnknownWords(replacedAt(TEST_PHRASE, { 1: "xyz*", 12: "?" }))).toThrow(
       /place 1/u,
     );
+    expect(() =>
+      parseUnknownWords(replacedAt(TEST_PHRASE, { 1: "abandon|abandonx", 12: "?" })),
+    ).toThrow(/place 1/u);
     expect(() => parseMissingWord("abandon ".repeat(12))).toThrow(/11, 14/u);
-    expect(() => parseMissingWord(`? ${"abandon ".repeat(10)}`)).toThrow(/place 1/u);
+    expect(() => parseMissingWord(replacedAt(ONE_WORD_MISSING, { 1: "?" }))).toThrow(/place 1/u);
     // Three forgotten words are more than one search may check.
-    const three = parseUnknownWords(`? ? ${"abandon ".repeat(9)}?`);
+    const three = parseUnknownWords(replacedAt(TEST_PHRASE, { 1: "?", 2: "?", 12: "?" }));
     expect(searchCombinations(three)).toBeGreaterThan(MAX_SEARCH_COMBINATIONS);
     expect(() => searchCandidates(three).next()).toThrow(/combinations/u);
   });
@@ -145,35 +155,39 @@ describe("WordCandidateSearch", () => {
   );
 
   it("tells the places it searched, and each candidate's entropy and checksum bits", () => {
-    const last = WordCandidateSearch.parse(`${ELEVEN}?`, "unknown-words");
+    const last = WordCandidateSearch.parse(LAST_WORD_FORGOTTEN, "unknown-words");
     expect(last.unknownPlaces).toEqual([11]);
     const first = firstCandidate(last);
-    expect(first.phrase).toBe(`${ELEVEN}about`);
+    expect(first.phrase).toBe(TEST_PHRASE);
     expect(first.checksumBits).toBe("0011");
     expect(last.placesOf(first)).toEqual([11]);
     expect(hex(first.entropy())).toBe("00".repeat(16));
-    const two = WordCandidateSearch.parse(`ab* ${"abandon ".repeat(10)}abo*`, "unknown-words");
+    const two = WordCandidateSearch.parse(
+      replacedAt(TEST_PHRASE, { 1: "ab*", 12: "abo*" }),
+      "unknown-words",
+    );
     expect(two.unknownPlaces).toEqual([0, 11]);
     // A missing word is at the first place of a run of equal words.
-    const missing = WordCandidateSearch.parse(`${"abandon ".repeat(10)}about`, "missing-word");
+    const missing = WordCandidateSearch.parse(ONE_WORD_MISSING, "missing-word");
     expect(missing.wordCount).toBe(12);
     expect(missing.unknownPlaces).toEqual([]);
     const inserted = firstCandidate(missing);
-    expect(inserted.phrase).toBe(`${ELEVEN}about`);
+    expect(inserted.phrase).toBe(TEST_PHRASE);
     expect(missing.placesOf(inserted)).toEqual([0]);
   });
 
   it("refuses what the parsers refuse, and checks a search made by a host", () => {
-    expect(() => WordCandidateSearch.parse(`${ELEVEN}about`, "unknown-words")).toThrow(
-      /Mark each/u,
-    );
+    expect(() => WordCandidateSearch.parse(TEST_PHRASE, "unknown-words")).toThrow(/Mark each/u);
     expect(() =>
-      WordCandidateSearch.parse(`? ? ${"abandon ".repeat(9)}?`, "unknown-words"),
+      WordCandidateSearch.parse(
+        replacedAt(TEST_PHRASE, { 1: "?", 2: "?", 12: "?" }),
+        "unknown-words",
+      ),
     ).toThrow(`This search has more than 16,777,216 combinations: ${NARROW_WORD_SEARCH}.`);
     // A kind that no type allows, fed on purpose as a JavaScript host could.
-    expect(() => WordCandidateSearch.parse(ELEVEN, "unknown" as WordSearch["kind"])).toThrow(
-      /Unknown kind/u,
-    );
+    expect(() =>
+      WordCandidateSearch.parse(ONE_WORD_MISSING, "unknown" as WordSearch["kind"]),
+    ).toThrow(/Unknown kind/u);
     // Eleven known words and the first 16 words of the list at the last place.
     const places: number[][] = Array.from({ length: 12 }, () => [0]);
     places[11] = Array.from({ length: 16 }, (_, index) => index);
@@ -185,18 +199,13 @@ describe("WordCandidateSearch", () => {
     const search = WordCandidateSearch.of({ kind: "unknown-words", places });
     places[11]!.push(16, 17, 18, 19);
     expect(search.combinations).toBe(16);
-    expect([...search.candidates()].map((candidate) => candidate.phrase)).toEqual([
-      `${ELEVEN}about`,
-    ]);
+    expect([...search.candidates()].map((candidate) => candidate.phrase)).toEqual([TEST_PHRASE]);
   });
 });
 
 describe("WordCandidateSearch", () => {
   it("never shows its words through toString, toJSON or inspect", () => {
-    const search = WordCandidateSearch.parse(
-      `legal winner thank year ? sausage worth useful legal winner thank yellow`,
-      "unknown-words",
-    );
+    const search = WordCandidateSearch.parse(replacedAt(OTHER_PHRASE, { 5: "?" }), "unknown-words");
     const candidate = firstCandidate(search);
     for (const [value, marker] of [
       [search, "[WordCandidateSearch: redacted]"],
@@ -210,7 +219,7 @@ describe("WordCandidateSearch", () => {
 
   it("makes a candidate only of BIP39 indexes, numbered from 1", () => {
     const words = Array.from({ length: 12 }, () => 0);
-    expect(new WordCandidate(1, words).phrase).toBe(`${ELEVEN}abandon`);
+    expect(new WordCandidate(1, words).phrase).toBe(replacedAt(TEST_PHRASE, { 12: "abandon" }));
     expect(() => new WordCandidate(0, words)).toThrow(
       expect.objectContaining({
         name: "RangeError",
@@ -252,7 +261,7 @@ describe("Candidate lists", () => {
     (_, list) => expect(() => decodeCandidateList(hexBytes(list.bytes))).toThrow(list.refusal),
   );
 
-  it("tell a search with more candidates than a list holds by its own type", () => {
+  it("have an error of their own for more candidates than a list holds, which says how to narrow the search", () => {
     const refusal = new TooManyForListError(NARROW_WORD_SEARCH);
     expect(refusal).toBeInstanceOf(Error);
     expect(refusal.message).toBe(
@@ -374,7 +383,7 @@ describe("Candidate file encryption", () => {
     // Its public recipient stays; its key opens nothing more.
     expect(session.recipient).toBe(vectors.age.recipient);
     await expect(decryptCandidates(file, { identity: session })).rejects.toThrow(
-      expect.objectContaining({ code: "core.secret-value.wiped" }),
+      expect.objectContaining({ code: WIPED_CODE }),
     );
   });
 

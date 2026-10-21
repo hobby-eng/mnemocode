@@ -207,15 +207,17 @@ describe("a sheet of cards", () => {
 
 describe("a sheet of cards", () => {
   it("lays out a sheet with the room that its split names take", () => {
-    const fixed = collectionSheetLayout({ pageSize: "a4", orientation: "portrait" }, 20, 1.2, 2);
-    const split = collectionSheetLayout(
-      { pageSize: "a4", orientation: "portrait" },
-      20,
-      1.2,
-      (width) => (width < 50 ? 3 : 2),
+    const page = { pageSize: "a4", orientation: "portrait" } as const;
+    const lines = (width: number) => (width < 50 ? 3 : 2);
+    // Twenty cards take columns narrower than 50 mm, whose names take three lines and leave less
+    // room for each card, so the layout weighs them so.
+    const split = collectionSheetLayout(page, 20, 1.2, lines);
+    const fixed = collectionSheetLayout(page, 20, 1.2, 2);
+    expect(split.cards[0]!.height).toBeLessThan(fixed.cards[0]!.height);
+    // Twelve cards take wider columns, whose names keep two lines.
+    expect(collectionSheetLayout(page, 12, 1.2, lines)).toEqual(
+      collectionSheetLayout(page, 12, 1.2, 2),
     );
-    // Columns narrower than 50 mm leave less room for each card, so the layout weighs them so.
-    expect(split.cards[0]!.height).toBeLessThanOrEqual(fixed.cards[0]!.height);
   });
 
   it("lays the joints of a material's backdrop between the cards on every page size", async () => {

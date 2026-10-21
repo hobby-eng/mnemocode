@@ -13,8 +13,10 @@ import { parseArguments } from "../src/cli/arguments.js";
 import { businessOptions } from "../src/cli/business-options.js";
 import { validateCardOptions } from "../src/cli/card-options.js";
 import { resolveCardPresentation } from "../src/export/card-copy.js";
+import { CardRenderer } from "../src/export/card-renderer.js";
 import { cardExportCheck } from "../src/export/cards-self-test.js";
-import { nodeCardRenderer } from "../src/export/platform-node.js";
+import { RENDER_ASSETS } from "../src/export/platform.js";
+import { nodeCardRenderer, nodeRenderPlatform } from "../src/export/platform-node.js";
 import { LONGEST_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 
 const colors = indexesToColors(
@@ -169,7 +171,16 @@ describe("business card collections", () => {
 });
 
 describe("the card renderers' self-test", () => {
-  it("draws a sheet of every artwork family (cardExportCheck)", async () => {
-    await expect(cardExportCheck(nodeCardRenderer).run()).resolves.toBeUndefined();
+  it("draws with every bundled artwork and passes (cardExportCheck)", async () => {
+    const read = new Set<string>();
+    const drawing = new CardRenderer({
+      ...nodeRenderPlatform,
+      readAsset: (path) => {
+        read.add(path);
+        return nodeRenderPlatform.readAsset(path);
+      },
+    });
+    await expect(cardExportCheck(drawing).run()).resolves.toBeUndefined();
+    expect([...read].sort()).toEqual([...RENDER_ASSETS]);
   });
 });

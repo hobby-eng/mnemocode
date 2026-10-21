@@ -28,7 +28,7 @@ describe("Coin configuration ownership", () => {
     const address = coin.parse(ADDRESS);
     expect(address.type).toBe("p2pkh");
     expect(address.testnet).toBe(false);
-    expect(address.pathsAt({ account: 0, branch: 0, index: 0 })).toEqual(["m/44'/0'/0'/0/0"]);
+    expect(address.branchPathsAt({ account: 0, branch: 0, index: 0 })).toEqual(["m/44'/0'/0'/0"]);
   });
 
   it("reads each version field once while admitting its policy", () => {
@@ -66,12 +66,13 @@ describe("Coin configuration ownership", () => {
     expect(Reflect.set(coin, "id", "dash")).toBe(false);
     expect(Reflect.set(coin, "name", "Another coin")).toBe(false);
     expect(Reflect.set(coin, "addressForms", "X…")).toBe(false);
-    expect(Reflect.set(coin, "coinTypes", [5])).toBe(false);
+    // The coin types live in a private field: a property of that name does not reach the paths.
+    Reflect.set(coin, "coinTypes", [5]);
     expect(coins.byId("bitcoin")).toBe(coin);
     expect(coin.name).toBe("Bitcoin");
     expect(coin.addressFormsOn(false)).toBe("1…");
-    expect(coin.parse(ADDRESS).pathsAt({ account: 0, branch: 0, index: 0 })).toEqual([
-      "m/44'/0'/0'/0/0",
+    expect(coin.parse(ADDRESS).branchPathsAt({ account: 0, branch: 0, index: 0 })).toEqual([
+      "m/44'/0'/0'/0",
     ]);
   });
 });

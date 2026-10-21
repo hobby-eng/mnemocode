@@ -155,7 +155,9 @@ export class BackupReading extends Redacted implements Disposable {
    * phrase with the same marks: with few marks the share's checksum settles it, with many they
    * are "either". A file or paste is split by ShareInput before testing each part, so later shares
    * are not mistaken for the decoy codes after the first one. Unreadable parts stay for the share
-   * reader to name; any definite share sends the whole text to it.
+   * reader to name; any definite share sends the whole text to it. Refuses a record header that
+   * parseRecord refuses (record.malformed-header and the others it names) and more parts than a
+   * set has shares (ShareInput.partsOfText: sskr.transport.assert-share-count-refused).
    */
   static shareKind(text: string): ShareKind | undefined {
     if (parseRecord(text) !== undefined) return undefined;
@@ -301,7 +303,11 @@ export class BackupReading extends Redacted implements Disposable {
     );
   }
 
-  /** The marked codes in `format`, taken as not masked until the host gives their mode. */
+  /**
+   * The marked codes in `format`, taken as not masked until the host gives their mode. Refuses
+   * what MissingCodes.read refuses, such as more combinations than a search takes
+   * (core.candidates.search-more-than-combinations).
+   */
   missingCodes(format: EncodedFormat): MissingCodes {
     return MissingCodes.read(this.#payloadIn(format), format, "direct");
   }

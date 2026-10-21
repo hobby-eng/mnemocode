@@ -8,6 +8,7 @@ import { planJointRepair, searchOnce } from "../src/sskr/joint-repair.js";
 import { ReadingSpace } from "../src/sskr/repair.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { writeShare } from "../src/sskr/transport.js";
+import { allWiped } from "./helpers/made-arrays.js";
 import { sskrVectors } from "./helpers/vectors.js";
 
 /** The solver, watched only: every reading of the assessment is solved through it (beforeEach). */
@@ -29,11 +30,9 @@ function solvedSpaces(): ReadingSpace[] {
   );
 }
 
-/** Whether every array of every reading solved so far is all zero. */
-function allWiped(): boolean {
-  return solvedSpaces()
-    .flatMap((space) => space.secretArrays())
-    .every((array) => array.every((byte) => byte === 0));
+/** Every array of every reading solved so far. */
+function solvedArrays(): Uint8Array[] {
+  return solvedSpaces().flatMap((space) => space.secretArrays());
 }
 
 describe("AUD-012-SEC004: an assessment keeps only what its search needs", () => {
@@ -50,7 +49,7 @@ describe("AUD-012-SEC004: an assessment keeps only what its search needs", () =>
       { platform: nodeSharePlatform },
     );
     expect(plan.assessment.verdict).toBe("determined");
-    expect(allWiped()).toBe(false);
+    expect(allWiped(solvedArrays())).toBe(false);
     const mnemonic = entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
     for (let time = 0; time < 2; time += 1)
       expect((await plan.search()).sets.map((set) => set.mnemonic)).toEqual([mnemonic]);
@@ -63,7 +62,7 @@ describe("AUD-012-SEC004: an assessment keeps only what its search needs", () =>
     );
     const mnemonic = entropyToMnemonic(Buffer.from(vector.entropy, "hex"), wordlist);
     expect((await searchOnce(plan)).sets.map((set) => set.mnemonic)).toEqual([mnemonic]);
-    expect(allWiped()).toBe(true);
+    expect(allWiped(solvedArrays())).toBe(true);
   });
 
   it("wipes every reading of shares that it refuses", async () => {
@@ -72,7 +71,7 @@ describe("AUD-012-SEC004: an assessment keeps only what its search needs", () =>
     const plan = await planJointRepair([typed, typed], { platform: nodeSharePlatform });
     expect(["search", "determined"]).not.toContain(plan.assessment.verdict);
     expect(solvedSpaces().length).toBeGreaterThan(0);
-    expect(allWiped()).toBe(true);
+    expect(allWiped(solvedArrays())).toBe(true);
   });
 
   it("wipes what it read when it is stopped between two shares", async () => {
@@ -88,6 +87,6 @@ describe("AUD-012-SEC004: an assessment keeps only what its search needs", () =>
     );
     expect(plan.assessment.verdict).toBe("stopped");
     expect(solvedSpaces().length).toBeGreaterThan(0);
-    expect(allWiped()).toBe(true);
+    expect(allWiped(solvedArrays())).toBe(true);
   });
 });

@@ -235,7 +235,11 @@ export class MasterFingerprintCheck {
     this.#seed = new Bip39Seed(pbkdf2);
   }
 
-  /** The standard four-byte BIP32 master fingerprint as lowercase hexadecimal. */
+  /**
+   * The standard four-byte BIP32 master fingerprint as lowercase hexadecimal. The phrase and the
+   * host's answer are refused as Bip39Seed.now refuses them
+   * (core.master-fingerprint.invalid-mnemonic and the others it names).
+   */
   fingerprint(mnemonic: string, passphrase = ""): string {
     // The fingerprint hashes the public key alone: BIP32's default version bytes serve every coin.
     return this.#seed.withRoot(mnemonic, passphrase, fingerprintOfKey);
@@ -243,7 +247,9 @@ export class MasterFingerprintCheck {
 
   /**
    * The four-byte BIP32 fingerprint as eight lowercase hexadecimal digits, awaiting PBKDF2.
-   * Propagates the supplied PBKDF2's failures and retires the owned seed and master key.
+   * Propagates the supplied PBKDF2's failures and retires the owned seed and master key. The
+   * phrase and the host's answer are refused as Bip39Seed.later refuses them
+   * (core.master-fingerprint.invalid-mnemonic and the others it names).
    */
   async fingerprintAsync(mnemonic: string, passphrase = ""): Promise<string> {
     return this.#seed.withRootLater(mnemonic, passphrase, fingerprintOfKey);
@@ -252,7 +258,8 @@ export class MasterFingerprintCheck {
   /**
    * Whether `mnemonic` has the fingerprint `expected`, which is checked first as
    * parseMasterFingerprint checks it. A fingerprint is only a filter, so a match carries
-   * FINGERPRINT_WARNING.
+   * FINGERPRINT_WARNING. The phrase is refused as Bip39Seed.now refuses it
+   * (core.master-fingerprint.invalid-mnemonic and the others it names).
    */
   match(mnemonic: string, expected: string, passphrase = ""): WalletMatch {
     const wanted = parseMasterFingerprint(expected);
@@ -260,8 +267,11 @@ export class MasterFingerprintCheck {
   }
 
   /**
-   * Asynchronous match(): refuses an invalid expected fingerprint before awaiting PBKDF2 and
-   * propagates its failures. A match remains a filter carrying FINGERPRINT_WARNING, not proof.
+   * Asynchronous match(): refuses an invalid expected fingerprint before awaiting PBKDF2
+   * (parseMasterFingerprint: core.wallet-check.master-fingerprint-eight-hexadecimal-characters)
+   * and propagates its failures; the phrase is refused as Bip39Seed.later refuses it
+   * (core.master-fingerprint.invalid-mnemonic and the others it names). A match remains a filter
+   * carrying FINGERPRINT_WARNING, not proof.
    */
   async matchAsync(mnemonic: string, expected: string, passphrase = ""): Promise<WalletMatch> {
     const wanted = parseMasterFingerprint(expected);

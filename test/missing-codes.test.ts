@@ -1,5 +1,5 @@
-import { pbkdf2Sync } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { nodePbkdf2HmacSha512 } from "../src/bitcoin-evidence.js";
 import { encodeMnemonic, formatEncoded, parseDate } from "../src/core.js";
 import { BackupReading } from "../src/core/backup-reading.js";
 import { DatesAnswer } from "../src/core/date-search.js";
@@ -8,15 +8,11 @@ import { MissingCodes } from "../src/core/missing-codes.js";
 import { englishWordlist } from "../src/core/words.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
-import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { DATE, LAST_WORD_FORGOTTEN, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 // Public test data only: the phrase "abandon ... about", masked with one public date.
-const DATE = parseDate("23-09-2026");
-const ENCODED = encodeMnemonic(TEST_PHRASE, [DATE]);
-const fingerprints = new MasterFingerprintCheck(
-  (password, salt, rounds, bytes) =>
-    new Uint8Array(pbkdf2Sync(password, salt, rounds, bytes, "sha512")),
-);
+const ENCODED = encodeMnemonic(TEST_PHRASE, [parseDate(DATE)]);
+const fingerprints = new MasterFingerprintCheck(nodePbkdf2HmacSha512);
 const encodedFingerprint = fingerprints.fingerprint(ENCODED.shiftedEnglish.join(" "));
 const phraseOf = (indexes: readonly number[]) =>
   indexes.map((index) => englishWordlist[index]).join(" ");
@@ -36,7 +32,7 @@ function marked(format: Parameters<typeof formatEncoded>[1], places: readonly nu
 
 describe("codes marked with ? (core/missing-codes.ts)", () => {
   it("reports cancellation from the final progress callback while keeping earlier results", async () => {
-    const codes = MissingCodes.read("abandon ".repeat(11) + "?", "english", "direct");
+    const codes = MissingCodes.read(LAST_WORD_FORGOTTEN, "english", "direct");
     for (const stopAt of [undefined, 1, 128]) {
       const stop = new AbortController();
       let ticks = 0;
@@ -62,7 +58,7 @@ describe("codes marked with ? (core/missing-codes.ts)", () => {
     }
   });
 
-  it("finds a missing code in every form by the encoded fingerprint", async () => {
+  it("finds a missing code in every form, as the one candidate that passes the check given", async () => {
     for (const format of ["english", "indexes", "unicode", "colors", "colors-unicode"] as const) {
       const text = marked(format, [2]);
       expect(MissingCodes.marked(text)).toBe(true);
@@ -127,6 +123,16 @@ describe("codes marked with ? (core/missing-codes.ts)", () => {
     expect(() =>
       MissingCodes.read(marked("indexes", [2]).replace("10", "9999"), "indexes", "direct"),
     ).toThrow("no number from 1 through 2048");
+  });
+
+  it("refuses a format that is no form of codes, an inherited name included", () => {
+    const text = marked("indexes", [2]);
+    for (const format of ["json", "toString", "constructor"])
+      // A wrong type on purpose: a JavaScript host may pass any text as the format.
+      expect(() => MissingCodes.read(text, format as never, "direct")).toThrow(
+        expect.objectContaining({ code: "core.missing-codes.codes-cannot-marked-form" }),
+      );
+    expect(MissingCodes.formats(text)).toEqual(["indexes"]);
   });
 });
 

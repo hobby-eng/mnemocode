@@ -232,7 +232,7 @@ export class RepairReport {
   }
 
   /** The time of the search in words, with `dates` as in seconds. */
-  duration(dates?: DateWork): string {
+  #duration(dates?: DateWork): string {
     return duration(this.seconds(dates));
   }
 
@@ -265,7 +265,7 @@ export class RepairReport {
   }
 
   /** What the search tries, as its question and notice name it, with `dates` as in seconds. */
-  searchSize(dates?: DateWork): string {
+  #searchSize(dates?: DateWork): string {
     return dates === undefined
       ? `${count(this.combinations)} combinations`
       : `${counted(this.combinations, "share combination")}, then ${counted(dates.combinations, "date combination")} for each phrase found`;
@@ -273,7 +273,7 @@ export class RepairReport {
 
   /** The question before a search that needsQuestion, with `dates` as in seconds. */
   searchQuestion(dates?: DateWork): string {
-    return `Search ${this.searchSize(dates)}, ${this.duration(dates)}?`;
+    return `Search ${this.#searchSize(dates)}, ${this.#duration(dates)}?`;
   }
 
   /**
@@ -281,12 +281,12 @@ export class RepairReport {
    * allows it instead: "The search takes 65,536 checks, about 2 seconds."
    */
   searchExtent(dates?: DateWork): string {
-    return `The search takes ${count(this.combinations)} checks, ${this.duration(dates)}.`;
+    return `The search takes ${count(this.combinations)} checks, ${this.#duration(dates)}.`;
   }
 
   /** The notice before a search that goes ahead without a question, with `dates` as in seconds. */
   searchNotice(dates?: DateWork): string {
-    return `The search tries ${this.searchSize(dates)}: ${this.duration(dates)}.`;
+    return `The search tries ${this.#searchSize(dates)}: ${this.#duration(dates)}.`;
   }
 
   /** What the shares settle together, what is open and what would help; none for a refusal. */
@@ -306,7 +306,7 @@ export class RepairReport {
       {
         kind: "status",
         label: "Open combinations:",
-        value: `${count(assessment.combinations)} (2^${Math.ceil(Math.log2(assessment.combinations))}), ${this.duration()}`,
+        value: `${count(assessment.combinations)} (2^${Math.ceil(Math.log2(assessment.combinations))}), ${this.#duration()}`,
         good: false,
       },
     ];
