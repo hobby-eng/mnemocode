@@ -30,6 +30,7 @@ import {
   TEST_PHRASE,
   WRONG_DATE,
 } from "./helpers/test-phrase.js";
+import { BACKUP_CHECK_QUESTION, DATES_AGAIN_ANSWER } from "./helpers/prompts.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -70,7 +71,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         `${WRONG_DATE}\r`,
         `${DATE}\r`,
       ];
-      terminal.choices = ["Yes", "Type the codes again", "Type the dates again"];
+      terminal.choices = ["Yes", "Type the codes again", DATES_AGAIN_ANSWER];
       await offerEncodedCheck(ORIGINAL, () => undefined, undefined);
       expect(seen.notices).toEqual([
         "",
@@ -87,7 +88,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         "Show the result again",
         "Stop checking",
       ]);
-      expect(terminal.labels[2]![0]).toBe("Type the dates again");
+      expect(terminal.labels[2]![0]).toBe(DATES_AGAIN_ANSWER);
       // The codes that fitted were not asked again with the dates.
       expect(promptsShown("Your backup, as written down:")).toHaveLength(4);
     });
@@ -161,9 +162,9 @@ describe("encode, decode and the backup check on the private screen", () => {
       );
       expect(show).toHaveBeenCalledTimes(1);
       expect(terminal.questions).toEqual([
-        "Check the backup now?",
+        BACKUP_CHECK_QUESTION,
         "What now?",
-        "Check the backup now?",
+        BACKUP_CHECK_QUESTION,
       ]);
       expect(seen.notices).toContain("The backup restores this seed phrase.");
     });
@@ -178,7 +179,7 @@ describe("encode, decode and the backup check on the private screen", () => {
         `${WRONG_DATE}\r`,
         `${DATE}\r`,
       ];
-      terminal.choices = ["Yes", "Type the dates again"];
+      terminal.choices = ["Yes", DATES_AGAIN_ANSWER];
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined, [
         parseDate(DATE),
       ]);
@@ -236,7 +237,7 @@ describe("encode, decode and the backup check on the private screen", () => {
     it("tells shares of another phrase from wrong dates without the dates of the result", async () => {
       const shares = await splitSskrMnemonic(MASKED_WORDS, 2, 3);
       terminal.answers = [`${shares[0]};${shares[1]}\r`, `${WRONG_DATE}\r`, `${DATE}\r`];
-      terminal.choices = ["Yes", "Type the dates again"];
+      terminal.choices = ["Yes", DATES_AGAIN_ANSWER];
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined);
       expect(seen.notices.filter((line) => line !== "")).toEqual([
         ...keptAbove(

@@ -5,11 +5,7 @@ import { recoverLegacyValidLastWords } from "../src/core.js";
 import { WordCandidateSearch } from "../src/core/candidates.js";
 import { matchBitcoinEvidence } from "../src/bitcoin-evidence.js";
 import { firstReceivingOf } from "./helpers/coin-addresses.js";
-import {
-  LAST_WORD_FORGOTTEN,
-  LEGACY_EXAMPLE_MASKED,
-  TEST_PHRASE,
-} from "./helpers/test-phrase.js";
+import { LAST_WORD_FORGOTTEN, LEGACY_EXAMPLE_MASKED, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 /**
  * The candidates for `text`, a phrase with ? for one forgotten word, as the word search finds them:

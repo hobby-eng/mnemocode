@@ -23,7 +23,7 @@ interface ShareLayout {
 
 /**
  * An independent byte snapshot of already-read shares, including the values a repair filled in.
- * It does not read or repair transports. Its caller supplies shares checked by those boundaries,
+ * It does not read or repair transports. Its caller supplies shares checked by those readers,
  * disposes the owner when done, and owns any earlier immutable views it requested.
  */
 export class ShareValues extends Redacted implements Disposable {

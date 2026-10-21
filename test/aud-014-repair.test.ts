@@ -68,7 +68,7 @@ describe("AUD-014-FUN002: Color Unicode marks of one code and of a whole color t
     expect(await jointPhrases(units.join(""))).toEqual([mnemonic]);
   });
 
-  it("refuses marks whose widths fit too many ways, before solving any of them", async () => {
+  it("refuses marks whose widths fit too many ways", async () => {
     // Synthetic codes, not a share: E000 is a color's first code and its second alike, so each
     // pair of marks between them may be two codes, a color and a code, or two colors, which fit
     // 577 ways in all.

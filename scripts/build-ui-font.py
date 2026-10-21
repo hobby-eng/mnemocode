@@ -37,6 +37,7 @@ class FontSourceError(RuntimeError):
 
 
 def main() -> None:
+    """Verify the pinned font and licence, then write the UI subset."""
     for path, digest in SOURCE_DIGESTS.items():
         if sha256(path.read_bytes()).hexdigest() != digest:
             raise FontSourceError(

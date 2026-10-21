@@ -22,18 +22,42 @@ import { script } from "./menu-script.js";
 import { FINGERPRINT_PROMPT } from "./prompts.js";
 import { TEST_ADDRESS, TEST_FINGERPRINT } from "./test-phrase.js";
 
+/** The public recipient of a disposable Scanner key, used by menu tests. */
+export const PUBLIC_SCANNER_KEY = "age12d86zp9uj65df2snvl656uewdl82zrdfya8a2zgxu5rauaw7fsaqrr6w3x";
+/** The list question that chooses a card design. */
+export const CARD_DESIGN_QUESTION = "Which card design?";
+/** The list question that chooses the coin of a wallet reference. */
+export const COIN_QUESTION = "Which coin is the address for?";
+/** The list question that chooses sheet orientation. */
+export const SHEET_ORIENTATION_QUESTION = "How should the sheets be turned?";
+/** The list question that enables typed card details. */
+export const CARD_DETAILS_QUESTION = "Type your own details for the cards?";
+/** The typed question of the share threshold. */
+export const SHARE_THRESHOLD_QUESTION = "How many of them restore the seed phrase?";
+/** The typed question of the number of shares. */
+export const SHARE_COUNT_QUESTION = "How many shares in all? (2 to 16)";
+/** The typed question of a Bitcoin address used to recognise the wallet. */
+export const BITCOIN_ADDRESS_QUESTION = "Bitcoin address (one of the first receiving ones)";
+/** The typed prompt for the card's name. */
+export const CARD_NAME_PROMPT = "Name, in Latin letters";
+/** The typed prompt for a record destination. */
+export const RECORD_FILE_PROMPT = "Record file name";
+/** The question that enables the complete-backup QR on sheets. */
+export const BACKUP_QR_QUESTION =
+  "Add a QR code with the codes of the backup, without the extra cards?";
+
 /** Questions whose answers all lead to command lines of the same shape; only the first is taken. */
-const SAME_SHAPE = new Set(["Which card design?"]);
+const SAME_SHAPE = new Set([CARD_DESIGN_QUESTION]);
 
 /**
  * Questions whose other answers only add options of their own, the same under every path: they
  * are taken where the question is first asked, and elsewhere only its first answer.
  */
 const TAKEN_ONCE = new Set([
-  "Type your own details for the cards?",
-  "Which coin is the address for?",
+  CARD_DETAILS_QUESTION,
+  COIN_QUESTION,
   // Each other answer adds --orientation alone, the same for every layout of sheets.
-  "How should the sheets be turned?",
+  SHEET_ORIENTATION_QUESTION,
 ]);
 
 /**
@@ -42,24 +66,24 @@ const TAKEN_ONCE = new Set([
  * (cards-fit.ts), which takes seconds, so only the tests of typed details type them
  * (typedCardDetails).
  */
-const USUAL: Readonly<Record<string, string>> = {
+export const USUAL: Readonly<Record<string, string>> = {
   Word: "abandon",
   "Word number": "1",
   "Unicode code": "5BF6",
-  "How many shares in all? (2 to 16)": "7",
-  "How many of them restore the seed phrase?": "4",
+  [SHARE_COUNT_QUESTION]: "7",
+  [SHARE_THRESHOLD_QUESTION]: "4",
   // The public test phrase's fingerprint and its first native SegWit address.
   [FINGERPRINT_PROMPT]: TEST_FINGERPRINT,
-  "Bitcoin address (one of the first receiving ones)": TEST_ADDRESS,
-  // The public test phrase\'s first address in each other coin.
+  [BITCOIN_ADDRESS_QUESTION]: TEST_ADDRESS,
+  // The public test phrase's first address in each other coin.
   ...COIN_ADDRESS_ANSWERS,
   // A public test key: the recipient of a key that is thrown away.
-  "Scanner key": "age12d86zp9uj65df2snvl656uewdl82zrdfya8a2zgxu5rauaw7fsaqrr6w3x",
+  "Scanner key": PUBLIC_SCANNER_KEY,
 };
 
 /** Invented details for the cards, as the decoy that they are, by their question. */
 const CARD_DETAILS: Readonly<Record<string, string>> = {
-  "Name, in Latin letters": "Ann Lee",
+  [CARD_NAME_PROMPT]: "Ann Lee",
   Role: "Architect",
   Company: "Example Studio",
   Email: "ann@example.com",
@@ -107,7 +131,7 @@ export function answeredByScript(): void {
     await mkdir(join(files, "folder"));
     script.usual = {
       ...USUAL,
-      "Record file name": join(files, "record.txt"),
+      [RECORD_FILE_PROMPT]: join(files, "record.txt"),
       "QR code file name": join(files, "qr.png"),
     };
   });

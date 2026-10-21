@@ -10,6 +10,7 @@ import { runDecode } from "../src/cli/decode-command.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { Masking, SPLIT_MODES_ONLY } from "../src/core/masking.js";
+import { MASKING_MODES } from "../src/core/types.js";
 import { duration } from "../src/core/search-plan.js";
 import { markUnits } from "./helpers/shares.js";
 import { publicShare, sskrVectors } from "./helpers/vectors.js";
@@ -34,11 +35,11 @@ const PUBLIC_SHARE = publicShare();
 
 describe("S001, S019: the modes of shares, sheets for heirs and replaced last words are Masking's", () => {
   it("derives which modes split and which take a sheet from the variants", () => {
-    expect(Masking.MODES.filter((mode) => Masking.isSplitMode(mode))).toEqual([
+    expect(MASKING_MODES.filter((mode) => Masking.isSplitMode(mode))).toEqual([
       "direct",
       "seedshift",
     ]);
-    expect(Masking.MODES.filter((mode) => Masking.isHeirSheetMode(mode))).toEqual([
+    expect(MASKING_MODES.filter((mode) => Masking.isHeirSheetMode(mode))).toEqual([
       "direct",
       "seedshift",
       "seedshift-legacy",
@@ -47,7 +48,7 @@ describe("S001, S019: the modes of shares, sheets for heirs and replaced last wo
     expect(() => Masking.assertHeirSheetMode("seedshift-legacy-valid")).toThrow(
       "A sheet for heirs cannot be made for the Original Seedshift with a valid last word",
     );
-    expect(Masking.MODES.filter((mode) => Masking.isMaskedMode(mode))).toEqual([
+    expect(MASKING_MODES.filter((mode) => Masking.isMaskedMode(mode))).toEqual([
       "seedshift",
       "seedshift-legacy",
       "seedshift-legacy-valid",
@@ -70,14 +71,16 @@ describe("S001, S019: the modes of shares, sheets for heirs and replaced last wo
 describe("S003: codes given with the options are read as typed ones are", () => {
   it("refuses a Shamir share in decode and recover-date, naming the share reader", async () => {
     await expect(runDecode(parseArguments(["--input", PUBLIC_SHARE]))).rejects.toThrow(
-      "This is a Shamir share, not an encoded seed phrase",
+      "This is a Shamir share, not an encoded seed phrase: Restore a seed phrase from Shamir shares reads it.",
     );
     await expect(
       runRecoverDate(parseArguments(["--input", PUBLIC_SHARE, "--date", "2?-09-2026"])),
-    ).rejects.toThrow("This is a Shamir share, not an encoded seed phrase");
+    ).rejects.toThrow(
+      "This is a Shamir share, not an encoded seed phrase: Restore a seed phrase from Shamir shares reads it.",
+    );
   });
 
-  it("refuses codes that fit no form before a search", async () => {
+  it("refuses codes that fit no form in decode and recover-date", async () => {
     // The library's reason for codes that fit no form, not a refusal of the date or the wallet.
     const codes = "not codes at all";
     await expect(

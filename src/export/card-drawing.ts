@@ -727,11 +727,6 @@ export class CardPdfReader implements Disposable {
     return new CardPdfReader(await PDFDocument.load(pdf));
   }
 
-  /** Number of pages; refused after this reader is wiped (export.card-drawing.reader-wiped). */
-  get pageCount(): number {
-    return this.#live().document.getPageCount();
-  }
-
   /**
    * Drawing steps in page order; image bytes are borrowed until wipe(). Refuses a page that holds
    * anything the card renderers never write, such as a moved or turned page, another command

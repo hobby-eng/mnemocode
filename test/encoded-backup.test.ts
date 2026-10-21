@@ -104,7 +104,7 @@ describe("EncodedBackup", () => {
 
   it("refuses codes that no seed phrase has, naming the count or the place only", () => {
     // The whole message, so that nothing typed can be in it.
-    const refusal = (message: string) => expect.objectContaining({ message });
+    const refusal = (message: string): unknown => expect.objectContaining({ message });
     const counts = "an encoded seed phrase has 12, 15, 18, 21 or 24.";
     const indexes = formatEncoded(MASKED, "indexes").split(" ");
     expect(() => EncodedBackup.read(indexes.slice(1).join(" "), "indexes", "direct")).toThrow(

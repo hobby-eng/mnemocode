@@ -34,6 +34,7 @@ afterEach(() => {
   keyboard.terminal = false;
   keyboard.answers = [];
   terminal.close();
+  vi.unstubAllEnvs();
 });
 
 /** The rows of what the terminal drew, each run of blanks as one space. */
@@ -84,6 +85,7 @@ describe("finite private legacy-valid candidate results", () => {
   });
 
   it("shows the candidates on a page of their own after the questions of --ask-secrets", async () => {
+    vi.stubEnv("TERM", "xterm");
     keyboard.terminal = true;
     keyboard.answers = [`${RECORD}\r`, `${DATE}\r`];
     await runDecode(parseArguments(["--ask-secrets"]));

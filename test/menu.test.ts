@@ -28,10 +28,17 @@ import {
   SINGLE,
   typedCardDetails,
   warningsAt,
+  RECORD_FILE_PROMPT,
+  CARD_DESIGN_QUESTION,
+  SHEET_ORIENTATION_QUESTION,
+  BACKUP_QR_QUESTION,
+  CARD_DETAILS_QUESTION,
+  CARD_NAME_PROMPT,
 } from "./helpers/menu-paths.js";
 import { script } from "./helpers/menu-script.js";
 import { takeCutNotes } from "./helpers/cut-notes.js";
 import { ENCODE_FORM_LABELS } from "./helpers/encode-form-cases.js";
+import { SEEDSHIFT_QUESTION } from "./helpers/prompts.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/menu-script.js"));
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
@@ -223,7 +230,7 @@ describe("start menu", () => {
 });
 
 describe("start menu", () => {
-  it("re-encodes from the Re-encode entry: the old backup as Decode asks it, the rest on the private screen", async () => {
+  it("builds re-encode arguments from typed-backup answers or a record file", async () => {
     // Typed, all the codes, MnemoCode Seedshift: the codes, the dates, the confirmation and the new
     // backup are asked by re-encode itself.
     expect(await runOf(ENTRY.reEncode, [0, 0, 1])).toEqual([
@@ -235,11 +242,11 @@ describe("start menu", () => {
     expect(script.asked.map((asked) => asked.question)).toEqual([
       "Where is the encoded seed phrase?",
       "How many words does the seed phrase have?",
-      "Was Seedshift used when it was encoded?",
+      SEEDSHIFT_QUESTION,
     ]);
     // A record file names its mode: none is asked.
     const path = join(files, "record.txt");
-    expect(await runOf(ENTRY.reEncode, [1], { "Record file name": [path] })).toEqual([
+    expect(await runOf(ENTRY.reEncode, [1], { [RECORD_FILE_PROMPT]: [path] })).toEqual([
       "re-encode",
       "--ask-secrets",
       "--input-file",
@@ -402,12 +409,12 @@ describe("start menu", () => {
     it("offers only the business card designs for separate cards", async () => {
       // A PDF, then Separate business cards (the fourth layout), in a new folder.
       await runOf(ENTRY.encode, [...SINGLE, 0, 3]);
-      const design = script.asked.find((asked) => asked.question === "Which card design?")!;
+      const design = script.asked.find((asked) => asked.question === CARD_DESIGN_QUESTION)!;
       expect(design.labels.length).toBeGreaterThan(0);
       for (const label of design.labels) expect(label).toMatch(/card collection$/u);
       // On sheets every design is offered, the material ones too.
       await runOf(ENTRY.encode, [...SINGLE, 0, 0]);
-      const sheets = script.asked.find((asked) => asked.question === "Which card design?")!;
+      const sheets = script.asked.find((asked) => asked.question === CARD_DESIGN_QUESTION)!;
       expect(sheets.labels.some((label) => label.endsWith("finish selection"))).toBe(true);
     });
 
@@ -432,10 +439,10 @@ describe("start menu", () => {
       expect(script.asked.map((asked) => asked.question).slice(4)).toEqual([
         "Which kind of file?",
         "How should the cards be laid out?",
-        "How should the sheets be turned?",
-        "Which card design?",
-        "Add a QR code with the codes of the backup, without the extra cards?",
-        "Type your own details for the cards?",
+        SHEET_ORIENTATION_QUESTION,
+        CARD_DESIGN_QUESTION,
+        BACKUP_QR_QUESTION,
+        CARD_DETAILS_QUESTION,
         "Instructions for your heirs?",
       ]);
       expect(await cardOptions(SHARES, [0, 0, 2, 0, 1])).toEqual([
@@ -466,9 +473,7 @@ describe("start menu", () => {
       );
       expect(turns!.labels).toEqual(["Landscape", "Portrait", "Whichever fills the sheet best"]);
       await cardOptions(SINGLE, [0, 3, 0]);
-      expect(script.asked.map((asked) => asked.question)).not.toContain(
-        "How should the sheets be turned?",
-      );
+      expect(script.asked.map((asked) => asked.question)).not.toContain(SHEET_ORIENTATION_QUESTION);
     });
 
     it("saves separate business cards in a new folder, without a QR code", async () => {
@@ -482,9 +487,7 @@ describe("start menu", () => {
           "mnemocode-cards",
           ...format,
         ]);
-        expect(script.asked.map((asked) => asked.question)).not.toContain(
-          "Add a QR code with the codes of the backup, without the extra cards?",
-        );
+        expect(script.asked.map((asked) => asked.question)).not.toContain(BACKUP_QR_QUESTION);
       }
       // Shares need the layout: without a page size, they would be sheets.
       expect(await cardOptions(SHARES, [0, 3, 0])).toEqual([
@@ -536,7 +539,7 @@ describe("start menu", () => {
 
     it("takes typed details, keeps the others random, and refuses what the command refuses", async () => {
       const typed = {
-        "Name, in Latin letters": ["Анна", "--help", "Ann Lee"],
+        [CARD_NAME_PROMPT]: ["Анна", "--help", "Ann Lee"],
         Role: [""],
         Company: [""],
         Email: [""],
@@ -558,7 +561,7 @@ describe("start menu", () => {
         "Printed with care",
       ]);
       assertAccepted(run);
-      expect(warningsAt("Name, in Latin letters")).toEqual([
+      expect(warningsAt(CARD_NAME_PROMPT)).toEqual([
         undefined,
         "Card name must use Latin letters only (spaces, apostrophes and hyphens are allowed).",
         "A detail that starts with - would be read as an option; leave out the -.",
@@ -574,7 +577,7 @@ describe("start menu", () => {
       assertAccepted((await runOf(ENTRY.encode, [...SINGLE, 0, 3, 0, 1], typedCardDetails()))!);
       expect(script.lines.map((line) => line.question)).toEqual([
         "Name of the new folder",
-        "Name, in Latin letters",
+        CARD_NAME_PROMPT,
         "Role",
         "Company",
         "Email",
@@ -593,9 +596,9 @@ describe("start menu", () => {
     const run = (await runOf(ENTRY.encode, [...SINGLE, 0, 0, 2, 0, 0, 1, 1], {
       // Every detail typed again where the details are asked again.
       ...typedCardDetails(2),
-      "Name, in Latin letters": [long, "Ann Lee"],
+      [CARD_NAME_PROMPT]: [long, "Ann Lee"],
     }))!;
-    const details = "Type your own details for the cards?";
+    const details = CARD_DETAILS_QUESTION;
     expect(
       script.asked.filter((asked) => asked.question === details).map((asked) => asked.warning),
     ).toEqual([
@@ -632,9 +635,9 @@ describe("start menu", () => {
     const run = (await runOf(ENTRY.encode, [...SHARES, 0, 0, 2, 0, 0, 1, 1], {
       // Every detail typed again where the details are asked again.
       ...typedCardDetails(2),
-      "Name, in Latin letters": [long, "Ann Lee"],
+      [CARD_NAME_PROMPT]: [long, "Ann Lee"],
     }))!;
-    const details = "Type your own details for the cards?";
+    const details = CARD_DETAILS_QUESTION;
     expect(
       script.asked.filter((asked) => asked.question === details).map((asked) => asked.warning),
     ).toEqual([undefined, expect.stringContaining("too long to fit legibly on the card")]);

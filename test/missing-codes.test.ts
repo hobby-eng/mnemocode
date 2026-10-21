@@ -85,7 +85,7 @@ describe("codes marked with ? (core/missing-codes.ts)", () => {
   it("holds the candidates to the checksum the codes keep, and to none for the Original Seedshift", () => {
     const text = marked("indexes", [5]);
     const kept = MissingCodes.read(text, "indexes", "seedshift");
-    expect(kept.missingPlaces).toEqual([6]);
+    expect(kept.placements).toEqual([[6]]);
     expect(kept.combinations).toBe(2048);
     // Four checksum bits for twelve words leave one in sixteen.
     expect(kept.expected).toBe(128);
@@ -111,9 +111,7 @@ describe("codes marked with ? (core/missing-codes.ts)", () => {
     // A beginning of a word, and one of two words.
     words[1] = `${words[1]!.slice(0, 2)}*`;
     words[4] = `${words[4]}|zoo`;
-    expect(MissingCodes.read(words.join(" "), "english", "seedshift").missingPlaces).toEqual([
-      2, 5,
-    ]);
+    expect(MissingCodes.read(words.join(" "), "english", "seedshift").placements).toEqual([[2, 5]]);
     const numbers = formatEncoded(ENCODED, "indexes").split(" ");
     numbers[0] = `${numbers[0]!.slice(0, -1)}?`;
     const narrowed = MissingCodes.read(numbers.join(" "), "indexes", "seedshift");

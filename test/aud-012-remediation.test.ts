@@ -492,7 +492,7 @@ describe("AUD-012-API004, API005: date patterns are checked together and owned",
     days,
   });
 
-  it("refuses two patterns of one key that differ, in every public entry", () => {
+  it("refuses conflicting keys in date combinations, their count, recovery and dates answers", () => {
     const conflicting = [pattern("same", [2]), pattern("same", [1])];
     expect(() => [...datePatternCombinations(conflicting)]).toThrow(/key of an earlier one/u);
     expect(() => datePatternCombinationCount(conflicting)).toThrow(/key of an earlier one/u);

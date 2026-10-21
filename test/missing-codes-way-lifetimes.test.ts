@@ -37,7 +37,7 @@ describe("The lifetime of a prepared marked-code search", () => {
         "core.missing-codes-search.way-wiped",
       );
       await expect(way.run()).rejects.toHaveProperty("code", "core.missing-codes-search.way-wiped");
-      expect(codes.missingPlaces).toEqual([3]);
+      expect(codes.placements).toEqual([[3]]);
       expect(dates.combinations).toBe(10);
     },
   );

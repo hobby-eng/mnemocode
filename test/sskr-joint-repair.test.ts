@@ -33,7 +33,7 @@ describe("Joint repair of the shares of one set", () => {
     "restores 2-of-3 shares that each miss two elements, in every form",
     async () => {
       for (const vector of vectors.deterministic) {
-        for (const format of ["ur", "words", "indexes", "unicode", "colors"] as const) {
+        for (const format of Share.FORMATS) {
           const typed = vector.shares.map((share, index) =>
             markUnits(share, format, [2 + index, 7 + index]),
           );
@@ -75,6 +75,8 @@ describe("Joint repair of the shares of one set", () => {
       [2, 0, 1],
       [1, 2, 0],
       [2, 1, 0],
+      [0, 2, 1],
+      [1, 0, 2],
     ]) {
       const found = (
         await (

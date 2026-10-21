@@ -27,7 +27,7 @@ describe("The lifetime of a retained backup reading", () => {
     const codes = reading.missingCodes("english");
     reading.wipe();
     expect(codes.combinations).toBe(2048);
-    expect(codes.missingPlaces).toEqual([12]);
+    expect(codes.placements).toEqual([[12]]);
     expect(text).toBe(LAST_WORD_FORGOTTEN);
   });
 

@@ -187,7 +187,7 @@ function impossibleGroupQuorum(): string[] {
         bytes.length - CHECKSUM_BYTES,
         crc32(bytes.subarray(0, -CHECKSUM_BYTES)),
       );
-      // Reach the native boundary: normal transportToUr correctly refuses this metadata first.
+      // Reach the native engine: normal transportToUr correctly refuses this metadata first.
       return SHARE_UNITS.ur.text(Array.from(bytes));
     } finally {
       bytes.fill(0);

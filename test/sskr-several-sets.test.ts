@@ -19,8 +19,9 @@ import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { unrepairedShare } from "../src/sskr/repair.js";
 import { severalSetsNote, variantsMessage } from "../src/sskr/share-restore.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
-import { testPhraseSet } from "./helpers/shares.js";
+import { testPhraseSet, SET_FINGERPRINT } from "./helpers/shares.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { WALLET_QUESTION } from "./helpers/prompts.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -28,13 +29,6 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
   harness.replacedTerminalInput(await importOriginal()),
 );
 
-/**
- * The master fingerprint of the phrase of SSKR_SET_VECTOR, computed with an independent Python
- * implementation of BIP39 and BIP32 that first reproduces the published BIP84 vector of
- * "abandon … about".
- */
-const SET_FINGERPRINT = "05d027a5";
-const WALLET_QUESTION = "How can MnemoCode recognise the wallet?";
 /** The places of the shares of each set among those typed, by their index in the set. */
 const PLACES = [1, 2];
 /** The export of --format ur, shown on the screen, with nothing to save. */

@@ -14,7 +14,7 @@ import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { writeShare } from "../src/sskr/transport.js";
 import { markUnits, VALUE_BYTE, wrongValue } from "./helpers/shares.js";
 import { STYLE_CODES } from "../src/cli/terminal-style.js";
-import { DECODE_DATES_PROMPT, FINGERPRINT_PROMPT } from "./helpers/prompts.js";
+import { DECODE_DATES_PROMPT, FINGERPRINT_PROMPT, SECOND_SHARE_PROMPT } from "./helpers/prompts.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
 import {
   marked,
@@ -86,7 +86,7 @@ describe("shares on the private screen", () => {
       "Share 2 cannot be read: SSKR transport checksum does not match.",
     );
     expect(terminal.labels).toEqual([["Leave share 2 out", "Type share 2 again"]]);
-    expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again, or its text file path:"]);
+    expect(promptsShown()).toEqual([SHARES_PROMPT, SECOND_SHARE_PROMPT]);
     // The private screen shows what is typed; no warning repeats it.
     expect(seen.notices.join("\n")).not.toContain(wrong.slice(8));
   });
@@ -100,7 +100,7 @@ describe("shares on the private screen", () => {
     expect(seen.notices).toContain(
       "Share 2: color 3 has 5 of 6 symbols: write a ? for each digit that cannot be read, or a lone ? for the whole color.",
     );
-    expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again, or its text file path:"]);
+    expect(promptsShown()).toEqual([SHARES_PROMPT, SECOND_SHARE_PROMPT]);
     expect(seen.out).toContain(PHRASE);
   });
 
@@ -321,7 +321,7 @@ describe("shares on the private screen", () => {
     // (test/scan-fixes.test.ts, S015).
     expect(terminal.questions.slice(1)).toEqual(["Which shares to change?", "Which share?"]);
     expect(terminal.labels[2]).toEqual(["Share 1", "Share 2"]);
-    expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again, or its text file path:"]);
+    expect(promptsShown()).toEqual([SHARES_PROMPT, SECOND_SHARE_PROMPT]);
     expect(seen.out).toContain(PHRASE);
   });
 

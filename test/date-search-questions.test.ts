@@ -12,7 +12,15 @@ import { askEncodedBackup } from "../src/cli/backup-questions.js";
 import { runRecoverDate } from "../src/cli/recover-date-command.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 import { writeShare } from "../src/sskr/transport.js";
-import { FINGERPRINT_PROMPT, WALLET_QUESTION } from "./helpers/prompts.js";
+import {
+  FINGERPRINT_PROMPT,
+  WALLET_QUESTION,
+  ENCODED_PROMPT,
+  CHECK_WALLET_ANSWER,
+  CANDIDATES_TOO_LONG_QUESTION,
+  CODES_AGAIN_ANSWER,
+  SEEDSHIFT_QUESTION,
+} from "./helpers/prompts.js";
 import {
   promptsMatching,
   questionsOnPrivateScreen,
@@ -75,7 +83,7 @@ describe("recover-date on the private screen", () => {
       ]),
     );
     expect(promptsMatching(PROMPTS)).toEqual([
-      "Encoded seed phrase, record or text file path:",
+      ENCODED_PROMPT,
       DATES_PROMPT,
       DATES_PROMPT,
       DATES_PROMPT,
@@ -112,9 +120,9 @@ describe("recover-date on the private screen", () => {
       ]),
     );
     expect(promptsMatching(PROMPTS).slice(0, 4)).toEqual([
-      "Encoded seed phrase, record or text file path:",
-      "Encoded seed phrase, record or text file path:",
-      "Encoded seed phrase, record or text file path:",
+      ENCODED_PROMPT,
+      ENCODED_PROMPT,
+      ENCODED_PROMPT,
       DATES_PROMPT,
     ]);
     expect(seen.out).toEqual([FOUND]);
@@ -179,7 +187,7 @@ describe("recover-date on the private screen", () => {
     // The original Seedshift lists checksum-valid candidates without a wallet. Asked for one to
     // check those not shown, "It cannot" would run the same search again.
     terminal.answers = [`${MASKED}\r`, "??-??-2026\r", `${TEST_FINGERPRINT}\r`];
-    terminal.choices = ["Check them against the wallet", "Fingerprint"];
+    terminal.choices = [CHECK_WALLET_ANSWER, "Fingerprint"];
     await recover({ mode: "seedshift-legacy", "max-results": "1" });
     expect(terminal.questions.slice(0, 2)).toEqual([
       "Not every candidate is shown. What now?",
@@ -208,17 +216,10 @@ describe("recover-date on the private screen", () => {
     terminal.stdoutTerminal = true;
     windowOf(40, 80);
     terminal.answers = [`${LEGACY}\r`, "2?-0?-202?\r", `${TEST_FINGERPRINT}\r`];
-    terminal.choices = ["Check them against the wallet", "Fingerprint"];
+    terminal.choices = [CHECK_WALLET_ANSWER, "Fingerprint"];
     await recover({ mode: "seedshift-legacy" });
-    expect(terminal.questions).toEqual([
-      "Not every candidate fits on the screen. What now?",
-      WALLET_QUESTION,
-    ]);
-    expect(terminal.labels[0]).toEqual([
-      "Check them against the wallet",
-      "Change the dates",
-      "Done",
-    ]);
+    expect(terminal.questions).toEqual([CANDIDATES_TOO_LONG_QUESTION, WALLET_QUESTION]);
+    expect(terminal.labels[0]).toEqual([CHECK_WALLET_ANSWER, "Change the dates", "Done"]);
     const listed = seen.out.filter((line) => /^\d{2}-\d{2}-\d{4}\t/u.test(line));
     expect(listed.length).toBeGreaterThan(40);
     expect(seen.out.at(-1)).toBe(FOUND);
@@ -242,17 +243,13 @@ describe("recover-date on the private screen", () => {
   it("keeps the dates and the wallet when the encoded phrase is typed again", async () => {
     const other = formatEncoded(encodeMnemonic(TEST_PHRASE, [parseDate("23-09-2025")]), "indexes");
     terminal.answers = [`${other}\r`, "2?-09-2026\r", `${MASKED}\r`];
-    terminal.choices = ["Type the encoded seed phrase again"];
+    terminal.choices = [CODES_AGAIN_ANSWER];
     await recover({ mode: "seedshift", "master-fingerprint": TEST_FINGERPRINT });
     expect(seen.out).toEqual([
       "None of the 10 checksum-valid candidates matched the requested master fingerprint.",
       FOUND,
     ]);
-    expect(promptsMatching(PROMPTS)).toEqual([
-      "Encoded seed phrase, record or text file path:",
-      DATES_PROMPT,
-      "Encoded seed phrase, record or text file path:",
-    ]);
+    expect(promptsMatching(PROMPTS)).toEqual([ENCODED_PROMPT, DATES_PROMPT, ENCODED_PROMPT]);
   });
 
   it("searches more than --max-candidates only when the person chooses it", async () => {
@@ -268,11 +265,7 @@ describe("recover-date on the private screen", () => {
       "Search 10 date combinations?",
       "Search 10 date combinations?",
     ]);
-    expect(promptsMatching(PROMPTS)).toEqual([
-      "Encoded seed phrase, record or text file path:",
-      DATES_PROMPT,
-      DATES_PROMPT,
-    ]);
+    expect(promptsMatching(PROMPTS)).toEqual([ENCODED_PROMPT, DATES_PROMPT, DATES_PROMPT]);
     expect(seen.out).toEqual([FOUND]);
   });
 
@@ -337,7 +330,7 @@ describe("recover-date on the private screen", () => {
       await writeFile(plain, `${MASKED}\n`);
       terminal.choices = ["MnemoCode Seedshift"];
       expect((await decoding({ "input-file": plain })).backup.mode).toBe("seedshift");
-      expect(terminal.questions).toEqual(["Was Seedshift used when it was encoded?"]);
+      expect(terminal.questions).toEqual([SEEDSHIFT_QUESTION]);
       expect(terminal.labels[0]).toEqual(["No", "MnemoCode Seedshift", "Original Seedshift"]);
       expect(seen.notices).toContain(
         "These codes have no MNC1 record header, so they do not say how they were made.",
@@ -350,7 +343,7 @@ describe("recover-date on the private screen", () => {
       terminal.answers = [`${MASKED}\r`];
       terminal.choices = ["Type the encoded seed phrase", "No"];
       expect((await decoding({ "input-file": bad })).backup.mode).toBe("direct");
-      expect(terminal.questions).toEqual(["What now?", "Was Seedshift used when it was encoded?"]);
+      expect(terminal.questions).toEqual(["What now?", SEEDSHIFT_QUESTION]);
 
       // A record names its mode, and so does --mode, which the menu passes, also for No.
       terminal.questions = [];
@@ -364,7 +357,7 @@ describe("recover-date on the private screen", () => {
       terminal.answers = [`${MASKED}\r`];
       terminal.choices = ["MnemoCode Seedshift"];
       expect((await decoding({})).backup.mode).toBe("seedshift");
-      expect(terminal.questions).toEqual(["Was Seedshift used when it was encoded?"]);
+      expect(terminal.questions).toEqual([SEEDSHIFT_QUESTION]);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

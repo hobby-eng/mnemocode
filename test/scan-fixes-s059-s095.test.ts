@@ -115,6 +115,7 @@ import {
 } from "./helpers/test-phrase.js";
 import { sskrVectors } from "./helpers/vectors.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
+import { WORDS_AGAIN_ANSWER } from "./helpers/prompts.js";
 
 describe("S059: the menu's wallet answer is the command line that gives the same evidence", () => {
   it("reads back every way of the wallet question, and a place that is not the first", () => {
@@ -542,7 +543,7 @@ describe("S087: the rows around a result are measured as they are printed", () =
 
   it("counts a question, the closing lines and a coloured heading by their lines", () => {
     const three = [
-      { label: "Type the words again", value: 1 },
+      { label: WORDS_AGAIN_ANSWER, value: 1 },
       { label: "Change the wallet", note: "the fingerprint or the address", value: 2 },
       { label: "Done", value: 3 },
     ];
@@ -597,7 +598,7 @@ describe("S089: one tally of the wallet's matches", () => {
 });
 
 describe("S090: one owner of the rules of output paths", () => {
-  it("refuses no path for every output, and a folder that could not be made", async () => {
+  it("refuses an absent image path and unusable folder destinations", async () => {
     expect(isUnusableOutputPath(" ")).toBe(true);
     expect(isUnusableOutputPath("-")).toBe(true);
     expect(isUnusableOutputPath("./-")).toBe(false);
@@ -682,7 +683,7 @@ describe("S093: one owner of the UTF-8 rules", () => {
 });
 
 describe("S095: one gate of colour cards and one check of a card's number", () => {
-  it("refuses a dated Unicode card and a card that is not there alike for every family", () => {
+  it("refuses non-colour content and an index outside the cards through the shared checks", () => {
     expect(() =>
       // Content of another kind, given on purpose as a JavaScript host could.
       assertColorCards({ kind: "unicode", payload: "" } as never),

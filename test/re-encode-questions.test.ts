@@ -5,7 +5,14 @@ import { describe, expect, it, vi } from "vitest";
 import { NO_SUCH_LAST_WORD } from "../src/core/re-encoding.js";
 import { runReEncode } from "../src/cli/re-encode-command.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
-import { DATES_PROMPT } from "./helpers/prompts.js";
+import {
+  DATES_PROMPT,
+  ENCODED_PROMPT,
+  RE_ENCODE_CONFIRMATION,
+  BACKUP_CHECK_QUESTION,
+  DATES_AGAIN_ANSWER,
+  CODES_AGAIN_ANSWER,
+} from "./helpers/prompts.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
 import {
   DATE,
@@ -30,15 +37,15 @@ const LAST_WORD = TEST_WORDS[11]!;
 const NOT_A_LAST_WORD = "zoo";
 /** A word of the old phrase that neither the codes nor the last word typed hold. */
 const OLD_WORD = TEST_WORDS[0]!;
-const CODES_PROMPT = "Encoded seed phrase, record or text file path:";
+const CODES_PROMPT = ENCODED_PROMPT;
 const LAST_WORD_PROMPT = "Last word of the original seed phrase:";
 /** The questions after the phrase is shown: its confirmation, then Encode's offer of a check. */
-const CONFIRMED = ["Is this the seed phrase to re-encode?", "Check the backup now?"];
+const CONFIRMED = [RE_ENCODE_CONFIRMATION, BACKUP_CHECK_QUESTION];
 /** The answers of "What now?" after a last word that no phrase of the backup ends with. */
 const AFTER_LAST_WORD = [
   "Type the last word again",
-  "Type the dates again",
-  "Type the encoded seed phrase again",
+  DATES_AGAIN_ANSWER,
+  CODES_AGAIN_ANSWER,
   "Stop",
 ];
 /** The old backup typed, the new one given by Encode's options: Unicode codes without Seedshift. */
@@ -65,7 +72,7 @@ describe("re-encode on the private screen, for a backup with a valid last word",
       `${DATE}\r`,
       `${LAST_WORD}\r`,
     ];
-    terminal.choices = ["Type the dates again", "Yes, I recognise it"];
+    terminal.choices = [DATES_AGAIN_ANSWER, "Yes, I recognise it"];
     await runReEncode({ ...ARGS });
     expect(seen.notices).toContain(NO_SUCH_LAST_WORD);
     expect(terminal.questions).toEqual(["What now?", ...CONFIRMED]);
@@ -105,11 +112,7 @@ describe("re-encode on the private screen, for a backup with a valid last word",
       `${DATE}\r`,
       `${LAST_WORD}\r`,
     ];
-    terminal.choices = [
-      "Type the encoded seed phrase again",
-      "Type the dates again",
-      "Yes, I recognise it",
-    ];
+    terminal.choices = [CODES_AGAIN_ANSWER, DATES_AGAIN_ANSWER, "Yes, I recognise it"];
     await runReEncode({ ...ARGS });
     expect(terminal.questions).toEqual(["What now?", "What now?", ...CONFIRMED]);
     expect(seen.out).toContain(TEST_UNICODE);

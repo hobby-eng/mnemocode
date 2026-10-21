@@ -176,7 +176,7 @@ describe("share cards after AUD-010", () => {
     return `${Math.round(width / MM_POINTS)}x${Math.round(height / MM_POINTS)}`;
   }
 
-  it("prints sheets of every design on A6 when no size is given (AUD-010-UI001)", async () => {
+  it("prints tile and IT sheets on A6 when no size is given (AUD-010-UI001)", async () => {
     for (const style of ["tile", "it"] as const) {
       const set = await ShareCardSet.create(nodeCardRenderer, SHARES, {
         style,

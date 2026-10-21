@@ -14,6 +14,8 @@ from terminal_result_checks import assert_closed_descriptor
 
 @unittest.skipIf(terminal.WINDOWS, "POSIX descriptor and PTY errors only.")
 class TerminalErrorTests(unittest.TestCase):
+    """Unexpected OS errors propagate; expected PTY races end a read."""
+
     def session(self, stack):
         """A session of the public constructor, its OS effects faked."""
         for name, answer in (
@@ -30,6 +32,7 @@ class TerminalErrorTests(unittest.TestCase):
         return session
 
     def test_read_propagates_unexpected_os_failures(self):
+        """Keep the original unexpected error from an OS read."""
         for code in (errno.EPERM, errno.EBADF, errno.EINVAL):
             with self.subTest(errno=code), ExitStack() as stack:
                 session = self.session(stack)
@@ -40,6 +43,7 @@ class TerminalErrorTests(unittest.TestCase):
                 self.assertIs(caught.exception, error)
 
     def test_read_accepts_pty_eof_and_nonblocking_races(self):
+        """Treat PTY EOF and nonblocking races as an empty read."""
         for code in {errno.EIO, errno.EAGAIN, errno.EWOULDBLOCK}:
             with self.subTest(errno=code), ExitStack() as stack:
                 session = self.session(stack)
@@ -49,6 +53,7 @@ class TerminalErrorTests(unittest.TestCase):
                 self.assertEqual(session.output, "")
 
     def test_read_keeps_normal_bytes_and_empty_eof(self):
+        """Keep read bytes when the next read reports EOF."""
         with ExitStack() as stack:
             session = self.session(stack)
             reads = [b"public terminal fragment", b""]
@@ -58,6 +63,7 @@ class TerminalErrorTests(unittest.TestCase):
             self.assertEqual(session.output, "public terminal fragment")
 
     def test_descriptor_check_accepts_only_bad_descriptor_as_closure(self):
+        """Accept EBADF alone as proof that a descriptor is closed."""
         closed = OSError(errno.EBADF, "Closed descriptor.")
         with patch("os.fstat", side_effect=closed):
             assert_closed_descriptor(7)
@@ -70,6 +76,7 @@ class TerminalErrorTests(unittest.TestCase):
                     self.assertIs(caught.exception, error)
 
     def test_descriptor_check_refuses_a_still_open_descriptor(self):
+        """An open descriptor fails the closure check."""
         with patch("os.fstat", return_value=object()):
             with self.assertRaisesRegex(AssertionError, "still open"):
                 assert_closed_descriptor(7)

@@ -15,6 +15,7 @@ import { runRecoverWord } from "../src/cli/recover-word-command.js";
 import { questionsOnPrivateScreen, seen, terminal, windowOf } from "./helpers/question-terminal.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 import { DATE, MASKED, TEST_FINGERPRINT, TEST_PHRASE, WRONG_DATE } from "./helpers/test-phrase.js";
+import { DATES_AGAIN_ANSWER, RE_ENCODE_CONFIRMATION, WALLET_QUESTION } from "./helpers/prompts.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -60,7 +61,7 @@ afterEach(() => {
 describe("decode", () => {
   it("types the dates again on a step screen of their own, after a phrase without a valid checksum", async () => {
     terminal.answers = [`${LEGACY_NUMBERS}\r`, `${WRONG_DATE}\r`, `${DATE}\r`];
-    terminal.choices = ["Type the dates again"];
+    terminal.choices = [DATES_AGAIN_ANSWER];
     await runDecode({ "ask-secrets": true, mode: "seedshift-legacy" });
     expect(terminal.questions).toEqual(["What now?"]);
     expect(screensAfter(1)).toEqual(["step screen after 1 questions, 1 answers to come"]);
@@ -91,7 +92,7 @@ describe("recover-date", () => {
       mode: "seedshift",
       "master-fingerprint": NO_WALLET,
     });
-    expect(terminal.questions).toEqual(["What now?", "How can MnemoCode recognise the wallet?"]);
+    expect(terminal.questions).toEqual(["What now?", WALLET_QUESTION]);
     expect(screensAfter(1)).toEqual([]);
     expect(screensAfter(2)).toEqual(["step screen after 2 questions, 0 answers to come"]);
     expect(seen.out.join("\n")).toContain("matched at m");
@@ -101,7 +102,7 @@ describe("recover-date", () => {
 describe("re-encode", () => {
   it("types the dates again on a step screen of their own, after the phrase shown to be confirmed", async () => {
     terminal.answers = [`${MASKED}\r`, `${WRONG_DATE}\r`, `${DATE}\r`];
-    terminal.choices = ["Type the dates again", "Yes, I recognise it", "No"];
+    terminal.choices = [DATES_AGAIN_ANSWER, "Yes, I recognise it", "No"];
     await runReEncode({
       "ask-secrets": true,
       "old-mode": "seedshift",
@@ -109,8 +110,8 @@ describe("re-encode", () => {
       format: "3",
     });
     expect(terminal.questions.slice(0, 2)).toEqual([
-      "Is this the seed phrase to re-encode?",
-      "Is this the seed phrase to re-encode?",
+      RE_ENCODE_CONFIRMATION,
+      RE_ENCODE_CONFIRMATION,
     ]);
     expect(screensAfter(1)).toEqual(["step screen after 1 questions, 1 answers to come"]);
   });

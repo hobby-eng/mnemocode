@@ -15,6 +15,7 @@ import { checkedExportFileName } from "../src/export/file-name.js";
 import { keyedQuestions, watchScreen } from "./helpers/terminal-screen.js";
 import { terminal } from "./helpers/keyed-terminal.js";
 import { DATE, MASKED, MASKED_WORDS, TEST_NUMBERS, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { BACKUP_CHECK_QUESTION, SEED_PHRASE_PROMPT } from "./helpers/prompts.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/keyed-terminal.js"));
 vi.mock("../src/cli/terminal-input.js", async (original) =>
@@ -198,7 +199,7 @@ describe("Encode result stays on the private screen through follow-up questions"
       terminal.keysFor = () => answers.shift()!;
       let atCheck: string | undefined;
       terminal.onFirstKey = () => {
-        if (terminal.asked.at(-1)?.question === "Check the backup now?")
+        if (terminal.asked.at(-1)?.question === BACKUP_CHECK_QUESTION)
           atCheck = screen.lines().join("\n");
       };
       expect(
@@ -209,11 +210,11 @@ describe("Encode result stays on the private screen through follow-up questions"
           ...(shares ? { sskr: true, threshold: "2", shares: "3" } : {}),
         }),
       ).toBeUndefined();
-      expect(atCheck).toContain("Check the backup now?");
+      expect(atCheck).toContain(BACKUP_CHECK_QUESTION);
       expect(atCheck).toContain(mode === "direct" ? TEST_NUMBERS : MASKED);
       // The result is a step of its own (CORE-39): the secret prompts, and the dates typed at one,
       // were cleared away before it.
-      expect(atCheck).not.toContain("Seed phrase (English BIP39 words):");
+      expect(atCheck).not.toContain(SEED_PHRASE_PROMPT);
       expect(atCheck).not.toContain("Dates (");
       expect(atCheck).not.toContain(DATE);
       if (shares)

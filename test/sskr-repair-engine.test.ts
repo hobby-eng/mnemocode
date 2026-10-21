@@ -74,7 +74,7 @@ describe("S038: one codec of units for every share form", () => {
       );
   });
 
-  it("reads back every unit it writes, and refuses a color that is none", () => {
+  it("reads back zero, one and the highest unit value of each form and refuses malformed colours", () => {
     for (const format of SHARE_FORMATS) {
       const units = SHARE_UNITS[format];
       for (const value of [0, 1, 2 ** units.unitBits - 1])
@@ -97,10 +97,10 @@ describe("S038: one codec of units for every share form", () => {
 
   it("repairs a share written with every separator that its reader takes", () => {
     const separators: readonly (readonly [ShareFormat, readonly string[]])[] = [
-      ["indexes", [" ", ",", ";", ", ", "\n"]],
-      ["unicode", [" ", ",", ";", ", ", "\n"]],
-      ["colors", [" ", ",", ";", ", ", "\n"]],
-      ["words", [" ", "-", "\n"]],
+      ["indexes", [" ", ",", ";", "#", ", ", "\n"]],
+      ["unicode", [" ", ",", ";", "#", ", ", "\n"]],
+      ["colors", [" ", ",", ";", "#", ", ", "\n"]],
+      ["words", [" ", "-", ",", ";", "\n"]],
     ];
     for (const [format, list] of separators)
       for (const separator of list) {
@@ -111,7 +111,7 @@ describe("S038: one codec of units for every share form", () => {
       }
   });
 
-  it("reads, unmarked, every share text that the repair takes, with every separator", () => {
+  it("reads complete and marked code forms with their listed separators", () => {
     // The reverse of the case before (final review R1): the look of each form splits elements
     // as code-text does, so that a text the repair takes is not turned away by a look.
     const separators: readonly (readonly [ShareFormat, readonly string[]])[] = [

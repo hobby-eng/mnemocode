@@ -78,7 +78,7 @@ it("preserves non-secret selectors, public references and safe file/stdin option
 });
 
 it.each(["input-file", "share-file", "dates-file", "old-dates-file", "last-word-file"])(
-  "refuses competing %s and mnemonic standard-input sources before reading",
+  "refuses competing %s and mnemonic standard-input sources",
   (key) => {
     expect(() => assertPrivateFileSources({ "mnemonic-file": "-", [key]: "-" })).toThrow(
       "only one material source",
@@ -88,7 +88,7 @@ it.each(["input-file", "share-file", "dates-file", "old-dates-file", "last-word-
 );
 
 it.each(["dates-file", "old-dates-file", "last-word-file"])(
-  "refuses %s beside private questions before attempting to read its path",
+  "refuses %s beside private questions",
   (key) => {
     expect(() =>
       assertPrivateFileSources({ "ask-secrets": true, [key]: "must-not-be-read" }),
@@ -105,7 +105,7 @@ it("reads complete UTF-8 file dates and infers masking without putting dates in 
   expect(args.date).toBeUndefined();
 });
 
-it("refuses a date-file source in direct mode before reading either backup or file contents", () => {
+it("refuses a date-file source in direct mode and permits it in Seedshift", () => {
   const args = { "dates-file": join(folder, "must-not-be-read") };
   expect(() => assertDateInputMode(args, "direct")).toThrow("Dates cannot be used in direct mode.");
   expect(() => assertDateInputMode(args, "seedshift")).not.toThrow();

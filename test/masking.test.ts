@@ -15,6 +15,7 @@ import { capabilities } from "../src/core/backup-options.js";
 import { DatesAnswer, DateSearch } from "../src/core/date-search.js";
 import { EncodedBackup, MissingChecksumError } from "../src/core/encoded-backup.js";
 import { Masking } from "../src/core/masking.js";
+import { MASKING_MODES } from "../src/core/types.js";
 import { parseRecord, serializeRecord } from "../src/record.js";
 import { Share, writeShare } from "../src/sskr/transport.js";
 import {
@@ -43,13 +44,13 @@ const SHARE = publicShare();
 
 describe("Masking", () => {
   it("is one value per mode, with every rule that tells the modes apart", () => {
-    expect(Masking.MODES).toEqual([
+    expect(MASKING_MODES).toEqual([
       "direct",
       "seedshift",
       "seedshift-legacy",
       "seedshift-legacy-valid",
     ]);
-    const rules = Masking.MODES.map((mode) => {
+    const rules = MASKING_MODES.map((mode) => {
       const masking = Masking.of(mode);
       return [mode, masking.name, masking.masked, masking.keepsChecksum, masking.givesSeveral];
     });
@@ -61,13 +62,13 @@ describe("Masking", () => {
     ]);
     // The same value each time, which the capabilities of the backup options are taken from.
     expect(Masking.of("seedshift")).toBe(Masking.of("seedshift"));
-    for (const mode of Masking.MODES)
+    for (const mode of MASKING_MODES)
       expect(capabilities(mode)).toBe(Masking.of(mode).capabilities);
     expect(Object.isFrozen(Masking.of("direct").capabilities)).toBe(true);
   });
 
   it("names the same modes as the MNC1 record, whose format has its own list of them", () => {
-    for (const mode of Masking.MODES)
+    for (const mode of MASKING_MODES)
       expect(parseRecord(serializeRecord(mode, "indexes", "1 2"))?.mode).toBe(mode);
     // A mode that no type allows, fed on purpose as a JavaScript host could.
     expect(() => serializeRecord("shifted" as never, "indexes", "1 2")).toThrow(

@@ -21,7 +21,6 @@ import { describe, expect, it } from "vitest";
 import {
   ACCEPTED_OPERATORS,
   CARD_DRAWING_REFUSAL,
-  CardPdfReader,
   readCardPages,
   type CardPageDrawing,
   type DrawingStep,
@@ -83,9 +82,8 @@ describe("Card pages read back as drawing steps (export/card-drawing.ts)", () =>
     "reads the sample cards of every design, one page each",
     async () => {
       const pdf = await new CardPreview(nodeCardRenderer).renderAll();
-      const reader = await CardPdfReader.load(pdf);
-      expect(reader.pageCount).toBe(CARD_TEMPLATES.length);
-      await expectCardPages(pdf, "every design");
+      const pages = await expectCardPages(pdf, "every design");
+      expect(pages).toHaveLength(CARD_TEMPLATES.length);
     },
     DRAWING_TEST_TIME_LIMIT_MS,
   );

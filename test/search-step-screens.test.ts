@@ -19,6 +19,7 @@ import {
   TEST_FINGERPRINT,
   TEST_PHRASE,
 } from "./helpers/test-phrase.js";
+import { WORDS_AGAIN_ANSWER } from "./helpers/prompts.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -68,7 +69,7 @@ describe("the search of recover-word", () => {
       `${LAST_WORD_FORGOTTEN}\r`,
       `${replacedAt(TEST_PHRASE, { 12: "about|abandon" })}\r`,
     ];
-    terminal.choices = ["Type the words again"];
+    terminal.choices = [WORDS_AGAIN_ANSWER];
     await runRecoverWord({ "ask-secrets": true, "master-fingerprint": "00000000" });
     const result = seen.notices.indexOf(
       "Matched 0 of 128 candidates against the requested master fingerprint locally.",

@@ -16,7 +16,7 @@ import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 import { CTRL_C } from "./helpers/keys.js";
 import { matching } from "./helpers/matchers.js";
 import { promptsShown } from "./helpers/phrase-questions.js";
-import { WALLET_QUESTION } from "./helpers/prompts.js";
+import { WALLET_QUESTION, WORDS_AGAIN_ANSWER, CHECK_WALLET_ANSWER } from "./helpers/prompts.js";
 import { questionsOnPrivateScreen, seen, terminal, windowOf } from "./helpers/question-terminal.js";
 import {
   LAST_WORD_FORGOTTEN,
@@ -132,7 +132,7 @@ describe("recover-word on the private screen", () => {
       `${replacedAt(TEST_PHRASE, { 12: "abandon|ability" })}\r`,
       `${LAST_WORD_FORGOTTEN}\r`,
     ];
-    terminal.choices = ["Type the words again"];
+    terminal.choices = [WORDS_AGAIN_ANSWER];
     await recover({});
     expect(seen.notices).toContain(
       "No valid phrase fits these words: check them, their order and the ? places.",
@@ -161,7 +161,7 @@ describe("recover-word on the private screen", () => {
       true,
     );
     expect(terminal.questions).toEqual(["What now?"]);
-    expect(terminal.labels[0]).toContain("Check them against the wallet");
+    expect(terminal.labels[0]).toContain(CHECK_WALLET_ANSWER);
     expect(seen.out).toEqual([]);
   });
 
@@ -171,7 +171,7 @@ describe("recover-word on the private screen", () => {
     terminal.stdoutTerminal = true;
     windowOf(40, 80);
     terminal.answers = [`${ONE_WORD_MISSING}\r`, `${TEST_FINGERPRINT}\r`];
-    terminal.choices = ["Check them against the wallet", "Fingerprint"];
+    terminal.choices = [CHECK_WALLET_ANSWER, "Fingerprint"];
     await recover({ "missing-word": true });
     expect(seen.notices).toContain(
       "1,497 candidates do not fit on this screen: check them against the wallet's fingerprint or an address, or give a few letters of the words.",
@@ -300,7 +300,7 @@ describe("recover-word on the private screen", () => {
       `${LAST_WORD_FORGOTTEN}\r`,
       `${replacedAt(TEST_PHRASE, { 12: "about|abandon" })}\r`,
     ];
-    terminal.choices = ["Type the words again"];
+    terminal.choices = [WORDS_AGAIN_ANSWER];
     await recover({ "candidates-file": other, ...wrongWallet });
     expect(seen.notices.filter(saved)).toEqual([
       `Saved 1 candidate phrase, NOT encrypted: ${other} (record N is candidate N).`,

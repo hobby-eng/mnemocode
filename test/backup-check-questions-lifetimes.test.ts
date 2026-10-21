@@ -21,6 +21,7 @@ import {
   WRONG_DATE,
 } from "./helpers/test-phrase.js";
 import { publicShare, sskrVectors } from "./helpers/vectors.js";
+import { DATES_AGAIN_ANSWER } from "./helpers/prompts.js";
 
 interface ReadEdges {
   reads: number;
@@ -130,7 +131,7 @@ describe("Backup-check children through the public terminal questions", () => {
       ];
       terminal.choices = [
         kind === "codes" ? "Type the codes again" : "Type the shares again",
-        "Type the dates again",
+        DATES_AGAIN_ANSWER,
       ];
       // Reads 2 and 5 are the questions "What now?", 3 and 6 the answers typed again.
       edges.beforeRead = (read) => {

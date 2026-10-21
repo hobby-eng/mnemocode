@@ -20,8 +20,8 @@ describe("The lifetime of a marked-code search", () => {
     expect(() => notStarted.next()).toThrow("has been wiped");
     expect(() => codes.candidates()).toThrow("has been wiped");
     expect(() => codes.withMode("direct")).toThrow("has been wiped");
-    expect(() => codes.missingPlaces).toThrow("has been wiped");
-    expect(copy.missingPlaces).toEqual([12]);
+    expect(() => codes.placements).toThrow("has been wiped");
+    expect(copy.placements).toEqual([[12]]);
     expect(copy.candidates().next().done).toBe(false);
     expect(first.value).toEqual(TEST_INDEXES);
   });

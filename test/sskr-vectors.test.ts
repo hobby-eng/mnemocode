@@ -173,7 +173,7 @@ describe("Published SSKR v1 vectors", () => {
     expect(() => split(SEED_BYTES - 1)).toThrow(/32 bytes/u);
     expect(() => split(SEED_BYTES + 1)).toThrow(/32 bytes/u);
   });
-  it("rejects metadata conflicts before native reconstruction", () => {
+  it("refuses conflicting set metadata and invalid counts through the set validator", () => {
     const first = vectors.official.shares[0]!;
     const body = urToTransport(vectors.official.shares[1]!).slice(0, -CHECKSUM_BYTES);
     const otherSet = "sskr.transport.shares-of-different-sets";

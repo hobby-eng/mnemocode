@@ -80,10 +80,12 @@ def inside_rim(pixels):
 
 
 def lightness(pixels):
+    """The weighted RGB lightness of every pixel, out of 255."""
     return pixels @ np.array([0.299, 0.587, 0.114])
 
 
 def colourfulness(pixels):
+    """The range of RGB channels at each pixel, out of 255."""
     return pixels.max(axis=2) - pixels.min(axis=2)
 
 
@@ -100,6 +102,7 @@ class Style:
         fit_by_mask=False,
         centring="sides",
     ):
+        """Keep the reference finish and its object-mask settings."""
         # The finish whose object stands out best from its backdrop.
         self.reference = reference
         # True for the pixels of the object, from the blurred RGB
@@ -190,6 +193,7 @@ NEIGHBOURS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 
 def finishes(style):
+    """Yield the named crops of a style from its source catalogue."""
     text = SOURCE.read_text()
     block = text[text.index(f"  {style}: {{") :]
     block = block[: block.index("\n  },")]
@@ -204,6 +208,7 @@ def finishes(style):
 
 
 def crop_of(image, numbers):
+    """Crop the image using the catalogue's source-pixel coordinates."""
     x, y, w, h, source_width, source_height = numbers
     sx, sy = image.width / source_width, image.height / source_height
     box = (
@@ -387,6 +392,7 @@ def rings(mask, kept_holes):
 
 
 def edges(crop):
+    """The gradient magnitude of the crop's blurred lightness."""
     gray = blurred(crop.convert("L"))
     gy, gx = np.gradient(gray)
     return np.hypot(gx, gy)
@@ -527,6 +533,7 @@ def placement(fit, mask, reference_fit, crop):
 
 
 def main(arguments):
+    """Trace material outlines, optionally writing preview images."""
     asked = len(arguments) == 2 and arguments[0] == "--preview"
     preview = Path(arguments[1]) if asked else None
     for style, settings in STYLES.items():

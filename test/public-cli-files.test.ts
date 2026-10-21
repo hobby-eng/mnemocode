@@ -5,6 +5,9 @@ import { PublicCliFiles } from "./helpers/public-cli-files.js";
 import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 it("translates published fixture text into safe files and closes only its own directory", () => {
+  using neighbour = new PublicCliFiles(["encode", "--mnemonic", TEST_PHRASE]);
+  const neighbourPath = value(parseArguments(neighbour.arguments.slice(1)), "mnemonic-file");
+  if (neighbourPath === undefined) throw new Error("The neighbour fixture file is missing.");
   using material = new PublicCliFiles([
     "encode",
     "--mnemonic",
@@ -28,6 +31,7 @@ it("translates published fixture text into safe files and closes only its own di
   material.close();
   expect(existsSync(words)).toBe(false);
   expect(existsSync(dates)).toBe(false);
+  expect(readFileSync(neighbourPath, "utf8")).toBe(`${TEST_PHRASE}\n`);
 });
 
 it("keeps the original raw-share-before-file ordering through the file fixture adapter", () => {

@@ -85,6 +85,7 @@ class Share:
     """The metadata of an SSKR share (BCR-2020-011) and its value."""
 
     def __init__(self, data):
+        """Read share metadata and value; refuse set reserved bits."""
         self.identifier = data[0] << 8 | data[1]
         self.group_threshold = (data[2] >> 4) + 1
         self.group_count = (data[2] & 0x0F) + 1
@@ -181,6 +182,7 @@ def combine(shares):
 
 
 def refused(shares):
+    """Whether the independent combiner refuses these shares."""
     try:
         combine(shares)
     except ValueError:
@@ -189,6 +191,7 @@ def refused(shares):
 
 
 def main():
+    """Check the published share quorums and refusals independently."""
     letters = minimal_bytewords()
     vectors = json.loads(VECTORS.read_text())
     official = vectors["official"]

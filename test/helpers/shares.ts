@@ -21,6 +21,12 @@ import {
 } from "../../src/core/colors.js";
 import { TEST_PHRASE } from "./test-phrase.js";
 
+/**
+ * The master fingerprint of SSKR_SET_VECTOR's phrase, from an independent Python BIP39/BIP32
+ * implementation that first reproduces the published BIP84 vector of "abandon … about".
+ */
+export const SET_FINGERPRINT = "05d027a5";
+
 /** A byte of the share value: the header, identifier and member numbers come before it. */
 export const VALUE_BYTE = 10;
 

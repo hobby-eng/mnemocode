@@ -182,7 +182,7 @@ describe("SSKR quick and feature-first-use checks", () => {
     expect(checkSskrTransportStartup).not.toThrow();
   });
 
-  it("checks the real engine's creation, grouped recovery, insufficient quorum and digest refusal", async () => {
+  it("passes the real engine's known-answer check", async () => {
     await expect(checkSskrKnownAnswers(nodeSharePlatform)).resolves.toBeUndefined();
   });
 

@@ -11,6 +11,7 @@ import { SecretValue } from "../src/core/secret-value.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
 import { WIPED_CODE } from "./helpers/owner-lifetime.js";
 import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { WORDS_AGAIN_ANSWER } from "./helpers/prompts.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -88,7 +89,7 @@ describe("The legacy phrase of recover-word", () => {
     let firstAtSecond: boolean[] = [];
     terminal.answers = [`${LEGACY_WORDS}\r`, `${TEST_PHRASE}\r`];
     terminal.choices = [
-      "Type the words again",
+      WORDS_AGAIN_ANSWER,
       async () => {
         firstAtSecond = phraseValues(made(), LEGACY_WORDS).map(readable);
         return "Done";

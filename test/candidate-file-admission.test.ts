@@ -154,15 +154,12 @@ describe("Candidate file admission", () => {
     expect(prefix.every((byte) => byte === 0)).toBe(true);
   });
 
-  it.each(vectors.age.refuse)(
-    "refuses the unsupported $name header without a key operation",
-    async ({ file }) => {
-      const bytes = hexBytes(file);
-      await expect(
-        CandidateFileAdmission.inspect(bytes.byteLength, async () => bytes.slice()),
-      ).rejects.toMatchObject({ problem: "unsupported" });
-    },
-  );
+  it.each(vectors.age.refuse)("refuses the unsupported $name header", async ({ file }) => {
+    const bytes = hexBytes(file);
+    await expect(
+      CandidateFileAdmission.inspect(bytes.byteLength, async () => bytes.slice()),
+    ).rejects.toMatchObject({ problem: "unsupported" });
+  });
 
   it("gives each refused header its own code, also where two refusals share their words", () => {
     const refusalOf = (run: () => unknown) => {
@@ -208,7 +205,7 @@ describe("Candidate file admission", () => {
     expect(CandidateFileRefusedError.isRefusal(imitation, ["file-changed-while-read"])).toBe(false);
   });
 
-  it.each(["stanza", "body", "MAC"])("refuses malformed %s before decryption", (part) => {
+  it.each(["stanza", "body", "MAC"])("refuses a malformed %s in an age header", (part) => {
     const header = new TextDecoder("latin1").decode(keyFile()).split("\n").slice(0, 4);
     if (part === "stanza") header[1] += " extra";
     else if (part === "body") header[2] = "!";

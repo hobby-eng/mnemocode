@@ -20,7 +20,7 @@ import { exportSskrCards } from "../src/export/sskr-cards.js";
 import { ShareCardSet } from "../src/export/sskr-render.js";
 import { nodeCardRenderer } from "../src/export/platform-node.js";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
@@ -196,6 +196,9 @@ describe("AUD-004 regression contracts", () => {
     return `
       import { createRequire, syncBuiltinESMExports } from "node:module";
       const files = createRequire(import.meta.url)("node:fs/promises");
+      // The TypeScript loader writes its own cache: only this publication is paused.
+      const prefix = ${JSON.stringify(join(dirname(path), ".mnemocode-export-"))};
+      const staging = (path) => typeof path === "string" && path.startsWith(prefix);
       let step = 0;
       async function reached(name) {
         if (step++ !== ${pauseAt}) return;
@@ -205,10 +208,14 @@ describe("AUD-004 regression contracts", () => {
       }
       for (const name of ["mkdtemp", "link", "rm"]) {
         const real = files[name];
-        files[name] = async (...args) => (await reached("before " + name), real(...args));
+        files[name] = async (...args) => {
+          if (staging(args[0])) await reached("before " + name);
+          return real(...args);
+        };
       }
       const { writeFile, appendFile } = files;
       files.writeFile = async (path, bytes, options) => {
+        if (!staging(path)) return writeFile(path, bytes, options);
         await reached("before writeFile");
         await writeFile(path, bytes.subarray(0, bytes.length / 2), options);
         await reached("half written");

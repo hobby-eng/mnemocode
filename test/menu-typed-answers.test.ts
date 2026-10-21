@@ -16,9 +16,14 @@ import {
   POSIX_SHELLS,
   runOf,
   warningsAt,
+  BITCOIN_ADDRESS_QUESTION,
+  PUBLIC_SCANNER_KEY,
+  SHARE_COUNT_QUESTION,
+  SHARE_THRESHOLD_QUESTION,
+  RECORD_FILE_PROMPT,
 } from "./helpers/menu-paths.js";
 import { script } from "./helpers/menu-script.js";
-import { FINGERPRINT_PROMPT } from "./helpers/prompts.js";
+import { FINGERPRINT_PROMPT, SEEDSHIFT_QUESTION } from "./helpers/prompts.js";
 import { TEST_ADDRESS, TEST_FINGERPRINT } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/menu-script.js"));
@@ -40,7 +45,7 @@ describe("start menu", () => {
     ]);
   });
   it.each(["english", "chinese", "unicode", "mapping", "guide"])(
-    "exports the complete %s text from the word lookup entry",
+    "builds arguments for the complete %s text from the word lookup entry",
     async (format) => {
       const choice = ["english", "chinese", "unicode", "mapping", "guide"].indexOf(format);
       const run = await runOf(ENTRY.table, [4, choice]);
@@ -77,7 +82,7 @@ describe("start menu", () => {
         "Type the eight characters of the fingerprint, or press Esc to go back.",
         "A master fingerprint must be eight hexadecimal characters.",
       ]);
-      const address = "Bitcoin address (one of the first receiving ones)";
+      const address = BITCOIN_ADDRESS_QUESTION;
       // BIP173's testnet example, then the public phrase's first native SegWit address.
       await runOf(ENTRY.recover, [...DATE_WALLET, 1], {
         [address]: ["tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx", TEST_ADDRESS],
@@ -90,7 +95,7 @@ describe("start menu", () => {
 
     it("asks the Scanner's key, the lookups and the numbers of shares again", async () => {
       await runOf(ENTRY.recover, [0, 0, 1, 0], {
-        "Scanner key": ["age1", "age12d86zp9uj65df2snvl656uewdl82zrdfya8a2zgxu5rauaw7fsaqrr6w3x"],
+        "Scanner key": ["age1", PUBLIC_SCANNER_KEY],
       });
       expect(warningsAt("Scanner key")[1]).toContain("62 characters");
       expect(await runOf(ENTRY.table, [0], { Word: ["Abandonn", "Abandon"] })).toEqual([
@@ -109,8 +114,8 @@ describe("start menu", () => {
         "5BF6",
       ]);
       // Other: only the refused number is asked again; a good first number stays.
-      const count = "How many shares in all? (2 to 16)";
-      const threshold = "How many of them restore the seed phrase?";
+      const count = SHARE_COUNT_QUESTION;
+      const threshold = SHARE_THRESHOLD_QUESTION;
       expect(
         await runOf(ENTRY.encode, [2, 1, 7, 0, 0, 0], {
           [count]: ["1", "17", "3"],
@@ -166,7 +171,7 @@ describe("start menu", () => {
       const record = join(files, "backup.txt");
       const heirs = "PDF file name";
       const run = await runOf(ENTRY.encode, [1, 0, 0, 1, 0, 1], {
-        "Record file name": [record],
+        [RECORD_FILE_PROMPT]: [record],
         [heirs]: [record, join(files, "heirs.pdf")],
       });
       expect(run).toEqual(expect.arrayContaining(["--heir-sheet", join(files, "heirs.pdf")]));
@@ -175,8 +180,8 @@ describe("start menu", () => {
         "Another file of this task has this name or this folder; choose another one.",
       ]);
       // The next task starts afresh: the same name may be used again.
-      await runOf(ENTRY.encode, [1, 0, 0, 1, 0], { "Record file name": [record] });
-      expect(warningsAt("Record file name")).toEqual([undefined, undefined]);
+      await runOf(ENTRY.encode, [1, 0, 0, 1, 0], { [RECORD_FILE_PROMPT]: [record] });
+      expect(warningsAt(RECORD_FILE_PROMPT)).toEqual([undefined, undefined]);
       // A new folder for cards may not hold a file of the same task either.
       script.lines = [];
       const cards = join(files, "cards");
@@ -190,7 +195,7 @@ describe("start menu", () => {
     });
 
     it("reads no file but checks that the one to read is there and small enough", async () => {
-      const name = "Record file name";
+      const name = RECORD_FILE_PROMPT;
       const large = join(files, "large.txt");
       // A sparse file one byte larger than the 1 MiB that the command reads.
       await writeFile(large, "");
@@ -293,9 +298,7 @@ describe("start menu", () => {
       "--input-file",
       join(files, "record.txt"),
     ]);
-    expect(script.asked.map((asked) => asked.question)).not.toContain(
-      "Was Seedshift used when it was encoded?",
-    );
+    expect(script.asked.map((asked) => asked.question)).not.toContain(SEEDSHIFT_QUESTION);
   });
 });
 

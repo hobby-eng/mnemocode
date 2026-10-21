@@ -20,6 +20,7 @@ import {
   TEST_FINGERPRINT,
   TEST_PHRASE,
 } from "./helpers/test-phrase.js";
+import { RE_ENCODE_CONFIRMATION } from "./helpers/prompts.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -66,7 +67,7 @@ describe("a command with the wallet's options", () => {
         format: "3",
       }),
     );
-    expect(terminal.questions[0]).toBe("Is this the seed phrase to re-encode?");
+    expect(terminal.questions[0]).toBe(RE_ENCODE_CONFIRMATION);
     expect(owners).toHaveLength(2);
     for (const owner of owners) expect(() => owner.passphrase).toThrow(WIPED);
   });

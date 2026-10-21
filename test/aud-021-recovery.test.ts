@@ -81,7 +81,7 @@ describe("AUD-021-FUN001: declared Color Unicode prefix preserves recovery marks
           ]);
           const missing = read.missingCodes("colors-unicode");
           expect(missing.wordCount).toBe(words);
-          expect(missing.missingPlaces).toEqual(expected.missingPlaces);
+          expect(missing.placements).toEqual(expected.placements);
           expect(missing.combinations).toBe(expected.combinations);
           const cropped = view.endsWith("symbols")
             ? colorText(marked, "joined symbols")
@@ -128,7 +128,7 @@ describe("AUD-021-FUN001: declared Color Unicode prefix preserves recovery marks
         BIP39_WORD_COUNTS[0],
       );
       expect(read.marked).toBe(true);
-      expect(read.missingCodes("colors-unicode").missingPlaces).toEqual(expected.missingPlaces);
+      expect(read.missingCodes("colors-unicode").placements).toEqual(expected.placements);
     }
     expect(() => MissingCodes.read(marked.join(""), "colors-unicode", "direct")).toThrow(
       /a \? stands for a whole code/u,

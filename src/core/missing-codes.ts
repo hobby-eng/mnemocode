@@ -392,11 +392,6 @@ export class MissingCodes extends Redacted implements Disposable {
     return this.#wordCount;
   }
 
-  /** The places, counted from 1, whose code is not known, in any placement. */
-  get missingPlaces(): number[] {
-    return [...new Set(this.placements.flat())].sort((a, b) => a - b);
-  }
-
   /**
    * The places, counted from 1, whose code is not known, for each placement that the codes allow:
    * one, but for colors whose tags leave it open (wordPositionPlacements).

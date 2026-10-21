@@ -17,6 +17,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { typedCommand, typedLine } from "../src/cli/shell-command.js";
 import { describeError, refusalMessage } from "../src/core/refusal.js";
 import { recoverLegacyValidLastWords } from "../src/core/words.js";
+import { BIP39_WORD_COUNTS } from "../src/core/bip39-sizes.js";
 import { FIT_NO_FORM } from "../src/core/encoded-backup.js";
 import { BackupReading } from "../src/core/backup-reading.js";
 import { MM, POINTS_PER_INCH as PAGE_POINTS_PER_INCH } from "../src/export/page-units.js";
@@ -119,6 +120,7 @@ import {
   replacedAt,
   TEST_FINGERPRINT,
   TEST_PHRASE,
+  ZERO_ENTROPY_PHRASES,
 } from "./helpers/test-phrase.js";
 
 describe("S100: the default page sizes are named once", () => {
@@ -428,7 +430,7 @@ describe("S128: one reading of what a thrown value says, and rules in the librar
     expect(() => colorsToUnicode(["#a3f09c"])).toThrow("uppercase #RRGGBB");
   });
 
-  it("refuses complete and marked codes that fit no form with one wording", () => {
+  it("refuses marked codes that fit no form and accepts an explicit colour form", () => {
     const reading = BackupReading.of("not codes at all", {
       seedshiftOnly: false,
       shareReader: "the share reader",
@@ -499,9 +501,8 @@ describe("S132: the scaffolding of the self-tests in one place each", () => {
   });
 
   it("gives the public phrase of all-zero entropy of every length", () => {
-    expect(zeroEntropyPhrase(12)).toBe(TEST_PHRASE);
-    expect(zeroEntropyPhrase(24).split(" ")).toHaveLength(24);
-    expect(zeroEntropyPhrase(24).endsWith(" art")).toBe(true);
+    for (const length of BIP39_WORD_COUNTS)
+      expect(zeroEntropyPhrase(length)).toBe(ZERO_ENTROPY_PHRASES[length]);
   });
 });
 
@@ -663,7 +664,7 @@ describe("S145: the coin families share their rules", () => {
     expect(new CoinList(COINS).byId(" Dash ").id).toBe("dash");
   });
 
-  it("names the network once, for every family", () => {
+  it("describes Dash Platform and Bitcoin testnet and checks Bitcoin version and length constants", () => {
     expect(coinById("dash").describe("dash-platform")).toBe("Platform payment (DIP17)");
     expect(
       coinById("bitcoin").parse("tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx").description,
@@ -714,7 +715,7 @@ describe("S148: the release key has one source", () => {
 });
 
 describe("G1-019, G1-023 and G1-025: the names and the designs of exports have one owner", () => {
-  it("names the pages of an export as every front end does", () => {
+  it("names single and multiple export pages and the sample file", () => {
     expect(pageFileName("cards", 0, 1, "pdf")).toBe("cards.pdf");
     expect(pageFileName("cards", 0, 2, "png")).toBe("cards-01.png");
     expect(pageFileName("cards", 1, 2, "png")).toBe("cards-02.png");

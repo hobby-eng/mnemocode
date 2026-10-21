@@ -10,10 +10,11 @@ import { BUILT_CLI } from "./helpers/built-cli.js";
 import { UNREACHED_FAULT_EXIT } from "./helpers/unreached-fault.js";
 import { LONGEST_TEST_TIME_LIMIT_MS } from "./helpers/limits.js";
 import { DATE, ENCODED_FINGERPRINT, TEST_PHRASE, WRONG_DATE } from "./helpers/test-phrase.js";
+import { addressAt, PLATFORM_ADDRESS } from "./helpers/coin-addresses.js";
 
 const execute = promisify(execFile);
 
-/** Declared file-read faults only; the real installation is neither copied nor modified. */
+/** Fault: child-only file-read overrides; the real installation stays unchanged. */
 async function withVirtualBuild(check: (directory: string) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), "mnemocode-integrity-"));
   try {
@@ -201,7 +202,7 @@ interface DamagedCase {
 const WALLET = "dist/core/wallet-evidence-self-test.js";
 
 /**
- * Each check of the self-test with one of its known answers damaged: it must fail, naming what
+ * Fault: damage one known answer of each self-test; it must fail, naming what
  * did not match. Public test data only; each child receives only its declared read overrides.
  */
 const DAMAGED_ANSWERS: readonly DamagedCase[] = [
@@ -343,8 +344,8 @@ const DAMAGED_ANSWERS: readonly DamagedCase[] = [
   {
     name: "the second Dash Platform address, for a host of Dash alone",
     file: "dist/core/coins/dash-self-test.js",
-    from: '"dash1kzjl7qzxy9lar37j8r37z3kvt07epqe20ckxfezw"',
-    to: '"dash1krma5z3ttj75la4m93xcndna9ullamq9y5e9n5rs"',
+    from: JSON.stringify(addressAt("dash", "m/9'/5'/17'/0'/0'/1")),
+    to: JSON.stringify(PLATFORM_ADDRESS),
     module: "core/coins/dash-self-test.js",
     run: "m.DASH_ADDRESS_SELF_TEST.startup()",
     fails: /Dash second address among two mismatch/u,
@@ -370,7 +371,7 @@ const DAMAGED_ANSWERS: readonly DamagedCase[] = [
 ];
 
 /**
- * A feature that accepts a case it must refuse, its refusal taken out of a copy of the build: the
+ * Fault: a child-only read override removes a required refusal of a feature; the
  * check of the feature must fail, saying that the case was accepted or refused for another reason.
  */
 const LOST_REFUSALS: readonly DamagedCase[] = [
@@ -497,7 +498,7 @@ describe("Each self-test check can fail", () => {
     LONGEST_TEST_TIME_LIMIT_MS,
   );
 
-  // Each named by the fault put into the build: a known answer damaged, or a refusal taken out.
+  // Fault: a child-only read damages a known answer or takes out a required refusal.
   const faults = [
     ...DAMAGED_ANSWERS.map((damaged) => ({
       damaged,
@@ -518,7 +519,7 @@ describe("Each self-test check can fail", () => {
       });
     });
 
-  it("stops every command before a secret when a feature's startup answer is damaged", async () => {
+  it("stops encode without printing the phrase when a feature's startup answer is damaged", async () => {
     await withVirtualBuild(async (directory) => {
       const { file, from, to } = DAMAGED_ANSWERS.find((damaged) => damaged.file === WALLET)!;
       await patchBuild(directory, file, from, to);

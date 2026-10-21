@@ -135,6 +135,7 @@ import { EncodedBackup } from "../src/core/encoded-backup.js";
 import { backupCardContent } from "../src/export/backup-cards.js";
 import { separateCardName } from "../src/export/card-codes.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { BACKUP_CHECK_QUESTION } from "./helpers/prompts.js";
 
 let folder: string;
 
@@ -236,7 +237,7 @@ describe.runIf(PAGE_IMAGES)(
   "AUD-021-FUN003: one card plan through the production Encode dispatcher",
   () => {
     it.each(["colors-unicode", "colors", "unicode"] as const)(
-      "shares every real code and decorative decoy across all destinations for %s",
+      "keeps real codes across destinations, sheet decoys in PDF and images, and a sheet decoy on cards for %s",
       async (format) => {
         PrivateSteps.close();
         await runEncode(argumentsFor(format));
@@ -280,7 +281,7 @@ describe.runIf(PAGE_IMAGES)(
           "What now?",
           "What now?",
           "What now?",
-          "Check the backup now?",
+          BACKUP_CHECK_QUESTION,
         ]);
         expect(seen.notices.filter((line) => line.includes("could not be saved"))).toEqual([
           `The PDF could not be saved as ${pathOf("pdf")}: the disk is full.`,
@@ -301,7 +302,7 @@ describe.runIf(PAGE_IMAGES)(
         expect(saved()).toEqual(["images", "cards"]);
         expect(seen.notices).toContain("The PDF was not saved.");
         expect(seen.notices.some((line) => line.startsWith("Saved PDF:"))).toBe(false);
-        expect(terminal.questions).toEqual(["What now?", "Check the backup now?"]);
+        expect(terminal.questions).toEqual(["What now?", BACKUP_CHECK_QUESTION]);
       },
       LONG_TEST_TIME_LIMIT_MS,
     );
@@ -345,7 +346,7 @@ describe.runIf(PAGE_IMAGES)(
         expect(seen.notices).toContain(
           `The PDF could not be saved as ${pathOf("pdf")}: synthetic font read failure.`,
         );
-        expect(terminal.questions).toEqual(["What now?", "Check the backup now?"]);
+        expect(terminal.questions).toEqual(["What now?", BACKUP_CHECK_QUESTION]);
       },
       LONG_TEST_TIME_LIMIT_MS,
     );

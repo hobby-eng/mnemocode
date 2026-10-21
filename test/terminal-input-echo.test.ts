@@ -385,7 +385,7 @@ describe("visible answer on the terminal", () => {
   });
 
   it(
-    "takes the same time for each key however long the answer is",
+    "echoes a long answer within a fixed output budget",
     async () => {
       // Counting the whole answer again for each key took minutes for this many bytes.
       process.stderr.columns = 80;
@@ -398,6 +398,7 @@ describe("visible answer on the terminal", () => {
       const keys = keyboard(`${text}\r`);
       expect(await readLine(keys.next, { echo: true })).toBe(text);
       expect(shown).toBeGreaterThan(Buffer.byteLength(text));
+      expect(shown).toBeLessThan(Buffer.byteLength(text) * 8);
     },
     LINEAR_ECHO_TIME_LIMIT_MS,
   );

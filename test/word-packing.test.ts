@@ -63,7 +63,7 @@ describe("packing word indexes into bytes", () => {
     }
   });
 
-  it("refuses an index that is no word index, and a hole, wherever it stands", () => {
+  it("refuses invalid word indexes and holes in the tested positions", () => {
     for (const wrong of [2048, 4096, -1, 1.5, Number.NaN]) {
       expect(() => entropyOfWords(phraseWith(wrong))).toThrow(
         expect.objectContaining({ code: NO_WORD_INDEX }),

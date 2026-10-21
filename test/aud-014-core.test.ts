@@ -15,7 +15,7 @@ import { formatConflictOf, modeConflictOf } from "../src/core/backup-reading.js"
 import { DATE_COUNT_WORDS, Masking } from "../src/core/masking.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
-import type { MaskingMode } from "../src/core/types.js";
+import { MASKING_MODES, type MaskingMode } from "../src/core/types.js";
 import { MALFORMED_WALLET_ANSWER, type WalletMatch } from "../src/core/wallet-check.js";
 import { withHoles } from "./helpers/holes.js";
 import {
@@ -161,7 +161,7 @@ describe("AUD-014-API006: MissingCodes refuses a mode that names none when it is
   });
 
   it("keeps every mode that names one, and the guards of the places", () => {
-    for (const mode of Masking.MODES)
+    for (const mode of MASKING_MODES)
       expect(MissingCodes.read(LAST_WORD_FORGOTTEN, "english", mode).mode).toBe(mode);
     expect(() => MissingCodes.read(TEST_PHRASE, "english", "direct")).toThrow(/No code is marked/u);
   });
@@ -274,7 +274,7 @@ describe("AUD-014 recommendation 4: the last word's entropy, one rule", () => {
 
   it("keeps every mode's search costs and last-word modulus", () => {
     // Fixed known answers: 2048 without a shift of the entropy alone, 2^(11 - bits) with one.
-    const table = Masking.MODES.map((mode) => {
+    const table = MASKING_MODES.map((mode) => {
       const masking = Masking.of(mode);
       return [
         mode,

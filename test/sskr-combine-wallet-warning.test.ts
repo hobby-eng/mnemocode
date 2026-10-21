@@ -24,6 +24,7 @@ import { SSKR_SET_VECTOR } from "../src/sskr/known-answers.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
 import { MASKED_WORDS, TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { SET_FINGERPRINT } from "./helpers/shares.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -46,12 +47,6 @@ vi.mock("node:crypto", async (importOriginal) => {
   };
 });
 
-/**
- * The master fingerprint and the first receiving BIP84 address (m/84'/0'/0'/0/0) of the phrase of
- * SSKR_SET_VECTOR, computed with an independent Python implementation of BIP39, BIP32 and BIP84
- * that first reproduces the published BIP84 vector of "abandon … about".
- */
-const SET_FINGERPRINT = "05d027a5";
 const SET_ADDRESS = "bc1qdsdxmlnu5phmwaw9fy88vm57n552l9ztcg4rev";
 
 /** Each line of standard output and of the notices, in the order printed. */

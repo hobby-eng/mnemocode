@@ -10,12 +10,21 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { MENU_ENTRIES, runMenu } from "../src/cli/menu.js";
 import { askLine, choose, waitForEnter } from "../src/cli/terminal-choice.js";
 import { ErrorCatalog } from "../src/core/error-catalog.js";
-import { COIN_ADDRESS_ANSWERS } from "./helpers/coin-addresses.js";
+import {
+  USUAL,
+  SHARE_COUNT_QUESTION,
+  CARD_DESIGN_QUESTION,
+  BACKUP_QR_QUESTION,
+  COIN_QUESTION,
+  SHEET_ORIENTATION_QUESTION,
+  CARD_DETAILS_QUESTION,
+  SHARE_THRESHOLD_QUESTION,
+} from "./helpers/menu-paths.js";
+import { TEST_FINGERPRINT } from "./helpers/test-phrase.js";
 import { terminal } from "./helpers/keyed-terminal.js";
 import type { DrawnQuestion } from "./helpers/drawn-question.js";
 import { ENCODE_FORM_LABELS } from "./helpers/encode-form-cases.js";
 import { CTRL_D, DOWN, ENTER, ESCAPE, LEFT } from "./helpers/keys.js";
-import { FINGERPRINT_PROMPT } from "./helpers/prompts.js";
 import {
   answer,
   answerLine,
@@ -28,7 +37,6 @@ import {
   watchScreen,
   type Screen,
 } from "./helpers/terminal-screen.js";
-import { TEST_ADDRESS, TEST_FINGERPRINT } from "./helpers/test-phrase.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/keyed-terminal.js"));
 vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
@@ -148,7 +156,7 @@ describe("the wait for Enter", () => {
 const MENU_QUESTION = "What do you want to do?";
 // Narrower than TEXT_WIDTH, so that lists, prompts and lines of the record wrap.
 const COLUMNS = 40;
-const SHARE_COUNT = "How many shares in all? (2 to 16)";
+const SHARE_COUNT = SHARE_COUNT_QUESTION;
 
 /**
  * A file name that wraps both its prompt and its line in the record of answers, one for each
@@ -161,17 +169,9 @@ function longFileName(fallback: string): string {
 
 /** The typed answers to the questions without a fallback, as public test data. */
 const TYPED: Readonly<Record<string, string>> = {
-  "How many of them restore the seed phrase?": "4",
-  Word: "abandon",
-  "Word number": "1",
+  ...USUAL,
+  // Preserve this screen walk's original lookup input while sharing the other answers.
   "Unicode code": "4E00",
-  // The public test phrase's fingerprint and its first native SegWit address.
-  [FINGERPRINT_PROMPT]: TEST_FINGERPRINT,
-  "Bitcoin address (one of the first receiving ones)": TEST_ADDRESS,
-  // The public test phrase\'s first address in each other coin.
-  ...COIN_ADDRESS_ANSWERS,
-  // A public test key: the recipient of a key that is thrown away.
-  "Scanner key": "age12d86zp9uj65df2snvl656uewdl82zrdfya8a2zgxu5rauaw7fsaqrr6w3x",
 };
 
 /** The question after an address: among how many of the first addresses it is. */
@@ -182,10 +182,10 @@ const SHARE_SET = /^\d+ of \d+$/u;
 
 /** Lists whose entries all lead to the same questions: only the first is chosen. */
 const SAME_QUESTIONS = new Set([
-  "Which card design?",
-  "Add a QR code with the codes of the backup, without the extra cards?",
-  "Which coin is the address for?",
-  "How should the sheets be turned?",
+  CARD_DESIGN_QUESTION,
+  BACKUP_QR_QUESTION,
+  COIN_QUESTION,
+  SHEET_ORIENTATION_QUESTION,
 ]);
 
 /**
@@ -196,7 +196,7 @@ const SAME_QUESTIONS = new Set([
 const WALKED_ONCE = new Set([
   "Which kind of file?",
   "How should the cards be laid out?",
-  "Type your own details for the cards?",
+  CARD_DETAILS_QUESTION,
 ]);
 const firstPath = new Map<string, string>();
 
@@ -453,7 +453,7 @@ describe("going back from an entry of the start menu", () => {
     expect(lines.filter((line) => /^ {2}(In all|Restore) /u.test(line))).toEqual([]);
     expect(lines).toContain("! Choose 2 to 16 shares.");
     // The threshold comes next, under the count that was taken.
-    expect(run!.askings[5]!.question.question).toBe("How many of them restore the seed phrase?");
+    expect(run!.askings[5]!.question.question).toBe(SHARE_THRESHOLD_QUESTION);
     expect(run!.shown[5]).toContain("  In all      7");
   });
 });

@@ -7,8 +7,9 @@
 import { EventEmitter } from "node:events";
 import { expect, onTestFinished, vi } from "vitest";
 
-/** Makes both streams terminals until the end of the current test. */
+/** Makes both streams redraw-capable terminals; restores streams and environment stubs after. */
 export function streamsAsTerminal(): void {
+  vi.stubEnv("TERM", "xterm");
   const saved = (["stdout", "stderr"] as const).map(
     (name) => [name, Object.getOwnPropertyDescriptor(process[name], "isTTY")] as const,
   );
@@ -18,6 +19,7 @@ export function streamsAsTerminal(): void {
     for (const [name, descriptor] of saved)
       if (descriptor === undefined) Reflect.deleteProperty(process[name], "isTTY");
       else Object.defineProperty(process[name], "isTTY", descriptor);
+    vi.unstubAllEnvs();
   });
 }
 

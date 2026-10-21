@@ -104,7 +104,7 @@ describe("The self-test as a library (core/self-test.ts)", () => {
     expect(report.milliseconds).toBe(1_750);
   });
 
-  it("stops at the first check that fails, and refuses a damaged vectors file", async () => {
+  it("refuses a mismatched fingerprint, a missing vector and an absent host fingerprint", async () => {
     const failing = new MnemoCodeSelfTest({
       fingerprint: () => "00000000",
       publicVectors,

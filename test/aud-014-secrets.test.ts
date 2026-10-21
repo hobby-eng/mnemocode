@@ -65,7 +65,7 @@ function fileWith(bytes: Uint8Array | string): string {
 }
 
 describe("AUD-014-SEC001: only the three known protections, none only when chosen", () => {
-  it("refuses the audit's misspelt, unknown and missing kinds before any list is written", () => {
+  it("refuses the audit's misspelt, unknown and missing protection kinds", () => {
     for (const kind of ["passpharse", "unknown", undefined])
       expect(
         // A kind that no type allows, fed on purpose as a JavaScript host could.
@@ -81,7 +81,7 @@ describe("AUD-014-SEC001: only the three known protections, none only when chose
       );
   });
 
-  it("refuses a malformed choice of any kind, and repeats none of its fields", () => {
+  it("gives one refusal for malformed protection choices without echoing a passphrase", () => {
     const malformed: unknown[] = [
       undefined,
       null,
@@ -114,7 +114,7 @@ describe("AUD-014-SEC001: only the three known protections, none only when chose
       assert.instanceOf(refusal, TypeError, JSON.stringify(choice));
       messages.add(refusal.message);
     }
-    // One message for every choice, so that no field of any choice is in it.
+    // Every malformed choice gives the same message, which leaves out the passphrase.
     expect(messages.size).toBe(1);
     expect([...messages][0]).not.toContain(LIST_PASSPHRASE);
   });
@@ -183,7 +183,7 @@ describe("AUD-014-API002: a file or standard input is valid UTF-8 or refused", (
     expect(allWiped()).toBe(true);
   });
 
-  it("refuses a malformed passphrase file for a candidate list before any search", async () => {
+  it("refuses a malformed passphrase file for a candidate list", async () => {
     const passphraseFile = fileWith(
       Buffer.concat([Buffer.from(LIST_PASSPHRASE), Buffer.from([0xc0, 0x80, 0x0a])]),
     );

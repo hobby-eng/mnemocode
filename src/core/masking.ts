@@ -237,9 +237,6 @@ export const DATE_COUNT_WORDS = Object.freeze({
   }),
 } satisfies Readonly<Record<string, DateCountWords>>);
 
-/** The modes, in the order the menu and the help name them. */
-const MODES: readonly MaskingMode[] = MASKING_MODES;
-
 /**
  * One transformation mode. A class, so that every rule that tells the modes apart is the
  * operation of one value, chosen once with `of`, and no caller switches over the mode names; the
@@ -254,12 +251,9 @@ export class Masking {
     this.#variant = VARIANTS[mode];
   }
 
-  /** Every mode, in the order the menu and the help name them. */
-  static readonly MODES: readonly MaskingMode[] = MODES;
-
-  /** The one value of each mode, made from MODES, which is MASKING_MODES: every mode. */
+  /** The one value of each mode, in the order of MASKING_MODES. */
   static readonly #values: ReadonlyMap<MaskingMode, Masking> = new Map(
-    MODES.map((mode) => [mode, new Masking(mode)]),
+    MASKING_MODES.map((mode) => [mode, new Masking(mode)]),
   );
 
   /** Whether `value` names a mode; a JavaScript host or a parsed file may pass anything. */
@@ -359,7 +353,7 @@ export class Masking {
    * word gives (withValidLastWord) cannot.
    */
   get encodable(): boolean {
-    return !MODES.some((mode) => variantOf(mode).withValidLastWord === this.#mode);
+    return !MASKING_MODES.some((mode) => variantOf(mode).withValidLastWord === this.#mode);
   }
 
   /**

@@ -141,7 +141,7 @@ export class ClaimedOutputs {
    * name is no folder. A file of that name may exist: the command saves under the next numbered
    * name.
    */
-  static async #outputFile(answer: string): Promise<string> {
+  static async #outputFile(this: void, answer: string): Promise<string> {
     const path = typedPath(answer);
     ClaimedOutputs.#assertFree(path);
     await preflightFileDestination(path, true);
@@ -154,7 +154,7 @@ export class ClaimedOutputs {
    * (preflightFolderDestination): the command makes the folders of its path that do not exist yet
    * and numbers a name that is taken.
    */
-  static async #newFolder(answer: string): Promise<string> {
+  static async #newFolder(this: void, answer: string): Promise<string> {
     const path = typedPath(answer);
     ClaimedOutputs.#assertFree(path);
     await preflightFolderDestination(path);

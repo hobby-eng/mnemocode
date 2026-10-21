@@ -2,8 +2,13 @@
 // the result is saved there (save-retry.ts): a warning kept for the rest of the command must be
 // about a file that is saved.
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { saveWithRetry } from "../src/cli/save-retry.js";
 import { PrivateSteps } from "../src/cli/private-steps.js";
+import { preflightFileDestination } from "../src/cli/output-paths.js";
+import { streamsAsTerminal } from "./helpers/terminal-streams.js";
 
 vi.mock("node:tty", async (original) => ({
   ...(await original<typeof import("node:tty")>()),
@@ -16,20 +21,23 @@ vi.mock("../src/cli/terminal-input.js", async (original) =>
 const { keyboard } = typing;
 
 let output: string[];
+let directory: string;
 const typed = (text: string): number[] => [...Buffer.from(text, "utf8")];
-beforeEach(() => {
+beforeEach(async () => {
+  directory = await mkdtemp(join(tmpdir(), "mnemocode-save-retry-"));
+  await mkdir(join(directory, "Dropbox"));
   output = [];
   vi.stubEnv("NO_COLOR", "1");
   vi.stubEnv("TERM", "xterm");
-  for (const stream of [process.stdin, process.stdout, process.stderr])
-    Object.defineProperty(stream, "isTTY", { configurable: true, value: true });
+  streamsAsTerminal();
   vi.spyOn(process.stderr, "write").mockImplementation((text) => (output.push(String(text)), true));
   vi.spyOn(console, "error").mockImplementation((line: unknown) => output.push(String(line)));
 });
-afterEach(() => {
+afterEach(async () => {
   PrivateSteps.close();
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
+  await rm(directory, { recursive: true, force: true });
 });
 
 it("warns of a cloud copy of another name only once saved there", async () => {
@@ -39,7 +47,7 @@ it("warns of a cloud copy of another name only once saved there", async () => {
   );
   const written: string[] = [];
   let failures = 2;
-  const cloud = "/public/Dropbox/other.txt";
+  const cloud = join(directory, "Dropbox", "other.txt");
   const marks: number[] = [];
   // Fails at the given name, then at the other name; "Try again" saves it.
   keyboard.bytes = [0x32, ...typed(cloud), 0x0d, 0x31];
@@ -52,7 +60,7 @@ it("warns of a cloud copy of another name only once saved there", async () => {
       marks.push(output.join("").split("Dropbox keeps a copy").length - 1);
       if (failures-- > 0) throw Object.assign(new Error("Synthetic."), { code: "EACCES" });
     },
-    checkName: async () => undefined,
+    checkName: (path) => preflightFileDestination(path, false),
   });
   expect(saved).toBe(cloud);
   expect(written).toEqual(["public.txt", cloud, cloud]);

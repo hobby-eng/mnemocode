@@ -15,6 +15,7 @@ import { ESCAPE } from "./helpers/keys.js";
 import { questionsOnPrivateScreen, seen, terminal } from "./helpers/question-terminal.js";
 import { OTHER_SET_SHARE, promptsShown, SHARES, SHARES_PROMPT } from "./helpers/share-questions.js";
 import { TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { SECOND_SHARE_PROMPT } from "./helpers/prompts.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -129,7 +130,7 @@ describe("shares on the private screen", () => {
       expect(seen.notices).toContain(
         "Shares 1 and 2 are of different sets, and nothing tells which is right.",
       );
-      expect(promptsShown()).toEqual([SHARES_PROMPT, "Share 2 again, or its text file path:"]);
+      expect(promptsShown()).toEqual([SHARES_PROMPT, SECOND_SHARE_PROMPT]);
       expect(seen.out).toEqual([
         writeShare(SHARES[0], "indexes"),
         writeShare(SHARES[2], "indexes"),

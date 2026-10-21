@@ -25,11 +25,10 @@ import { CTRL_C, CTRL_D, ESCAPE } from "./helpers/keys.js";
 import { FINGERPRINT_PROMPT, WALLET_QUESTION } from "./helpers/prompts.js";
 import { DATE, TEST_ADDRESS, TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { Keyboard, keyboardAsStandardInput } from "./helpers/terminal-streams.js";
+import { BITCOIN_ADDRESS_QUESTION, COIN_QUESTION } from "./helpers/menu-paths.js";
 
 /** A valid testnet address (BIP173's example), which mainnet refuses by name. */
 const TESTNET_ADDRESS = "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx";
-/** The other list question of the wallet, as askWalletEvidence asks it. */
-const COIN_QUESTION = "Which coin is the address for?";
 
 /** A question to answer once it shows: a typed one by its prompt, a list one by its question. */
 type AwaitedQuestion =
@@ -241,8 +240,8 @@ describe("questions asked again until the answer can be used", () => {
     notices = [];
     pick(WALLET_QUESTION, "Address");
     pick(COIN_QUESTION, "Bitcoin");
-    at("Bitcoin address (one of the first receiving ones):", `${TESTNET_ADDRESS}\r`);
-    at("Bitcoin address (one of the first receiving ones):", `${TEST_ADDRESS}\r`);
+    at(`${BITCOIN_ADDRESS_QUESTION}:`, `${TESTNET_ADDRESS}\r`);
+    at(`${BITCOIN_ADDRESS_QUESTION}:`, `${TEST_ADDRESS}\r`);
     // How many of the first addresses it is compared with: Enter takes the first 20.
     at("Compare with how many addresses from the first (Enter: 20):", "\r");
     const answer = await askWalletEvidence({ optional: false });
@@ -261,7 +260,7 @@ describe("questions asked again until the answer can be used", () => {
     notices = [];
     pick(WALLET_QUESTION, "Address");
     pick(COIN_QUESTION, "Bitcoin");
-    at("Bitcoin address (one of the first receiving ones):", `${TEST_ADDRESS}\r`);
+    at(`${BITCOIN_ADDRESS_QUESTION}:`, `${TEST_ADDRESS}\r`);
     at("Compare with how many addresses from the first (Enter: 20):", "0\r");
     at("Compare with how many addresses from the first (Enter: 20):", "1001\r");
     at("Compare with how many addresses from the first (Enter: 20):", "50\r");

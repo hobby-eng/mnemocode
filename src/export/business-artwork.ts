@@ -17,8 +17,8 @@ import { defined } from "../core/defined.js";
 /** Pixels per millimetre of the business artwork: 254 dpi, 900 x 500 on a business card. */
 const ARTWORK_PIXELS_PER_MM = 10;
 /**
- * The deflate level of the recoloured artwork's PNG: zlib's default level (Z_DEFAULT_COMPRESSION
- * is 6), its balance of size against time, as recoloured encodes the artwork anew for each
+ * The deflate level of the recoloured artwork's PNG: level 6, selected by zlib's default
+ * (Z_DEFAULT_COMPRESSION is -1), balances size against time as recoloured encodes it for each
  * reference.
  */
 const ARTWORK_DEFLATE_LEVEL = 6;

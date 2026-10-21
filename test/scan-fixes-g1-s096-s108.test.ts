@@ -164,7 +164,7 @@ describe("G1-031 follow-up: the count of the dates of a pattern", () => {
 });
 
 describe("G1-016 and G1-017: one source of the files of cards and of drawing them", () => {
-  it("draws a business card at 1062 x 590 pixels and keeps the facts of each format", () => {
+  it("converts a business card to 1062 x 590 pixels and checks image format settings", () => {
     const points = (millimetres: number): number => (millimetres * POINTS_PER_INCH) / 25.4;
     expect([coveredPixels(points(90)), coveredPixels(points(50))]).toEqual([1062, 590]);
     expect(JPEG_QUALITY).toBe(90);
@@ -555,7 +555,7 @@ describe("S096: one rule decides between a separate card and a sheet", () => {
     );
   });
 
-  it("refuses an index that is not one of the cards in every family, sheet or not", async () => {
+  it("refuses an index outside the business sheet's cards", async () => {
     // Before the check was part of the rule, the business family drew the whole-share sheet here.
     await expect(renderBusinessCards(nodeCardRenderer, "it", share, 99)).rejects.toThrow(
       "There is no card 100",
@@ -704,7 +704,7 @@ describe("S098, S099: a separate card is one card centred on its page", () => {
 });
 
 describe("S146 follow-up: finish rows state their photograph once; one new-folder rule", () => {
-  it("measures each crop on its material's photograph", () => {
+  it("measures the ivory kitchen crop and keeps charcoal and sand finish settings", () => {
     const [ivory] = MATERIAL_ARTWORK.kitchen.finishes;
     expect(ivory!.crop).toEqual([49 / 1580, 186 / 996, 346 / 1580, 250 / 996]);
     expect(ivory!.outlineFit).toBeUndefined();

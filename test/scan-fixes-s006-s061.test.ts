@@ -143,7 +143,7 @@ describe("S009: one look-up in the word table", () => {
     expect(() => wordTableRow("unicode", "0000")).toThrow("No BIP39 word has that code");
   });
 
-  it("the command line takes a word in capitals as the menu does", async () => {
+  it("the word lookup command accepts a capitalized word", async () => {
     const lines: string[] = [];
     const log = vi.spyOn(console, "log").mockImplementation((line: string) => lines.push(line));
     try {
@@ -229,7 +229,7 @@ describe("S011: one reader of word numbers and Unicode codes", () => {
     expect(wordNumberOf(0)).toBe(1);
   });
 
-  it("reads Unicode codes of a phrase and of a share with one message", () => {
+  it("reads Unicode codes of a phrase and refuses incomplete or unknown codes", () => {
     expect(unicodeIndexesOf("7684 7684")).toEqual([0, 0]);
     expect(() => unicodeIndexesOf("768")).toThrow("four hexadecimal digits each");
     expect(() => unicodeIndexesOf("7684 0000")).toThrow("Unicode code 2 is not a BIP39 word.");
@@ -544,7 +544,7 @@ describe("S032: one range of the Color Unicode characters", () => {
 });
 
 describe("S033: one check of a color and of a code point's digits", () => {
-  it("takes a color in any case, with or without #, as every card export does", () => {
+  it("normalizes colour references with either letter case and an optional hash", () => {
     for (const color of ["#A3F09C", "#a3f09c", "a3f09c"]) {
       expect(isRgbReference(color)).toBe(true);
       expect(rgbReferenceDigits(color)).toBe("A3F09C");
@@ -677,7 +677,7 @@ describe("S043-S045: one table of the parts of a date", () => {
     expect(Object.isFrozen(parseDatePattern("2?-09-2026"))).toBe(true);
   });
 
-  it("finds the earlier pattern of each key once, for the count and the search alike", () => {
+  it("finds the immediately preceding pattern with the same key", () => {
     const one = parseDatePattern("2?-09-2026");
     const other = parseDatePattern("1?-09-2026");
     expect(sameKeyPredecessors([one, other, one, one])).toEqual([undefined, undefined, 0, 2]);

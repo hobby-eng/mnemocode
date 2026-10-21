@@ -12,7 +12,7 @@ import { CheckedSskrBridge } from "./bridge.js";
  * Node.js host: OpenSSL's HMAC and the bundled, integrity-checked SSKR WASM (runtime.ts). The
  * records joined by line breaks and the threshold and count as a pair of bytes are the bridge's
  * own interface: create_sskr_shares and recover_sskr_shares in sskr-wasm/rust/src/lib.rs, the
- * Compact UR wrappers of create_sskr_shares_formatted and recover_sskr_shares_formatted, define
+ * Compact UR functions over create_sskr_shares_formatted and recover_sskr_shares_formatted, define
  * it, and this platform calls them.
  */
 export const nodeSharePlatform: SharePlatform = {

@@ -76,6 +76,7 @@ import { COLOR_FORMAT_NUMBERS, formatLegend } from "../src/cli/format-numbers.js
 import { HEIR_MENU } from "../src/cli/heir-sheet.js";
 import { TOPIC_HELP } from "../src/cli/help-pages.js";
 import { DATE, MASKED, TEST_FINGERPRINT, TEST_PHRASE } from "./helpers/test-phrase.js";
+import { SEEDSHIFT_QUESTION } from "./helpers/prompts.js";
 
 describe("AUD-011-ARC001: one reader of a known word number", () => {
   it("reads numbers alike in complete codes and beside a ?", () => {
@@ -100,7 +101,7 @@ describe("AUD-011-ARC001: one reader of a known word number", () => {
     // A padded known number beside a ? was refused, though complete codes read it.
     const padded = MASKED.replace(/^2027 10/u, "2027 0010").replace(/377$/u, "?");
     expect(parseInput(MASKED.replace(/^2027 10/u, "2027 0010"), "indexes")[1]).toBe(9);
-    expect(MissingCodes.read(padded, "indexes", "seedshift").missingPlaces).toEqual([12]);
+    expect(MissingCodes.read(padded, "indexes", "seedshift").placements).toEqual([[12]]);
     expect(() => MissingCodes.read(padded.replace("0010", "2049"), "indexes", "seedshift")).toThrow(
       "Word number 2 is no number from 1 through 2048.",
     );
@@ -158,7 +159,10 @@ describe("AUD-011-ARC002, ARC003, ARC020: the color form has one decoder and der
       (set: readonly string[]) => [...set],
       (set: readonly string[]) => [...set].reverse(),
       (set: readonly string[]) => [...set.slice(3), ...set.slice(0, 3)],
-      (set: readonly string[]) => [...set.filter((_, at) => at % 2 === 1), ...set.filter((_, at) => at % 2 === 0)],
+      (set: readonly string[]) => [
+        ...set.filter((_, at) => at % 2 === 1),
+        ...set.filter((_, at) => at % 2 === 0),
+      ],
     ];
     for (const set of [colors, offset]) {
       for (const order of orders) expect(colorsToIndexes(order(set))).toEqual(indexes);
@@ -375,7 +379,6 @@ describe("AUD-011-ARC018, ARC037: one list of forms and modes, and their numbers
     for (const format of ENCODED_FORMATS)
       for (const mode of MASKING_MODES)
         expect(parseRecord(serializeRecord(mode, format, "x"))).toMatchObject({ mode, format });
-    expect(MASKING_MODES).toEqual(Masking.MODES);
     expect(() => parseRecord("MNC1:shifted:english:x")).toThrow(
       "Malformed MnemoCode record header.",
     );
@@ -707,7 +710,7 @@ describe("A place and a count of addresses as typed, read in core for every host
 describe("AUD-011-ARC038: the Seedshift questions are worded once", () => {
   it("leads the sheet for heirs through the words of the menu", () => {
     expect(HEIR_MENU.decode).toMatchObject({
-      question: "Was Seedshift used when it was encoded?",
+      question: SEEDSHIFT_QUESTION,
       answers: {
         direct: "No",
         seedshift: "MnemoCode Seedshift",

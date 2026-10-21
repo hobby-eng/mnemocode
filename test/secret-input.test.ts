@@ -49,7 +49,7 @@ const typed = (answer: string) => answer;
 import { CANCELLED, type MoreWithin, type NextByte } from "../src/cli/terminal-keys.js";
 import { BUILT_CLI } from "./helpers/built-cli.js";
 import { BACKSPACE, CTRL_C } from "./helpers/keys.js";
-import { DATES_PROMPT, DECODE_DATES_PROMPT } from "./helpers/prompts.js";
+import { DATES_PROMPT, DECODE_DATES_PROMPT, SEED_PHRASE_PROMPT } from "./helpers/prompts.js";
 import { DATE, TEST_PHRASE } from "./helpers/test-phrase.js";
 
 let written: string[];
@@ -69,8 +69,8 @@ afterEach(() => vi.restoreAllMocks());
 describe("secret input", () => {
   it("reads the answer at a hidden prompt and shows only the question", async () => {
     terminal.answers = "  test only  \r";
-    expect(await askSecretUntil("Seed phrase (English BIP39 words):", typed)).toBe("test only");
-    expect(written.join("")).toBe("Seed phrase (English BIP39 words): \n");
+    expect(await askSecretUntil(SEED_PHRASE_PROMPT, typed)).toBe("test only");
+    expect(written.join("")).toBe(`${SEED_PHRASE_PROMPT} \n`);
   });
 
   it("shows the answer as it is typed on the private screen, which is cleared afterwards", async () => {

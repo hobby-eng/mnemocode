@@ -9,7 +9,7 @@ const COLORS = sskrVectors().official.firstShareColors;
 
 describe("bounded single-share repair budgets", () => {
   it.each([-1, 0.5, NaN, Infinity, 9, 31, 32, 40])(
-    "refuses the unsupported free-bit budget %s before reading even an intact share",
+    "refuses the unsupported free-bit budget %s for an intact share",
     (budget) => {
       expect(() => repairCandidates(SHARE, budget)).toThrow(
         expect.objectContaining({ code: "sskr.repair.free-bits-budget" }),

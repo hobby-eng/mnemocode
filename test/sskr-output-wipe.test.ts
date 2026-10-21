@@ -52,11 +52,11 @@ describe("SSKR recovered output ownership", () => {
     },
   );
 
-  it("also wipes and releases the intermediate when making the host copy fails", () => {
+  it("also wipes the intermediate when making the host copy fails", () => {
     const failure = new Error("Synthetic host copy failure.");
     // oxlint-disable-next-line typescript/unbound-method -- the observer invokes this intrinsic with its explicit receiver through call.
     const fill = Uint8Array.prototype.fill;
-    let erasedBeforeFree = false;
+    let erased = false;
     vi.spyOn(Uint8Array.prototype, "fill").mockImplementation(function (
       this: Uint8Array,
       value,
@@ -65,7 +65,7 @@ describe("SSKR recovered output ownership", () => {
     ) {
       const result = fill.call(this, value, start, end);
       if (this.buffer === wasm.memory.buffer && this.length === expected.length)
-        erasedBeforeFree = this.every((byte) => byte === 0);
+        erased = this.every((byte) => byte === 0);
       return result;
     });
     vi.spyOn(Uint8Array.prototype, "slice").mockImplementationOnce(() => {
@@ -73,7 +73,7 @@ describe("SSKR recovered output ownership", () => {
     });
     expect(() => recover_sskr_shares(compact)).toThrow(failure);
     vi.restoreAllMocks();
-    expect(erasedBeforeFree).toBe(true);
+    expect(erased).toBe(true);
     // The allocator may write free-list metadata after the wipe; it must not retain the entropy.
     expect(outputTail()).not.toEqual(expected.subarray(expected.length / 2));
     const next = recover_sskr_shares(compact);

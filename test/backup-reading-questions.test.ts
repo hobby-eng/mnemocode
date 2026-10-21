@@ -4,6 +4,7 @@ import { askEncodedBackup } from "../src/cli/backup-questions.js";
 import { CANCELLED, type Cancelled } from "../src/cli/terminal-keys.js";
 import { questionsOnPrivateScreen, terminal } from "./helpers/question-terminal.js";
 import { LAST_WORD_FORGOTTEN } from "./helpers/test-phrase.js";
+import { SEEDSHIFT_QUESTION } from "./helpers/prompts.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -32,9 +33,7 @@ describe("Backup reading lifetime across an asynchronous question", () => {
         seedshiftOnly: false,
         marks: true,
       });
-      await vi.waitFor(() =>
-        expect(terminal.questions).toContain("Was Seedshift used when it was encoded?"),
-      );
+      await vi.waitFor(() => expect(terminal.questions).toContain(SEEDSHIFT_QUESTION));
       const result = made.mock.results[0]!;
       expect(result.type).toBe("return");
       if (result.type !== "return") throw new Error("The reading must have been created.");

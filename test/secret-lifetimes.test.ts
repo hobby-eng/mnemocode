@@ -118,7 +118,7 @@ describe("Retained secret lifetimes", () => {
     backup.wipe();
   });
 
-  it("refuses to use a wiped passphrase without beginning encryption", async () => {
+  it("refuses to encrypt with a wiped passphrase", async () => {
     const protection = new PassphraseProtection("public test list passphrase");
     protection[Symbol.dispose]();
     protection.wipe();

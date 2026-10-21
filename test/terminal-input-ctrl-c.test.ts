@@ -196,7 +196,7 @@ describe("Ctrl+C during a long search", () => {
 
   it("stops a share repair at its next turn, watching only after the question", async () => {
     const [first, second] = sskrVectors().deterministic[0]!.shares;
-    // Two unreadable colours: 65,536 combinations, several turns of the search.
+    // Two unreadable colours: 65,536 combinations.
     const parts = writeShare(second!, "colors").split(" ");
     for (const place of [5, 7]) parts[place] = "?";
     const input = new ShareInput({ decodeEntry: "The Decode entry" });
@@ -220,17 +220,27 @@ describe("Ctrl+C during a long search", () => {
       }
       return true;
     });
-    const search = withPrivateScreen(() => searchShareRepair(read, { shares: 1 }));
     // Typed once the watch has taken the terminal, after the drop of the keys typed ahead and the
     // question, each of which took it and left it: a Ctrl+C typed before the question would cancel
     // at that drop, before the question is asked.
     const watched = 2 * RAW_SESSION.length + RAW_ENTRY.length;
-    const typeOnceWatched = (): void => {
-      if (terminal.rawModes.length < watched) setTimeout(typeOnceWatched, 1);
-      else setTimeout(() => keys.type(CTRL_C), 0);
-    };
-    typeOnceWatched();
+    // Advance the host clock at each read so that even a fast computer yields. Deliver Ctrl+C at
+    // the terminal's read edge, without a timer racing the search's completion.
+    let now = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => (now += 100));
+    const resume = keys.resume.bind(keys);
+    let typedCancel = false;
+    vi.spyOn(keys, "resume").mockImplementation(() => {
+      const result = resume();
+      if (!typedCancel && terminal.rawModes.length === watched) {
+        typedCancel = true;
+        setImmediate(() => keys.type(CTRL_C));
+      }
+      return result;
+    });
+    const search = withPrivateScreen(() => searchShareRepair(read, { shares: 1 }));
     expect(await search).toBe(CANCELLED);
+    expect(typedCancel).toBe(true);
     // The question drops the keys typed ahead itself, then reads its own; the watch takes raw mode
     // only after it.
     expect(modesAtQuestions).toEqual([[...RAW_SESSION, ...RAW_ENTRY]]);

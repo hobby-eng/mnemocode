@@ -11,6 +11,7 @@ import { STYLE_CODES } from "../src/cli/terminal-style.js";
 import { questionsOnPrivateScreen, seen, terminal, windowOf } from "./helpers/question-terminal.js";
 import { replacedAt, TEST_PHRASE } from "./helpers/test-phrase.js";
 import { streamsAsTerminal } from "./helpers/terminal-streams.js";
+import { CHECK_WALLET_ANSWER } from "./helpers/prompts.js";
 
 const harness = await vi.hoisted(async () => import("./helpers/question-terminal.js"));
 vi.mock("node:tty", async (importOriginal) => harness.replacedTty(await importOriginal()));
@@ -50,6 +51,6 @@ describe("recover-word on a terminal", () => {
     expect(seen.out.some((line) => line.includes("Candidate "))).toBe(false);
     expect(seen.notices.join("\n")).toContain("8 candidates do not fit on this screen");
     expect(terminal.questions).toEqual(["What now?"]);
-    expect(terminal.labels[0]).toContain("Check them against the wallet");
+    expect(terminal.labels[0]).toContain(CHECK_WALLET_ANSWER);
   });
 });

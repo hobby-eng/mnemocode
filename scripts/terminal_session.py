@@ -324,6 +324,7 @@ class Screen:
     """
 
     def __init__(self, columns, text, height=None):
+        """Interpret text at this width and optional screen height."""
         self.columns = columns
         self.height = height
         self.rows = [[]]
