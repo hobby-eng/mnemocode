@@ -267,28 +267,57 @@ export function terminalPhrase(phrase: string, channel: Channel = "stdout"): boo
 }
 
 /**
- * Codes written joined, such as Unicode codes, shown apart, separated by spaces and wrapped at
- * them, so that a person sees each code and which one to mark with ?; then `joined`, the text as
- * written, on one plain line, for copying (owner, 2026-10-13: both views, without numbers).
+ * One readable version and, for joined codes, an alternate copy of the same data. Keeping them
+ * apart lets a backup's end label exclude the alternate version from the block to transcribe.
  */
-function joinedCodeLines(codes: readonly string[], joined: string): string[] {
-  return [
-    ...wrapText(codes.join(" ")).map((line) => terminalPaint("stdout", STYLE.strong, line)),
-    terminalPaint("stdout", STYLE.muted, "Joined, for copying:"),
-    joined,
-  ];
+function codeParts(text: string, format: EncodedFormat): { data: string[]; copy: string[] } {
+  const apart = EncodedForm.of(format).apartCodes(text);
+  return {
+    data: wrapText(apart?.join(" ") ?? text).map((line) =>
+      terminalPaint("stdout", STYLE.strong, line),
+    ),
+    copy:
+      apart === undefined
+        ? []
+        : [
+            terminalPaint("stdout", STYLE.muted, "Joined, for copying:"),
+            terminalPaint("stdout", STYLE.strong, compactCode(text)),
+          ],
+  };
 }
 
 /**
  * The exact lines printCodes writes: on a terminal the codes of a form that writes them joined
- * apart beside the joined text (joinedCodeLines), and the codes of every other form, which are
+ * apart beside the joined text (codeParts), and the codes of every other form, which are
  * separated by spaces, wrapped at those spaces (CORE-36), as the terminal would otherwise break a
  * long line inside a code; for a file, a pipe or TERM=dumb the text as written, on one line.
  */
 export function codeLines(text: string, format: EncodedFormat): string[] {
   if (!terminalLayout("stdout")) return [text];
-  const apart = EncodedForm.of(format).apartCodes(text);
-  return apart === undefined ? wrapText(text) : joinedCodeLines(apart, compactCode(text));
+  const { data, copy } = codeParts(text, format);
+  return [...data, ...copy];
+}
+
+/**
+ * The complete backup or share to save, distinctly bounded on a terminal. Pipes keep only the
+ * original data; no display instruction is added to a record, QR payload or redirected share.
+ */
+export function backupCodeLines(
+  text: string,
+  format: EncodedFormat,
+  kind: "backup" | "share" = "backup",
+): string[] {
+  if (!terminalLayout("stdout")) return [text];
+  const { data, copy } = codeParts(text, format);
+  return [
+    "",
+    terminalPaint("stdout", STYLE.heading, `SAVE THIS ${kind.toUpperCase()}`),
+    terminalPaint("stdout", STYLE.strong, "Copy the entire block below in this exact order."),
+    ...data,
+    terminalPaint("stdout", STYLE.muted, `End of ${kind}.`),
+    ...copy,
+    "",
+  ];
 }
 
 /**
@@ -314,14 +343,10 @@ export function terminalFingerprint(
     channel,
     `${paint(STYLE.muted, label)}  ${paint(STYLE.strong, value)}  ${paint(STYLE.muted, `(${note})`)}`,
   );
-  terminalLine(channel, paint(STYLE.muted, FINGERPRINT_DISCLOSURE));
 }
 
 /** What the fingerprints of the command line are made with, as their note says. */
 export const FINGERPRINT_NOTE = "empty BIP39 passphrase";
-
-/** The explanation accompanying openly shown original and encoded fingerprints (DOC-05). */
-export const FINGERPRINT_DISCLOSURE = "They do not reveal the phrase.";
 
 /** Returns to the start of the line and erases it (VT100 "erase in line"). */
 const REWRITE_LINE = "\r\x1b[2K";

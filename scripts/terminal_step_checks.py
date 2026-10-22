@@ -84,12 +84,13 @@ def check_steps_after_result():
 
 def check_share_result_again():
     """A wrong written quorum leads back to the whole split result,
-    with its complete backup and fingerprints on the fresh screen.
+    with its optional original words and fingerprints on the fresh
+    screen.
     """
     with terminal.terminal_size(REPEATED_SPLIT_ROWS, 120):
         session = terminal.Session((
             "encode", "--sskr", "--ask-secrets", "--mode", "direct",
-            "--format", "2", "--threshold", "2", "--shares", "3",
+            "--show-original", "words", "--threshold", "2", "--shares", "3",
         ))
         try:
             session.wait_for(SEED_PHRASE)
@@ -102,14 +103,14 @@ def check_share_result_again():
             session.type(FIRST_SHARE + ";" + THIRD_SHARE + terminal.ENTER)
             session.wait_for(WHAT_NOW)
             session.type("2")
-            session.wait_for("Encoded result")
+            session.wait_for("Original seed phrase")
             session.wait_for("Check the backup now?")
             terminal.assert_private_result_visible(session, (
-                "MnemoCode · SSKR export", "MnemoCode · Encoded result",
-                WORD_NUMBERS, "SSKR share 1 of 3", "SSKR share 3 of 3",
+                "MnemoCode · SSKR export", "MnemoCode · Original seed phrase",
+                TEST_PHRASE, "SSKR share 1 of 3", "SSKR share 3 of 3",
                 "Original fingerprint " + FINGERPRINT,
                 "Encoded fingerprint " + FINGERPRINT,
-            ))
+            ), absent=(WORD_NUMBERS,))
             session.type("2")
             end_at_clear_prompt(session)
             terminal.assert_kept_private(
@@ -118,7 +119,7 @@ def check_share_result_again():
         finally:
             session.close()
     print(
-        "SSKR: showing the result again restores its whole backup "
+        "SSKR: showing the result again restores its original words "
         "and fingerprints"
     )
 

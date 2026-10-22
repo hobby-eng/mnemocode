@@ -96,7 +96,7 @@ The guide explains date sorting, the repeating year/month/day shifts, modular ad
 
 ## Representation details
 
-`encode --show-masked-words` also shows the English words after Seedshift, beside the chosen codes. This is the masked phrase: the original dates are still needed. With Shamir shares, `--show-original words|codes|both` separately chooses how to show the original wallet phrase before Seedshift; `codes` and `both` need `--format`. These display choices do not add the words or the original copy to exported files.
+`encode --show-masked-words` also shows the English words after Seedshift, beside the chosen codes. This is the masked phrase: the original dates are still needed. `--show-original words` separately shows the original wallet phrase as English words for visual checking, with or without Shamir shares. Its former `codes` and `both` values are refused before any secret is read. The menu offers No or Yes, show the words, and leaves this display off by default. These display choices do not add the original to encoded or share files and QR images.
 
 The [format table](../README.md#commands) lists names and numbers. Input syntax differs by form:
 
@@ -123,7 +123,7 @@ Control and text-direction characters in displayed paths are replaced with U+FFF
 
 On the private screen, a result that does not fit with the question or prompt under it, such as a long share set with its heading and notices, missing-code candidates, the candidates of `recover-word`, the matches of `recover-date` or the phrases of an Original Seedshift record with a replaced last word, is shown whole by pages first. Use Up/Down or PageUp/PageDown to move, Home/End to reach the first or last page, and Enter or Escape when finished copying; the end of the result then stays above the question. Ctrl+C cancels. Output redirected to a file or pipe stays complete and has no page controls. `recover-word` shows every candidate there when the list would fit on the screen as one row per candidate, as a file gets it; a longer list shows only the candidates that match the wallet, and without a wallet or a candidate list offers to check them against one.
 
-`--mnemonic-file PATH` reads a phrase; `--input-file PATH` reads codes or a record. The path `-` reads standard input. With `--ask-secrets`, Decode and date recovery can read `--input-file` or `--qr-file` and then ask only for dates. Decode also accepts a file of Shamir shares, one per line, and passes every share to restoration.
+`--mnemonic-file PATH` reads a phrase; `--input-file PATH` reads codes or a record. The path `-` reads standard input. With `--ask-secrets`, Decode and date recovery can read `--input-file` or `--qr-file` and then ask only for dates. Decode and Re-encode also accept a file or paste of Shamir shares, separated by lines or `;`, in any share form; their mixed input prompt explains the separator and using `?` for each missing or unreadable share code or digit. Both keep every share and use Restore's questions, including repair of share codes marked with `?`. Re-encode asks about Seedshift and takes its dates before confirming the original phrase; it never confirms the masked phrase as the wallet's. Forgotten date digits can be searched with the original wallet's fingerprint or address. If several candidates remain, choose one and confirm it before making a new backup. A wallet reference cannot replace a missing share below the threshold or make inconsistent unmarked codes fit.
 
 Raw `--mnemonic`, `--input`, `--share`, `--date`/`--dates`, `--old-date`/`--old-dates` and `--last-word` values are refused, including public fixtures. Help names them as refused, with the option to use instead; none is accepted as an exception.
 
@@ -287,3 +287,31 @@ const sameMnemonic = directBackup.decode([]);
 
 The creating scope disposes both backups, including when decoding fails. Returned strings and
 copied views belong to the caller; JavaScript cannot erase them when their owner is disposed.
+
+## Output destinations in the menu
+
+Each choice includes the screen and the destination it names. `Screen and printable cards`
+saves the cards without a record file. Choices do not include earlier entries; `All of these`
+is the choice that adds every offered destination.
+
+Unicode codes, colors as text and colors offer printable cards. Their card questions also ask
+whether to include QR output, so the destination menu omits a separate QR choice. English words,
+word numbers and standard shares offer standalone QR images directly. Explicit `--qr` and
+`--qr-dir` command-line options remain available regardless of the menu choices.
+
+## Copying the displayed backup
+
+Terminal results mark the data to save with `SAVE THIS BACKUP`, or `SAVE THIS SHARE` for each
+Shamir share. Copy the entire block in the displayed order, up to `End of backup` or `End of share`.
+The data is bold where terminal styling is enabled; the labels remain visible with `NO_COLOR`.
+Seedshift still needs its original dates. Optional original words are for visual checking.
+These display labels are not added to records, QR payloads or redirected data.
+For joined codes, an alternate joined copy follows the end label; use either version, not both.
+
+## Automatic QR checks
+
+Every generated PNG QR image is decoded and compared with the exact backup or share before it is saved. MnemoCode reports a successful check as `QR code verified`; unreadable or mismatching output is not saved, and on the private screen you can try creating it again, choose another name or skip it. QR matrices are also decoded and compared before they are drawn into PDF or page images, including A4, A5 and A6. These checks cover the generated data and symbol; they do not certify a later printed copy or a camera.
+
+For Shamir shares, `--qr-dir NEW_FOLDER` saves one complete share per PNG, named `share-1-qr.png`, `share-2-qr.png` and so on. It works in every share format without printable cards. All shares are in that folder: separate them for storage. A taken folder name is numbered instead of replaced. `sskr-combine --share-qr PATH` reads the images.
+
+The separate “Check the backup now?” question checks what you copied by hand: words, word numbers, Unicode codes, colors or shares. Type that copy back; automatic QR verification does not verify your handwriting.

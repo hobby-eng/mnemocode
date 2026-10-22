@@ -5,6 +5,9 @@
  */
 export type StepContextLifetime = "question" | "page" | "command";
 
+/** The part of a displayed result retained above later questions after paging. */
+type ResultContext = "start" | "end";
+
 /** Lines that belong to the coming steps, drawn again under the title of each step screen. */
 interface StepContext {
   readonly draw: () => void;
@@ -29,6 +32,7 @@ export class PrivateSteps {
   /** Whether a step screen drew #warnings: the next warning is then one of a new step. */
   static #warningsDrawn = false;
   static #showingResult = false;
+  static #resultContext: ResultContext = "end";
   static #drawingContext = false;
 
   /** Whether a private command owns the current terminal screen. */
@@ -79,11 +83,17 @@ export class PrivateSteps {
     return PrivateSteps.#showingResult;
   }
 
-  /** A displayed result must remain readable until its owner explicitly opens another page. */
-  static showResult(): void {
+  /** Where the current result stands relative to later save receipts. */
+  static get resultContext(): ResultContext {
+    return PrivateSteps.#resultContext;
+  }
+
+  /** Keeps a displayed result readable, with its chosen context, until its owner opens a page. */
+  static showResult(context?: ResultContext): void {
     if (!PrivateSteps.active) return;
     PrivateSteps.#begun = true;
     PrivateSteps.#showingResult = true;
+    if (context !== undefined) PrivateSteps.#resultContext = context;
   }
 
   /**
@@ -104,6 +114,7 @@ export class PrivateSteps {
   static newPage(): void {
     PrivateSteps.#begun = true;
     PrivateSteps.#showingResult = false;
+    PrivateSteps.#resultContext = "end";
     PrivateSteps.endWarnings();
     PrivateSteps.#keepOnly("command");
   }
@@ -178,5 +189,6 @@ export class PrivateSteps {
     PrivateSteps.endWarnings();
     PrivateSteps.#showingResult = false;
     PrivateSteps.#drawingContext = false;
+    PrivateSteps.#resultContext = "end";
   }
 }

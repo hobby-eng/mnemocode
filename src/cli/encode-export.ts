@@ -14,6 +14,7 @@ import { indexesToColors } from "../core.js";
 import { type ParsedArguments, value } from "./arguments.js";
 import { colorCards, printableText, terminalSaved, terminalWork } from "./terminal.js";
 import { exportQrPayload } from "../export/qr-image.js";
+import { reportQrVerified } from "./qr-export.js";
 import type { EncodeOutcome } from "./encode-types.js";
 import { SecretValue } from "../core/secret-value.js";
 import { Redacted } from "../core/redacted.js";
@@ -175,6 +176,7 @@ export async function saveEncodeResult(
   const qrPath = value(arguments_, "qr");
   if (qrPath !== undefined) {
     await exportQrPayload(backup.text(), qrPath);
+    reportQrVerified();
     terminalSaved(`Saved QR code (${format}): ${printableText(qrPath)}`);
   }
 }

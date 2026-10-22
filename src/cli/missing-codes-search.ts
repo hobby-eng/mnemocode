@@ -33,7 +33,6 @@ import { choose } from "./terminal-choice.js";
 import { askToSearch } from "./search-consent.js";
 import { CtrlCWatch, nodeTurn } from "./terminal-input.js";
 import {
-  FINGERPRINT_DISCLOSURE,
   ProgressLine,
   terminalHint,
   terminalLastingWarning,
@@ -268,7 +267,7 @@ async function byEncodedFingerprint(
   const fingerprint = given
     ? answers.encodedFingerprint
     : await askValueUntil(
-        `Encoded fingerprint of these codes, such as 1a2b3c4d (${FINGERPRINT_DISCLOSURE}):`,
+        "Encoded fingerprint of these codes, such as 1a2b3c4d:",
         parseMasterFingerprint,
         { what: "the eight characters of the fingerprint" },
       );
@@ -353,7 +352,6 @@ function candidateFacts({ codes, phrase, fingerprint }: MissingCodesRow): [strin
 function showCandidates(rows: readonly MissingCodesRow[]): void {
   if (onPrivateScreen() && terminalLayout("stdout")) {
     terminalResultHeader("Candidates", [["Found", String(rows.length)]]);
-    terminalHint(FINGERPRINT_DISCLOSURE);
     for (const [index, row] of rows.entries())
       showCandidate(candidateLabel(index + 1), candidateFacts(row));
     return;
@@ -361,7 +359,6 @@ function showCandidates(rows: readonly MissingCodesRow[]): void {
   rows.forEach(({ codes, phrase, fingerprint }, index) =>
     console.log(`${index + 1}\t${codes}\t${phrase}\t${fingerprint}`),
   );
-  console.error(FINGERPRINT_DISCLOSURE);
 }
 
 /** That a list held more candidates than it can: the way is asked again, without the list. */

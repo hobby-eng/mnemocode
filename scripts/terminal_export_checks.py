@@ -130,9 +130,9 @@ def stopped_while_drawing(folder, output, at_first):
     path = os.environ["PATH"]
     os.environ["PATH"] = f"{programs}{os.pathsep}{path}"
     try:
-        arguments = (
-            "encode", "--ask-secrets", "--mode", "direct", "--format", "5",
-        )
+        arguments = ("encode", "--ask-secrets", "--mode", "direct")
+        if "--sskr" not in output:
+            arguments += ("--format", "5")
         session = terminal.Session(
             (*arguments, *output, "--image-format", "png"), folder=folder
         )

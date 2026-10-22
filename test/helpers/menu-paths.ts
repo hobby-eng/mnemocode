@@ -247,7 +247,7 @@ export function warningsAt(question: string): (string | undefined)[] {
 }
 
 /** Colors, no Seedshift, no shares, printable cards. */
-export const SINGLE = [4, 1, 0, 3];
+export const SINGLE = [4, 1, 0, 2];
 /** Colors, no Seedshift, 2 of 3 shares, printable cards. */
 export const SHARES = [4, 1, 1, 2];
 

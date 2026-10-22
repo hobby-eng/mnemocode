@@ -12,7 +12,7 @@ import { MINIMAL_BYTEWORDS } from "../src/sskr/bytewords-list.js";
 import { nodeSharePlatform } from "../src/sskr/share-platform-node.js";
 import { splitSskrMnemonic } from "../src/sskr/shares.js";
 import { ShareSplit } from "../src/sskr/split.js";
-import { CTRL_C } from "./helpers/keys.js";
+import { CTRL_C, ESCAPE } from "./helpers/keys.js";
 import { matching } from "./helpers/matchers.js";
 import { ORIGINAL, promptsShown } from "./helpers/phrase-questions.js";
 import {
@@ -42,6 +42,26 @@ vi.mock("../src/cli/terminal-input.js", async (importOriginal) =>
 const SSKR_UR_PREFIX = "ur:sskr/";
 
 questionsOnPrivateScreen();
+
+describe("leaving a refused backup check", () => {
+  it.each(["direct", "seedshift", "seedshift-legacy"] as const)(
+    "cancels %s at Escape and wipes the encoded backup",
+    async (mode) => {
+      const encoding = vi.spyOn(EncodedBackup, "encode");
+      terminal.answers = [
+        `${TEST_PHRASE}\r`,
+        ...(mode === "direct" ? [] : [`${DATE}\r`]),
+        "not-a-backup\r",
+        ESCAPE,
+      ];
+      terminal.choices = ["Yes"];
+      expect(await runEncode({ "ask-secrets": true, mode, format: "indexes" })).toBe(CANCELLED);
+      const made = encoding.mock.results[0]!;
+      expect(made.type).toBe("return");
+      if (made.type === "return") expect(() => made.value.backup.text()).toThrow("has been wiped");
+    },
+  );
+});
 
 describe("encode, decode and the backup check on the private screen", () => {
   describe("the backup check", () => {
@@ -75,7 +95,7 @@ describe("encode, decode and the backup check on the private screen", () => {
       await offerEncodedCheck(ORIGINAL, () => undefined, undefined);
       expect(seen.notices).toEqual([
         "",
-        "Type the codes you wrote down, or press Ctrl+C to stop.",
+        "Type the backup you wrote down, or press Ctrl+C to stop.",
         "These are 3 word numbers; an encoded seed phrase has 12, 15, 18, 21 or 24.",
         // Each part that differs is said, then kept above "What now?" and above that part asked
         // again, each on a screen of its own (PrivateSteps).
@@ -104,10 +124,10 @@ describe("encode, decode and the backup check on the private screen", () => {
       await offerShareCheck(TEST_PHRASE, "direct", 2, () => undefined, undefined);
       await offerShareCheck(TEST_PHRASE, "seedshift", 2, () => undefined, undefined);
       expect(terminal.notes.map((notes) => notes[0])).toEqual([
-        "type the codes from what you wrote down, and the dates",
-        "type the codes from what you wrote down",
-        "type 2 shares from what you wrote down",
-        "type 2 shares from what you wrote down, and the dates",
+        "type the backup you wrote down, and the dates",
+        "type the backup you wrote down",
+        "type 2 shares you wrote down",
+        "type 2 shares you wrote down, and the dates",
       ]);
       // Nothing came before the offer: Escape answers No.
       expect(terminal.escapes).toEqual(Array.from({ length: 4 }, () => "skips the check"));

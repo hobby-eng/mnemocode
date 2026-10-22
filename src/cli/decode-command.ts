@@ -70,7 +70,6 @@ import {
   terminalNotice,
   terminalPart,
   terminalPhrase,
-  FINGERPRINT_DISCLOSURE,
   FINGERPRINT_NOTE,
 } from "./terminal.js";
 import { factLine, hintLines, wrapText } from "./terminal-style.js";
@@ -165,7 +164,7 @@ function reportShorterPhrases(backup: EncodedBackup, dates: readonly DateShiftDa
     )
     .join("; ");
   terminalNotice(
-    `The first codes give a phrase with a valid checksum: ${listed}. ${FINGERPRINT_DISCLOSURE} Printed cards end with codes that belong to nothing; give the number of words of the phrase (--words ${defined(shorter[0]).words}).`,
+    `The first codes give a phrase with a valid checksum: ${listed}. Printed cards end with codes that belong to nothing; give the number of words of the phrase (--words ${defined(shorter[0]).words}).`,
     "warning",
   );
 }
@@ -191,7 +190,7 @@ function showLegacyValidCandidates(
       `${index + 1}\t${candidate.recoveredMnemonic}\t${masterFingerprint(candidate.recoveredMnemonic)}`,
     );
   console.error(
-    `${summary} The final column is the original BIP32 master fingerprint for an empty BIP39 passphrase. ${FINGERPRINT_DISCLOSURE}`,
+    `${summary} The final column is the original BIP32 master fingerprint for an empty BIP39 passphrase.`,
   );
 }
 
@@ -214,7 +213,7 @@ function showCandidateParts(
   console.log("");
   for (const line of wrapText(summary)) console.log(line);
   const label = PHRASE_WORDS.originalFingerprint;
-  const note = `Each ${label.toLowerCase()} uses an ${FINGERPRINT_NOTE}. ${FINGERPRINT_DISCLOSURE}`;
+  const note = `Each ${label.toLowerCase()} uses an ${FINGERPRINT_NOTE}.`;
   for (const line of hintLines(process.stdout, note)) console.log(line);
   for (const [index, candidate] of candidates.entries()) {
     terminalPart(`${candidateLabel(index + 1)} of ${candidates.length}`, true);
@@ -280,7 +279,7 @@ export function comparedPassphrase(tool: string, withPassphrase: boolean): strin
 }
 
 /** What is asked or done next on the private screen. */
-type Step = "backup" | "dates" | "wallet" | "search" | "decode" | "done";
+type Step = "backup" | "dates" | "wallet" | "search" | "decode" | "last-word" | "done";
 
 /** What follows a phrase that the questions decoded: the end, or the dates or the codes again. */
 export type AfterDecoded = Extract<Step, "done" | "dates" | "backup">;
@@ -290,8 +289,10 @@ export type AfterDecoded = Extract<Step, "done" | "dates" | "backup">;
  * and encodes it again (re-encode-command.ts), from the whole backup.
  */
 export interface DecodeUse {
-  /** Codes and dates with ?, and a Shamir share given for the codes, are taken and searched. */
+  /** Codes and dates with ? are taken and searched. */
   readonly searches: boolean;
+  /** Restores a share given for the codes, then uses its original phrase. */
+  readonly restore: typeof restoreFromShare;
   /** The choice that ends after a phrase whose checksum fails, beside typing again. */
   readonly stop: Choice<"done">;
   /** What follows a record that gives several phrases (EncodedBackup.givesSeveral). */
@@ -311,6 +312,7 @@ export interface DecodeUse {
 /** Decode itself: the phrase shown, a record's several phrases listed, and done. */
 const DECODE: DecodeUse = {
   searches: true,
+  restore: restoreFromShare,
   stop: { label: "Done", note: "keep this result", value: "done" },
   async several(backup, dates) {
     // The result is a step of its own: the questions are cleared away.
@@ -451,14 +453,14 @@ export async function decodeWithQuestions(
           seedshiftOnly: false,
           recordMode,
           marks: use.searches,
-          shares: use.searches,
+          shares: true,
           inputKind,
         });
         if (read === CANCELLED) return CANCELLED;
         // A Shamir share typed here is restored from, with its mode if Decode was given one.
         if (read.kind === "share") {
           const restore = { text: read.text, fromQr: read.fromQr };
-          const restored = await restoreFromShare(handedToRestore(args), restore);
+          const restored = await use.restore(handedToRestore(args), restore);
           if (restored !== "back") return restored === "done" ? undefined : restored;
           // Escape at the question whether Seedshift was used: the codes are given again.
           backupArgs = typedAfterFile(args);
@@ -484,6 +486,11 @@ export async function decodeWithQuestions(
           }
         } else backup = read.backup;
         step = stepAfterCodes(backup, typedDates);
+      } else if (step === "last-word") {
+        const replacement = defined(defined(backup).lastWordReplacement());
+        backup?.wipe();
+        backup = replacement;
+        step = "decode";
       } else if (step === "dates") {
         const asked = await askDates({
           wordCount: defined(backup).words,
@@ -583,7 +590,16 @@ async function decodeAndShow(
   use.show(result, mode, format);
   if (result.checksumValid) return use.decoded(backup, known);
   reportShorterPhrases(backup, known);
+  using replaced = backup.lastWordReplacement();
+  if (replaced !== undefined)
+    terminalNotice(
+      "A date or code may be wrong. If the Legacy backup's last word was replaced to make its checksum valid, choose that option; the original last word is needed to restore the phrase.",
+      "warning",
+    );
   return askAfterFailure<Step>(WHAT_NOW, [
+    ...(replaced === undefined
+      ? []
+      : [{ label: "The last word was replaced", value: "last-word" as const }]),
     ...(Masking.of(mode).masked ? [datesAgainChoice()] : []),
     backupChoice(backupArgs),
     use.stop,

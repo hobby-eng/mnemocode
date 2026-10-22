@@ -54,9 +54,9 @@ async function newPath(name: string): Promise<string> {
 }
 
 /** Every captured buffer held something, and holds nothing now. */
-function expectAllWiped(): void {
+function expectAllWiped(pixels = 1): void {
   expect(captured.files).toHaveLength(1);
-  expect(captured.pixels).toHaveLength(1);
+  expect(captured.pixels).toHaveLength(pixels);
   for (const bytes of [...captured.files, ...captured.pixels]) {
     expect(bytes.length).toBeGreaterThan(0);
     expect(wiped(bytes)).toBe(true);
@@ -69,7 +69,8 @@ describe("AUD-018-SEC001: a QR image read as secret input is wiped", () => {
     await exportQrPayload(PUBLIC_RECORD, path);
     captured.files.length = 0;
     expect(await decodeQrPngFile(path)).toBe(PUBLIC_RECORD);
-    expectAllWiped();
+    // Export verification and import each decode a pixel buffer; both must be wiped.
+    expectAllWiped(2);
   });
 
   it("wipes them too when the image holds no QR code", async () => {

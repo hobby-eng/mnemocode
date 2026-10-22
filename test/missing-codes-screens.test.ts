@@ -64,8 +64,5 @@ describe("the search for codes marked with ?", () => {
     expect(plain).toContain("Candidate 1");
     for (const label of ["Codes", "Phrase", "Fingerprint"])
       expect(seen.out.some((line) => line.includes(`\x1b[${STYLE.muted}m${label}`))).toBe(true);
-    expect(seen.notices.map((line) => line.replace(STYLE_CODES, ""))).toContain(
-      "They do not reveal the phrase.",
-    );
   });
 });

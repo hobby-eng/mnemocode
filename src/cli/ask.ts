@@ -3,8 +3,9 @@
 // or unusable answer is explained in one warning line, which never repeats what was typed (a
 // position such as "date 2" or "place 11" is fine), and the same question is asked again, while the
 // caller keeps every earlier answer. Only the person leaves: Ctrl+C (CANCELLED, returned up to the
-// command, which ends with CANCELLED_EXIT_CODE), or the last choice of askAfterFailure. Inside a secret question Escape does
-// nothing, so that a slip of the finger loses nothing. Every question first drops what was typed
+// command, which ends with CANCELLED_EXIT_CODE), Escape in a secret question, or the last choice
+// of askAfterFailure. A cancelled command returns to the menu that started it. Each question drops
+// what was typed
 // before it showed (TerminalKeys.dropTypedAhead), so that only keys pressed for it answer it.
 //
 // The API for the commands:
@@ -100,7 +101,7 @@ type Reading =
   | { readonly kind: "answer"; readonly text: string }
   /** Nothing typed but Enter, or Ctrl+D on an empty line. */
   | { readonly kind: "empty" }
-  /** Escape, where it goes back. */
+  /** Escape: goes back from a visible value, or cancels a secret question. */
   | { readonly kind: "back" }
   /** An answer longer than any valid one, or not UTF-8: the reason, without the answer. */
   | { readonly kind: "unusable"; readonly reason: string }
@@ -131,7 +132,6 @@ async function readAnswer(
   prompt: string,
   how: {
     readonly echo: boolean;
-    readonly back: boolean;
     readonly pastedLineBreak?: PastedLineBreak;
     readonly hints?: WordHints | undefined;
   },
@@ -154,7 +154,7 @@ async function readAnswer(
         echo: how.echo,
         moreWithin,
         promptWidth: displayWidth(`${prompt} `),
-        escapeGoesBack: how.back,
+        escapeGoesBack: true,
         onBack: () => {
           wentBack = true;
         },
@@ -181,7 +181,7 @@ async function readAnswer(
 
 /**
  * Asks for a secret until `parse` accepts the answer, as described at the top, and returns what
- * `parse` made of it, or CANCELLED at Ctrl+C or the end of the input. Typed text is trimmed; file
+ * `parse` made of it, or CANCELLED at Escape, Ctrl+C or the end of the input. Typed text is trimmed; file
  * contents reach parse unchanged. Only the typed answer is echoed on the private screen.
  */
 export async function askSecretUntil<T>(
@@ -191,11 +191,10 @@ export async function askSecretUntil<T>(
 ): Promise<T | Cancelled> {
   const read = (text: string): T | Promise<T> =>
     parse(options.textFile === undefined ? text : TextFileInput.read(text, options.textFile));
-  // A secret is never left with Escape: Ctrl+C stops instead, so that its turn never goes back.
-  return askUntil(prompt, read, async () => {
-    const reading = await readAnswer(prompt, {
+  const shown = `${prompt} (Esc cancels)`;
+  return askUntil(shown, read, async () => {
+    const reading = await readAnswer(shown, {
       echo: onPrivateScreen(),
-      back: false,
       pastedLineBreak: options.pastedLineBreak ?? " ",
       hints: options.hints,
     });
@@ -231,7 +230,8 @@ function turnOf(typed: string, rules: TurnRules): Answered {
  */
 function turnOfReading(reading: Reading, rules: TurnRules): Answered | Cancelled {
   // Nothing can answer once the input has ended: the command is cancelled.
-  if (reading.kind === "ended" || reading.kind === "cancelled") return CANCELLED;
+  if (reading.kind === "ended" || reading.kind === "cancelled" || reading.kind === "back")
+    return CANCELLED;
   if (reading.kind === "unusable") return { warning: reading.reason };
   return turnOf(reading.kind === "answer" ? reading.text : "", rules);
 }
@@ -283,7 +283,7 @@ export async function askValueUntil<T>(
   options: ValueAskOptions = {},
 ): Promise<T | undefined | Cancelled> {
   const answer = await askUntil(prompt, parse, async () => {
-    const reading = await readAnswer(prompt, { echo: true, back: true });
+    const reading = await readAnswer(prompt, { echo: true });
     if (reading.kind === "back") return WENT_BACK;
     return turnOfReading(reading, { ...options, leave: "back" });
   });

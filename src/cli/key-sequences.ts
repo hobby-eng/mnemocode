@@ -104,7 +104,7 @@ export async function readEscapeSequence(
 }
 
 /**
- * How long after an Escape alone, which a question for a secret ignores, the rest of a key's
+ * How long after an Escape alone, which a reader may ignore, the rest of a key's
  * sequence is still read as that key: a slow remote link may deliver ESC and "[B" of an arrow key
  * apart, and "[B" must not become part of the answer.
  */

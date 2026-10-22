@@ -33,7 +33,6 @@ import { QUESTION_HOURS } from "../core/search-turns.js";
 import { numberWord } from "../core/prose.js";
 import { COINS } from "../core/coins.js";
 import { type CommandHelp, type TopicHelp } from "./help-types.js";
-import { FINGERPRINT_DISCLOSURE } from "./terminal.js";
 import {
   ASK_SECRETS,
   CANDIDATE_LIST_GROUP,
@@ -149,7 +148,7 @@ export const COMMAND_HELP: Readonly<Record<CommandName, CommandHelp>> = {
       ],
     ],
     notes: [
-      `Fingerprints are calculated for an empty BIP39 passphrase. ${FINGERPRINT_DISCLOSURE} A legacy result is a valid phrase only by chance; when it is not, only the original fingerprint is shown.`,
+      "Fingerprints are calculated for an empty BIP39 passphrase. A legacy result is a valid phrase only by chance; when it is not, only the original fingerprint is shown.",
       "Note the encoded fingerprint too: decode, recover-date and sskr-combine show it again on the private screen once the codes or shares are read, before the dates, so that a code written or typed wrongly shows before the dates are typed.",
       "Individual cards are not Shamir sharing: every real card is needed, and each reveals a part of the encoded phrase; the decoy cards after them, one on separate cards, are not needed.",
     ],
@@ -279,7 +278,8 @@ export const COMMAND_HELP: Readonly<Record<CommandName, CommandHelp>> = {
       "Reads a backup that MnemoCode encoded, from text, a file or a QR code, and decodes it as decode does; then encodes its seed phrase again as encode does: with other dates, another mode or in another form, as cards or as Shamir shares. The seed phrase is never typed.",
       "Its BIP39 checksum is no confirmation: with MnemoCode Seedshift every date gives a valid phrase. So the phrase is shown, and re-encoded only once you recognise it or your wallet matches it. With --ask-secrets you either recognise it or its fingerprint, or MnemoCode compares it with an address of your wallet, of Bitcoin or another coin, which confirms it, or with its fingerprint, which only accepts it: a fingerprint is a filter, not proof. On the command line give a wallet option or --recognised.",
       "With --ask-secrets the codes are asked first, then at once their dates, then the phrase is shown to confirm; only then, unless options give it, the new backup is asked, with the questions of Encode in the menu. A backup of the original Seedshift with a valid last word keeps nothing of the original last word: give it, as you remember it.",
-      "Every code and date of the old backup is needed: decode and recover-date find what is forgotten. Afterwards the old backup still restores the same wallet.",
+      "With --ask-secrets the old input may also be Shamir shares, in any share form, separated by semicolons or lines, or read from a text file. Restore's questions ask whether Seedshift was used and take its dates before the original seed phrase is shown for confirmation. Too few shares ask for more; the masked phrase is never the phrase to confirm.",
+      "For an encoded phrase every code and date is needed: decode and recover-date find what is forgotten. Shamir input uses Restore's repair and date questions. Afterwards the old backup still restores the same wallet.",
     ],
     usage: "[OPTIONS] (--ask-secrets | --input-file <PATH> | --qr-file <PNG>)",
     groups: [
@@ -759,7 +759,7 @@ export const TOPIC_HELP: Readonly<Record<string, TopicHelp>> = {
       {
         heading: "In the menu:",
         paragraphs: [
-          `After "Also as printable cards", the menu asks about the files: which kind of file, PDF, PNG or JPEG (images need pdftocairo); how the cards are laid out, on ${SHEET_SIZES_TEXT} sheets in one PDF or as images of the sheets, or as separate business cards of ${pageSizeLabel(SEPARATE_CARD_SIZE)}, one file each in a new folder; for sheets, how they are turned, landscape, portrait or whichever fills the sheet best (${SHEET_PLAN_TEXT}); and the name of the PDF or of the folder. Then it asks for the design, for sheets whether to add a QR code with ${SHEET_QR_HOLDS}, and last, for every way of saving, whether to type your own details; Enter on a detail keeps it random. Typed details that do not fit on the cards are refused at once, and the details are asked again with every other answer kept.`,
+          `After "Screen and printable cards", the menu asks about the files: which kind of file, PDF, PNG or JPEG (images need pdftocairo); how the cards are laid out, on ${SHEET_SIZES_TEXT} sheets in one PDF or as images of the sheets, or as separate business cards of ${pageSizeLabel(SEPARATE_CARD_SIZE)}, one file each in a new folder; for sheets, how they are turned, landscape, portrait or whichever fills the sheet best (${SHEET_PLAN_TEXT}); and the name of the PDF or of the folder. Then it asks for the design, for sheets whether to add a QR code with ${SHEET_QR_HOLDS}, and last, for every way of saving, whether to type your own details; Enter on a detail keeps it random. Typed details that do not fit on the cards are refused at once, and the details are asked again with every other answer kept.`,
         ],
       },
       {

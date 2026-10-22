@@ -19,16 +19,16 @@ mnemocode encode --sskr --ask-secrets \
 
 The shares are always shown in the terminal. `--output NEW_FILE` also saves them, one share per line. The file holds **all shares**. An existing file is never replaced: when the name is taken, the shares are saved under a numbered name such as `shares-1.txt`, and MnemoCode says so. When a file cannot be saved on the private screen, for example because the disk is full, the shares are still shown, and MnemoCode offers to try again, to use another name, or to skip that file.
 
-| Option                               | Selects                                                                                              |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `--share-format FORMAT`              | How the shares are shown and saved (see [Share formats](#share-formats)); default `ur`               |
-| `--format 1\|2\|3\|4\|5`             | Alone, also shows the complete encoded backup beside the shares, in that form                        |
-| `--show-original words\|codes\|both` | Also shows the original wallet phrase, before Seedshift: English words, codes in `--format`, or both |
-| `--show-masked-words`                | Also shows the English words after Seedshift; the original dates are still needed                    |
+| Option                   | Selects                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `--share-format FORMAT`  | How the shares are shown and saved (see [Share formats](#share-formats)); default `ur`                              |
+| `--format 1\|2\|3\|4\|5` | With Seedshift, also shows the complete masked backup beside the shares; without it, only English words are allowed |
+| `--show-original words`  | Also shows the original wallet phrase as English words for visual checking                                          |
+| `--show-masked-words`    | Also shows the English words after Seedshift; the original dates are still needed                                   |
 
 `sskr-split` splits a phrase as `encode --sskr` does, with two differences. Its `--format` selects the share format, as `--share-format` does there, so it cannot also show the complete backup; `sskr-export` reads `--format` the same way. The display options `--show-original` and `--show-masked-words` are not available; use `encode --sskr` for them. A text file saved with `--output` holds the shares in the share format, one per line.
 
-The menu offers these display choices separately. The original copy restores the wallet without shares or dates: keep it apart from the shares. Neither display choice adds words or an original copy to exported share files. With `--show-original`, `--format` selects the original copy's codes instead of also showing a complete masked backup.
+The menu offers the original words separately, off by default. Keep them apart from the shares. The original phrase is never shown as a second set of codes, and neither display choice adds it to exported share files. `--format` does not change the original words shown with `--show-original words`. Restoring shares without Seedshift also shows only the recovered English words, without an extra code block.
 
 ### Date masking before splitting
 
@@ -76,9 +76,13 @@ A share whose CBOR byte string has a longer head than it needs (`58` and a lengt
 
 Word numbers and Unicode codes are made the same way with the version byte `A2`, but the bytes are cut into pieces of 11 bits instead of 3 bytes, the last piece filled with zero bits, and each piece is written as the word number (1 to 2048) or the Unicode code of that BIP39 word, as `--format 2` and `--format 3` write a phrase. `colors-unicode` writes the colors of a share as `--format 4` writes the colors of a phrase. Because every form carries a version, a length and a checksum, a share is read in whatever form it is written.
 
+## Share QR images
+
+`--qr-dir NEW_FOLDER` saves one complete share per PNG in every share format, without a card design or PDF. Encode with `--sskr`, Re-encode with shares, `sskr-split` and `sskr-export` accept it. Files are named `share-1-qr.png`, `share-2-qr.png` and so on. Each PNG is read back and compared with that share before publication; a failed check offers another try on the private screen. All shares are in one folder: separate them for storage. Restore reads each image with `--share-qr PATH`.
+
 ## Share cards
 
-Shares written in colors (`colors`, `colors-unicode`) can be printed as cards with every template, and shares in Unicode codes (`unicode`) with every template but the enclosure and tile materials, which have too few samples for the longest share; one code to a card. Shares in word numbers, Bytewords or as a `ur:sskr` code have no cards: write them on paper or keep the text file. `sskr-export` prints existing shares and never makes new ones; `--format` writes them in a form that has cards; here the `ur` shares saved above are printed in colors:
+Shares written in colors (`colors`, `colors-unicode`) can be printed as cards with every template, and shares in Unicode codes (`unicode`) with every template but the enclosure and tile materials, which have too few samples for the longest share; one code to a card. Shares in word numbers, Bytewords or as a `ur:sskr` code have no cards: write them on paper, keep the text file or save standalone QR images with `--qr-dir NEW_FOLDER`. `sskr-export` prints existing shares and never makes new ones; `--format` writes them in a form that has cards; here the `ur` shares saved above are printed in colors:
 
 ```bash
 mnemocode sskr-export --share-file ./shares.txt --format colors \

@@ -249,7 +249,7 @@ export interface RestoredPhrase extends UnmaskedPhrase {
   readonly held: string;
   /** What a repair filled in where ? marked an element, share by share. */
   readonly repairs: readonly ShareRepairs[];
-  /** The backup in the form its shares were written in, where it is not the phrase itself. */
+  /** The masked backup in its shares' form; absent when the shares hold the original itself. */
   readonly backup?: SetBackup | undefined;
 }
 

@@ -3,7 +3,7 @@
 // its heading, notices and fingerprints, would lose the rows that scrolled over its top edge. The
 // page is therefore recorded as it is written, and before a question or an Enter prompt is drawn
 // under it, a page that does not fit with them is shown again whole, by pages, with the colours it
-// was written in (keepReadable). Then its end stays on the screen above what comes next. Output
+// was written in (keepReadable). The current result's context stays above what comes next. Output
 // that goes to a file or a pipe is written there as before and is not part of the page.
 
 import { PrivateSteps } from "./private-steps.js";
@@ -144,19 +144,21 @@ export class PrivatePage {
    * Keeps the page readable before `reserve` rows are drawn under it, down to the row the cursor
    * then waits on. Rows that were on the screen whole when it was last kept may scroll away; where
    * the rows written since do not fit with `reserve`, the whole page is shown by pages until Enter
-   * or Escape, and then its last rows that fit stay above. CANCELLED at Ctrl+C.
+   * or Escape. The current result's context keeps its first or last rows above the question.
+   * CANCELLED at Ctrl+C.
    */
   static async keepReadable(reserve: number): Promise<Cancelled | undefined> {
     const record = PrivatePage.#record;
     if (PrivatePage.#stop === undefined) return undefined;
+    // Previously read rows may scroll away, except a result pinned above follow-up questions.
+    const seenRows = PrivateSteps.resultContext === "start" ? 0 : record.seenRows;
     // A page that cannot fill the terminal is not read: no copy of its text is made.
-    if (record.mostRows(terminalColumns()) - record.seenRows + reserve <= terminalRows())
-      return undefined;
+    if (record.mostRows(terminalColumns()) - seenRows + reserve <= terminalRows()) return undefined;
     // A Windows console takes standard output later: the page is read once it has.
     await flushed(process.stdout);
     const page = (): ScreenRows => screenRows(record.text(), terminalColumns());
     const { cursorRow } = page();
-    if (cursorRow - record.seenRows + reserve <= terminalRows()) {
+    if (cursorRow - seenRows + reserve <= terminalRows()) {
       record.markSeen(cursorRow);
       return undefined;
     }
@@ -168,8 +170,14 @@ export class PrivatePage {
     }
     const { rows } = page();
     const room = Math.max(0, terminalRows() - reserve);
-    const above = room === 0 ? [] : rows.slice(0, page().cursorRow).slice(-room);
-    // Written through the record: the end of the page is the page now, and was read.
+    const content = rows.slice(0, page().cursorRow);
+    const above =
+      room === 0
+        ? []
+        : PrivateSteps.resultContext === "start"
+          ? content.slice(0, room)
+          : content.slice(-room);
+    // Written through the record: this retained part is the page now, and was read.
     process.stderr.write(`${CLEAR_SCREEN}${above.map((row) => `${row}\n`).join("")}`);
     record.markSeen(above.length);
     // Keys typed with the one that ended the pages answer nothing under them.

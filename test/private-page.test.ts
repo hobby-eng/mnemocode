@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PrivatePage } from "../src/cli/private-page.js";
+import { PrivateSteps } from "../src/cli/private-steps.js";
 import { printShares, inForm } from "../src/cli/sskr-output.js";
 import { CLEAR_SCREEN } from "../src/cli/terminal.js";
 import { CANCELLED } from "../src/cli/terminal-keys.js";
@@ -45,6 +46,45 @@ beforeEach(() => {
   terminal = new PrivateTerminal();
 });
 afterEach(() => terminal.close());
+
+describe("the result above a follow-up question", () => {
+  it("keeps the result above a question instead of its later receipts, without repeating stdout", async () => {
+    process.stderr.write(CLEAR_SCREEN);
+    console.log("Encoded result\nFirst public code\nLast public code");
+    PrivateSteps.showResult("start");
+    for (let row = 0; row < 40; row += 1) console.error(`Saved public file ${row}`);
+    const stdout = vi.spyOn(process.stdout, "write");
+    const stdoutText = (): string => stdout.mock.calls.map(([chunk]) => String(chunk)).join("");
+    const before = stdoutText();
+    type(ENTER);
+    expect(await PrivatePage.keepReadable(7)).toBeUndefined();
+    expect(screen().slice(0, 3)).toEqual([
+      "Encoded result",
+      "First public code",
+      "Last public code",
+    ]);
+    expect(screen()).toHaveLength(18);
+    expect(terminal.frames().join("\n")).toContain("Saved public file 39");
+    expect(stdoutText()).toBe(before);
+    // A save-retry prompt may page first; retain its result for the question after it too.
+    console.error("Saved another public file");
+    type(ENTER);
+    expect(await PrivatePage.keepReadable(9)).toBeUndefined();
+    expect(screen().slice(0, 3)).toEqual([
+      "Encoded result",
+      "First public code",
+      "Last public code",
+    ]);
+    console.error(Array.from({ length: 8 }, (_, row) => `Question row ${row}`).join("\n"));
+    const visible = new Screen(80, 24);
+    visible.write(terminal.written);
+    expect(visible.lines().slice(0, 3)).toEqual([
+      "Encoded result",
+      "First public code",
+      "Last public code",
+    ]);
+  });
+});
 
 describe("the page of the private screen", () => {
   it("leaves a page that fits with what comes under it as it is", async () => {
@@ -232,7 +272,7 @@ describe("shares on the private screen", () => {
     process.stderr.rows = 12;
     process.stderr.write(CLEAR_SCREEN);
     const shares = Array.from({ length: 16 }, (_, at) => SSKR_SET_VECTOR.shares[at % 3]!);
-    printShares(inForm(shares, form));
+    printShares(inForm(shares, form), undefined, undefined, "backup");
     type("\x1b[6~".repeat(200) + ENTER);
     await PrivatePage.keepReadable(2);
     for (let number = 1; number <= 16; number += 1)
@@ -247,7 +287,7 @@ describe("shares on the private screen", () => {
       try {
         process.stderr.write(CLEAR_SCREEN);
         console.log("MnemoCode · SSKR export");
-        printShares(inForm(SSKR_SET_VECTOR.shares, form), 3, Masking.of("direct").holds);
+        printShares(inForm(SSKR_SET_VECTOR.shares, form), 3, Masking.of("direct").holds, "backup");
         console.log(`Original fingerprint ${TEST_FINGERPRINT}`);
         type("\x1b[6~".repeat(20) + ENTER);
         await PrivatePage.keepReadable(8);

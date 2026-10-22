@@ -112,6 +112,26 @@ afterEach(() => {
   expect(takeCutNotes(), "a note cut to fit its list").toEqual([]);
 });
 
+describe("leaving a secret question", () => {
+  it.each([false, true])("cancels with Escape, after a refused answer: %s", async (refused) => {
+    if (refused) at("Phrase:", "bad\r");
+    at("Phrase:", ESCAPE);
+    // The old reader ignores Escape. A later ordinary answer makes that defect fail promptly
+    // instead of leaving the regression waiting for the test timeout.
+    const fallback = setTimeout(() => keyboard.type("fallback\r"), 1000);
+    const parse = vi.fn((answer: string) => {
+      if (answer === "bad") throw new Error("Wrong test value.");
+      return answer;
+    });
+    try {
+      expect(await askSecretUntil("Phrase:", parse)).toBe(CANCELLED);
+      expect(parse.mock.calls).toEqual(refused ? [["bad"]] : []);
+    } finally {
+      clearTimeout(fallback);
+    }
+  });
+});
+
 describe("questions asked again until the answer can be used", () => {
   it("asks again after an empty answer and after Ctrl+D, with one line", async () => {
     at("Dates:", "   \r");

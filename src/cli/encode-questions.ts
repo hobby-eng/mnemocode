@@ -33,7 +33,7 @@ import { ClaimedOutputs, FILE_NAME_QUESTIONS } from "./output-questions.js";
 import { askCards } from "./card-questions.js";
 import { assertColorCardsFit, assertShareCardsFit } from "./cards-fit.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
-import { ORIGINAL_COPY_FORMS, type OriginalCopyForm } from "./encode-report.js";
+import { ORIGINAL_COPY_FORM } from "./encode-report.js";
 
 /**
  * The phrase of the examples: a public BIP39 test vector (entropy 0x80 repeated). The usual test
@@ -129,18 +129,6 @@ const SHARES_EXPLANATION: Explanation = {
   more: [readmeLink("splitting-a-mnemonic-into-shares")],
 };
 
-/** What a whole copy beside the shares means, shown with the question whether to show one. */
-const COPY_EXPLANATION: Explanation = {
-  lines: ["Before Seedshift; no shares or dates needed. Keep it apart from the shares."],
-};
-
-/** The labels of the original-copy forms, in the same order as their command-line values. */
-const ORIGINAL_COPY_LABELS: Readonly<Record<OriginalCopyForm, string>> = {
-  words: "Words only",
-  codes: "Selected codes only",
-  both: "Words and selected codes",
-};
-
 /** What the sheet for heirs is, shown with the question whether to make it. */
 const HEIRS_EXPLANATION: Explanation = {
   lines: ["A printed page on how to restore the backup; it holds no secret."],
@@ -192,8 +180,15 @@ export async function askSeedshift(
 /** The answer of a question where a result goes that keeps it on the screen alone. */
 const SCREEN_ONLY: Choice<"screen"> = { label: "Only on this screen", value: "screen" };
 
-/** The label of the answer of a question where a result goes that saves it as cards too. */
-const AS_CARDS = "Also as printable cards";
+type OutputQuestion = () => Promise<string[] | undefined | Cancelled>;
+
+/** One additional destination, its name in All of these and the questions that name its output. */
+interface OutputDestination {
+  readonly kind: "file" | "qr" | "cards";
+  readonly note: string;
+  readonly place: string;
+  readonly ask: OutputQuestion;
+}
 
 /**
  * The answer of a question where a result goes that takes every place it offers, `places`, as
@@ -208,7 +203,7 @@ function everyPlace(places: readonly string[]): Choice<"all"> {
  * back from one of them.
  */
 async function eachAsked(
-  asks: readonly (() => Promise<string[] | undefined | Cancelled>)[],
+  asks: readonly OutputQuestion[],
 ): Promise<string[] | undefined | Cancelled> {
   const options: string[] = [];
   for (const ask of asks) {
@@ -217,6 +212,34 @@ async function eachAsked(
     options.push(...asked);
   }
   return options;
+}
+
+/** One extra destination or all; card questions own QR output when cards are offered. */
+async function askDestination(
+  question: string,
+  places: readonly OutputDestination[],
+): Promise<string[] | undefined | Cancelled> {
+  const offered = places.some((place) => place.kind === "cards")
+    ? places.filter((place) => place.kind !== "qr")
+    : places;
+  const choices: Choice<"screen" | "all" | OutputDestination>[] = [
+    SCREEN_ONLY,
+    ...offered.map((place) => ({
+      label: `Screen and ${place.place}`,
+      note: place.note,
+      value: place,
+    })),
+    everyPlace(offered.map((place) => place.place)),
+  ];
+  const destination = await choose(question, choices, { label: "Output" });
+  if (destination === undefined || destination === CANCELLED) return destination;
+  return eachAsked(
+    destination === "screen"
+      ? []
+      : destination === "all"
+        ? offered.map((place) => place.ask)
+        : [destination.ask],
+  );
 }
 
 /** The record file of a result: --output and its name. */
@@ -242,31 +265,29 @@ async function askResultDestination(
   form: EncodedFormat,
 ): Promise<string[] | undefined | Cancelled> {
   const withCards = EncodedForm.of(form).cardKind !== undefined;
-  const choices: Choice<"screen" | "record" | "qr" | "cards" | "all">[] = [
-    SCREEN_ONLY,
-    { label: "Also in a record file", note: "text that Decode reads back", value: "record" },
-    { label: "Also as a QR code image", note: "a PNG file that Decode reads back", value: "qr" },
+  const places: OutputDestination[] = [
+    {
+      kind: "file",
+      note: "text that Decode reads back",
+      place: "a record file",
+      ask: askRecordFile,
+    },
+    {
+      kind: "qr",
+      note: "a PNG file that Decode reads back",
+      place: "a QR code image",
+      ask: askQrFile,
+    },
   ];
   if (withCards)
-    choices.push({
-      label: AS_CARDS,
+    places.push({
+      kind: "cards",
       note: "a PDF or images in a card design",
-      value: "cards",
+      place: "printable cards",
+      ask: () =>
+        askCards("mnemocode-cards", false, (options) => assertColorCardsFit(options, form)),
     });
-  choices.push(everyPlace(["a record file", "a QR code", ...(withCards ? ["cards"] : [])]));
-  const destination = await choose("Where should the result go?", choices, { label: "Output" });
-  if (destination === undefined || destination === CANCELLED) return destination;
-  const cards = () =>
-    askCards("mnemocode-cards", false, (options) => assertColorCardsFit(options, form));
-  // The questions of each answer: none for the screen, all of them for All of these.
-  const asks = {
-    screen: [],
-    record: [askRecordFile],
-    qr: [askQrFile],
-    cards: [cards],
-    all: [askRecordFile, askQrFile, ...(withCards ? [cards] : [])],
-  }[destination];
-  return eachAsked(asks);
+  return askDestination("Where should the result go?", places);
 }
 
 /** The file that Encode saves a record in by default, and that Decode reads by default. */
@@ -297,6 +318,11 @@ export async function askEncoding(): Promise<string[] | undefined | Cancelled> {
   const run =
     set === null ? await askCopyDestination(form, mode) : await askSharesRun(set, form, mode);
   if (run === undefined || run === CANCELLED) return run;
+  if (set !== null || Masking.of(mode).masked) {
+    const copy = await askOriginalCopy(mode, set !== null);
+    if (copy === undefined || copy === CANCELLED) return copy;
+    if (copy) run.push("--show-original", ORIGINAL_COPY_FORM);
+  }
   // Codes in words show the masked words already (writtenInWords); shares never do.
   if (Masking.of(mode).masked && (set !== null || !EncodedForm.of(form).writtenInWords)) {
     const showWords = await choose(
@@ -334,8 +360,7 @@ async function askCopyDestination(
 }
 
 /**
- * Shares in the chosen form, where they go, and which forms of the original wallet phrase to
- * show beside them (--show-original), if any.
+ * Shares in the chosen form and where they go; the original words are a separate opt-in.
  */
 async function askSharesRun(
   set: ShareSetChoice,
@@ -344,30 +369,29 @@ async function askSharesRun(
 ): Promise<string[] | undefined | Cancelled> {
   const shares = await askShares(set, shareFormatOf(form));
   if (shares === undefined || shares === CANCELLED) return shares;
-  const copy = await choose<OriginalCopyForm | null>(
-    "Also show the original seed phrase, before Seedshift?",
+  return ["encode", "--sskr", "--ask-secrets", "--mode", mode, ...shares];
+}
+
+/** One opt-in original-copy question for masked backups and shares; the default shows none. */
+function askOriginalCopy(mode: Mode, shares: boolean): Promise<boolean | undefined | Cancelled> {
+  const masked = Masking.of(mode).masked;
+  return choose(
+    masked
+      ? "Also show the original seed phrase, before Seedshift?"
+      : "Also show the original seed phrase beside the shares?",
     [
-      { label: "No", note: "only the shares", value: null },
-      ...ORIGINAL_COPY_FORMS.map((value) => ({ label: ORIGINAL_COPY_LABELS[value], value })),
+      { label: "No", note: shares ? "only the shares" : "only the encoded result", value: false },
+      { label: "Yes, show the words", note: "for visual checking", value: true },
     ],
-    { label: "Copy", explanation: COPY_EXPLANATION },
+    {
+      label: "Copy",
+      explanation: {
+        lines: [
+          `${masked ? "Before Seedshift; no dates needed. " : ""}${shares ? "No shares needed. Keep it apart from the shares." : "Keep it apart from the encoded backup."}`,
+        ],
+      },
+    },
   );
-  if (copy === undefined || copy === CANCELLED) return copy;
-  return [
-    "encode",
-    "--sskr",
-    "--ask-secrets",
-    "--mode",
-    mode,
-    ...shares,
-    ...(copy === null
-      ? []
-      : [
-          "--show-original",
-          copy,
-          ...(copy === "words" ? [] : ["--format", String(formatNumber(form))]),
-        ]),
-  ];
 }
 
 /** What each size of the sheet for heirs is like, as the menu offers it. */
@@ -454,7 +478,8 @@ async function askOtherShareSet(): Promise<ShareSetChoice | undefined | Cancelle
 
 /**
  * Where the shares go, written in `shareFormat` (--share-format). Shares in colors or Unicode codes
- * can be printed as cards (shareFormatHasCards); the others only as text.
+ * can also be printed as cards (shareFormatHasCards), whose questions own QR output. Other forms
+ * offer standalone QR images here.
  */
 export async function askShares(
   set: ShareSetChoice,
@@ -462,41 +487,49 @@ export async function askShares(
 ): Promise<string[] | undefined | Cancelled> {
   const options = ["--threshold", String(set.threshold), "--shares", String(set.count)];
   options.push("--share-format", shareFormat);
-  const destinations: Choice<"screen" | "file" | "cards" | "all">[] = [
-    SCREEN_ONLY,
-    { label: "Also in a text file", note: "one share per line", value: "file" },
+  const places: OutputDestination[] = [
+    {
+      kind: "file",
+      note: "one share per line",
+      place: "a text file",
+      ask: askShareFile,
+    },
+    {
+      kind: "qr",
+      note: "one PNG per share, in a new folder",
+      place: "QR code images",
+      ask: askShareQrFolder,
+    },
   ];
   // Cards print each share in its form: its colors, or its codes beside colors that only decorate.
   const withCards = shareFormatHasCards(shareFormat);
   if (withCards)
-    destinations.push(
-      {
-        label: AS_CARDS,
-        note: isColorShareFormat(shareFormat)
-          ? "disguised, one sheet per share"
-          : "its codes on cards, one sheet per share",
-        value: "cards",
-      },
-      // Without cards a text file is the one place besides the screen: nothing more to take.
-      everyPlace(["a text file", "cards"]),
-    );
-  const destination = await choose("Where should the shares go?", destinations, {
-    label: "Output",
-  });
-  if (destination === undefined || destination === CANCELLED) return destination;
-  const file = async (): Promise<string[] | undefined | Cancelled> => {
-    const path = await ClaimedOutputs.askOutputFile(
-      FILE_NAME_QUESTIONS.text,
-      "mnemocode-shares.txt",
-    );
-    if (path === undefined || path === CANCELLED) return path;
-    return ["--output", path];
-  };
-  const cards = () =>
-    askCards("mnemocode-share-cards", true, (options) => assertShareCardsFit(options, shareFormat));
-  // The questions of each answer: none for the screen, all of them for All of these.
-  const asks = { screen: [], file: [file], cards: [cards], all: [file, cards] }[destination];
-  const outputs = await eachAsked(asks);
+    places.push({
+      kind: "cards",
+      note: isColorShareFormat(shareFormat)
+        ? "disguised, one sheet per share"
+        : "its codes on cards, one sheet per share",
+      place: "printable cards",
+      ask: () =>
+        askCards("mnemocode-share-cards", true, (options) =>
+          assertShareCardsFit(options, shareFormat),
+        ),
+    });
+  const outputs = await askDestination("Where should the shares go?", places);
   if (outputs === undefined || outputs === CANCELLED) return outputs;
   return [...options, ...outputs];
+}
+
+/** The text copy of the shares; each complete share takes one line. */
+async function askShareFile(): Promise<string[] | undefined | Cancelled> {
+  const path = await ClaimedOutputs.askOutputFile(FILE_NAME_QUESTIONS.text, "mnemocode-shares.txt");
+  if (path === undefined || path === CANCELLED) return path;
+  return ["--output", path];
+}
+
+/** A separate PNG for each complete share, without requiring a card design or sheet output. */
+async function askShareQrFolder(): Promise<string[] | undefined | Cancelled> {
+  const path = await ClaimedOutputs.askNewFolder("mnemocode-share-qr");
+  if (path === undefined || path === CANCELLED) return path;
+  return ["--qr-dir", path];
 }

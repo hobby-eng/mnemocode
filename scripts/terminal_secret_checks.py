@@ -178,11 +178,13 @@ def check_encode_result_visible_in(mode):
     """check_encode_result_visible for `mode`, without and with shares.
     """
     for shares in (False, True):
-        arguments = [
-            "encode", "--ask-secrets", "--mode", mode, "--format", "2",
-        ]
+        arguments = ["encode", "--ask-secrets", "--mode", mode]
         if shares:
             arguments += ["--sskr", "--threshold", "2", "--shares", "3"]
+        if shares and mode == "direct":
+            arguments += ["--show-original", "words"]
+        else:
+            arguments += ["--format", "2"]
         session = Session(arguments=arguments)
         try:
             session.wait_for("Seed phrase (English BIP39 words):")
@@ -194,14 +196,19 @@ def check_encode_result_visible_in(mode):
             session.wait_for("Esc skips the check")
             seedshift = mode == "seedshift"
             codes = MASKED_WORD_NUMBERS if seedshift else WORD_NUMBERS
-            markers = [codes]
+            markers = [TEST_PHRASE if shares and not seedshift else codes]
+            if not shares or seedshift:
+                markers += ["SAVE THIS BACKUP", "End of backup."]
             if shares:
+                markers += ["SAVE THIS SHARE", "End of share."]
                 markers += [
                     f"SSKR share {number} of 3" for number in (1, 2, 3)
                 ]
             # The result is a step of its own (CORE-39): the secret
             # prompts are cleared away.
-            prompts = ("Seed phrase (English BIP39 words):", "Dates (")
+            prompts = ["Seed phrase (English BIP39 words):", "Dates ("]
+            if shares and not seedshift:
+                prompts.append(WORD_NUMBERS)
             assert_private_result_visible(session, markers, absent=prompts)
             session.type("2")
             session.wait_for(CLEAR_PROMPT)
@@ -235,7 +242,7 @@ def check_phrase_display_choices_on_screen():
     original_codes = (
         "#000064 #1EAB91 #3D0964 #5BB491 #7A1264 #98BD91 #B71B64 #D5C694"
     )
-    for copy in (None, "words", "codes", "both"):
+    for copy in (None, "words"):
         arguments = [
             "encode", "--ask-secrets", "--mode", "seedshift", "--format", "5",
             "--show-masked-words",
@@ -254,11 +261,10 @@ def check_phrase_display_choices_on_screen():
             session.wait_for("Check the backup now?")
             session.wait_for("Esc skips the check")
             markers = [masked]
-            if copy in ("words", "both"):
+            if copy == "words":
                 markers.append(TEST_PHRASE)
-            if copy in ("codes", "both"):
-                markers.append(original_codes)
             assert_private_result_visible(session, markers)
+            assert original_codes not in session.output
             session.type("2")
             session.wait_for(CLEAR_PROMPT)
             assert_private_result_visible(session, markers)
@@ -492,6 +498,53 @@ def check_re_encode_recognised():
     )
 
 
+def check_re_encode_marked_shares():
+    """Repair marked shares, unmask them and confirm the original before
+    any new backup; Escape at confirmation writes nothing.
+    """
+    body = THIRD_SHARE.removeprefix(SHARE_PREFIX)
+    # Two unreadable bytes of the public masked-phrase fixture.
+    pairs = [body[at:at + 2] for at in range(0, len(body), 2)]
+    pairs[10] = pairs[14] = "?"
+    marked = SHARE_PREFIX + "".join(pairs)
+    for accept in (False, True):
+        session = Session((
+            "re-encode", "--ask-secrets", "--mode", "direct",
+            "--format", "3", "--backup-check", "no",
+        ))
+        try:
+            session.wait_for(HIDDEN_RECORD)
+            assert_private_result_visible(session, (
+                "Shamir shares are accepted too; separate them with ;.",
+                "Use ? for each missing or unreadable share code or digit.",
+            ))
+            session.type(f"{FIRST_SHARE};{marked}" + ENTER)
+            session.wait_for("Was Seedshift used before it was split?")
+            session.type("2")
+            session.wait_for(DATES_WITH_MARKS)
+            session.type(MASK_DATE + ENTER)
+            session.wait_for("Is this the seed phrase to re-encode?")
+            assert_private_result_visible(session, (TEST_PHRASE,))
+            assert JOINED_UNICODE not in session.output
+            session.type("1" if accept else ESCAPE)
+            if accept:
+                session.wait_for(JOINED_UNICODE)
+                session.wait_for(CLEAR_PROMPT)
+                session.type(ENTER)
+            code = session.wait_for_exit()
+            assert code == (0 if accept else CANCELLED)
+            if not accept:
+                assert JOINED_UNICODE not in session.output
+            assert_kept_private(session, (
+                TEST_PHRASE, MASK_DATE, JOINED_UNICODE,
+                FIRST_SHARE.removeprefix(SHARE_PREFIX),
+                marked.removeprefix(SHARE_PREFIX),
+            ))
+        finally:
+            session.close()
+    print("re-encode: share repair, unmasking, original confirmation and cancel")
+
+
 def check_re_encode_last_word_after_wrong_date():
     """Re-encode of a backup with a valid last word: after a wrong date
     the dates are typed again, and the codes are kept.
@@ -678,28 +731,49 @@ def check_restore_share_asked_again():
 
 
 def check_decode_share_lines():
-    """Decode keeps members 1 and 3 from a share file or a two-line
-    paste before asking dates.
+    """Decode and Re-encode keep every pasted or filed share, ask its
+    dates and use the original phrase; only Re-encode confirms it.
     """
     text = f"{FIRST_SHARE}\n{THIRD_SHARE}\n"
     prefix = "mnemocode-share-lines-"
     with tempfile.TemporaryDirectory(prefix=prefix) as folder:
         path = Path(folder) / "shares.txt"
         path.write_text(text, encoding="utf-8")
-        for source in ("file", "paste"):
-            arguments = ["decode", "--ask-secrets", "--mode", "seedshift"]
+        for command, source in (
+            (command, source)
+            for command in ("decode", "re-encode")
+            for source in ("file", "paste")
+        ):
+            arguments = [command, "--ask-secrets"]
+            if command == "decode":
+                arguments += ["--mode", "seedshift"]
+            else:
+                arguments += [
+                    "--mode", "direct", "--format", "3",
+                    "--backup-check", "no",
+                ]
             if source == "file":
                 arguments += ["--input-file", str(path)]
             session = Session(arguments=arguments)
             try:
                 if source == "paste":
                     session.wait_for(HIDDEN_RECORD)
-                    session.type(text + ENTER)
+                    session.type(text.rstrip("\n").replace("\n", ";\n") + ENTER)
+                if command == "re-encode":
+                    session.wait_for(
+                        "Was Seedshift used before it was split?"
+                    )
+                    session.type("2")
                 session.wait_for(DATES_WITH_MARKS)
                 more = "More shares or text file path ("
-                assert more not in session.output, "Decode lost a share line"
+                assert more not in session.output, "A share line was lost"
                 session.type(MASK_DATE + ENTER)
                 session.wait_for(TEST_PHRASE)
+                if command == "re-encode":
+                    session.wait_for("Is this the seed phrase to re-encode?")
+                    assert_private_result_visible(session, (TEST_PHRASE,))
+                    session.type("1")
+                    session.wait_for(JOINED_UNICODE)
                 session.wait_for(CLEAR_PROMPT)
                 session.type(ENTER)
                 assert session.wait_for_exit() == 0
@@ -709,8 +783,8 @@ def check_decode_share_lines():
             finally:
                 session.close()
             print(
-                f"decode {source}: two share lines kept, dates restore the "
-                "public test phrase"
+                f"{command} {source}: every share kept, dates restore the "
+                "original phrase before confirmation or output"
             )
 
 

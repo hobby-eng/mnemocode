@@ -170,7 +170,7 @@ describe("start menu", () => {
       // Encode: word numbers, MnemoCode Seedshift, no shares, a record file, and heirs on A5.
       const record = join(files, "backup.txt");
       const heirs = "PDF file name";
-      const run = await runOf(ENTRY.encode, [1, 0, 0, 1, 0, 1], {
+      const run = await runOf(ENTRY.encode, [1, 0, 0, 1, 0, 0, 1], {
         [RECORD_FILE_PROMPT]: [record],
         [heirs]: [record, join(files, "heirs.pdf")],
       });
@@ -185,7 +185,7 @@ describe("start menu", () => {
       // A new folder for cards may not hold a file of the same task either.
       script.lines = [];
       const cards = join(files, "cards");
-      await runOf(ENTRY.encode, [4, 1, 0, 3, 0, 3, 0, 0, 1], {
+      await runOf(ENTRY.encode, [4, 1, 0, 2, 0, 3, 0, 0, 1], {
         "Name of the new folder": [cards],
         [heirs]: [join(cards, "heirs.pdf"), join(files, "heirs.pdf")],
       });
@@ -227,7 +227,7 @@ describe("start menu", () => {
       // Printing sample cards has no folder; Encode's separate cards do. Missing folders are made
       // by the command.
       const deep = join(files, "a", "b", "cards");
-      const run = await runOf(ENTRY.encode, [4, 1, 0, 3, 0, 3, 0, 0], {
+      const run = await runOf(ENTRY.encode, [4, 1, 0, 2, 0, 3, 0, 0], {
         "Name of the new folder": [
           join(files, "record.txt", "cards"),
           "''",

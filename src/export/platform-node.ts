@@ -1,6 +1,8 @@
 import { randomInt } from "node:crypto";
 import { PNG } from "pngjs";
 import QRCode from "qrcode";
+import jsQR from "jsqr";
+import { QrPngReader } from "./qr-reader.js";
 import { readBundledFile } from "../bundled-files.js";
 import { type RenderPlatform, QR_ERROR_CORRECTION_LEVEL } from "./platform.js";
 import { ASSETS_FOLDER } from "../bundled-file-paths.js";
@@ -21,7 +23,13 @@ export const nodeRenderPlatform: RenderPlatform = {
   },
   qrModules: (payload) => {
     const qr = QRCode.create(payload, { errorCorrectionLevel: QR_ERROR_CORRECTION_LEVEL });
-    return { size: qr.modules.size, get: (row, column) => Boolean(qr.modules.get(row, column)) };
+    return QrPngReader.withScanner(PNG, jsQR).checkedModules(
+      {
+        size: qr.modules.size,
+        get: (row, column) => Boolean(qr.modules.get(row, column)),
+      },
+      payload,
+    );
   },
 };
 

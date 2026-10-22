@@ -152,4 +152,62 @@ describe("re-encode on the private screen, for a backup with a valid last word",
     expect(terminal.questions).toEqual(["What now?"]);
     expect(seen.out).not.toContain(TEST_UNICODE);
   });
+
+  it("offers the replaced-last-word recovery only after Legacy and its dates were chosen", async () => {
+    terminal.answers = [`${LEGACY_VALID_MASKED}\r`, `${DATE}\r`, `${LAST_WORD}\r`];
+    terminal.choices = ["Original Seedshift", "The last word was replaced", "Yes, I recognise it"];
+    expect(await runReEncode({ "ask-secrets": true, mode: "direct", format: "3" })).toBeUndefined();
+    expect(terminal.questions).toEqual([
+      "Was Seedshift used when it was encoded?",
+      "What now?",
+      ...CONFIRMED,
+    ]);
+    expect(seen.out).toContain(TEST_UNICODE);
+    expect(timesShown(DATES_PROMPT)).toBe(1);
+    expect(timesShown(LAST_WORD_PROMPT)).toBe(1);
+    expect(seen.screen.indexOf(DATES_PROMPT)).toBeLessThan(seen.screen.indexOf(LAST_WORD_PROMPT));
+  });
+
+  it("keeps the selected last-word replacement when its dates are typed again", async () => {
+    terminal.answers = [
+      `${LEGACY_VALID_MASKED}\r`,
+      `${WRONG_DATE}\r`,
+      `${LAST_WORD}\r`,
+      `${DATE}\r`,
+      `${LAST_WORD}\r`,
+    ];
+    terminal.choices = [
+      "Original Seedshift",
+      "The last word was replaced",
+      DATES_AGAIN_ANSWER,
+      "Yes, I recognise it",
+    ];
+    expect(await runReEncode({ "ask-secrets": true, mode: "direct", format: "3" })).toBeUndefined();
+    expect(seen.out).toContain(TEST_UNICODE);
+    expect(timesShown(CODES_PROMPT)).toBe(1);
+    expect(timesShown(DATES_PROMPT)).toBe(2);
+    expect(timesShown(LAST_WORD_PROMPT)).toBe(2);
+  });
+
+  it("refuses non-BIP39 words without asking for dates or the original last word", async () => {
+    terminal.answers = [`${"notabip39word ".repeat(12)}\r`];
+    expect(await runReEncode({ "ask-secrets": true, mode: "direct", format: "3" })).toBe(CANCELLED);
+    expect(seen.refusals.length).toBeGreaterThan(0);
+    expect(timesShown(DATES_PROMPT)).toBe(0);
+    expect(timesShown(LAST_WORD_PROMPT)).toBe(0);
+    expect(terminal.questions).not.toContain(RE_ENCODE_CONFIRMATION);
+    expect(seen.out).toEqual([]);
+  });
+
+  it("reports a direct phrase's invalid checksum after the masking answer without guessing Legacy", async () => {
+    terminal.answers = [`${`${OLD_WORD} `.repeat(12)}\r`];
+    terminal.choices = ["No"];
+    expect(await runReEncode({ "ask-secrets": true, mode: "direct", format: "3" })).toBe(CANCELLED);
+    expect(terminal.questions[0]).toBe("Was Seedshift used when it was encoded?");
+    expect(seen.screen.toLowerCase()).toContain("checksum");
+    expect(timesShown(DATES_PROMPT)).toBe(0);
+    expect(timesShown(LAST_WORD_PROMPT)).toBe(0);
+    expect(terminal.questions).not.toContain(RE_ENCODE_CONFIRMATION);
+    expect(seen.out).toEqual([]);
+  });
 });

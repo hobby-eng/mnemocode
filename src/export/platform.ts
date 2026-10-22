@@ -44,6 +44,9 @@ export interface QrModules {
  */
 export const QR_ERROR_CORRECTION_LEVEL = "M";
 
+/** The blank border of a QR symbol, in modules (ISO/IEC 18004). */
+export const QR_QUIET_MODULES = 4;
+
 /**
  * A uniform choice of a whole number below `upperExclusive`: the platform's randomInt, or a
  * test's.

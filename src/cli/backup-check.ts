@@ -133,7 +133,7 @@ async function runCheck<Written extends Disposable>(
 function checkCodes(check: EncodedBackupCheck): Promise<CheckEnd | Cancelled> {
   return runCheck(check.steps, () =>
     askSecretUntil("Your backup, as written down:", (typed) => check.readCodes(typed), {
-      what: "the codes you wrote down",
+      what: "the backup you wrote down",
       hints: EncodedForm.typedWords,
     }),
   );
@@ -201,7 +201,7 @@ export async function offerEncodedCheck(
   if (!onPrivateScreen() || !EncodedBackupCheck.supports(original.mode)) return undefined;
   using check = new EncodedBackupCheck(original);
   return await offerCheck(
-    { what: "the codes", dated: check.dated },
+    { what: "the backup", dated: check.dated },
     () => checkCodes(check),
     show,
     answer,
@@ -217,7 +217,7 @@ async function askToCheck(parts: CheckedParts): Promise<"yes" | "no" | Cancelled
     [
       {
         label: "Yes",
-        note: `type ${parts.what} from what you wrote down${parts.dated ? ", and the dates" : ""}`,
+        note: `type ${parts.what} you wrote down${parts.dated ? ", and the dates" : ""}`,
         value: "yes" as const,
       },
       { label: "No", value: "no" as const },

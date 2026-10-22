@@ -294,6 +294,24 @@ export class EncodedBackup extends Redacted {
   }
 
   /**
+   * An owned reading of these same codes as Legacy with a replaced last word, where possible;
+   * undefined for another mode or codes without a valid checksum. This is only a possibility,
+   * never evidence that a word was replaced: the host must ask before using its candidates.
+   * The caller disposes the returned backup. A disposed Legacy backup refuses with
+   * core.secret-value.wiped.
+   */
+  lastWordReplacement(): EncodedBackup | undefined {
+    const variant = Masking.of(this.#mode).withValidLastWord;
+    if (variant === undefined) return undefined;
+    try {
+      return this.withMode(variant.mode);
+    } catch (error) {
+      if (error instanceof MissingChecksumError) return undefined;
+      throw error;
+    }
+  }
+
+  /**
    * Every phrase that the codes and the complete `dates` may give: one unless givesSeveral. What
    * Masking.undo refuses of the dates passes on.
    */

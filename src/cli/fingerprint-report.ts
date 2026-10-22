@@ -7,7 +7,6 @@ import { PHRASE_WORDS } from "../core/masking.js";
 import { capitalized } from "../core/prose.js";
 import {
   FINGERPRINT_NOTE,
-  FINGERPRINT_DISCLOSURE,
   type Channel,
   terminalLayout,
   terminalLine,
@@ -20,8 +19,6 @@ import {
 
 /** The note under one fingerprint shown on a terminal. */
 export const FINGERPRINT_HINT = `Fingerprint uses an ${FINGERPRINT_NOTE}.`;
-/** The note under the two fingerprints of a backup shown on a terminal. */
-export const FINGERPRINTS_HINT = `BIP32 fingerprints above use an ${FINGERPRINT_NOTE}.`;
 /**
  * What a phrase whose BIP39 checksum fails says: its dates or its codes are probably wrong. One
  * text, on a terminal and in plain lines.
@@ -51,7 +48,6 @@ export function reportFingerprint(label: string, value: string, plainLine: strin
     terminalStatus(label, value);
     terminalHint(FINGERPRINT_HINT);
   } else console.error(plainLine);
-  terminalHint(FINGERPRINT_DISCLOSURE);
 }
 
 /**

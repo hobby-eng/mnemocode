@@ -51,7 +51,7 @@ describe("finite private legacy-valid candidate results", () => {
     expect(shown().some((frame) => frame.includes(TEST_PHRASE))).toBe(true);
     expect(shown().some((frame) => frame.includes(LAST_CANDIDATE))).toBe(true);
     expect(shown().at(-2)).toContain(TEST_PHRASE);
-    expect(shown().some((frame) => frame.includes("They do not reveal the phrase."))).toBe(true);
+    expect(shown().some((frame) => frame.includes("Each original fingerprint uses an"))).toBe(true);
   });
 
   it("shows the candidates as a result: a heading with facts, wrapped notes, grey fingerprint labels", async () => {
@@ -114,6 +114,6 @@ describe("finite private legacy-valid candidate results", () => {
     expect(raw[0]).toMatch(new RegExp(`^1\\t${TEST_PHRASE}\\t[0-9a-f]{8}$`, "u"));
     expect(raw[127]).toMatch(new RegExp(`^128\\t${LAST_CANDIDATE}\\t[0-9a-f]{8}$`, "u"));
     expect(terminal.written).not.toContain("Home/End");
-    expect(terminal.written).toContain("They do not reveal the phrase.");
+    expect(terminal.written).toContain("The final column is the original BIP32 master fingerprint");
   });
 });

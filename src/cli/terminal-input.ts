@@ -605,20 +605,7 @@ export async function readLine(
       if (byte === KEY.CTRL_D && answer.length === 0) return undefined;
       if (byte === KEY.BACKSPACE || byte === KEY.DELETE || byte === KEY.CTRL_U)
         answer.control(byte);
-      else if (!echo) answer.insert(byte);
-      else if (late) {
-        const sequence = await readLateSequence(byte, take, defined(more));
-        if ("key" in sequence) answer.edit(sequence.key);
-        else {
-          try {
-            answer.insert(byte);
-            giveBack(sequence.readAgain);
-          } finally {
-            // Insertion may refuse before the replay is admitted to its byte owner.
-            sequence.readAgain.fill(0);
-          }
-        }
-      } else if (byte === KEY.ESCAPE) {
+      else if (byte === KEY.ESCAPE && (echo || options.escapeGoesBack === true)) {
         if (more !== undefined && !(await more(ESCAPE_DELAY_MS))) {
           if (options.escapeGoesBack === true) {
             answer.moveToEnd();
@@ -632,6 +619,19 @@ export async function readLine(
         if (sequence.kind === "sequence")
           answer.edit(editKeyOf(sequence.introducer, sequence.parameters, sequence.final));
         else if (sequence.kind === "none") giveBack(sequence.readAgain);
+      } else if (!echo) answer.insert(byte);
+      else if (late) {
+        const sequence = await readLateSequence(byte, take, defined(more));
+        if ("key" in sequence) answer.edit(sequence.key);
+        else {
+          try {
+            answer.insert(byte);
+            giveBack(sequence.readAgain);
+          } finally {
+            // Insertion may refuse before the replay is admitted to its byte owner.
+            sequence.readAgain.fill(0);
+          }
+        }
       } else if (answer.control(byte)) {
         // Edited.
       } else if (byte === KEY.TAB) {

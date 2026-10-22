@@ -47,7 +47,7 @@ The menu always masks word numbers and English words with Seedshift, because the
 
 After Encode, the optional backup check asks for the written copy and dates again and checks that they restore the same seed phrase. The menu shows the equivalent command, with secrets omitted.
 
-You can also show the phrase after Seedshift as words. When creating shares, you can separately show the original wallet phrase as words, codes or both; that original copy needs no shares or dates. These choices affect the screen only.
+You can also show the phrase after Seedshift as words. With or without shares, you can separately show the original wallet phrase only as English words for visual checking. These choices affect the screen only; the original words are never added to the encoded exports.
 
 ## Transformation modes
 
@@ -78,6 +78,8 @@ mnemocode encode --mode seedshift --ask-secrets --format 3
 ```
 
 The private screen shows the secret and result, then clears them when you leave it. It requires an interactive terminal, and refuses `TERM=dumb`. This does not protect against screen capture, terminal logging or a compromised computer.
+
+The result marks the data to keep with **SAVE THIS BACKUP**, or **SAVE THIS SHARE** for each Shamir share. Copy the complete block in the displayed order. Seedshift also needs the original dates; optional original words are for visual checking.
 
 For scripts, `--mnemonic-file PATH` and `--input-file PATH` read local files; `-` reads standard input. [Input limits and QR files](docs/CLI.md#input-files-and-limits) are documented separately.
 
@@ -122,7 +124,7 @@ mnemocode encode --mode seedshift --ask-secrets --format 5 \
 
 Printed sets include extra random codes to disguise their length. To decode manually copied cards, use `--words` for the original phrase length and leave out those extra codes. The sheet for heirs records that length.
 
-A QR code contains only the real codes: **no mode, format header or dates**. `--card-qr` adds one to the collection sheet and saves a PNG copy beside it; individual cards never have a QR code. `--qr PATH` saves a separate PNG. Read a backup with `decode --qr-file PATH`, or a share with `sskr-combine --share-qr PATH`.
+A QR code contains only the real codes: **no mode, format header or dates**. `--card-qr` adds one to the collection sheet and saves a PNG copy beside it; individual cards never have a QR code. `--qr PATH` saves a separate PNG of a backup; `--qr-dir NEW_FOLDER` saves one PNG per Shamir share in any share format, without cards. Every generated PNG is read back and compared with its exact content before saving; a mismatch offers another try. The separate backup check checks the copy you wrote down. Read a backup with `decode --qr-file PATH`, or a share with `sskr-combine --share-qr PATH`.
 
 Files and folders are not overwritten; taken names receive a number. Folder exports are prepared privately, but interruption while publishing can leave partial output or a private temporary copy. See [export precautions](SECURITY.md#secret-lifecycle-and-local-boundaries).
 
@@ -179,11 +181,15 @@ Typed codes and QR codes have no header: retain the original mode. MnemoCode can
 
 `re-encode` reads an existing backup, restores its phrase and makes another with new dates, mode, form, cards or shares. It requires recognition of the recovered phrase or a wallet check before creating the replacement. A valid checksum alone is not confirmation.
 
+On the private screen it also accepts Shamir shares in every supported form, separated by `;` or line breaks, or read from a text file. The input prompt reminds you about `;` and using `?` for each missing or unreadable code or digit. Use `?` for an unreadable share code or digit: it runs the same repair as Restore from Shamir shares, removes Seedshift with the old dates where used, and only then asks you to confirm the original phrase. A forgotten date digit can also be searched with the original wallet's fingerprint or address. At least the threshold number of shares is needed; a fingerprint or address cannot replace a missing share. If no repair fits, check the unmarked codes and the positions of `?`.
+
 ```bash
 mnemocode re-encode --ask-secrets --input-file shifted-colors.txt --mode seedshift --format 5
 ```
 
 Use `--old-mode`, `--old-format` and `--old-dates-file` for the input; the ordinary encoding options describe the output. Legacy-valid input also needs the remembered original final word, entered privately or supplied with `--last-word-file`. For scripts, supply a wallet reference or `--recognised`. Recover missing codes or dates first. The old backup remains usable after re-encoding.
+
+If ordinary Legacy decoding fails its checksum, the private screen also offers recovery with a replaced final word when the input permits it. Choose this only if that word was replaced to make the backup's checksum valid; the original final word is then required. Wrong dates or codes can also fail a checksum. Words outside the BIP39 list are a separate input error.
 
 ## Recovery
 

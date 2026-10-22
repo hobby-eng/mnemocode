@@ -125,9 +125,9 @@ def check_private_share_pages():
         navigate(session, "MnemoCode · SSKR export", titles)
         session.type(terminal.ENTER)
         session.wait_for(CLEAR_PROMPT)
-        # The end of the result stays, its last line the fingerprints'
-        # note, without the keys of the pages (AUD-037-UI004).
-        end = ("They do not reveal the phrase.",)
+        # The end of the result keeps its fingerprints, without the
+        # keys of the pages (AUD-037-UI004).
+        end = (FINGERPRINT,)
         gone = ("Page ", NAVIGATION)
         terminal.assert_private_result_visible(session, end, absent=gone)
         session.type(terminal.ENTER)

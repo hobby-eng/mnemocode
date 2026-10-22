@@ -69,6 +69,51 @@ function assertAccepted(run: readonly string[]): void {
 }
 
 describe("start menu", () => {
+  it("offers one QR path when printable cards are available", async () => {
+    for (const form of [0, 1, 2, 3, 4]) {
+      for (const shares of [false, true]) {
+        script.drawnLines = new Set();
+        takeCutNotes();
+        const run = await runOf(ENTRY.encode, [form, form < 2 ? 0 : 1, shares ? 1 : 0]);
+        expect(run).toBeDefined();
+        const output = script.asked.find((asked) => asked.question.startsWith("Where should"))!;
+        expect(output.labels.some((label) => label.includes("printable cards"))).toBe(form >= 2);
+        expect(output.labels.some((label) => label.includes("QR code"))).toBe(form < 2);
+        expect(output.labels).toHaveLength(4);
+        for (const line of script.drawnLines)
+          expect(Array.from(line).length, line).toBeLessThanOrEqual(TEXT_WIDTH);
+        expect(takeCutNotes()).toEqual([]);
+      }
+    }
+  });
+
+  it("offers QR images and all destinations for standard shares too", async () => {
+    const run = (await runOf(ENTRY.split, [1, 0, 0, 3]))!;
+    const output = script.asked.find((asked) => asked.question === "Where should the shares go?")!;
+    expect(output.labels).toEqual([
+      "Only on this screen",
+      "Screen and a text file",
+      "Screen and QR code images",
+      "All of these",
+    ]);
+    expect(run).toContain("--output");
+    expect(run).toContain("--qr-dir");
+    expect(run).not.toContain("--template");
+  });
+
+  it("offers the same original copy for masked backups without shares and skips it for direct copies", async () => {
+    const masked = (await runOf(ENTRY.encode, [1, 0, 0, 0, 1]))!;
+    expect(masked).toEqual(expect.arrayContaining(["--show-original", "words"]));
+    const copy = script.asked.find(
+      (asked) => asked.question === "Also show the original seed phrase, before Seedshift?",
+    )!;
+    expect(copy.labels).toEqual(["No", "Yes, show the words"]);
+    await runOf(ENTRY.encode, [4, 1, 0, 0]);
+    expect(
+      script.asked.some((asked) => asked.question.startsWith("Also show the original seed phrase")),
+    ).toBe(false);
+  });
+
   it("offers the agreed entries, 1 to 9, 0 for help, and Quit without a digit", () => {
     // Quit has no digit: Escape quits too (owner, 2026-10-13).
     expect(MENU_ENTRIES.map((entry) => entry.digit)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 0, null]);
@@ -141,7 +186,7 @@ describe("start menu", () => {
   it("builds the command lines of the usual answers", async () => {
     // Colors, no Seedshift, no shares, as printable cards in the first design, in one PDF of A6
     // sheets turned the way the cards are largest, with a QR code each, with random details.
-    expect(await runOf(ENTRY.encode, [4, 1, 0, 3, 0, 0, 2, 0, 0])).toEqual([
+    expect(await runOf(ENTRY.encode, [4, 1, 0, 2, 0, 0, 2, 0, 0])).toEqual([
       "encode",
       "--ask-secrets",
       "--format",
@@ -155,8 +200,8 @@ describe("start menu", () => {
       "--card-qr",
     ]);
     // Word numbers, always masked, with MnemoCode Seedshift, split 2 of 3 into shares in word
-    // numbers too, on the screen, with the original wallet phrase in word numbers beside them.
-    expect(await runOf(ENTRY.encode, [1, 0, 1, 0, 2, 0])).toEqual([
+    // numbers too, on the screen, with only the original English words beside them.
+    expect(await runOf(ENTRY.encode, [1, 0, 1, 0, 1, 0])).toEqual([
       "encode",
       "--sskr",
       "--ask-secrets",
@@ -169,9 +214,7 @@ describe("start menu", () => {
       "--share-format",
       "indexes",
       "--show-original",
-      "codes",
-      "--format",
-      "2",
+      "words",
     ]);
     // Colors give color shares without a question about their look.
     expect(await runOf(ENTRY.encode, [4, 1, 1, 0])).toEqual(
@@ -193,6 +236,7 @@ describe("start menu", () => {
       "Which form should the seed phrase take?",
       "Which Seedshift?",
       "Where should the result go?",
+      "Also show the original seed phrase, before Seedshift?",
       "Instructions for your heirs?",
     ]);
     // Unicode codes, no Seedshift, a threshold typed under Other, no whole copy, and a sheet for
@@ -217,12 +261,12 @@ describe("start menu", () => {
   });
 
   it("offers independent choices for the original wallet phrase and the Seedshift words", async () => {
-    for (const [choice, form] of [undefined, "words", "codes", "both"].entries()) {
+    for (const [choice, form] of [undefined, "words"].entries()) {
       for (const words of [0, 1]) {
         const run = (await runOf(ENTRY.encode, [1, 0, 1, 0, choice, words, 0]))!;
         const args = parseArguments(run.slice(1));
         expect(args["show-original"]).toBe(form);
-        expect(args.format).toBe(form === "codes" || form === "both" ? "2" : undefined);
+        expect(args.format).toBeUndefined();
         expect(args["show-masked-words"]).toBe(words === 1 ? true : undefined);
       }
     }
@@ -337,36 +381,43 @@ describe("start menu", () => {
     };
     // Word numbers or English words, MnemoCode Seedshift, no shares: a record or a QR code, no
     // cards.
-    expect(await destinations([1, 0, 0])).not.toContain("Also as printable cards");
-    expect(await destinations([0, 0, 0])).not.toContain("Also as printable cards");
+    expect(await destinations([1, 0, 0])).not.toContain("Screen and printable cards");
+    expect(await destinations([0, 0, 0])).not.toContain("Screen and printable cards");
     // Colors, colors as text and Unicode codes: cards too.
-    expect(await destinations([4, 1, 0])).toContain("Also as printable cards");
-    expect(await destinations([3, 1, 0])).toContain("Also as printable cards");
-    expect(await destinations([2, 1, 0])).toContain("Also as printable cards");
+    expect(await destinations([4, 1, 0])).toContain("Screen and printable cards");
+    expect(await destinations([3, 1, 0])).toContain("Screen and printable cards");
+    expect(await destinations([2, 1, 0])).toContain("Screen and printable cards");
     // Shares of word numbers have no cards; shares of Unicode codes print their codes, with
     // colors that only decorate them, and shares of colors print their colors.
     expect(await destinations([1, 0, 1, 0])).toEqual([
       "Only on this screen",
-      "Also in a text file",
+      "Screen and a text file",
+      "Screen and QR code images",
+      "All of these",
     ]);
     // Shares of a phrase in English words have no cards either; shares of colors as text do.
-    expect(await destinations([0, 0, 1])).toEqual(["Only on this screen", "Also in a text file"]);
+    expect(await destinations([0, 0, 1])).toEqual([
+      "Only on this screen",
+      "Screen and a text file",
+      "Screen and QR code images",
+      "All of these",
+    ]);
     expect(await destinations([3, 1, 1, 0])).toEqual([
       "Only on this screen",
-      "Also in a text file",
-      "Also as printable cards",
+      "Screen and a text file",
+      "Screen and printable cards",
       "All of these",
     ]);
     expect(await destinations([2, 1, 1, 0])).toEqual([
       "Only on this screen",
-      "Also in a text file",
-      "Also as printable cards",
+      "Screen and a text file",
+      "Screen and printable cards",
       "All of these",
     ]);
     expect(await destinations([4, 1, 1])).toEqual([
       "Only on this screen",
-      "Also in a text file",
-      "Also as printable cards",
+      "Screen and a text file",
+      "Screen and printable cards",
       "All of these",
     ]);
   });
@@ -387,25 +438,54 @@ describe("start menu", () => {
     ]);
     const all = script.asked.find((asked) => asked.question === "Where should the result go?")!;
     expect(all.labels.at(-1)).toBe("All of these");
-    // Colors, no Seedshift, no shares: the record, the QR code, then the questions of the cards,
-    // a PDF of A6 sheets in the first design here.
-    const run = (await runOf(ENTRY.encode, [4, 1, 0, 4, 0, 0, 0, 0, 0, 0, 0]))!;
-    expect(run.slice(run.indexOf("--output"), run.indexOf("--qr") + 2)).toEqual([
-      "--output",
-      anyOf(String),
-      "--qr",
-      anyOf(String),
-    ]);
+    // Colors: the record and cards, whose questions own QR output, without a second QR path.
+    script.lines = [];
+    const run = (await runOf(ENTRY.encode, [4, 1, 0, 3, 0, 0, 0, 0, 0, 0, 0]))!;
+    expect(run[run.indexOf("--output") + 1]).toEqual(anyOf(String));
+    expect(run).not.toContain("--qr");
+    expect(script.lines.some((line) => line.question === "QR code file name")).toBe(false);
+    expect(script.asked.filter((asked) => asked.question === BACKUP_QR_QUESTION)).toHaveLength(1);
     expect(run).toContain("--pdf");
-    // Shares of colors: a text file and their cards.
+    // Shares of colors: a text file and cards, without a standalone QR folder question.
     const shares = (await runOf(ENTRY.encode, [4, 1, 1, 3, 0, 0, 0, 0, 0, 0, 0]))!;
     expect(shares[shares.indexOf("--output") + 1]).toEqual(anyOf(String));
+    expect(shares).not.toContain("--qr-dir");
     expect(shares).toContain("--template");
+    expect(script.asked.filter((asked) => asked.question === BACKUP_QR_QUESTION)).toHaveLength(1);
+  });
+
+  it("selects screen and cards without a record or standalone QR destination", async () => {
+    for (const form of [2, 3, 4]) {
+      for (const shares of [false, true]) {
+        const run = (await runOf(ENTRY.encode, [form, 1, shares ? 1 : 0, 2]))!;
+        expect(run).toContain("--pdf");
+        expect(run).not.toContain("--output");
+        expect(run).not.toContain("--qr");
+        expect(run).not.toContain("--qr-dir");
+        expect(script.lines.some((line) => line.question === RECORD_FILE_PROMPT)).toBe(false);
+        const output = script.asked.find((asked) => asked.question.startsWith("Where should"))!;
+        expect(output.labels[2]).toBe("Screen and printable cards");
+      }
+    }
+  });
+
+  it("selects screen and QR without a text file for forms without cards", async () => {
+    for (const form of [0, 1]) {
+      for (const shares of [false, true]) {
+        const run = (await runOf(ENTRY.encode, [form, 0, shares ? 1 : 0, 2]))!;
+        expect(run).toContain(shares ? "--qr-dir" : "--qr");
+        expect(run).not.toContain("--output");
+        expect(run).not.toContain("--template");
+      }
+      const standard = (await runOf(ENTRY.split, [1, 0, form, 2]))!;
+      expect(standard).toContain("--qr-dir");
+      expect(standard).not.toContain("--output");
+    }
   });
 });
 
 describe("start menu", () => {
-  describe("card questions after Also as printable cards", () => {
+  describe("card questions after Screen and printable cards", () => {
     it("offers only the business card designs for separate cards", async () => {
       // A PDF, then Separate business cards (the fourth layout), in a new folder.
       await runOf(ENTRY.encode, [...SINGLE, 0, 3]);
@@ -501,7 +581,7 @@ describe("start menu", () => {
 });
 
 describe("start menu", () => {
-  describe("card questions after Also as printable cards", () => {
+  describe("card questions after Screen and printable cards", () => {
     it("saves images of A6, A5 or A4 sheets, and says at once when pdftocairo is missing", async () => {
       expect(await cardOptions(SINGLE, [2, 0, 2, 0, 0])).toEqual([
         "--images-dir",

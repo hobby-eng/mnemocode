@@ -29,6 +29,7 @@ import { combineSskrShares } from "../src/sskr/shares.js";
 import { containing } from "./helpers/matchers.js";
 import {
   DATE,
+  LEGACY_VALID_MASKED,
   MASKED_WORDS,
   TEST_ADDRESS,
   TEST_FINGERPRINT,
@@ -56,6 +57,22 @@ async function run(arguments_: readonly string[], command = "re-encode") {
 const OLD = ["--input", MASKED_WORDS, "--old-mode", "seedshift", "--old-dates", DATE];
 
 describe("ReEncoding", () => {
+  it("offers a possible replaced-last-word reading only for checksum-valid Legacy input", () => {
+    using legacy = EncodedBackup.read(LEGACY_VALID_MASKED, "indexes", "seedshift-legacy");
+    using replacement = legacy.lastWordReplacement();
+    expect(replacement?.mode).toBe("seedshift-legacy-valid");
+    expect(replacement?.givesSeveral).toBe(true);
+    expect(legacy.mode).toBe("seedshift-legacy");
+    using invalid = EncodedBackup.read("1 ".repeat(12).trim(), "indexes", "seedshift-legacy");
+    expect(invalid.lastWordReplacement()).toBeUndefined();
+    using direct = EncodedBackup.read(TEST_PHRASE, "english", "direct");
+    expect(direct.lastWordReplacement()).toBeUndefined();
+    using seedshift = masked();
+    expect(seedshift.lastWordReplacement()).toBeUndefined();
+    legacy.wipe();
+    expect(() => legacy.lastWordReplacement()).toThrow(/wiped/iu);
+  });
+
   it("decodes the old backup and holds its phrase back until it is confirmed", () => {
     const reEncoding = ReEncoding.of(masked(), [RIGHT]);
     expect(reEncoding.phrase).toBe(TEST_PHRASE);

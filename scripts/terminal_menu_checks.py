@@ -407,6 +407,10 @@ def check_lines_pasted_as_one_answer():
         session.type("1")
         session.wait_for("Where should the result go?")
         session.type("1")
+        session.wait_for(
+            "Also show the original seed phrase, before Seedshift?"
+        )
+        session.type("1")
         session.wait_for("Also show the Seedshift phrase as English words?")
         session.type("1")
         session.wait_for("Instructions for your heirs?")
@@ -460,8 +464,8 @@ def at_card_files(session):
     session.wait_for("Split it into Shamir shares?")
     session.type("1")
     session.wait_for("Where should the result go?")
-    # Also as printable cards, which only a form in colors offers.
-    session.type("4")
+    # Screen and printable cards; the card questions own QR output.
+    session.type("3")
     session.wait_for("Which kind of file?")
 
 
@@ -587,16 +591,22 @@ def check_card_questions():
     )
 
 
-def check_ctrl_c():
-    """Ctrl+C at a prompt goes back to the menu there, and ends a typed
+def check_cancel_at_prompt():
+    """Both cancel keys return to the menu rather than ending it."""
+    for key, name in ((CTRL_C, "Ctrl+C"), (ESCAPE, "Escape")):
+        check_prompt_cancel_key(key, name)
+
+
+def check_prompt_cancel_key(key, name):
+    """A cancel key goes back to the menu there, and ends a typed
     command with the exit code of a cancelled one.
     """
-    # In the menu, Ctrl+C at a prompt cancels that command alone: the
+    # In the menu, cancellation stops that command alone: the
     # menu comes back.
     session = Session()
     try:
         prompt_end = at_hidden_record_prompt(session)
-        session.type("abc" + CTRL_C)
+        session.type("abc" + key)
         session.wait_for(MENU_SHOWN)
         if not WINDOWS:
             assert (
@@ -609,13 +619,13 @@ def check_ctrl_c():
         ), f"Escape after a cancelled command gave exit code {code}"
     finally:
         session.close()
-    # A typed command ends at Ctrl+C with exit code 130.
+    # A typed command has no parent menu and ends with exit code 130.
     session = Session(("decode", "--ask-secrets", "--mode", "direct"))
     try:
         prompt_end = session.wait_for(HIDDEN_RECORD)
-        session.type("abc" + CTRL_C)
+        session.type("abc" + key)
         code = session.wait_for_exit()
-        assert code == CANCELLED, f"Ctrl+C gave exit code {code}"
+        assert code == CANCELLED, f"{name} gave exit code {code}"
         if not WINDOWS:
             assert (
                 LEAVE_ALTERNATE_SCREEN in session.output[prompt_end:]
@@ -623,7 +633,7 @@ def check_ctrl_c():
     finally:
         session.close()
     print(
-        f"Ctrl+C at a prompt: back to the menu there, exit code {CANCELLED} "
+        f"{name} at a prompt: back to the menu there, exit code {CANCELLED} "
         "for a typed command"
     )
 

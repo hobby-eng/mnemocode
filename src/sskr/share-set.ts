@@ -14,7 +14,7 @@
 import { formatEncoded } from "../core/representations.js";
 import { representMnemonic } from "../core/seedshift.js";
 import { wordCountOfEntropy } from "../core/bip39-sizes.js";
-import { fingerprintOfValidPhrase } from "../core/english-words.js";
+import { englishTokens, fingerprintOfValidPhrase } from "../core/english-words.js";
 import type { EncodedFormat } from "../core/types.js";
 import { JointRepair, searchOnce } from "./joint-repair.js";
 import {
@@ -370,13 +370,14 @@ export class ShareSet extends Redacted implements Disposable {
 
   /**
    * The backup that was split, in the form its shares were written in (that of its first share,
-   * RESTORED_FORM), which the dates turn into the seed phrase `mnemonic`; undefined where it would
-   * be the same words again.
+   * RESTORED_FORM), which the dates turn into the seed phrase `mnemonic`; undefined when the
+   * shares already hold that original phrase, in every share form.
    */
   backup(mnemonic: string): SetBackup | undefined {
+    const held = this.mnemonic;
+    if (held === englishTokens(mnemonic).join(" ")) return undefined;
     const form = RESTORED_FORM[defined(this.shares[0]).format];
-    const text = formatEncoded(representMnemonic(this.mnemonic), form);
-    return text === mnemonic ? undefined : { form, text };
+    return { form, text: formatEncoded(representMnemonic(held), form) };
   }
 
   /**

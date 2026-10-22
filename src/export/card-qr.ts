@@ -1,5 +1,5 @@
 // The QR codes of the cards, drawn from the matrix that the host's platform made (QrSource).
-import type { QrModules } from "./platform.js";
+import { QR_QUIET_MODULES, type QrModules } from "./platform.js";
 import { rgb, type PDFPage } from "pdf-lib";
 import { MM } from "./business-layout.js";
 import { pdfRect } from "./business-render-primitives.js";
@@ -13,7 +13,6 @@ const ERRORS = new ErrorCatalog("export.card-qr", {
   "qr-does-not-fit-on-page": () => "The QR does not fit on this page.",
 });
 
-const QUIET_MODULES = 4;
 /** The smallest module that a printed code keeps, in millimetres. */
 export const MIN_MODULE_MM = 0.4;
 /** How far a module may fall short of the smallest, in millimetres: rounding of the sums. */
@@ -29,7 +28,7 @@ const PAGE_ROUNDING_POINTS = 0.01;
 export function qrSizeForModuleMm(qr: QrModules, minimum: number, moduleMm: number): number {
   if (!Number.isFinite(moduleMm) || moduleMm <= 0)
     throw ERRORS.create("qr-module-size-positive-physical-measurement", []);
-  return Math.max(minimum, (qr.size + QUIET_MODULES * 2) * moduleMm);
+  return Math.max(minimum, (qr.size + QR_QUIET_MODULES * 2) * moduleMm);
 }
 
 /**
@@ -47,7 +46,7 @@ export function drawCollectionQr(
   size: number,
   minimumModuleMm = MIN_MODULE_MM,
 ): void {
-  const totalModules = qr.size + QUIET_MODULES * 2;
+  const totalModules = qr.size + QR_QUIET_MODULES * 2;
   if (size / totalModules < minimumModuleMm - MODULE_ROUNDING_MM)
     throw ERRORS.create("qr-too-small-payload-use-larger-page", []);
   if (
@@ -65,8 +64,8 @@ export function drawCollectionQr(
     for (let col = 0; col < qr.size; col++) {
       if (!qr.get(row, col)) continue;
       page.drawRectangle({
-        x: x * MM + (col + QUIET_MODULES) * pitch,
-        y: bottom + (qr.size + QUIET_MODULES - 1 - row) * pitch,
+        x: x * MM + (col + QR_QUIET_MODULES) * pitch,
+        y: bottom + (qr.size + QR_QUIET_MODULES - 1 - row) * pitch,
         width: pitch,
         height: pitch,
         color: rgb(0, 0, 0),

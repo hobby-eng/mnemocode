@@ -60,7 +60,7 @@ import {
   DEFAULT_HEIR_SHEET_SIZE,
 } from "../export/heir-sheet.js";
 import { defined } from "../core/defined.js";
-import { ORIGINAL_COPY_FORMS } from "./encode-report.js";
+import { ORIGINAL_COPY_FORM } from "./encode-report.js";
 import { type HelpGroup, type HelpOption, type HelpRow } from "./help-types.js";
 import { PUBLIC_FINGERPRINT } from "../core/self-test-vectors.js";
 
@@ -110,7 +110,7 @@ export const ASK_SECRETS: HelpOption = {
   summary: "Ask for the secrets on a private screen",
   details: [
     "The secrets are typed on the terminal's alternate screen, a private screen that shows what you type and then the result. When you press Enter after the result, it is cleared and the terminal returns to where it was, so that no secret stays in the scrollback: only a summary stays, of what was saved and where and of the warnings. This works on Linux, macOS and Windows alike.",
-    "Each answer is checked as soon as it is given: one that cannot be used is explained in one line and asked again, and the answers before it are kept. While a secret is typed, Escape does nothing, so that a slip loses nothing; at a visible value, such as a fingerprint, an address or a file name, it goes back to the question before and drops what was typed there; in a list of choices it does what the key hint says. Ctrl+C stops the command.",
+    "Each answer is checked as soon as it is given: one that cannot be used is explained in one line and asked again, and the answers before it are kept. While a secret is typed, Escape cancels the action and returns to the menu when started there; at a visible value, such as a fingerprint, an address or a file name, it goes back to the question before and drops what was typed there; in a list of choices it does what the key hint says. Ctrl+C stops the command.",
     "Standard input must be the terminal; without one, or in a terminal that says TERM=dumb, the command stops at once. Output sent to a file goes there as before.",
     "Raw phrase, record, share, date and final-word arguments are refused, including public fixtures. Use the private screen or the corresponding file/stdin option.",
   ],
@@ -643,7 +643,7 @@ export const ENCODE_FORMAT: HelpOption = {
   value: "FORMAT",
   summary: `The form of the result, ${FORMAT_NUMBER_RANGE} or its name; default ${formatNumber("english")} (english)`,
   details: [
-    `${formatLegend(FORMAT_LEGEND_NAMES)}. Cards need ${CARD_FORMAT_NUMBERS}. See mnemocode help formats. With --sskr, --format alone shows the complete encoded backup beside the shares; --show-original instead shows the original wallet phrase in the requested forms.`,
+    `${formatLegend(FORMAT_LEGEND_NAMES)}. Cards need ${CARD_FORMAT_NUMBERS}. See mnemocode help formats. With --sskr and Seedshift, --format alone shows the complete masked backup beside the shares. The original phrase is shown only as English words, with --show-original words.`,
   ],
 };
 
@@ -651,6 +651,16 @@ export const ENCODE_LEGACY_VALID_LAST_WORD: HelpOption = {
   ...LEGACY_VALID_LAST_WORD,
   details: [
     "A legacy result usually fails the BIP39 checksum. With this option only the checksum bits of the last word are calculated again, as with the same option of the original Seedshift; the record becomes seedshift-legacy-valid. Its decoding lists every possible last word.",
+  ],
+};
+
+/** Independent PNG images of complete shares, in any share format. */
+export const SHARE_QR_DIR: HelpOption = {
+  flag: "--qr-dir",
+  value: "NEW_FOLDER",
+  summary: "Save each complete share as a separate PNG QR image",
+  details: [
+    "Works with every share format without cards. Files are share-1-qr.png, share-2-qr.png and so on; sskr-combine --share-qr reads them. The folder contains all shares: separate them for storage. A taken folder name is numbered, never replaced.",
   ],
 };
 
@@ -689,6 +699,14 @@ export const ENCODE_OUTPUT_GROUPS: readonly HelpGroup[] = [
           "The original dates are still needed. In the english format the same words are already shown once.",
         ],
       },
+      {
+        flag: "--show-original",
+        value: ORIGINAL_COPY_FORM,
+        summary: "Also show the original seed phrase as English words for visual checking",
+        details: [
+          "Shown only on the screen, never as codes or added to encoded files, QR images or share files. Keep the original words apart from the backup.",
+        ],
+      },
     ],
   },
   {
@@ -719,14 +737,7 @@ export const ENCODE_OUTPUT_GROUPS: readonly HelpGroup[] = [
       },
       THRESHOLD,
       SHARES,
-      {
-        flag: "--show-original",
-        value: ORIGINAL_COPY_FORMS.join("|"),
-        summary: "Also show the original seed phrase before Seedshift; --sskr only",
-        details: [
-          "words shows English words; codes uses --format; both shows both. This copy needs no shares or dates. It is shown only, never added to exported share files.",
-        ],
-      },
+      SHARE_QR_DIR,
       {
         flag: "--share-format",
         value: "FORMAT",

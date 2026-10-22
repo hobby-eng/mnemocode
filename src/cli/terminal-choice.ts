@@ -122,11 +122,15 @@ function digitOf<T>(choice: Choice<T>, index: number): number | undefined {
   return choice.digit ?? (index < DIGIT_PLACES ? index + 1 : undefined);
 }
 
-/** The lines of a list, without colours when the terminal has none; the chosen entry has a cyan
- * marker and a bold label, so that it stands out also without colours. */
+/**
+ * The lines of a list, without colours when the terminal has none; the chosen entry has a cyan
+ * marker and a bold label, so that it stands out also without colours. Where any entry has an
+ * example, every entry reserves that second row so their labels stand equally far apart.
+ */
 export function listLines<T>(choices: readonly Choice<T>[], selected: number): string[] {
   const labelWidth = Math.max(...choices.map((choice) => Array.from(choice.label).length));
   const noteRoom = notesRoom(choices);
+  const hasExamples = choices.some((choice) => choice.example !== undefined);
   const lines: string[] = [];
   choices.forEach((choice, index) => {
     const digit = digitOf(choice, index);
@@ -146,7 +150,7 @@ export function listLines<T>(choices: readonly Choice<T>[], selected: number): s
     if (choice.example !== undefined) {
       const indent = " ".repeat(LABEL_INDENT + labelWidth + NOTE_GAP.length);
       lines.push(`${indent}${paint(STYLE.muted, shortened(choice.example, noteRoom))}`);
-    }
+    } else if (hasExamples) lines.push("");
   });
   return lines;
 }

@@ -28,13 +28,15 @@ it.each([
     ["sskr-combine", ...SSKR_SET_VECTOR.shares.slice(0, 2).flatMap((share) => ["--share", share])],
   ],
 ] as const)(
-  "explains the fingerprints after %s without adding a column to the result",
+  "reports the fingerprints after %s without redundant notes or an extra result column",
   (_, args) => {
     const result = runBuiltCliSync(args);
     expect(result.status, result.stderr).toBe(0);
     expect(result.signal).toBeNull();
-    expect(result.stderr).toContain("They do not reveal the phrase.");
-    expect(result.stdout).not.toContain("They do not reveal the phrase.");
+    const written = result.stdout + result.stderr;
+    expect(written).not.toContain("They do not reveal the phrase.");
+    expect(written).not.toContain("BIP32 fingerprints above use an empty BIP39 passphrase.");
+    expect(result.stderr).toContain("fingerprint");
     if (args[0] === "decode" && args[2] === LEGACY) {
       const rows = result.stdout.trimEnd().split("\n");
       expect(rows).toHaveLength(128);
@@ -47,7 +49,7 @@ it.each([
 );
 
 it.each(["stdout", "stderr"] as const)(
-  "keeps the terminal fingerprint explanation on its selected %s channel",
+  "keeps the terminal fingerprint on its selected %s channel without a redundant note",
   (channel) => {
     const writes = { stdout: "", stderr: "" };
     const streams = { log: "stdout", error: "stderr" } as const;
@@ -62,7 +64,8 @@ it.each(["stdout", "stderr"] as const)(
         "empty BIP39 passphrase",
         channel,
       );
-      expect(writes[channel]).toContain("They do not reveal the phrase.");
+      expect(writes[channel]).toContain(TEST_FINGERPRINT);
+      expect(writes[channel]).not.toContain("They do not reveal the phrase.");
       expect(writes[channel === "stdout" ? "stderr" : "stdout"]).toBe("");
     } finally {
       vi.restoreAllMocks();

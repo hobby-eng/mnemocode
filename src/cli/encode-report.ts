@@ -1,8 +1,8 @@
 import { masterFingerprint } from "../bitcoin-evidence.js";
-import { EncodedBackup } from "../core/encoded-backup.js";
+import type { EncodedBackup } from "../core/encoded-backup.js";
 import { EncodedForm } from "../core/encoded-form.js";
 import {
-  printCodes,
+  backupCodeLines,
   terminalLayout,
   terminalHint,
   terminalMore,
@@ -10,17 +10,16 @@ import {
   terminalStatus,
   terminalPhrase,
   terminalNotice,
-  FINGERPRINT_DISCLOSURE,
 } from "./terminal.js";
 import { encodedOutputLabel } from "./input.js";
 import { runningLines } from "./terminal-style.js";
 import type { EncodeOutcome } from "./encode-types.js";
 import { Masking, PHRASE_WORDS, type MaskingMode } from "../core/masking.js";
-import type { EncodedFormat } from "../core/types.js";
-import { FINGERPRINTS_HINT, plainFingerprintLine } from "./fingerprint-report.js";
+import { plainFingerprintLine } from "./fingerprint-report.js";
 import { defined } from "../core/defined.js";
-import type { ParsedArguments } from "./arguments.js";
+import { choiceOption, type ParsedArguments } from "./arguments.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { PrivateSteps } from "./private-steps.js";
 
 const ERRORS = new ErrorCatalog("cli.encode-report", {
   "masked-words-need-seedshift": () => "--show-masked-words needs a Seedshift mode.",
@@ -50,34 +49,27 @@ export function printMaskedWords(mnemonic: string, mode: MaskingMode): void {
 const NO_ENCODED_FINGERPRINT =
   "unavailable because legacy Seedshift output may have an invalid BIP39 checksum";
 
-/** The optional ways to show the original wallet phrase beside Shamir shares. */
-export const ORIGINAL_COPY_FORMS = ["words", "codes", "both"] as const;
-/** One original-copy choice; omission shows no original phrase. */
-export type OriginalCopyForm = (typeof ORIGINAL_COPY_FORMS)[number];
+/** The original phrase is shown only in English words, for visual checking. */
+export const ORIGINAL_COPY_FORM = "words";
+
+/** The optional original-copy form, refused before any secret is read when it is unknown. */
+export function originalCopyRequested(args: ParsedArguments): boolean {
+  return choiceOption(args, "show-original", [ORIGINAL_COPY_FORM]) !== undefined;
+}
 
 /**
- * Shows only the requested forms of the original wallet phrase, before Seedshift. Codes need
- * the selected format, checked before input. Nothing is saved beside the shares.
+ * Shows the original wallet phrase only as English words, for visual checking. It is never
+ * converted to codes or added to the encoded exports.
  */
-export function printOriginalCopy(
-  mnemonic: string,
-  form: OriginalCopyForm,
-  format: EncodedFormat | undefined,
-): void {
-  const codes = form === "words" ? undefined : EncodedForm.of(defined(format));
-  // Codes in words are the phrase itself (writtenInWords): a request for both shows it only once.
-  if (form !== "codes" || codes?.writtenInWords === true) {
-    if (
-      !terminalResultHeader("Original seed phrase", [["Content", "Wallet phrase before Seedshift"]])
-    )
-      console.log("Original seed phrase (before Seedshift):");
-    if (!terminalPhrase(mnemonic)) console.log(mnemonic);
-  }
-  if (codes !== undefined && !codes.writtenInWords) {
-    using backup = EncodedBackup.encode(mnemonic, [], codes.format, "direct").backup;
-    printEncodedBackup(backup, "Original seed phrase in codes");
-  }
-  terminalNotice("This is the original wallet backup: no shares or dates are needed.", "warning");
+export function printOriginalCopy(mnemonic: string): void {
+  if (
+    !terminalResultHeader("Original seed phrase", [
+      ["Content", "English words for visual checking"],
+    ])
+  )
+    console.log("Original seed phrase (words for visual checking):");
+  if (!terminalPhrase(mnemonic)) console.log(mnemonic);
+  terminalNotice("Keep the original phrase apart from the encoded backup.", "warning");
 }
 
 /**
@@ -98,7 +90,6 @@ export function printFingerprints(
     if (encoded === undefined)
       terminalStatus(masking.encodedFingerprintLabel, NO_ENCODED_FINGERPRINT, false);
     else terminalStatus(masking.encodedFingerprintLabel, encoded);
-    terminalHint(FINGERPRINTS_HINT);
     if (masking.masked) terminalHint(PHRASE_WORDS.fingerprintRoles);
   } else {
     console.error(plainFingerprintLine("original", original));
@@ -108,7 +99,6 @@ export function printFingerprints(
         : plainFingerprintLine("encoded", encoded, masking.masked),
     );
   }
-  terminalHint(FINGERPRINT_DISCLOSURE);
 }
 
 /**
@@ -125,7 +115,7 @@ export function printEncodedBackup(backup: EncodedBackup, title = "Encoded resul
     ])
   )
     console.log(`${label}:`);
-  printCodes(backup.text(), backup.format);
+  for (const line of backupCodeLines(backup.text(), backup.format)) console.log(line);
 }
 
 /** `sentence` on standard error, wrapped on a terminal (runningLines). */
@@ -134,13 +124,22 @@ function printSentence(sentence: string): void {
 }
 
 /** Reporting is separate from transformation and file side effects. */
-export function printEncodeResult(outcome: EncodeOutcome, showMaskedWords = false): void {
+export function printEncodeResult(
+  outcome: EncodeOutcome,
+  showMaskedWords = false,
+  originalCopy = false,
+): void {
+  // Save and retry notices follow this result; every later question retains its beginning.
+  PrivateSteps.showResult("start");
   const { mode, encoding } = outcome;
   const { backup, result, base, validLastWord } = encoding;
+  const legacy = Masking.of(mode).withValidLastWord !== undefined;
+  if (legacy && encoding.lastWordChanged) terminalMore("transformation-modes");
   printEncodedBackup(backup);
   // Codes in words already print these words (writtenInWords).
   if (showMaskedWords && !EncodedForm.of(backup.format).writtenInWords)
     printMaskedWords(result.shiftedEnglish.join(" "), backup.mode);
+  if (originalCopy) printOriginalCopy(result.sourceMnemonic);
   // By the rule that decode and sskr-combine show it by (EncodedBackup.fingerprint): only codes
   // that are a valid BIP39 phrase have one, which the Original Seedshift's are only by chance.
   printFingerprints(
@@ -149,7 +148,7 @@ export function printEncodeResult(outcome: EncodeOutcome, showMaskedWords = fals
     backup.fingerprint(masterFingerprint),
   );
 
-  if (Masking.of(mode).withValidLastWord !== undefined) {
+  if (legacy) {
     if (!encoding.lastWordChanged) {
       printSentence(
         "Legacy shifted phrase already has a valid BIP39 checksum; no final-word replacement is needed.",
@@ -161,16 +160,11 @@ export function printEncodeResult(outcome: EncodeOutcome, showMaskedWords = fals
       printSentence(
         `Optional checksum-valid legacy phrase: ${defined(validLastWord).shiftedEnglish.join(" ")}`,
       );
-      printSentence(
-        "That word replaces the shifted last word; --legacy-valid-last-word records it.",
-      );
-      terminalMore("transformation-modes");
     } else {
       printSentence(
         `Replaced legacy final word ${base.shiftedEnglish.at(-1)} with checksum-valid word ${result.shiftedEnglish.at(-1)}.`,
       );
       printSentence("The shifted last word is not stored; decoding lists the candidates.");
-      terminalMore("transformation-modes");
     }
   }
 }

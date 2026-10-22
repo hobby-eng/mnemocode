@@ -24,10 +24,9 @@ from terminal_answers import (
 )
 
 # The encoded fingerprint of the test phrase masked with the README's
-# date, as Encode shows it, and the sentence that comes with every
-# fingerprint; its label differs with colour.
+# date, as Encode shows it, and the label it is shown under.
 ENCODED_FINGERPRINT = "0d05289e"
-FINGERPRINT_NOTE = "They do not reveal the phrase."
+FINGERPRINT_LABEL = "Encoded fingerprint"
 
 
 def frame_shows_at(arguments, prompt, answer, question, markers, colour):
@@ -50,7 +49,7 @@ def check_fingerprint_before_dates():
     """Decode, recover-date and sskr-combine keep the encoded
     fingerprint on the Dates screen.
     """
-    markers = (ENCODED_FINGERPRINT, FINGERPRINT_NOTE)
+    markers = (ENCODED_FINGERPRINT, FINGERPRINT_LABEL)
     shares = f"{FIRST_SHARE}; {THIRD_SHARE}"
     codes = "Encoded seed phrase"
     cases = (
@@ -115,7 +114,7 @@ def check_fingerprint_before_dates_in_menu():
             session.wait_for(prompt)
             session.type(answer + terminal.ENTER)
             session.wait_for("Dates")
-            markers = (ENCODED_FINGERPRINT, FINGERPRINT_NOTE)
+            markers = (ENCODED_FINGERPRINT, FINGERPRINT_LABEL)
             terminal.assert_private_result_visible(session, markers)
             session.type(terminal.CTRL_C)
             session.wait_for(MENU_SHOWN)

@@ -29,7 +29,6 @@ import { parseAddressCount, defaultAddressCount } from "../core/address-scan.js"
 import { isFirstReceiving, isTestNetwork } from "../core/wallet-evidence.js";
 import { askValueUntil } from "./ask.js";
 import { FIRST_RECEIVING, type WalletPlace } from "./bitcoin-options.js";
-import { FINGERPRINT_DISCLOSURE } from "./terminal.js";
 import { choose, type Choice, type Explanation } from "./terminal-choice.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 
@@ -132,7 +131,7 @@ class WalletQuestionWords {
   // As mhfe asks it (src/bin/mhfe/check.rs), every coin in the same list (owner, 2026-10-13).
   static readonly COIN_QUESTION = "Which coin is the address for?";
   static readonly FINGERPRINT: AskedValue = Object.freeze({
-    prompt: `Original fingerprint of the wallet, such as 73c5da0a (not the encoded one; ${FINGERPRINT_DISCLOSURE})`,
+    prompt: "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one)",
     what: "the eight characters of the fingerprint",
   });
 
@@ -290,7 +289,6 @@ export async function askWalletEvidence(
             {
               ...WalletQuestionWords.FINGERPRINT,
               label: "Fingerprint",
-              note: FINGERPRINT_DISCLOSURE,
             },
             (answer): WalletEvidence => ({
               kind: "master-fingerprint",

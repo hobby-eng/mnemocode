@@ -235,7 +235,7 @@ describe("S002, S123: ShareRestore holds the steps of a restore and a repair", (
     return { input, restore: new ShareRestore(nodeSharePlatform), confirmed, limits };
   }
 
-  it("restores the vector's phrase from complete shares, with no repair and the backup in the form of the first share", async () => {
+  it("restores the vector's phrase from complete shares without repair or another original-code block", async () => {
     const { writeShare } = await import("../src/sskr/transport.js");
     const { input, restore } = await restoreOf([writeShare(first, "indexes"), second], false);
     const outcome = await restore.restore({ input, mode: "direct", confirmed: false });
@@ -247,15 +247,8 @@ describe("S002, S123: ShareRestore holds the steps of a restore and a repair", (
     expect(outcome.phrases[0]).toMatchObject({
       mnemonic: phrase,
       repairs: [],
-      // The word numbers of the phrase, counted from 1, as the first share is written.
-      backup: {
-        form: "indexes",
-        text: phrase
-          .split(" ")
-          .map((word) => wordlist.indexOf(word) + 1)
-          .join(" "),
-      },
     });
+    expect(outcome.phrases[0]!.backup).toBeUndefined();
     expect(outcome.listed).toEqual([phrase]);
   });
 

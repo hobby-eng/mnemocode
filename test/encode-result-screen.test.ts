@@ -65,35 +65,32 @@ describe("Encode result visibility while the real backup question waits", () => 
   });
 
   it.each(["direct", "seedshift"] as const)(
-    "shows only the requested forms of the original phrase with %s shares",
+    "shows the original phrase only in words with %s shares",
     async (mode) => {
-      for (const choice of ["words", "codes", "both"] as const) {
-        const screen = watchScreen(120);
-        vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
-          screen.write(format(...parts) + "\n");
-        });
-        const answers = [TEST_PHRASE + "\r", ...(mode === "direct" ? [] : [DATE + "\r"]), "2"];
-        terminal.keysFor = () => answers.shift()!;
-        await runEncode({
-          "ask-secrets": true,
-          sskr: true,
-          threshold: "2",
-          shares: "3",
-          "share-format": "colors",
-          mode,
-          "show-original": choice,
-          ...(choice === "words" ? {} : { format: "2" }),
-        });
-        const visible = screen.lines().join("\n");
-        expect(visible.includes(TEST_PHRASE), choice).toBe(choice !== "codes");
-        expect(visible.includes(TEST_NUMBERS), choice).toBe(choice !== "words");
-        expect(visible).toContain("no shares or dates are needed");
-        expect(visible).toContain("SSKR share 3 of 3");
-      }
+      const screen = watchScreen(120);
+      vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+        screen.write(format(...parts) + "\n");
+      });
+      const answers = [TEST_PHRASE + "\r", ...(mode === "direct" ? [] : [DATE + "\r"]), "2"];
+      terminal.keysFor = () => answers.shift()!;
+      await runEncode({
+        "ask-secrets": true,
+        sskr: true,
+        threshold: "2",
+        shares: "3",
+        "share-format": "colors",
+        mode,
+        "show-original": "words",
+      });
+      const visible = screen.lines().join("\n");
+      expect(visible).toContain(TEST_PHRASE);
+      expect(visible).not.toContain(TEST_NUMBERS);
+      expect(visible).toContain("for visual checking");
+      expect(visible).toContain("SSKR share 3 of 3");
     },
   );
 
-  it("refuses an original-code copy with no selected format before asking for the phrase", async () => {
+  it("refuses an original-code copy before asking for the phrase", async () => {
     terminal.keysFor = () => {
       throw new Error("no secret must be asked");
     };
@@ -105,7 +102,7 @@ describe("Encode result visibility while the real backup question waits", () => 
         shares: "3",
         "show-original": "codes",
       }),
-    ).rejects.toThrow("--format");
+    ).rejects.toThrow("--show-original");
   });
 
   it("refuses invalid display choices before asking for any secret", async () => {
@@ -114,7 +111,7 @@ describe("Encode result visibility while the real backup question waits", () => 
     };
     for (const [args, message] of [
       [{ sskr: true, threshold: "2", shares: "3", "show-original": "unknown" }, "--show-original"],
-      [{ "show-original": "words" }, "only in SSKR mode"],
+      [{ "show-original": "both" }, "--show-original"],
       [{ "show-masked-words": true, mode: "direct" }, "needs a Seedshift mode"],
     ] as const) {
       await expect(runEncode({ "ask-secrets": true, ...args })).rejects.toThrow(message);
@@ -123,7 +120,7 @@ describe("Encode result visibility while the real backup question waits", () => 
 });
 
 describe("Optional phrase copies stay apart from exported shares", () => {
-  it("saves only shares when both original forms and Seedshift words are shown", async () => {
+  it("saves only shares when original and Seedshift words are shown", async () => {
     const folder = await mkdtemp(join(tmpdir(), "mnemocode-display-"));
     const path = join(folder, "shares.txt");
     const screen = watchScreen(120);
@@ -139,7 +136,7 @@ describe("Optional phrase copies stay apart from exported shares", () => {
         threshold: "2",
         shares: "3",
         mode: "seedshift",
-        "show-original": "both",
+        "show-original": "words",
         "show-masked-words": true,
         format: "5",
         output: path,
@@ -154,7 +151,7 @@ describe("Optional phrase copies stay apart from exported shares", () => {
       ).toBe(true);
       expect(stored).not.toContain(TEST_PHRASE);
       expect(stored).not.toContain("wool abuse");
-      expect(screen.lines().join("\n")).toContain(
+      expect(screen.lines().join("\n")).not.toContain(
         "#000064 #1EAB91 #3D0964 #5BB491 #7A1264 #98BD91 #B71B64 #D5C694",
       );
     } finally {
@@ -162,7 +159,7 @@ describe("Optional phrase copies stay apart from exported shares", () => {
     }
   });
 
-  it("shows English only once when both original forms were requested", async () => {
+  it("shows the original English words only once beside a masked English backup", async () => {
     const screen = watchScreen(120);
     vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
       screen.write(format(...parts) + "\n");
@@ -175,7 +172,7 @@ describe("Optional phrase copies stay apart from exported shares", () => {
       threshold: "2",
       shares: "3",
       mode: "seedshift",
-      "show-original": "both",
+      "show-original": "words",
       format: "1",
     });
     expect(screen.lines().join("\n").split(TEST_PHRASE)).toHaveLength(2);
@@ -206,12 +203,13 @@ describe("Encode result stays on the private screen through follow-up questions"
         await runEncode({
           "ask-secrets": true,
           mode,
-          format: "2",
+          format: shares && mode === "direct" ? "1" : "2",
           ...(shares ? { sskr: true, threshold: "2", shares: "3" } : {}),
         }),
       ).toBeUndefined();
       expect(atCheck).toContain(BACKUP_CHECK_QUESTION);
-      expect(atCheck).toContain(mode === "direct" ? TEST_NUMBERS : MASKED);
+      const expected = mode === "direct" ? (shares ? TEST_PHRASE : TEST_NUMBERS) : MASKED;
+      expect(atCheck).toContain(expected);
       // The result is a step of its own (CORE-39): the secret prompts, and the dates typed at one,
       // were cleared away before it.
       expect(atCheck).not.toContain(SEED_PHRASE_PROMPT);
@@ -219,7 +217,7 @@ describe("Encode result stays on the private screen through follow-up questions"
       expect(atCheck).not.toContain(DATE);
       if (shares)
         for (const number of [1, 2, 3]) expect(atCheck).toContain(`SSKR share ${number} of 3`);
-      expect(screen.lines().join("\n")).toContain(mode === "direct" ? TEST_NUMBERS : MASKED);
+      expect(screen.lines().join("\n")).toContain(expected);
     },
   );
 

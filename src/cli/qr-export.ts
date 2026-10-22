@@ -7,7 +7,13 @@ import { exportQrPayload } from "../export/qr-image.js";
 import { firstFreeName } from "./output-paths.js";
 import { saveWithRetry } from "./save-retry.js";
 import { preflightFileDestination } from "./output-paths.js";
-import type { Cancelled } from "./terminal-keys.js";
+import { CANCELLED, type Cancelled } from "./terminal-keys.js";
+import { terminalSaved } from "./terminal.js";
+
+/** Reports only images already verified by exportQrPayload and successfully published. */
+export function reportQrVerified(count = 1): void {
+  if (count > 0) terminalSaved(count === 1 ? "QR code verified." : `${count} QR codes verified.`);
+}
 
 /**
  * The image of a QR code that a sheet prints, saved where the sheet is: beside the PDF `sheet`,
@@ -35,12 +41,14 @@ export async function saveQrInside(
   return saveQrAt(payload, path);
 }
 
-function saveQrAt(payload: string, path: string): Promise<string | undefined | Cancelled> {
-  return saveWithRetry({
+async function saveQrAt(payload: string, path: string): Promise<string | undefined | Cancelled> {
+  const saved = await saveWithRetry({
     what: "The QR code of the sheet",
     kind: "file",
     path,
     write: (name) => exportQrPayload(payload, name),
     checkName: (name) => preflightFileDestination(name, false),
   });
+  if (saved !== undefined && saved !== CANCELLED) reportQrVerified();
+  return saved;
 }

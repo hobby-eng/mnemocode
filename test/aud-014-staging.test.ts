@@ -113,9 +113,10 @@ describe("a QR code saved beside its sheet, whose staging copy is left (AUD-015-
       if (typeof path !== "string") throw Error("The QR fixture was not saved.");
       expect((await readFile(path)).length).toBeGreaterThan(0);
     }
-    expect(state.notices).toHaveLength(2);
-    for (const notice of state.notices)
-      expect(notice).toMatch(/could not be removed: delete it\.$/u);
+    expect(state.notices).toHaveLength(4);
+    const warnings = state.notices.filter((notice) => !notice.includes("QR code verified."));
+    expect(warnings).toHaveLength(2);
+    for (const notice of warnings) expect(notice).toMatch(/could not be removed: delete it\.$/u);
   });
 
   it("still fails a QR code that could not be written at all", async () => {

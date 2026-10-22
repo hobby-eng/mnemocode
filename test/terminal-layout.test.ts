@@ -139,7 +139,7 @@ describe("the layout of results on a terminal (terminal.ts)", () => {
     // A share's Unicode codes, written apart, also get the joined line.
     out.length = 0;
     printCodes("7A0B 971E 80CC", "unicode");
-    expect(out.at(-1)).toBe("7A0B971E80CC");
+    expect(out.at(-1)).toBe("\x1b[1m7A0B971E80CC\x1b[0m");
     out.length = 0;
     printCodes("E000E064E13AE191", "colors-unicode");
     // Code by code, as a ? stands for one code in every reader.

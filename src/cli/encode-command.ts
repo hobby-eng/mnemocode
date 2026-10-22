@@ -5,7 +5,7 @@ import { validateCardOptions } from "./card-options.js";
 import { colorCardsFit } from "./cards-fit.js";
 import { RenamedOutputs } from "./output-paths.js";
 import { prepareSskrSplit } from "./sskr-split-command.js";
-import { printEncodeResult, maskedWordsRequested } from "./encode-report.js";
+import { printEncodeResult, maskedWordsRequested, originalCopyRequested } from "./encode-report.js";
 import { backupCheckAnswer, offerEncodedCheck } from "./backup-check.js";
 import { EncodeCardExport, saveEncodeResult } from "./encode-export.js";
 import { optionLabel } from "./option-copy.js";
@@ -30,14 +30,17 @@ const ERRORS = new ErrorCatalog("cli.encode-command", {
     `Terminal color cards are available only for RGB color formats ${value0}.`,
 });
 
-async function validateEncodeOptions(
-  args: ParsedArguments,
-): Promise<{ mode: MaskingMode; format: EncodedFormat }> {
+async function validateEncodeOptions(args: ParsedArguments): Promise<{
+  mode: MaskingMode;
+  format: EncodedFormat;
+  originalCopy: boolean;
+}> {
   for (const key of ENCODE_SSKR_ONLY_OPTIONS) {
     if (args[key] !== undefined)
       throw ERRORS.create("setting-available-only-sskr-mode", [`${optionLabel(key)}`]);
   }
   const mode = transformMode(args);
+  const originalCopy = originalCopyRequested(args);
   maskedWordsRequested(args, mode);
   const format = encodeFormat(value(args, "format"));
   EncodedBackup.assertEncodable(mode, { validLastWord: args["legacy-valid-last-word"] === true });
@@ -57,7 +60,7 @@ async function validateEncodeOptions(
   validateCardOptions(args, format);
   // Validate all destinations before prompting or reading a mnemonic.
   await preflightOutputs(args);
-  return { mode, format };
+  return { mode, format, originalCopy };
 }
 
 async function createOutcome(
@@ -163,7 +166,7 @@ export async function runEncode(args: ParsedArguments): Promise<Cancelled | unde
  */
 export async function prepareEncode(args: ParsedArguments): Promise<PreparedEncode> {
   if (args.sskr === true) return prepareSskrSplit(args, true);
-  const { mode, format } = await validateEncodeOptions(args);
+  const { mode, format, originalCopy } = await validateEncodeOptions(args);
   const checkAnswer = backupCheckAnswer(args);
   const saving: ParsedArguments = { ...args };
   // A detail too long for its card is refused before a secret is asked, not after the result is
@@ -173,13 +176,14 @@ export async function prepareEncode(args: ParsedArguments): Promise<PreparedEnco
     terminalWork("Checking that the cards can be printed…");
     await fit();
   }
-  return (known) => encodeChecked(args, saving, { mode, format, checkAnswer }, known);
+  return (known) => encodeChecked(args, saving, { mode, format, checkAnswer, originalCopy }, known);
 }
 
 /** What prepareEncode checked: the mode, the form and the answer to the backup check. */
 interface CheckedEncode {
   readonly mode: MaskingMode;
   readonly format: EncodedFormat;
+  readonly originalCopy: boolean;
   readonly checkAnswer: ReturnType<typeof backupCheckAnswer>;
 }
 
@@ -187,13 +191,14 @@ interface CheckedEncode {
 async function encodeChecked(
   args: ParsedArguments,
   saving: ParsedArguments,
-  { mode, format, checkAnswer }: CheckedEncode,
+  { mode, format, checkAnswer, originalCopy }: CheckedEncode,
   known: string | undefined,
 ): Promise<Cancelled | undefined> {
   const outcome = await createOutcome(args, mode, format, known);
   if (outcome === CANCELLED) return CANCELLED;
   using backup = outcome.encoding.backup;
-  const show = (): void => printEncodeResult(outcome, maskedWordsRequested(args, mode));
+  const show = (): void =>
+    printEncodeResult(outcome, maskedWordsRequested(args, mode), originalCopy);
   // The result is a step of its own: the questions are cleared away (CORE-39).
   clearPrivateScreen();
   show();

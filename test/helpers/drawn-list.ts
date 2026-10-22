@@ -54,14 +54,15 @@ export function drawnList(drawn: string): DrawnList | undefined {
   while (hintAt >= 0 && !KEY_HINT.test(lines[hintAt]!)) hintAt -= 1;
   const escape = KEY_HINT.exec(lines[hintAt] ?? "")?.groups?.["escape"];
   if (escape === undefined) return undefined;
-  // The list ends above the blank line over the hint, and starts below the first line that is no
-  // entry of it.
+  // The list ends above the blank line over the hint; an entry without an example may reserve
+  // an empty row so that its label stands as far from the next as one with an example does.
   const end = hintAt - 1;
   let start = end;
-  while (start > 0 && isListLine(lines[start - 1]!)) start -= 1;
+  while (start > 0 && (lines[start - 1] === "" || isListLine(lines[start - 1]!))) start -= 1;
   const entries: DrawnEntry[] = [];
   let selected = 0;
   for (const line of lines.slice(start, end)) {
+    if (line === "") continue;
     const entry = ENTRY_LINE.exec(line)?.groups;
     if (entry === undefined) {
       const last = entries.pop();

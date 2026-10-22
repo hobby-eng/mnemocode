@@ -5,13 +5,7 @@ import { terminalNotice, terminalResultHeader } from "./terminal.js";
 import { clearPrivateScreen } from "./private-screen.js";
 import { ownShareCards } from "../export/sskr-render.js";
 import { RenamedOutputs } from "./output-paths.js";
-import {
-  assertSingleValues,
-  integerOption,
-  value,
-  choiceOption,
-  type ParsedArguments,
-} from "./arguments.js";
+import { assertSingleValues, integerOption, value, type ParsedArguments } from "./arguments.js";
 import { assertDateInputMode, encodeFormat, phraseAndDates, transformMode } from "./input.js";
 import { DATE_COUNT_WORDS, Masking, type SplitMode } from "../core/masking.js";
 import { masterFingerprint } from "../bitcoin-evidence.js";
@@ -27,8 +21,7 @@ import {
   printEncodedBackup,
   printFingerprints,
   printOriginalCopy,
-  ORIGINAL_COPY_FORMS,
-  type OriginalCopyForm,
+  originalCopyRequested,
   maskedWordsRequested,
   printMaskedWords,
 } from "./encode-report.js";
@@ -51,7 +44,8 @@ import { ErrorCatalog } from "../core/error-catalog.js";
 const ERRORS = new ErrorCatalog("cli.sskr-split-command", {
   "setting-not-available-sskr-mode-export-shares-pdf": (value0: string) =>
     `The ${value0} setting is not available in SSKR mode. Export shares to a PDF file or an individual-card output folder instead.`,
-  "original-codes-need-format": () => "Choose --format to show the original seed phrase in codes.",
+  "original-codes-not-shown": () =>
+    "The original seed phrase is shown only as English words. Use --show-original words, or select Seedshift to show a masked backup in --format.",
 });
 
 export async function runSskrSplit(
@@ -85,24 +79,26 @@ export async function prepareSskrSplit(
           `${optionLabel(key)}`,
         ]);
   }
-  // With --format the whole seed phrase is shown beside the shares, in that form; without it, only
-  // the shares, which is what splitting is for.
+  // --format adds the whole masked backup beside the shares. An unmasked original is words only.
   const representation =
     integrated && value(args, "format") !== undefined
       ? encodeFormat(value(args, "format"))
       : undefined;
-  const originalCopy = integrated
-    ? choiceOption(args, "show-original", ORIGINAL_COPY_FORMS)
-    : undefined;
-  if (originalCopy !== undefined && originalCopy !== "words" && representation === undefined)
-    throw ERRORS.create("original-codes-need-format", []);
+  const originalCopy = integrated && originalCopyRequested(args);
+  const mode = transformMode(args);
+  if (
+    representation !== undefined &&
+    !originalCopy &&
+    !Masking.of(mode).masked &&
+    !EncodedForm.of(representation).writtenInWords
+  )
+    throw ERRORS.create("original-codes-not-shown", []);
   const format = integrated
     ? shareFormat({ format: value(args, "share-format") ?? DEFAULT_SHARE_FORMAT })
     : shareFormat(args);
   const options = exportOptions(args, format);
   await preflightOutputs(args);
   await assertShareCardsPrintable(options);
-  const mode = transformMode(args);
   const maskedWords = maskedWordsRequested(args, mode);
   Masking.assertSplitMode(mode);
   assertDateInputMode(args, mode, DATE_COUNT_WORDS.split);
@@ -134,7 +130,7 @@ interface CheckedSplit {
   readonly format: ShareFormat;
   readonly options: ReturnType<typeof exportOptions>;
   readonly representation: EncodedFormat | undefined;
-  readonly originalCopy: OriginalCopyForm | undefined;
+  readonly originalCopy: boolean;
   readonly maskedWords: boolean;
   readonly checkAnswer: ReturnType<typeof backupCheckAnswer>;
 }
@@ -203,27 +199,26 @@ async function splitChecked(
     terminalNotice(`The shares hold ${Masking.of(mode).holds}.`);
     if (Masking.of(mode).masked)
       terminalNotice("The shares do not store the dates or the mode; keep them yourself.");
-    if (representation !== undefined && originalCopy === undefined) {
-      using backup = EncodedBackup.encode(mnemonic, dateValues, representation, mode).backup;
-      printEncodedBackup(backup);
-      // Shown for a person who keeps the whole phrase too, with the shares as a reserve.
-      terminalNotice(
-        Masking.of(mode).masked
-          ? "This is the complete backup: no share is needed, but the original dates are still required."
-          : "This is the whole seed phrase: it restores the wallet without any share.",
-        "warning",
-      );
+    if (representation !== undefined && !originalCopy) {
+      if (Masking.of(mode).masked) {
+        using backup = EncodedBackup.encode(mnemonic, dateValues, representation, mode).backup;
+        printEncodedBackup(backup);
+        terminalNotice(
+          "This is the complete backup: no share is needed, but the original dates are still required.",
+          "warning",
+        );
+      } else printOriginalCopy(original);
     }
     // A complete backup in codes that are words (writtenInWords), shown above with --format alone,
     // shows the masked words already.
     const wordsShown =
       representation !== undefined &&
-      originalCopy === undefined &&
+      !originalCopy &&
       EncodedForm.of(representation).writtenInWords;
     // The optional original copy comes last, so it remains in view after long share blocks.
-    printShares(inForm(shares, format), undefined, Masking.of(mode).holds);
+    printShares(inForm(shares, format), undefined, Masking.of(mode).holds, "backup");
     if (maskedWords && !wordsShown) printMaskedWords(held, mode);
-    if (originalCopy !== undefined) printOriginalCopy(original, originalCopy, representation);
+    if (originalCopy) printOriginalCopy(original);
     printFingerprints(mode, masterFingerprint(original), masterFingerprint(held));
   };
   show();

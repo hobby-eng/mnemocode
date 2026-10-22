@@ -317,7 +317,7 @@ async function askDetailsOnce(
 }
 
 /**
- * Printable cards, after "Also as printable cards": how the cards are saved in files named after
+ * Printable cards, after "Screen and printable cards": how the cards are saved in files named after
  * `base` (the kind of file, then the layout), the design, a QR code on each sheet, and the details
  * on them, which `fit` checks as the command will (askCardDetails). Separate business cards never
  * carry a QR code. `shares`: the cards of Shamir shares, one set per share.

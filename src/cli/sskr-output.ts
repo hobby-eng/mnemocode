@@ -7,6 +7,7 @@ import { resolveSskrLayout, parseSskrLayout, SSKR_LAYOUT_RULES } from "../export
 import {
   printableText,
   codeLines,
+  backupCodeLines,
   resultHeaderLines,
   terminalLine,
   terminalNotice,
@@ -37,7 +38,7 @@ import {
 } from "../export/sskr-cards.js";
 import { ShareCardSet, type ShareQrCode } from "../export/sskr-render.js";
 import { nodeCardRenderer } from "../export/platform-node.js";
-import { saveQrBeside, saveQrInside } from "./qr-export.js";
+import { saveQrBeside, saveQrInside, reportQrVerified } from "./qr-export.js";
 import { saveOutput } from "./output-saving.js";
 import { assertCardOutput } from "./card-options.js";
 import { isImageFormat, type DocumentFormat } from "../export/document-formats.js";
@@ -45,6 +46,9 @@ import { shareKeepingNote, type ShareCardPackaging } from "../export/sskr-keepin
 import { refusalMessage } from "../core/refusal.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
+import { join } from "node:path";
+import { exportQrPayload } from "../export/qr-image.js";
+import { claimOutputFolder } from "./output-saving.js";
 
 const ERRORS = new ErrorCatalog("cli.sskr-output", {
   "share-formats-not-bip39-representations": (value0: string) =>
@@ -113,7 +117,8 @@ export function inForm(shares: readonly string[], format: ShareFormat): WrittenS
 
 /**
  * Prints one share under `title`, with its form and what it holds where that is known: as a
- * result header on a terminal, as one line before it elsewhere.
+ * result header on a terminal, as one line before it elsewhere. A repair variant is not marked
+ * as a share to save.
  */
 export function printShareBlock(
   title: string,
@@ -125,12 +130,14 @@ export function printShareBlock(
 }
 
 type ShareLine = readonly [Channel, string];
+type SharePresentation = "backup" | "candidate";
 
 function shareBlockLines(
   title: string,
   ur: string,
   format: ShareFormat,
   holds: string | undefined,
+  purpose: SharePresentation = "candidate",
 ): ShareLine[] {
   const form = SHARE_FORMAT_NAMES[format];
   const facts: [string, string][] = [["Format", form]];
@@ -140,12 +147,12 @@ function shareBlockLines(
     header.length === 0
       ? [["stderr", `${title} — ${form}${holds === undefined ? "" : `, holds ${holds}`}:`]]
       : header.map((line) => ["stdout", line] as const);
-  return [
-    ...heading,
-    ...codeLines(writeShare(ur, format), MIRRORED_FORM[format]).map(
-      (line) => ["stdout", line] as const,
-    ),
-  ];
+  const text = writeShare(ur, format);
+  const codes =
+    purpose === "backup"
+      ? backupCodeLines(text, MIRRORED_FORM[format], "share")
+      : codeLines(text, MIRRORED_FORM[format]);
+  return [...heading, ...codes.map((line) => ["stdout", line] as const)];
 }
 
 function printShareLines(lines: readonly ShareLine[]): void {
@@ -156,16 +163,24 @@ function printShareLines(lines: readonly ShareLine[]): void {
 /**
  * Prints shares as "SSKR share N of M", by their places among the `total` made or typed, with what
  * they hold where that is known (PHRASE_WORDS), so that a masked phrase is not taken for the
- * wallet's.
+ * wallet's. The accepted split/export requests the backup presentation; unconfirmed repair
+ * candidates keep their ordinary display by default.
  */
 export function printShares(
   shares: readonly WrittenShare[],
   total: number = shares.length,
   holds?: string,
+  purpose: SharePresentation = "candidate",
 ): void {
   printShareLines(
     shares.flatMap((share) =>
-      shareBlockLines(`SSKR share ${share.number} of ${total}`, share.ur, share.format, holds),
+      shareBlockLines(
+        `SSKR share ${share.number} of ${total}`,
+        share.ur,
+        share.format,
+        holds,
+        purpose,
+      ),
     ),
   );
 }
@@ -192,6 +207,27 @@ export async function saveShares(
   if (options !== undefined) {
     using cards = await nodeShareCards(shares, options);
     if ((await saveShareCards(cards, args, options, keep)) === CANCELLED) return CANCELLED;
+  }
+  const qrFolder = await saveOutput(
+    args,
+    "qr-dir",
+    { what: "The QR images of the shares", plural: true },
+    async (path) => {
+      const folder = await claimOutputFolder("qr-dir", path);
+      await folder.publish(".mnemocode-share-qr-", async (staging) => {
+        for (const share of shown)
+          await exportQrPayload(
+            writeShare(share.ur, share.format),
+            join(staging, `share-${share.number}-qr.png`),
+          );
+      });
+    },
+  );
+  if (qrFolder === CANCELLED) return CANCELLED;
+  if (qrFolder !== undefined) {
+    reportQrVerified(shown.length);
+    terminalSaved(`Saved ${shown.length} share QR images to: ${printableText(qrFolder)}`);
+    keep("folder");
   }
   // Each share in its form, as the terminal shows it.
   const lines = shown.map((share) => writeShare(share.ur, share.format));

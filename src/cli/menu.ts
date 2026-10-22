@@ -59,8 +59,6 @@ import {
   terminalMore,
   terminalNotice,
   terminalPaint,
-  terminalHint,
-  FINGERPRINT_DISCLOSURE,
 } from "./terminal.js";
 import { printUsage } from "./usage.js";
 import { REPAIR_ANCHOR } from "../sskr/repair-report.js";
@@ -112,9 +110,6 @@ type Action =
   | "quit"
   | undefined
   | Cancelled;
-
-/** Visible wallet-reference settings that make the command preview show a fingerprint. */
-const FINGERPRINT_PREVIEW_FLAGS = ["--master-fingerprint", "--encoded-fingerprint"] as const;
 
 /** What standard shares are, shown with the question how many to make in entry 4. */
 const STANDARD_SHARES_EXPLANATION: Explanation = {
@@ -786,8 +781,6 @@ export async function runMenu(): Promise<Cancelled | undefined> {
       if (printableText(command) === command) {
         console.error(`\n${paint(STYLE.muted, "The same as:")}`);
         console.error(paint(STYLE.accent, command));
-        if (FINGERPRINT_PREVIEW_FLAGS.some((flag) => action.run.includes(flag)))
-          terminalHint(FINGERPRINT_DISCLOSURE);
       } else {
         terminalNotice(
           "Command preview omitted: an argument contains display controls.",

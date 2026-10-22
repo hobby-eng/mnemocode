@@ -31,6 +31,7 @@ const FOLDER_RULES = {
   "images-dir": claimImageFolder,
   "word-lists-dir": (path: string) =>
     NewFolder.claim(path, "Choose a new folder for the word-list set."),
+  "qr-dir": (path: string) => NewFolder.claim(path, "Choose a new folder for the share QR images."),
 } as const satisfies Readonly<Record<FolderOutput, (path: string) => Promise<NewFolder>>>;
 
 /** Claims a new folder of `key`, refusing an occupied name or an unusable parent. */

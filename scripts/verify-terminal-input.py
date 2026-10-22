@@ -74,8 +74,9 @@ It checks that
   warning that a fingerprint is only a filter, then that the result was
   cleared, or "Cancelled." once after the warnings of a cancelled one,
   and none of the phrase, codes, dates or fingerprint;
-- Ctrl+C at a prompt for a secret leaves the private screen; in the menu
-  it cancels that command and the menu comes back, a typed command ends
+- Escape or Ctrl+C at a prompt for a secret leaves the private screen;
+  in the menu it cancels that command and the menu comes back; a typed
+  command ends
   with exit code 130; Ctrl+C while card images are drawn ends the
   command as cancelled, leaving no temporary folder of the export;
 - Escape or q in the menu ends it with exit code 0, and Ctrl+C there
@@ -106,7 +107,7 @@ from terminal_result_checks import (
 from terminal_menu_checks import (
     check_back_from_entry,
     check_card_questions,
-    check_ctrl_c,
+    check_cancel_at_prompt,
     check_cursor_editing,
     check_date_search_ctrl_c,
     check_decode_menu,
@@ -136,6 +137,7 @@ from terminal_secret_checks import (
     check_re_encode_answer_refused,
     check_re_encode_last_word_after_wrong_date,
     check_re_encode_menu,
+    check_re_encode_marked_shares,
     check_re_encode_recognised,
     check_restore_share_asked_again,
 )
@@ -164,6 +166,7 @@ def main():
     check_re_encode_menu()
     check_re_encode_answer_refused()
     check_re_encode_recognised()
+    check_re_encode_marked_shares()
     check_re_encode_last_word_after_wrong_date()
     check_decode_dates_asked_again()
     check_fingerprint_before_dates()
@@ -181,7 +184,7 @@ def main():
     check_word_candidate_pages()
     check_steps_after_result()
     check_candidate_passphrase_roles()
-    check_ctrl_c()
+    check_cancel_at_prompt()
     check_ctrl_c_during_image_export()
     check_interrupt_without_terminal()
     check_interrupt_at_clear_prompt()

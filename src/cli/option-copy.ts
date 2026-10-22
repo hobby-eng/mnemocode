@@ -93,6 +93,7 @@ const OPTION_LABELS: Readonly<Record<string, string>> = {
   pdf: "PDF output file",
   "progress-every": "progress interval",
   qr: "QR output file",
+  "qr-dir": "share QR output folder",
   recognised: "confirmation that the seed phrase is recognised",
   "qr-file": "QR input file",
   "scan-gap": "--scan-gap address count",

@@ -236,7 +236,7 @@ describe("visible line", () => {
     expect(await readLine(typed(`a€b${LEFT}${LEFT}${BACKSPACE}\r`), { echo: true })).toBe("€b");
   });
 
-  it("ignores Escape alone in a secret prompt and goes back with it in the menu", async () => {
+  it("ignores Escape alone unless going back was requested", async () => {
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const lone = (text: string) => {
       const next = typed(text);

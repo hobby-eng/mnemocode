@@ -342,50 +342,42 @@ describe("going back from an entry of the start menu", () => {
       await writeFile(longFileName(fallback), "");
   });
 
-  it.each([40, 80])(
-    "keeps the fingerprint explanation beside its value in a %i-column answer record",
-    async (columns) => {
-      vi.stubEnv("CLICOLOR_FORCE", "1");
-      vi.stubEnv("NO_COLOR", undefined);
-      const screen = watchScreen(columns);
-      const written: string[] = [];
-      const write = process.stderr.write.bind(process.stderr);
-      vi.spyOn(process.stderr, "write").mockImplementation((chunk: string | Uint8Array) => {
-        written.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
-        return write(chunk);
-      });
-      const keys = [
-        String(MENU_ENTRY_NAMES.recover.digit),
-        `${DOWN.repeat(2)}${ENTER}`,
-        ENTER,
-        ENTER,
-        ENTER,
-        ENTER,
-        `${TEST_FINGERPRINT}${ENTER}`,
-        ESCAPE,
-      ];
-      let recorded: string[] = [];
-      terminal.keysFor = () => {
-        const next = keys.shift();
-        if (next === undefined) throw new Error("The menu asked more than was answered.");
-        return next;
-      };
-      terminal.exit = async () => {
-        recorded = screen.lines();
-        return 130;
-      };
-      await runMenu();
-      const expected = screenOf(
-        columns,
-        answerLine("Fingerprint", `${TEST_FINGERPRINT} · They do not reveal the phrase.`),
-      ).lines;
-      expect(recorded).toEqual(expect.arrayContaining(expected.filter((line) => line !== "")));
-      expect(written.join("")).toContain(
-        `\x1b[36m${TEST_FINGERPRINT} · \x1b[90mThey do not reveal the phrase.\x1b[0m`,
-      );
-      expect(keys).toEqual([]);
-    },
-  );
+  it.each([40, 80])("keeps the fingerprint value in a %i-column answer record", async (columns) => {
+    vi.stubEnv("CLICOLOR_FORCE", "1");
+    vi.stubEnv("NO_COLOR", undefined);
+    const screen = watchScreen(columns);
+    const written: string[] = [];
+    const write = process.stderr.write.bind(process.stderr);
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk: string | Uint8Array) => {
+      written.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
+      return write(chunk);
+    });
+    const keys = [
+      String(MENU_ENTRY_NAMES.recover.digit),
+      `${DOWN.repeat(2)}${ENTER}`,
+      ENTER,
+      ENTER,
+      ENTER,
+      ENTER,
+      `${TEST_FINGERPRINT}${ENTER}`,
+      ESCAPE,
+    ];
+    let recorded: string[] = [];
+    terminal.keysFor = () => {
+      const next = keys.shift();
+      if (next === undefined) throw new Error("The menu asked more than was answered.");
+      return next;
+    };
+    terminal.exit = async () => {
+      recorded = screen.lines();
+      return 130;
+    };
+    await runMenu();
+    const expected = screenOf(columns, answerLine("Fingerprint", TEST_FINGERPRINT)).lines;
+    expect(recorded).toEqual(expect.arrayContaining(expected.filter((line) => line !== "")));
+    expect(written.join("")).toContain(`\x1b[36m${TEST_FINGERPRINT}\x1b[0m`);
+    expect(keys).toEqual([]);
+  });
 
   // Encode's complete product exceeds one hosted test's limit. Cover Escape before its first
   // answer separately, then every later question under each of the five first-form answers.
@@ -490,7 +482,7 @@ describe("going back on a terminal shorter than the record of answers", () => {
 
   it("draws the menu anew from the top where answers scrolled out of reach", async () => {
     const quit = await onShortScreen("", [ESCAPE]);
-    // Encode: colors, no Seedshift, no shares, printable cards as a PDF of A6 sheets turned as
+    // Encode: Unicode, no Seedshift, no shares, printable cards as a PDF of A6 sheets turned as
     // first offered, under its usual name, in the first design, a QR code, and own details, each
     // left random; then Escape at the question about heirs, under 23 lines of answers.
     const deep = await onShortScreen(SHELL, [
@@ -498,7 +490,7 @@ describe("going back on a terminal shorter than the record of answers", () => {
       `${DOWN.repeat(2)}${ENTER}`,
       `${DOWN}${ENTER}`,
       ENTER,
-      `${DOWN.repeat(3)}${ENTER}`,
+      `${DOWN.repeat(2)}${ENTER}`,
       ENTER,
       ENTER,
       ENTER,

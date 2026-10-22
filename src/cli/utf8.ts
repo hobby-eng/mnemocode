@@ -1,8 +1,4 @@
-import { ErrorCatalog, suppliedMessage } from "../core/error-catalog.js";
-
-const ERRORS = new ErrorCatalog("cli.utf8", {
-  "strict-utf8text-refused": suppliedMessage,
-});
+export { notUtf8Text, strictUtf8Text } from "../core/utf8-text.js";
 // The rules of UTF-8 (RFC 3629) that reading text needs: how many bytes a character has, which
 // bytes continue one, a reader that passes on valid characters only, and the strict decoding of a
 // file or of standard input. One owner for the terminal modules (terminal-input.ts,
@@ -32,34 +28,6 @@ export function characterLength(first: number): number {
 
 /** Decodes UTF-8 as an answer is decoded: anything else, such as a surrogate, throws. */
 export const STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true });
-
-/**
- * Decodes as STRICT_UTF8 does, but keeps a leading byte order mark, which TextDecoder would drop by
- * default: each reader of a file decides about it (parseListPassphrase and the WIF file drop it).
- */
-const STRICT_UTF8_WITH_BOM = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
-
-/** Why text that holds bytes of no UTF-8 character is refused, for `what` it was read from. */
-export function notUtf8Text(what: string): string {
-  return `${what} is not valid UTF-8 text.`;
-}
-
-/**
- * The text of a file or of standard input, `bytes`, refused as a whole when it is not valid UTF-8
- * (notUtf8Text): a byte replaced by U+FFFD would turn a passphrase into another one without a word
- * (AUD-014-API002). A U+FFFD written as valid UTF-8 is kept, as is a leading byte order mark and
- * every line break; the caller owns `bytes` and wipes them.
- */
-export function strictUtf8Text(bytes: Uint8Array, what: string): string {
-  try {
-    return STRICT_UTF8_WITH_BOM.decode(bytes);
-  } catch (error) {
-    // TextDecoder refuses with a TypeError, whose message names no byte of the text.
-    if (error instanceof TypeError)
-      throw ERRORS.create("strict-utf8text-refused", [notUtf8Text(what)]);
-    throw error;
-  }
-}
 
 /** Whether `bytes`, one character's, are valid UTF-8. */
 function isValidCharacter(bytes: readonly number[]): boolean {

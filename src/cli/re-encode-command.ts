@@ -8,6 +8,8 @@
 // backup is made as Encode makes it, shares and cards included: from its options, or, with
 // --ask-secrets and none of them, from Encode's questions, asked on the private screen once the
 // phrase is confirmed (encode-questions.ts).
+// Shares given instead of codes use Restore's questions and unmasking first; only their original
+// phrase reaches the same confirmation, never the masked phrase that the shares may hold.
 //
 // Every option given is checked before the first question, and a refusal of an option of the old
 // backup says so (ofOldBackup). On the command line the options give every answer: a wallet option
@@ -27,7 +29,9 @@ import { EVIDENCE_MATCHED_BY } from "../core/wallet-evidence.js";
 import { WordList } from "../core/word-hints.js";
 import type { DateShiftDate, DecodedResult, EncodedFormat, MaskingMode } from "../core/types.js";
 import { Masking } from "../core/masking.js";
-import type { EncodedBackup } from "../core/encoded-backup.js";
+import { EncodedBackup } from "../core/encoded-backup.js";
+import { masterFingerprint } from "../bitcoin-evidence.js";
+import { restoreFromShare } from "./sskr-restore-command.js";
 import { askAfterFailure, askOrCancel, askSecretUntil, WHAT_NOW } from "./ask.js";
 import { askWalletEvidence } from "./wallet-question.js";
 import { warnOfCloudCopies } from "./cloud-folders.js";
@@ -69,7 +73,7 @@ import {
   terminalPart,
   type NoticeKind,
 } from "./terminal.js";
-import { waitForEnter, type Choice, type Explanation } from "./terminal-choice.js";
+import { choose, waitForEnter, type Choice, type Explanation } from "./terminal-choice.js";
 import { CANCELLED, type Cancelled } from "./terminal-keys.js";
 import { defined } from "../core/defined.js";
 import { ErrorCatalog } from "../core/error-catalog.js";
@@ -314,7 +318,7 @@ async function askedReEncoding(
    */
   const confirmAndAsk = async (
     reEncoding: ReEncoding,
-    backup: EncodedBackup,
+    backup: Pick<EncodedBackup, "mode" | "format">,
   ): Promise<AfterDecoded | Cancelled> => {
     let handedOut = false;
     try {
@@ -337,6 +341,37 @@ async function askedReEncoding(
   };
   const decoded = await decodeWithQuestions(old, {
     searches: false,
+    restore: (handed, share) =>
+      restoreFromShare(handed, share, async (restored, mode) => {
+        // A repaired set or a date search can give several phrases. Never silently take the first.
+        const phrase =
+          restored.phrases.length === 1
+            ? defined(restored.phrases[0])
+            : await choose(
+                "Which original seed phrase should be re-encoded?",
+                restored.phrases.map((phrase, index) => ({
+                  label: `Phrase ${index + 1}`,
+                  note: `original fingerprint ${masterFingerprint(phrase.mnemonic)}`,
+                  value: phrase,
+                })),
+                { label: "Phrase", quit: "goes back" },
+              );
+        if (phrase === undefined) return "back";
+        if (phrase === CANCELLED) return CANCELLED;
+        // Restore has already removed Seedshift. Direct mode validates this original phrase
+        // without applying the dates twice; ReEncoding still gates every new backup on confirmation.
+        using original = EncodedBackup.read(phrase.mnemonic, "english", "direct");
+        const reEncoding = ReEncoding.of(original, []);
+        try {
+          clearPrivateScreen();
+          showOldPhrase(reEncoding.result, mode, "english");
+          const next = await confirmAndAsk(reEncoding, { mode, format: "english" });
+          return next === "backup" ? "back" : next;
+        } catch (error) {
+          reEncoding.wipe();
+          throw error;
+        }
+      }),
     stop: STOP,
     async several(backup, dates) {
       const reEncoding = await askLastWord(backup, dates, old);
@@ -481,7 +516,7 @@ type Confirmation = { readonly notices: Notices } | Exclude<AfterDecoded, "done"
  */
 async function confirmation(
   reEncoding: ReEncoding,
-  backup: EncodedBackup,
+  backup: Pick<EncodedBackup, "mode">,
   old: ParsedArguments,
   given: GivenWallet,
   confirmed: GivenConfirmation,

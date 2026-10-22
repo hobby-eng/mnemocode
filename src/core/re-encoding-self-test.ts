@@ -109,6 +109,11 @@ function checkReEncodingStartup(): void {
   );
   using selected = ReEncoding.of(several, [RIGHT_DATE], "about");
   expectSame(selected.phrase, PUBLIC_MNEMONIC, "Last word");
+  using plainLegacy = several.withMode("seedshift-legacy");
+  using replacement = plainLegacy.lastWordReplacement();
+  expectSame(replacement?.mode, "seedshift-legacy-valid", "Possible replaced last word");
+  expectSame(legacy.lastWordReplacement(), undefined, "Legacy without a valid checksum");
+  expectSame(encodedBackup.lastWordReplacement(), undefined, "Direct input is not Legacy");
   reEncoding.wipe();
   expectRefused(() => reEncoding.phrase, /has been wiped/u, "Re-encoding after disposal");
 }

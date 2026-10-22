@@ -151,6 +151,6 @@ def answer_fingerprint(session):
     session.type("1")
     session.wait_for(
         "Original fingerprint of the wallet, such as 73c5da0a "
-        "(not the encoded one; They do not reveal the phrase.):"
+        "(not the encoded one):"
     )
     session.type(FINGERPRINT + ENTER)

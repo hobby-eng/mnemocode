@@ -38,7 +38,7 @@ import {
   ENCODED_SEEDSHIFT_CHOICES,
 } from "./seedshift-choices.js";
 import { decodeQrPngFile } from "./qr-input.js";
-import { terminalNotice } from "./terminal.js";
+import { terminalHint, terminalNotice } from "./terminal.js";
 import { PrivateSteps } from "./private-steps.js";
 import { choose, type Choice } from "./terminal-choice.js";
 import { refusal } from "./terminal-input.js";
@@ -171,12 +171,14 @@ class BackupSource {
   #typed: boolean;
   readonly #qr: boolean;
   readonly #shares: boolean;
+  readonly #showShareHint: boolean;
   #reads = 0;
   readonly #args: ParsedArguments;
 
-  constructor(args: ParsedArguments, shares: boolean) {
+  constructor(args: ParsedArguments, shares: boolean, inputKind: InputKind | undefined) {
     this.#args = args;
     this.#shares = shares;
+    this.#showShareHint = shares && inputKind !== "codes";
     this.#qr = value(args, "qr-file") !== undefined;
     this.#typed = !this.#qr && value(args, "input-file") === undefined;
   }
@@ -208,6 +210,11 @@ class BackupSource {
   async next(problem: string | undefined): Promise<string | Cancelled> {
     if (this.#typed) {
       if (problem !== undefined) terminalNotice(problem, "warning");
+      if (this.#showShareHint)
+        PrivateSteps.keep(() => {
+          terminalHint(`Shamir shares are accepted too; separate them with ${SHARE_SEPARATOR}.`);
+          terminalHint("Use ? for each missing or unreadable share code or digit.");
+        });
       const typed = await askSecretUntil(
         "Encoded seed phrase, record or text file path:",
         recordText,
@@ -281,7 +288,7 @@ interface Again {
  * person cancels.
  */
 export async function askEncodedBackup(question: BackupQuestion): Promise<ReadBackup | Cancelled> {
-  const source = new BackupSource(question.args, question.shares === true);
+  const source = new BackupSource(question.args, question.shares === true, question.inputKind);
   for (let problem: string | undefined; ;) {
     const text = await source.next(problem);
     if (text === CANCELLED) return CANCELLED;

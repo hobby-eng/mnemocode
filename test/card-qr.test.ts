@@ -5,6 +5,9 @@ import { drawCollectionQr, MIN_MODULE_MM, qrSizeForModuleMm } from "../src/expor
 import { MM } from "../src/export/business-layout.js";
 import { nodeRenderPlatform } from "../src/export/platform-node.js";
 import { TEST_PHRASE } from "./helpers/test-phrase.js";
+import { pageDimensions, SHEET_PAGE_SIZES } from "../src/export/card-settings.js";
+import { SSKR_LONG_VECTOR } from "../src/sskr/known-answers.js";
+import { writeShare } from "../src/sskr/transport.js";
 
 /** jsQR's scanner (jsqr/dist/index.d.ts): the parts of its options and result read here. */
 type Scanner = (
@@ -25,6 +28,45 @@ function isScanner(loaded: unknown): loaded is Scanner {
 
 const jsQR: unknown = jsQRModule;
 if (!isScanner(jsQR)) throw new Error("jsQR's default export is no function.");
+const scanQr: Scanner = jsQR;
+
+/** Checks the actual vector drawing calls without rasterizing a saved document. */
+async function expectDrawnQr(
+  payload: string,
+  minimum: number,
+  dimensions: [number, number],
+): Promise<void> {
+  const document = await PDFDocument.create();
+  const page = document.addPage(dimensions);
+  const rectangles = vi.spyOn(page, "drawRectangle");
+  // The matrix the Node.js platform makes, which every host's qrModules gives too.
+  const code = nodeRenderPlatform.qrModules(payload);
+  drawCollectionQr(page, code, 5, 5, qrSizeForModuleMm(code, minimum, MIN_MODULE_MM));
+
+  // Small independent raster of the actual PDF drawing calls. The real method
+  // still runs. Full PDF rasterization is covered by check-card-output.mjs.
+  const pixelsPerPoint = 200 / 72;
+  const width = Math.ceil(page.getWidth() * pixelsPerPoint);
+  const height = Math.ceil(page.getHeight() * pixelsPerPoint);
+  const pixels = new Uint8ClampedArray(width * height * 4).fill(255);
+  for (const [rectangle] of rectangles.mock.calls) {
+    const { x = 0, y = 0, width: w = 0, height: h = 0, color } = rectangle!;
+    if (!color || !("red" in color)) throw new Error("Unexpected QR fill color.");
+    const left = Math.round(x * pixelsPerPoint);
+    const right = Math.round((x + w) * pixelsPerPoint);
+    const top = Math.round((page.getHeight() - y - h) * pixelsPerPoint);
+    const bottom = Math.round((page.getHeight() - y) * pixelsPerPoint);
+    for (let row = top; row < bottom; row++) {
+      for (let column = left; column < right; column++) {
+        const offset = (row * width + column) * 4;
+        pixels[offset] = Math.round(color.red * 255);
+        pixels[offset + 1] = Math.round(color.green * 255);
+        pixels[offset + 2] = Math.round(color.blue * 255);
+      }
+    }
+  }
+  expect(scanQr(pixels, width, height, { inversionAttempts: "dontInvert" })?.data).toBe(payload);
+}
 
 describe("Printable card QR", () => {
   it.each([
@@ -35,38 +77,19 @@ describe("Printable card QR", () => {
   ] as const)(
     "decodes exact data from the rectangles actually drawn at 200 dpi %#",
     async (payload, minimum) => {
-      const document = await PDFDocument.create();
-      const page = document.addPage([85.6 * MM, 54 * MM]);
-      const rectangles = vi.spyOn(page, "drawRectangle");
-      // The matrix the Node.js platform makes, which every host's qrModules gives too.
-      const code = nodeRenderPlatform.qrModules(payload);
-      drawCollectionQr(page, code, 5, 5, qrSizeForModuleMm(code, minimum, MIN_MODULE_MM));
-
-      // Small independent raster of the actual PDF drawing calls. The real method
-      // still runs. Full PDF rasterization is covered by check-card-output.mjs.
-      const pixelsPerPoint = 200 / 72;
-      const width = Math.ceil(page.getWidth() * pixelsPerPoint);
-      const height = Math.ceil(page.getHeight() * pixelsPerPoint);
-      const pixels = new Uint8ClampedArray(width * height * 4).fill(255);
-      for (const [rectangle] of rectangles.mock.calls) {
-        const { x = 0, y = 0, width: w = 0, height: h = 0, color } = rectangle!;
-        if (!color || !("red" in color)) throw new Error("Unexpected QR fill color.");
-        const left = Math.round(x * pixelsPerPoint);
-        const right = Math.round((x + w) * pixelsPerPoint);
-        const top = Math.round((page.getHeight() - y - h) * pixelsPerPoint);
-        const bottom = Math.round((page.getHeight() - y) * pixelsPerPoint);
-        for (let row = top; row < bottom; row++) {
-          for (let column = left; column < right; column++) {
-            const offset = (row * width + column) * 4;
-            pixels[offset] = Math.round(color.red * 255);
-            pixels[offset + 1] = Math.round(color.green * 255);
-            pixels[offset + 2] = Math.round(color.blue * 255);
-          }
-        }
-      }
-      expect(jsQR(pixels, width, height, { inversionAttempts: "dontInvert" })?.data).toBe(payload);
+      await expectDrawnQr(payload, minimum, [85.6 * MM, 54 * MM]);
     },
   );
+
+  it.each(
+    SHEET_PAGE_SIZES.flatMap((pageSize) => [
+      { pageSize, kind: "backup", payload: `MNC1:direct:english:${TEST_PHRASE}` },
+      { pageSize, kind: "share", payload: writeShare(SSKR_LONG_VECTOR.shares[0]!, "unicode") },
+    ]),
+  )("decodes the verified $kind QR drawn on $pageSize", async ({ pageSize, payload }) => {
+    const [width, height] = pageDimensions(pageSize);
+    await expectDrawnQr(payload, 28, [width * MM, height * MM]);
+  });
 
   it("rejects undersized or out-of-page codes before drawing anything", async () => {
     const document = await PDFDocument.create();

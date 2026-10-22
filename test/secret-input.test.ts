@@ -70,7 +70,7 @@ describe("secret input", () => {
   it("reads the answer at a hidden prompt and shows only the question", async () => {
     terminal.answers = "  test only  \r";
     expect(await askSecretUntil(SEED_PHRASE_PROMPT, typed)).toBe("test only");
-    expect(written.join("")).toBe(`${SEED_PHRASE_PROMPT} \n`);
+    expect(written.join("")).toBe(`${SEED_PHRASE_PROMPT} (Esc cancels) \n`);
   });
 
   it("shows the answer as it is typed on the private screen, which is cleared afterwards", async () => {
@@ -81,7 +81,7 @@ describe("secret input", () => {
     expect(await withPrivateScreen(() => askSecretUntil("Seed phrase:", typed))).toBe("test only");
     // Backspace redraws the answer after the prompt (13 columns): back to its start, cleared,
     // written again; then y is added.
-    const echo = "Seed phrase: test onlz\r\x1b[13C\x1b[Jtest onl\r\x1b[21Cy\n";
+    const echo = "Seed phrase: (Esc cancels) test onlz\r\x1b[27C\x1b[Jtest onl\r\x1b[35Cy\n";
     const shown = written.join("");
     expect(shown).toContain(echo);
     // Shown on the private screen, which is left once Enter was pressed.

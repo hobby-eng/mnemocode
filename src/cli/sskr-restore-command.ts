@@ -189,6 +189,17 @@ type PhrasesAt = PhrasesFound & {
 /** What restorePhrases gives: the phrases, or too few shares, which the caller deals with. */
 export type Restoring = PhrasesAt | { readonly kind: "few" };
 
+/**
+ * Uses the original phrases after restoration and Seedshift removal, without printing them on
+ * standard output. "dates" keeps the shares and asks their dates again; "back" changes the input.
+ * The borrowed result is valid only during the call. Every phrase still needs confirmation by
+ * the caller: a valid checksum does not identify the wallet.
+ */
+export type RestoredUse = (
+  restored: PhrasesAt,
+  mode: SplitMode,
+) => Promise<"done" | "dates" | "back" | Cancelled>;
+
 /** Too few shares to restore a phrase, by the code of the condition (ShareTrouble). */
 type FewTrouble = Extract<ShareTrouble, { readonly kind: "few" }>;
 
@@ -582,15 +593,17 @@ async function afterMismatch(r: Recovery, message: string): Promise<Step | Cance
 }
 
 /**
- * The restore from Shamir shares on the private screen, after a share was typed where Decode asked
- * for the codes: that share is kept as the first, and the others are asked for. Shares are made
+ * The restore from Shamir shares on the private screen, after shares were typed where Decode or
+ * Re-encode asked for the codes: every share is kept, and any more needed are asked for. Shares are made
  * with Seedshift or without; Decode's mode tells which where it is one of the two, or it is asked
  * as the menu's entry asks it. `handed` are Decode's options that a restore takes too, such as
- * the mode, the wallet and the search limits. CANCELLED when the person cancelled.
+ * the mode, the wallet and the search limits. `use` receives the original phrases after Seedshift
+ * removal instead of printing them; Re-encode confirms them privately. CANCELLED when cancelled.
  */
 export async function restoreFromShare(
   handed: ParsedArguments,
   share: FirstShare,
+  use?: RestoredUse,
 ): Promise<"done" | "back" | Cancelled> {
   const given = value(handed, "mode");
   const mode = Masking.isSplitMode(given) ? given : await askShareSeedshift();
@@ -599,7 +612,7 @@ export async function restoreFromShare(
   const options: ParsedArguments = { ...handed, "ask-secrets": true };
   delete options.mode;
   if (Masking.of(mode).masked) options.mode = mode;
-  return (await runSskrCombine(options, share)) ?? "done";
+  return useRestoredShares(options, share, use);
 }
 
 /** Whether Seedshift was used before the shares were made; undefined goes back (Escape). */
@@ -619,6 +632,16 @@ export async function runSskrCombine(
   args: ParsedArguments,
   firstShare?: FirstShare,
 ): Promise<Cancelled | undefined> {
+  const result = await useRestoredShares(args, firstShare);
+  return result === "done" ? undefined : CANCELLED;
+}
+
+/** Owns the same share/date recovery for Decode, Restore and Re-encode. */
+async function useRestoredShares(
+  args: ParsedArguments,
+  firstShare: FirstShare | undefined,
+  use?: RestoredUse,
+): Promise<"done" | "back" | Cancelled> {
   // Again for the menu, which runs the command without the command line's checks.
   assertSingleValues(args);
   const settings = await recoverySettings(args);
@@ -633,49 +656,68 @@ export async function runSskrCombine(
   const r: Recovery = { ...settings, dates: initialDates, target, shares: ownedShares };
   try {
     if ((await target?.prepare(r.wallet.passphrase)) === CANCELLED) return CANCELLED;
-    const restored = await restorePhrases(r, {
-      few: async (trouble) => (await mendShares(r.shares, trouble, r.interactive)) ?? "again",
-      one: false,
-    });
-    if (restored === CANCELLED) return CANCELLED;
-    if (restored.kind === "few") throw ERRORS.create("too-few-shares-restore-phrase", []);
-    const { phrases } = restored;
-    // The result is a step of its own: the questions and the search are cleared away.
-    const cleared = clearPrivateScreen();
-    if (phrases.length > 1)
-      terminalNotice(
-        `${phrases.length} phrases fit these shares. Each is listed with its fingerprint: the wallet tells which is yours.`,
-        "warning",
-      );
-    const reported = new Set<RepairedSet>();
-    let shown = 0;
-    for (const [index, phrase] of phrases.entries()) {
-      // The private screen keeps no scrollback: there each phrase has a screen of its own, the next
-      // shown on Enter, so that none scrolls out of reach.
-      if (index > 0 && cleared) {
-        const next = await waitForEnter(
-          `Press Enter for phrase ${index + 1} of ${phrases.length}; Esc ends.`,
-        );
-        if (next === CANCELLED) return CANCELLED;
-        if (next === "escape") break;
-        clearPrivateScreen();
-      }
-      showRestored(phrase, r.mode, {
-        index,
-        of: phrases.length,
-        places: restored.places,
-        // What is said of a set comes once, with its first phrase, and again on a screen of its own.
-        set: cleared ? "cleared" : reported.has(phrase.set) ? "said" : "new",
-        ...(r.evidence === undefined ? {} : { evidence: evidenceLabel(r.evidence) }),
+    for (;;) {
+      const restored = await restorePhrases(r, {
+        few: async (trouble) => (await mendShares(r.shares, trouble, r.interactive)) ?? "again",
+        one: use !== undefined,
       });
-      reported.add(phrase.set);
-      shown += 1;
+      if (restored === CANCELLED) return CANCELLED;
+      if (restored.kind === "few") throw ERRORS.create("too-few-shares-restore-phrase", []);
+      if (use !== undefined) {
+        const next = await use(restored, r.mode);
+        if (next !== "dates") return next;
+        r.dates?.wipe();
+        r.dates = undefined;
+        continue;
+      }
+      if ((await showRestoredPhrases(restored, r)) === CANCELLED) return CANCELLED;
+      const saved = await target?.savePhrases(restored.listed, r.wallet.passphrase);
+      return saved === CANCELLED ? CANCELLED : "done";
     }
-    reportWalletWarnings(phrases.slice(0, shown));
-    return await target?.savePhrases(restored.listed, r.wallet.passphrase);
   } finally {
     r.dates?.wipe();
   }
+}
+
+/** Restore's output adapter; Re-encode uses its own terminal-only confirmation instead. */
+async function showRestoredPhrases(
+  restored: PhrasesAt,
+  r: Recovery,
+): Promise<Cancelled | undefined> {
+  const { phrases } = restored;
+  // The result is a step of its own: the questions and the search are cleared away.
+  const cleared = clearPrivateScreen();
+  if (phrases.length > 1)
+    terminalNotice(
+      `${phrases.length} phrases fit these shares. Each is listed with its fingerprint: the wallet tells which is yours.`,
+      "warning",
+    );
+  const reported = new Set<RepairedSet>();
+  let shown = 0;
+  for (const [index, phrase] of phrases.entries()) {
+    // The private screen keeps no scrollback: there each phrase has a screen of its own, the next
+    // shown on Enter, so that none scrolls out of reach.
+    if (index > 0 && cleared) {
+      const next = await waitForEnter(
+        `Press Enter for phrase ${index + 1} of ${phrases.length}; Esc ends.`,
+      );
+      if (next === CANCELLED) return CANCELLED;
+      if (next === "escape") break;
+      clearPrivateScreen();
+    }
+    showRestored(phrase, r.mode, {
+      index,
+      of: phrases.length,
+      places: restored.places,
+      // What is said of a set comes once, with its first phrase, and again on a screen of its own.
+      set: cleared ? "cleared" : reported.has(phrase.set) ? "said" : "new",
+      ...(r.evidence === undefined ? {} : { evidence: evidenceLabel(r.evidence) }),
+    });
+    reported.add(phrase.set);
+    shown += 1;
+  }
+  reportWalletWarnings(phrases.slice(0, shown));
+  return undefined;
 }
 
 /** Where a restored phrase stands among those shown, and what was already said of its set. */
@@ -721,7 +763,7 @@ function reportSet(phrase: RestoredPhrase, place: RestoredPlace, spaced: boolean
 /**
  * The backup that was split, in the form its shares were written in, which the dates turn into
  * the seed phrase (RestoredPhrase.backup), under the label of its form; undefined where it would
- * be the same words again.
+ * repeat the original phrase in another form.
  */
 function restoredBackup(
   phrase: RestoredPhrase,

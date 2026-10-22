@@ -18,6 +18,7 @@ export const ENCODE_SHARED_OPTIONS = Object.freeze([
   "dates-file",
   "format",
   "show-masked-words",
+  "show-original",
   "output",
   "pdf",
   "heir-sheet",
@@ -43,7 +44,7 @@ export const ENCODE_SSKR_ONLY_OPTIONS = Object.freeze([
   "shares",
   "share-format",
   "card-layout",
-  "show-original",
+  "qr-dir",
 ] as const);
 
 /** Every option of Encode: the three groups, and --sskr, which chooses between its modes. */

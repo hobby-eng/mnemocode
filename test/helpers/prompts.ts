@@ -5,7 +5,7 @@
 import { TEST_FINGERPRINT } from "./test-phrase.js";
 
 /** The prompt for the wallet's original fingerprint, with the test phrase's as its example. */
-export const FINGERPRINT_PROMPT = `Original fingerprint of the wallet, such as ${TEST_FINGERPRINT} (not the encoded one; They do not reveal the phrase.)`;
+export const FINGERPRINT_PROMPT = `Original fingerprint of the wallet, such as ${TEST_FINGERPRINT} (not the encoded one)`;
 
 /** The prompt for the dates that encode and re-encode mask with. */
 export const DATES_PROMPT = "Dates (up to 4, DD-MM-YYYY, separated by spaces):";
