@@ -13,6 +13,16 @@ pending host acceptance remains visible even after a local variant is verified.
 
 ## Standalone release acceptance (2026-10-22)
 
+### Current release preparation after manual testing
+
+Signed `633f120` contains the subsequent manual-testing corrections: menu spacing and independent output choices, retained results above follow-up questions, Escape cancellation, original words without a second code copy, automatic QR checks, share QR exports and Shamir repair within Re-encode before confirmation of the original phrase. `ae20050` dates version 0.1.0 for release. These changes are later than the native checkpoint below; its executable hashes and test totals do not describe this candidate.
+
+The complete local run covered 3,654 tests in 279 files: 3,648 passed and six obsolete expectations failed. All six were corrected in five test files without changing runtime code or removing the checked security properties; all 81 cases in those files then passed. Mandatory gates, the full self-test, the complete real-terminal suite, independent SSKR known answers and the package-file review passed. The standard dependency audit reported no known vulnerabilities. These overlapping runs are not a new all-green full-suite total.
+
+Release preparation is in progress. The signed release tag, complete tagged Windows/macOS/Linux checks, canonical SSKR comparison, new executable artifacts, attestations and OpenPGP signing must finish before publication. Earlier native artifacts remain evidence of their own source only. Browser/MHFE integration remains deferred by the owner's ordering.
+
+### Retained native checkpoint before manual testing
+
 Standalone pre-release verification is complete for the three tested native targets. The full [CI run](https://github.com/hobby-eng/mnemocode/actions/runs/39722442871) checked signed source `f980236`; all three source-test and real-terminal jobs passed. No confirmed high/medium code finding remains open in the reviewed release paths. This is bounded verification, not a claim that every possible defect or CORE violation has been ruled out.
 
 | Native target | Passed | Failed | Conditional skips | Test files | Real terminal |

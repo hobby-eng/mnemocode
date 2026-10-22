@@ -67,7 +67,7 @@ Original Seedshift usually produces an invalid BIP39 checksum. Its `--legacy-val
 
 ### How checksum-valid Seedshift works
 
-MnemoCode Seedshift shifts the entropy represented by each word and then calculates a new checksum. Decoding subtracts the shifts and restores the original phrase with the same dates. Different dates can produce the same shift. The [construction and worked example](docs/SEEDSHIFT_CONSTRUCTION.md) describe the bit packing and its limits.
+MnemoCode Seedshift shifts the entropy represented by each word and then calculates a new checksum. Decoding subtracts the shifts and restores the original phrase with the same dates. Different dates can produce the same shift. The [construction](docs/SEEDSHIFT_CONSTRUCTION.md) and [worked example](docs/MANUAL_RECOVERY.md#worked-12-word-example-public-test-data) describe the bit packing and its limits.
 
 ## Secret input styles
 
@@ -187,7 +187,7 @@ On the private screen it also accepts Shamir shares in every supported form, sep
 mnemocode re-encode --ask-secrets --input-file shifted-colors.txt --mode seedshift --format 5
 ```
 
-Use `--old-mode`, `--old-format` and `--old-dates-file` for the input; the ordinary encoding options describe the output. Legacy-valid input also needs the remembered original final word, entered privately or supplied with `--last-word-file`. For scripts, supply a wallet reference or `--recognised`. Recover missing codes or dates first. The old backup remains usable after re-encoding.
+Use `--old-mode`, `--old-format` and `--old-dates-file` for the input; the ordinary encoding options describe the output. Legacy-valid input also needs the remembered original final word, entered privately or supplied with `--last-word-file`. For scripts, supply a wallet reference or `--recognised`, and recover missing codes or dates before calling Re-encode. Interactive Shamir repair and date search use the private screen described above. The old backup remains usable after re-encoding.
 
 If ordinary Legacy decoding fails its checksum, the private screen also offers recovery with a replaced final word when the input permits it. Choose this only if that word was replaced to make the backup's checksum valid; the original final word is then required. Wrong dates or codes can also fail a checksum. Words outside the BIP39 list are a separate input error.
 

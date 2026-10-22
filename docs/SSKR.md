@@ -19,12 +19,12 @@ mnemocode encode --sskr --ask-secrets \
 
 The shares are always shown in the terminal. `--output NEW_FILE` also saves them, one share per line. The file holds **all shares**. An existing file is never replaced: when the name is taken, the shares are saved under a numbered name such as `shares-1.txt`, and MnemoCode says so. When a file cannot be saved on the private screen, for example because the disk is full, the shares are still shown, and MnemoCode offers to try again, to use another name, or to skip that file.
 
-| Option                   | Selects                                                                                                             |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `--share-format FORMAT`  | How the shares are shown and saved (see [Share formats](#share-formats)); default `ur`                              |
-| `--format 1\|2\|3\|4\|5` | With Seedshift, also shows the complete masked backup beside the shares; without it, only English words are allowed |
-| `--show-original words`  | Also shows the original wallet phrase as English words for visual checking                                          |
-| `--show-masked-words`    | Also shows the English words after Seedshift; the original dates are still needed                                   |
+| Option                   | Selects                                                                                                        |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `--share-format FORMAT`  | How the shares are shown and saved (see [Share formats](#share-formats)); default `ur`                         |
+| `--format 1\|2\|3\|4\|5` | With Seedshift, `--format` alone also shows the complete masked backup; direct mode never shows original codes |
+| `--show-original words`  | Also shows the original wallet phrase as English words for visual checking                                     |
+| `--show-masked-words`    | Also shows the English words after Seedshift; the original dates are still needed                              |
 
 `sskr-split` splits a phrase as `encode --sskr` does, with two differences. Its `--format` selects the share format, as `--share-format` does there, so it cannot also show the complete backup; `sskr-export` reads `--format` the same way. The display options `--show-original` and `--show-masked-words` are not available; use `encode --sskr` for them. A text file saved with `--output` holds the shares in the share format, one per line.
 
@@ -56,7 +56,7 @@ When a digit of a date is forgotten, type `?` in its place on the private screen
 | `colors`         | Color codes in a fixed order, like `--format 5`          | MnemoCode          |
 | `colors-unicode` | The same color codes as Unicode codes, like `--format 4` | MnemoCode          |
 
-The last four write a share with the same signs as the form of an encoded phrase, so that shares look like the form chosen in Encode, and `sskr-combine` shows the restored backup in that form again. They are only other ways to write the same share, not encryption, and other SSKR programs do not read them.
+The last four write a share with the same signs as the form of an encoded phrase, so that shares look like the form chosen in Encode. When Seedshift was used, `sskr-combine` also shows the restored masked backup in that form before the original words. Without Seedshift it shows only the original English words. These formats are only other ways to write the same share, not encryption, and other SSKR programs do not read them.
 
 Color codes may be separated by spaces or joined, with or without `#`. **Their order matters.** A share in colors has its own colors: they are not the colors of the phrase itself.
 
@@ -127,7 +127,7 @@ mnemocode sskr-combine --share-qr ./first.png --share-qr ./second.png
 
 On the private screen, enter the path to a saved text file in the share field, or paste the shares themselves. The file may hold any sufficient subset, such as shares 1 and 3 of a 2-of-3 set. When replacing just one unreadable share, give that share or a file containing only that share.
 
-The restored backup is shown in the form of the first share: word numbers, Unicode codes or colors for shares written that way, words for shares in Bytewords or `ur`. With `--mode seedshift` and the dates, the seed phrase follows.
+With `--mode seedshift` and the dates, the restored masked backup is shown in the form of the first share: word numbers, Unicode codes or colors for shares written that way, words for shares in Bytewords or `ur`. The original seed phrase follows as English words. Without Seedshift, only the original English words are shown, without a second code block.
 
 MnemoCode refuses a damaged share, two different shares with the same member number, shares from different sets and too few shares. A share given twice is used once, with a note, so its copy does not count towards the threshold. From the command line such a problem ends the command. On the private screen it is named by the place of the share among those typed, and the other answers are kept: a share that cannot be read is typed again alone, a share beyond the threshold that disagrees with the others can be left out or typed again, and more shares can be added to too few. When nothing tells which share is wrong, such as two different shares with the same member number, or as many shares of one set as of another, they are named together, and you choose which to change or leave out. When the shares restore nothing, or no phrase matches the wallet, MnemoCode asks what to change: a share, the dates, the wallet, whether the phrase was masked with Seedshift, or Stop.
 
