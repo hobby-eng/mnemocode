@@ -1,0 +1,1006 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-038",
+  "auditNumber": 38,
+  "date": "2026-10-22",
+  "title": "Release-candidate verification and targeted follow-up",
+  "completedAtUtc": "2026-10-22T03:17:05.394016+00:00",
+  "reviewer": {
+    "name": "Codex coordinator with independent read-only reviewers Dirac and Raman",
+    "model": null,
+    "reasoningEffort": null
+  },
+  "snapshot": {
+    "commit": "230425c912912e0f0964ac77c01880a6ee8b078e",
+    "workingTree": "Clean at baseline; authorized corrections reviewed and checked separately.",
+    "sourceFingerprint": "60dc4dffa33f2208c3a4443d10613d1d6b76958294cb12400490e9962196f6c0"
+  },
+  "verification": {
+    "commit": "cecdd9c0b8719bd8407db3dd57db0e7ef1a5d84d",
+    "sourceFingerprint": "7388084ba8a90e8ee914d4b4815a39676d91f739f5eb6c0f1329fb47f386f2b5",
+    "artifacts": [
+      {
+        "path": "release/readiness-final/mnemocode-0.1.0-linux-x64",
+        "size": 157916285,
+        "sha256": "64e5671567f4232131f362a5cf6f02c175830167c81d6e9f83d61bc43717e769",
+        "source": "7388084ba8a90e8ee914d4b4815a39676d91f739f5eb6c0f1329fb47f386f2b5"
+      },
+      {
+        "path": "release/readiness-final/mnemocode-0.1.0-linux-x64-licenses.txt",
+        "size": 381307,
+        "sha256": "8e622814d3cbc687b681b04120e76695a0df93ef25ba9e1eefe2a758060af381",
+        "source": "7388084ba8a90e8ee914d4b4815a39676d91f739f5eb6c0f1329fb47f386f2b5"
+      },
+      {
+        "path": "release/readiness-final/mnemocode-0.1.0-linux-x64.sha256",
+        "size": 197,
+        "sha256": "de37c9024b60bd0b88af5674493eefe41d4fa7e19388967def5ae6fe68ad9fc3",
+        "source": "7388084ba8a90e8ee914d4b4815a39676d91f739f5eb6c0f1329fb47f386f2b5"
+      }
+    ]
+  },
+  "scope": {
+    "kind": "Targeted pass-5 and standalone release follow-up, not a fresh complete all-files audit.",
+    "libraryInventory": {
+      "total": 204,
+      "semantic": 107,
+      "selectedPaths": 18,
+      "inventoryOnly": 79
+    },
+    "cliInventory": {
+      "total": 92,
+      "semantic": 89,
+      "selectedHelpData": 3
+    },
+    "procedureHashes": {
+      "multi-chain-wallet-tools/docs/FULL_AUDIT_GUIDE.md": "e1b2fb641e4a25ebf292548fc1e2ef0c25dbd01faa5c2b580c6ba75df2afcab7",
+      "multi-chain-wallet-tools/docs/audits/AUDIT_STANDARD.md": "0c80621acaf5d210f85af76de28a994e545f89f3f660a129026ac0931bb38593",
+      "multi-chain-wallet-tools/docs/audits/AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
+      "multi-chain-wallet-tools/docs/audit-report.schema.json": "989bf3de974d581579c1d1c1e143d5ab9fa232dc70cc8c6f84ad00531ae698fb"
+    },
+    "guideHashes": [
+      {
+        "path": "audits.instructions.md",
+        "sha256": "6eed08f958c11bd530006c89489796db8efa759f8a93c501a514de262d0ab004"
+      },
+      {
+        "path": "ci.instructions.md",
+        "sha256": "22320f16f35a530bda5839a478ca9cce59cd2d1cabe64b75f96339af470cad41"
+      },
+      {
+        "path": "code-browser.instructions.md",
+        "sha256": "954f96b4c2c11ffd23ad6b85113e80eedfb049e2689dd5a134e45de84f130f10"
+      },
+      {
+        "path": "code-core.instructions.md",
+        "sha256": "1841be5e175dc80f57b7081f41c9ca5d914238435725146bca3f29ba43155155"
+      },
+      {
+        "path": "code-rust.instructions.md",
+        "sha256": "08bb268d4da1d1e01e93e6294b028a9471a062565eeaf7eb7355fd6592bdcc9c"
+      },
+      {
+        "path": "code-tooling.instructions.md",
+        "sha256": "ba09a6530475e8ba08cc96dbf4100b043b6c250263e62def21321f178bb631f7"
+      },
+      {
+        "path": "code-typescript.instructions.md",
+        "sha256": "51185b4a594ff4a19210d101e331200710f3e124b3ed6ef78397979c52e47186"
+      },
+      {
+        "path": "docs.instructions.md",
+        "sha256": "1fc9e20ab2f2dad220dc3f6b507e7372c161a05208c80ed2aa8dc28525bb33bf"
+      }
+    ],
+    "coverage": [
+      {
+        "checkId": "CHECK-SEC-001",
+        "title": "Threat model and secret ownership",
+        "category": "SEC",
+        "outcome": "passed",
+        "reason": "Reviewed recovery/evidence trust boundaries and secret owners in scoped library paths; retained lifetime regressions included in the current suite. No new exhaustive threat model.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-SEC-002",
+        "title": "Secret Vault, CSP, sandbox, and transport",
+        "category": "SEC",
+        "outcome": "passed",
+        "reason": "Fresh Linux executable sandbox and permission probes passed. No separate browser-host CSP/Vault acceptance in this standalone follow-up.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-SEC-003",
+        "title": "Network egress and secret guards",
+        "category": "SEC",
+        "outcome": "passed",
+        "reason": "Standalone offline egress/protection paths reviewed; no network behavior was added. Host provider and browser-network tests were not repeated.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-SEC-004",
+        "title": "Randomness, encryption, and authentication",
+        "category": "SEC",
+        "outcome": "passed",
+        "reason": "Pinned native engine, published answers, independent Python SSKR quorum replay and self-tests checked. No complete upstream cryptographic re-audit or constant-time proof.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-SEC-005",
+        "title": "Secret lifecycle and exceptional paths",
+        "category": "SEC",
+        "outcome": "passed",
+        "reason": "Scoped native/TypeScript disposal and error paths reviewed; current suite includes retained cleanup regressions. No physical-memory erasure claim.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-SEC-006",
+        "title": "Browser injection, persistence, and sensitive APIs",
+        "category": "SEC",
+        "outcome": "passed",
+        "reason": "Host-neutral library ownership and export contracts checked. The separate browser application was not exercised, by owner ordering.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-SEC-007",
+        "title": "Read-only guarantees and availability bounds",
+        "category": "SEC",
+        "outcome": "passed",
+        "reason": "Search combination bounds and candidate deduplication inspected and tested; corrected colors preserve the shared bound. No exhaustive performance/fuzzing campaign.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-FUN-001",
+        "title": "BIP39, entropy, and seed interpretation",
+        "category": "FUN",
+        "outcome": "passed",
+        "reason": "Published BIP39/representation answers and the complete current project suite executed. Original independent fixtures remain unchanged.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-FUN-002",
+        "title": "HD derivation and every coin/profile",
+        "category": "FUN",
+        "outcome": "passed",
+        "reason": "Wallet-evidence nullish refusal and nearest derivation tests passed; valid derivation was unchanged. Host coin/profile inventory was not repeated.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-FUN-003",
+        "title": "BIP85, BIP38, messages, and Silent Payments",
+        "category": "FUN",
+        "outcome": "not-applicable",
+        "reason": "Standalone MnemoCode has no BIP85/BIP38/message signing/Silent Payments, scripts/PSBT/transactions or provider/discovery operations."
+      },
+      {
+        "checkId": "CHECK-FUN-004",
+        "title": "Scripts, descriptors, Miniscript, and multisig",
+        "category": "FUN",
+        "outcome": "not-applicable",
+        "reason": "Standalone MnemoCode has no BIP85/BIP38/message signing/Silent Payments, scripts/PSBT/transactions or provider/discovery operations."
+      },
+      {
+        "checkId": "CHECK-FUN-005",
+        "title": "Transactions, PSBT version context, and commitments",
+        "category": "FUN",
+        "outcome": "not-applicable",
+        "reason": "Standalone MnemoCode has no BIP85/BIP38/message signing/Silent Payments, scripts/PSBT/transactions or provider/discovery operations."
+      },
+      {
+        "checkId": "CHECK-FUN-006",
+        "title": "Recovery and backup formats",
+        "category": "FUN",
+        "outcome": "passed",
+        "reason": "Both damaged-color forms, all 700 registered rotations, retained recovery cases, SSKR quorums, standalone round trips and PDF/QR exports checked.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-FUN-007",
+        "title": "Discovery, providers, proofs, and accounting",
+        "category": "FUN",
+        "outcome": "not-applicable",
+        "reason": "Standalone MnemoCode has no BIP85/BIP38/message signing/Silent Payments, scripts/PSBT/transactions or provider/discovery operations."
+      },
+      {
+        "checkId": "CHECK-API-001",
+        "title": "Actual dependency call contracts",
+        "category": "API",
+        "outcome": "passed",
+        "reason": "Pinned dependency contracts and nullish JavaScript admission examined in scoped paths; no upstream implementation-wide dependency audit.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-API-002",
+        "title": "Async state, cancellation, and revisions",
+        "category": "API",
+        "outcome": "passed",
+        "reason": "Current cancellation/error cleanup regressions and real PTY executed; browser-worker async behavior deferred with host integration.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-API-003",
+        "title": "Public export schema and monetary fidelity",
+        "category": "API",
+        "outcome": "passed",
+        "reason": "Portable output and file/package contracts checked; no monetary/provider schemas exist in standalone MnemoCode.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-API-004",
+        "title": "Encoding and import/export interoperability",
+        "category": "API",
+        "outcome": "passed",
+        "reason": "Actual standalone encode/re-encode/restore, representations, PDF/QR and independent SSKR replay passed. Peer browser intake deferred.",
+        "coverage": "partial",
+        "owner": "Dirac"
+      },
+      {
+        "checkId": "CHECK-BLD-001",
+        "title": "Manifest, flags, and feature composition",
+        "category": "BLD",
+        "outcome": "passed",
+        "reason": "Frozen offline install, pinned tools, composition/type gates and package inputs checked on Linux. No alternative-edition matrix in this repository.",
+        "coverage": "partial",
+        "owner": "coordinator"
+      },
+      {
+        "checkId": "CHECK-BLD-002",
+        "title": "Matrix depth and runtime sampling",
+        "category": "BLD",
+        "outcome": "blocked",
+        "reason": "Fresh Linux source and standalone runtime acceptance executed. Current Windows/macOS require authorized push; older green matrix is retained evidence only.",
+        "coverage": "partial",
+        "owner": "coordinator"
+      },
+      {
+        "checkId": "CHECK-BLD-003",
+        "title": "Lockfiles, source provenance, and licenses",
+        "category": "BLD",
+        "outcome": "blocked",
+        "reason": "Exact pins, frozen install, license files, SSH signatures and package contents checked. Fresh npm advisory POSTs timed out; no clean advisory result inferred.",
+        "coverage": "partial",
+        "owner": "coordinator"
+      },
+      {
+        "checkId": "CHECK-BLD-004",
+        "title": "Canonical WASM and Docker bytes",
+        "category": "BLD",
+        "outcome": "passed",
+        "reason": "Canonical generated comparison passed; separate built-stage-uncached Docker compilation produced the same raw WASM. Cached layers are distinguished.",
+        "coverage": "partial",
+        "owner": "coordinator"
+      },
+      {
+        "checkId": "CHECK-BLD-005",
+        "title": "Artifacts, CI, and release workflows",
+        "category": "BLD",
+        "outcome": "blocked",
+        "reason": "Two local Linux builds compared and exercised independently. CI workflows reviewed; current native remote artifacts and regrouped history remain pending.",
+        "coverage": "partial",
+        "owner": "coordinator"
+      },
+      {
+        "checkId": "CHECK-UI-001",
+        "title": "Real files and representative viewports",
+        "category": "UI",
+        "outcome": "passed",
+        "reason": "Real Linux terminal acceptance includes direct repeat and masked 80x24 paging with distinct fingerprints. External browser viewports not exercised.",
+        "coverage": "partial",
+        "owner": "Raman/coordinator"
+      },
+      {
+        "checkId": "CHECK-UI-002",
+        "title": "Navigation, inputs, and state preservation",
+        "category": "UI",
+        "outcome": "passed",
+        "reason": "Full source/executable terminal navigation, cancellation and private-screen checks executed. Separate browser state/navigation deferred.",
+        "coverage": "partial",
+        "owner": "Raman/coordinator"
+      },
+      {
+        "checkId": "CHECK-UI-003",
+        "title": "Secret visibility, help, QR, and accessibility",
+        "category": "UI",
+        "outcome": "passed",
+        "reason": "Terminal secrecy, standalone help and PDF/QR acceptance executed. Browser accessibility review not repeated.",
+        "coverage": "partial",
+        "owner": "Raman/coordinator"
+      },
+      {
+        "checkId": "CHECK-ARC-001",
+        "title": "Ownership, imports, and composition seams",
+        "category": "ARC",
+        "outcome": "passed",
+        "reason": "Library review: 107 semantic files, 18 selected-path files, 79 inventory-only files. CLI: 89 full reads and 3 selected help files. Not all files semantically audited.",
+        "coverage": "partial",
+        "owner": "coordinator"
+      },
+      {
+        "checkId": "CHECK-ARC-002",
+        "title": "Dead code, duplication, and false positives",
+        "category": "ARC",
+        "outcome": "passed",
+        "reason": "Current duplication, dead-export, types and code-rule gates passed; changed control flow reviewed for simplicity. No universal optimality claim.",
+        "coverage": "partial",
+        "owner": "coordinator"
+      },
+      {
+        "checkId": "CHECK-ARC-003",
+        "title": "Comments, tests, and production-path fidelity",
+        "category": "ARC",
+        "outcome": "passed",
+        "reason": "Regression red/green receipts and final full suite verified; exact independent fix review retained. Arbitrary color permutations not exhaustively enumerated.",
+        "coverage": "partial",
+        "owner": "coordinator"
+      },
+      {
+        "checkId": "CHECK-DOC-001",
+        "title": "User-facing capability and safety descriptions",
+        "category": "DOC",
+        "outcome": "passed",
+        "reason": "Changed user-facing release notes checked against actual corrected behavior. Unchanged documentation not re-audited line by line.",
+        "coverage": "partial",
+        "owner": "coordinator"
+      },
+      {
+        "checkId": "CHECK-DOC-002",
+        "title": "Commands, metadata, links, and legal materials",
+        "category": "DOC",
+        "outcome": "passed",
+        "reason": "Pinned commands, package file list, release paths and native licenses checked. Current release publication is not performed.",
+        "coverage": "partial",
+        "owner": "coordinator"
+      },
+      {
+        "checkId": "CHECK-DOC-003",
+        "title": "Audit records and evidence consistency",
+        "category": "DOC",
+        "outcome": "passed",
+        "reason": "Report schema, finding IDs, privacy, links and evidence hashes checked separately. Frozen historical audit results remain unchanged.",
+        "coverage": "partial",
+        "owner": "coordinator"
+      }
+    ]
+  },
+  "checks": [
+    {
+      "label": "colors-and-evidence-green",
+      "outcome": "passed",
+      "command": [
+        "bash",
+        "-euc",
+        "pnpm exec prettier --write src/core/colors.ts src/core/wallet-evidence.ts test/color-placements.test.ts test/known-audit-defects.test.ts; pnpm exec vitest run test/color-placements.test.ts test/missing-codes.test.ts test/missing-codes-search.test.ts test/wallet-evidence.test.ts test/known-audit-defects.test.ts --maxWorkers=1"
+      ],
+      "startedAtUtc": "2026-10-22T02:46:23.230223+00:00",
+      "endedAtUtc": "2026-10-22T02:46:46.790897+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "0332cfcb286ea892e992953e03ee5d01bf8049fcd169792f6742b0e58f596958",
+      "sourceAfter": "2ea28221d81dc4c233b9de71318518749403dcf943e2cff6688dc4b3f26f3ce6",
+      "changedFiles": [
+        "src/core/wallet-evidence.ts",
+        "test/color-placements.test.ts"
+      ],
+      "minimumAvailableBytes": 7104540672,
+      "peakProcessRssBytes": 833703936,
+      "logSha256": "a7ada127aa7af7056052d0bd9e49497d2d8697fadd0939029770d900eadd0949",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "sskr-repeat-green-final",
+      "outcome": "passed",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "test/sskr-result-repeat.test.ts",
+        "test/backup-check-questions.test.ts",
+        "test/sskr-export-questions.test.ts",
+        "--maxWorkers=1"
+      ],
+      "startedAtUtc": "2026-10-22T02:42:03.735724+00:00",
+      "endedAtUtc": "2026-10-22T02:42:11.263346+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "985601a21416980ab48ecceb822cf51cc98d3b28cf2d66f748c6eb674f6a00f1",
+      "sourceAfter": "985601a21416980ab48ecceb822cf51cc98d3b28cf2d66f748c6eb674f6a00f1",
+      "changedFiles": [],
+      "minimumAvailableBytes": 6889009152,
+      "peakProcessRssBytes": 789782528,
+      "logSha256": "141e29414cbd7e86aecf0aed2dabfe96a2ce7947ad7e932896793a2cf8877c06",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "fixes-gates-and-terminal-final",
+      "outcome": "passed",
+      "command": [
+        "bash",
+        "-euc",
+        "pnpm format:check; CARGO_HOME=/home/user/Documents/bip_tools/workingspace/cargo RUSTUP_HOME=/home/user/Documents/bip_tools/workingspace/rustup pnpm check; pnpm build; PYTHONPATH=scripts python3 -c \"from terminal_step_checks import check_share_result_again; check_share_result_again()\""
+      ],
+      "startedAtUtc": "2026-10-22T02:48:53.948573+00:00",
+      "endedAtUtc": "2026-10-22T02:49:18.075743+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "7388084ba8a90e8ee914d4b4815a39676d91f739f5eb6c0f1329fb47f386f2b5",
+      "sourceAfter": "7388084ba8a90e8ee914d4b4815a39676d91f739f5eb6c0f1329fb47f386f2b5",
+      "changedFiles": [],
+      "minimumAvailableBytes": 6868279296,
+      "peakProcessRssBytes": 1060769792,
+      "logSha256": "0afd861dbcd843a21d1e764cb2d3a0d9297c933c404f869cd0804f8509e0914e",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "final-suite-and-source-terminal",
+      "outcome": "passed",
+      "command": [
+        "bash",
+        "-euc",
+        "pnpm exec vitest run --maxWorkers=2; python3 scripts/verify-terminal-input.py"
+      ],
+      "startedAtUtc": "2026-10-22T02:50:25.998010+00:00",
+      "endedAtUtc": "2026-10-22T03:05:30.334634+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "7388084ba8a90e8ee914d4b4815a39676d91f739f5eb6c0f1329fb47f386f2b5",
+      "sourceAfter": "7388084ba8a90e8ee914d4b4815a39676d91f739f5eb6c0f1329fb47f386f2b5",
+      "changedFiles": [],
+      "minimumAvailableBytes": 6129422336,
+      "peakProcessRssBytes": 1806983168,
+      "logSha256": "4f363e493150ff9b17c4fabd982c383fc2aef6c973ccf9fb4ae8e97c50e860f8",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "masked-repeat-pty",
+      "outcome": "passed",
+      "command": [
+        "bash",
+        "-euc",
+        "PYTHONPATH=scripts python3 /home/user/Documents/bip_tools/tmp/aud037/release-readiness/masked-repeat.py"
+      ],
+      "startedAtUtc": "2026-10-22T03:05:30.389163+00:00",
+      "endedAtUtc": "2026-10-22T03:05:32.513846+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "7388084ba8a90e8ee914d4b4815a39676d91f739f5eb6c0f1329fb47f386f2b5",
+      "sourceAfter": "7388084ba8a90e8ee914d4b4815a39676d91f739f5eb6c0f1329fb47f386f2b5",
+      "changedFiles": [],
+      "minimumAvailableBytes": 7098019840,
+      "peakProcessRssBytes": 398929920,
+      "logSha256": "b8ba45d1d0917c215377410b59056795fec8f4f473b098d48b5a77929b36fbb6",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "final-linux-artifacts",
+      "outcome": "passed",
+      "command": [
+        "bash",
+        "-euc",
+        "python3 -c \"import json; from pathlib import Path; p=Path(\\\"/home/user/Documents/bip_tools/tmp/aud037/release-readiness\\\"); assert all(json.loads((p/(name+\\\".command.json\\\")).read_text())[\\\"exitCode\\\"]==0 for name in (\\\"final-suite-and-source-terminal\\\",\\\"masked-repeat-pty\\\"))\"; node scripts/build-executable.mjs release/readiness-final; node scripts/verify-executable.mjs release/readiness-final; python3 scripts/verify-terminal-input.py release/readiness-final/mnemocode-0.1.0-linux-x64; node scripts/build-executable.mjs release/readiness-final-repeat; cmp release/readiness-final/mnemocode-0.1.0-linux-x64 release/readiness-final-repeat/mnemocode-0.1.0-linux-x64; cmp release/readiness-final/mnemocode-0.1.0-linux-x64-licenses.txt release/readiness-final-repeat/mnemocode-0.1.0-linux-x64-licenses.txt; cmp release/readiness-final/mnemocode-0.1.0-linux-x64.sha256 release/readiness-final-repeat/mnemocode-0.1.0-linux-x64.sha256; node /home/user/Documents/bip_tools/tmp/aud037/release-readiness/startup.mjs"
+      ],
+      "startedAtUtc": "2026-10-22T03:05:32.570185+00:00",
+      "endedAtUtc": "2026-10-22T03:07:42.359857+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "7388084ba8a90e8ee914d4b4815a39676d91f739f5eb6c0f1329fb47f386f2b5",
+      "sourceAfter": "7388084ba8a90e8ee914d4b4815a39676d91f739f5eb6c0f1329fb47f386f2b5",
+      "changedFiles": [],
+      "minimumAvailableBytes": 6335479808,
+      "peakProcessRssBytes": 1258856448,
+      "logSha256": "632f4f96c08c4707de0d87fff7a3e1fa687030b7c26b6c61acaa7051a36ceb50",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "canonical-sskr",
+      "outcome": "passed",
+      "command": [
+        "pnpm",
+        "verify:sskr"
+      ],
+      "startedAtUtc": "2026-10-22T02:41:35.546364+00:00",
+      "endedAtUtc": "2026-10-22T02:41:43.452801+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "3fee48d8755e9eb76d118e9f3b60fadfe0106d3307d121dc728d81591d84c482",
+      "sourceAfter": "3fee48d8755e9eb76d118e9f3b60fadfe0106d3307d121dc728d81591d84c482",
+      "changedFiles": [],
+      "minimumAvailableBytes": 7355699200,
+      "peakProcessRssBytes": 261115904,
+      "logSha256": "7ecd7b1600d6408f652bd346ce6402c6bac2fced8f0c9671c3f7532d36434910",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "canonical-sskr-fresh",
+      "outcome": "passed",
+      "command": [
+        "docker",
+        "buildx",
+        "build",
+        "--platform",
+        "linux/amd64",
+        "--file",
+        "Dockerfile.sskr",
+        "--target",
+        "output",
+        "--no-cache-filter",
+        "built",
+        "--resource",
+        "memory=2g",
+        "--progress",
+        "plain",
+        "--output",
+        "type=local,dest=/home/user/Documents/bip_tools/tmp/aud037/release-readiness/canonical-fresh",
+        "sskr-wasm/rust"
+      ],
+      "startedAtUtc": "2026-10-22T02:42:36.698911+00:00",
+      "endedAtUtc": "2026-10-22T02:43:20.339376+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "985601a21416980ab48ecceb822cf51cc98d3b28cf2d66f748c6eb674f6a00f1",
+      "sourceAfter": "985601a21416980ab48ecceb822cf51cc98d3b28cf2d66f748c6eb674f6a00f1",
+      "changedFiles": [],
+      "minimumAvailableBytes": 6814732288,
+      "peakProcessRssBytes": 86716416,
+      "logSha256": "7d6c33e9e49304b322508163edfe293df242921aa1f4daa72cd6251f7e00514a",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "package-list",
+      "outcome": "passed",
+      "command": [
+        "npm",
+        "pack",
+        "--dry-run",
+        "--json",
+        "--ignore-scripts"
+      ],
+      "startedAtUtc": "2026-10-22T02:43:20.388080+00:00",
+      "endedAtUtc": "2026-10-22T02:43:22.298826+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "985601a21416980ab48ecceb822cf51cc98d3b28cf2d66f748c6eb674f6a00f1",
+      "sourceAfter": "985601a21416980ab48ecceb822cf51cc98d3b28cf2d66f748c6eb674f6a00f1",
+      "changedFiles": [],
+      "minimumAvailableBytes": 7236730880,
+      "peakProcessRssBytes": 168656896,
+      "logSha256": "ce4641ac71b8a278c621fc5a369d388f88031435cdf0898e94f3df697a14b06f",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "ssh-signatures",
+      "outcome": "passed",
+      "command": [
+        "python3",
+        "/home/user/Documents/bip_tools/tmp/aud037/release-readiness/verify-signatures.py"
+      ],
+      "startedAtUtc": "2026-10-22T02:39:58.789165+00:00",
+      "endedAtUtc": "2026-10-22T02:40:00.494909+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "60dc4dffa33f2208c3a4443d10613d1d6b76958294cb12400490e9962196f6c0",
+      "sourceAfter": "60dc4dffa33f2208c3a4443d10613d1d6b76958294cb12400490e9962196f6c0",
+      "changedFiles": [],
+      "minimumAvailableBytes": 7206260736,
+      "peakProcessRssBytes": 18350080,
+      "logSha256": "0e304555679a002f128f719a6850babfed5e9bfdb8337f16434d0b898185fbcb",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "report-metadata-gates",
+      "outcome": "passed",
+      "command": [
+        "bash",
+        "-euc",
+        "pnpm format:check; pnpm check:markdown; pnpm check:audit-privacy; pnpm check:audit-package; pnpm check:code-rules; pnpm check:python-docs; git diff --check"
+      ],
+      "startedAtUtc": "2026-10-22T03:10:41.125969+00:00",
+      "endedAtUtc": "2026-10-22T03:10:53.263898+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "d8e5c39c81dd82c321b564f30cc02a710e46944e980e247ab99225ca8cd8292a",
+      "sourceAfter": "d8e5c39c81dd82c321b564f30cc02a710e46944e980e247ab99225ca8cd8292a",
+      "changedFiles": [],
+      "minimumAvailableBytes": 7145017344,
+      "peakProcessRssBytes": 454017024,
+      "logSha256": "56eab3720738a4f3d314cfa3e0843428b38f7f452867e559c16c36c011515958",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "final-advisory-replay",
+      "outcome": "passed",
+      "command": [
+        "python3",
+        "docs/audits/AUD-038-harnesses/advisories.py",
+        "--cached"
+      ],
+      "startedAtUtc": "2026-10-22T03:12:07.025147+00:00",
+      "endedAtUtc": "2026-10-22T03:12:07.260636+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "d8e5c39c81dd82c321b564f30cc02a710e46944e980e247ab99225ca8cd8292a",
+      "sourceAfter": "d8e5c39c81dd82c321b564f30cc02a710e46944e980e247ab99225ca8cd8292a",
+      "changedFiles": [],
+      "minimumAvailableBytes": 7543848960,
+      "peakProcessRssBytes": 9486336,
+      "logSha256": "bc96fdbc5059c32068e5ff6680ee35c561862431c3cc2535b9776b91f018e873",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "final-runner-self-test",
+      "outcome": "passed",
+      "command": [
+        "python3",
+        "docs/audits/AUD-038-harnesses/check-runner.py",
+        "stopped-check-final"
+      ],
+      "startedAtUtc": "2026-10-22T03:11:51.216870+00:00",
+      "endedAtUtc": "2026-10-22T03:11:52.942029+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "d8e5c39c81dd82c321b564f30cc02a710e46944e980e247ab99225ca8cd8292a",
+      "sourceAfter": "d8e5c39c81dd82c321b564f30cc02a710e46944e980e247ab99225ca8cd8292a",
+      "changedFiles": [],
+      "minimumAvailableBytes": 7550402560,
+      "peakProcessRssBytes": 29388800,
+      "logSha256": "8fd35d138ac52b48bc7ffe0a541181e0d5ed30555b562c2ab5d5b5f87da60301",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "final-support-corrections",
+      "outcome": "passed",
+      "command": [
+        "bash",
+        "-euc",
+        "python3 docs/audits/AUD-038-harnesses/check-advisories.py; python3 docs/audits/AUD-038-harnesses/advisories.py --cached"
+      ],
+      "startedAtUtc": "2026-10-22T03:17:02.604455+00:00",
+      "endedAtUtc": "2026-10-22T03:17:02.840524+00:00",
+      "exitCode": 0,
+      "stopReason": null,
+      "nodeHeapMiB": 384,
+      "rssBudgetBytes": 3221225472,
+      "reserveBytes": 3221225472,
+      "timeoutSeconds": 1800,
+      "sourceBefore": "4b199cee1caa694c984cfd85fe39cb53e1424c89d9b068b2f46aeb196affd61f",
+      "sourceAfter": "4b199cee1caa694c984cfd85fe39cb53e1424c89d9b068b2f46aeb196affd61f",
+      "changedFiles": [],
+      "minimumAvailableBytes": 7587819520,
+      "peakProcessRssBytes": 3543040,
+      "logSha256": "19d68af0beca24f18a7411ba9aee060e80f5d16fc6385c0f6760a730c1035e0b",
+      "runnerSha256": "99aea677b5b470271bfea912a75a7ed0fb9d4dbc27b31ad4d712cc45cce9e52c"
+    },
+    {
+      "label": "fresh npm advisory check",
+      "outcome": "blocked",
+      "evidence": "dependency-audit-retry.command.json",
+      "reason": "The npm bulk advisory endpoint timed out in pnpm and in an independent curl POST. The initial stalled pnpm child was stopped (exit 143); the bounded retry failed. The command remains failed; separate version-matched GitHub global-advisory checks passed and are reported distinctly."
+    }
+  ],
+  "supplementalAdvisories": {
+    "source": "https://docs.github.com/en/rest/security-advisories/global-advisories#list-global-security-advisories",
+    "atUtc": "2026-10-22T03:07:44.116565+00:00",
+    "npmVersions": 217,
+    "cargoVersions": 134,
+    "queries": 21,
+    "matches": 0,
+    "positiveControlMatches": 5,
+    "reportSha256": "af5295f6bc603a289c13f84b1f0b63360a92b5872b33237b8f09e3086674442a",
+    "qualification": "Fresh official GitHub global-advisory checks, not a passing pnpm audit and not repository Dependabot alerts. All lockfile npm package versions, including optional platforms, and registry Cargo versions were queried."
+  },
+  "testResults": {
+    "files": 267,
+    "passed": 3477,
+    "failed": 0,
+    "skipped": 0
+  },
+  "findings": [
+    {
+      "id": "AUD-038-UI001",
+      "category": "UI",
+      "kind": "finding",
+      "title": "Repeated SSKR result omits its full backup and fingerprints",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "src/cli/sskr-split-command.ts"
+      ],
+      "reproduction": "Encode with --sskr --format indexes; check a valid written quorum of another public phrase, then choose Show the result again.",
+      "expected": "The whole result returns after the mismatch screen is cleared.",
+      "observed": "The callback originally redrew shares but omitted the export heading, optional full backup and fingerprints.",
+      "impact": "A person could no longer compare or transcribe those omitted fields through the offered repeat action. Shares themselves remained correct.",
+      "recommendedFix": "Use one complete display callback; keep saves outside it.",
+      "requiredVerification": "Observe the missing output before correction, assert only output after repeat, and run real-terminal repeat acceptance.",
+      "evidence": [
+        "sskr-repeat-red.command.json",
+        "sskr-repeat-green-final.command.json",
+        "fixes-gates-and-terminal-final.command.json",
+        "masked-repeat-pty.command.json"
+      ]
+    },
+    {
+      "id": "AUD-038-BLD001",
+      "category": "BLD",
+      "kind": "finding",
+      "title": "Audit wrapper accepts a zero child status after a monitor stop",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "docs/audits/AUD-038-harnesses/run.py"
+      ],
+      "reproduction": "Set a one-second timeout and run a child whose SIGTERM handler exits zero.",
+      "expected": "The wrapper refuses a timed-out check regardless of the child status.",
+      "observed": "The wrapper initially forwarded the child status without checking stopReason.",
+      "impact": "A rerun could be read as successful after a resource stop. The coordinator separately required empty stopReason when accepting the actual release receipts, so these checks were not falsely accepted.",
+      "recommendedFix": "Return a nonzero wrapper status on every monitor stop, preserving both statuses and script hashes.",
+      "requiredVerification": "Use a real timed-out child with a successful SIGTERM handler; observe red before and green after correction.",
+      "evidence": [
+        "runner-stop-red.log",
+        "runner-stop-green.log",
+        "stopped-check-red.command.json",
+        "stopped-check-green.command.json"
+      ]
+    },
+    {
+      "id": "AUD-038-BLD002",
+      "category": "BLD",
+      "kind": "finding",
+      "title": "A repeated advisory harness run labels cached answers as live",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "docs/audits/AUD-038-harnesses/advisories.py"
+      ],
+      "reproduction": "Populate retained query/response files, then call the original harness without --cached.",
+      "expected": "A live run fetches fresh answers or refuses; cached replay is explicitly identified.",
+      "observed": "The first wrapper reused saved answers while setting cachedOnly false and writing a new live timestamp.",
+      "impact": "A future repeated audit could mistake stale advisory responses for a fresh query. The actual retained 21-query network results of this follow-up remain valid.",
+      "recommendedFix": "Give each live run a fresh UTC-named folder and refuse existing responses; allow cached responses only in explicit replay mode.",
+      "requiredVerification": "A network-edge fake proves fresh fetch, refusal of existing live data and explicit replay without a request; baseline must fail.",
+      "evidence": [
+        "advisory-cache-red.log",
+        "advisory-cache-green.log"
+      ]
+    },
+    {
+      "id": "AUD-038-DOC001",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "Report fixCommit identifies release notes instead of program fixes",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "affectedFiles": [
+        "docs/audits/AUD-038-2026-10-22.json"
+      ],
+      "reproduction": "Compare fixCommit in the three program remediation rows with the changed files of those Git commits.",
+      "expected": "fixCommit identifies 1137905; verificationCommit identifies cecdd9c.",
+      "observed": "The draft used cecdd9c for both fields, but that commit changes only release notes.",
+      "impact": "A reader following the fix reference would inspect the wrong diff. Source fingerprints and execution results remain valid.",
+      "recommendedFix": "Keep fix and verification commits distinct and validate all three references against the actual signed code commit.",
+      "requiredVerification": "Retain the original incorrect draft and verify that all three corrected references equal the real code commit.",
+      "evidence": [
+        "report-fixcommit-red.log",
+        "report-fixcommit-red.json",
+        "report-validation.json"
+      ]
+    }
+  ],
+  "observations": [],
+  "remediation": [
+    {
+      "id": "AUD-037-FUN004",
+      "status": "verified",
+      "severity": "medium",
+      "variant": "Rotating a missing leading color to the end imitates a later tag start.",
+      "fixCommit": "1137905190c516d9767bce30ec39ad561554db50",
+      "verificationCommit": "cecdd9c0b8719bd8407db3dd57db0e7ef1a5d84d",
+      "evidence": [
+        "colors-and-evidence-red.command.json",
+        "colors-and-evidence-green.command.json",
+        "final-suite-and-source-terminal.command.json"
+      ],
+      "change": "Every compatible tag offset is retained regardless of input order; the shared sum-of-combinations bound and candidate deduplication remain in force. Both Colors and Color Unicode and 700 nonzero rotations across 5 phrase lengths are covered. Startup checks a literal published direct-12 placement without a search."
+    },
+    {
+      "id": "AUD-004-API001",
+      "status": "verified",
+      "severity": "low",
+      "variant": "Nullish runtime evidence reaches .kind before input validation.",
+      "fixCommit": "1137905190c516d9767bce30ec39ad561554db50",
+      "verificationCommit": "cecdd9c0b8719bd8407db3dd57db0e7ef1a5d84d",
+      "evidence": [
+        "colors-and-evidence-red.command.json",
+        "colors-and-evidence-green.command.json"
+      ],
+      "change": "Null and non-object values fail before property access with the existing unsupported-bitcoin-evidence-kind code. Valid derivation and public signatures are unchanged."
+    },
+    {
+      "id": "AUD-038-UI001",
+      "status": "verified",
+      "fixCommit": "1137905190c516d9767bce30ec39ad561554db50",
+      "verificationCommit": "cecdd9c0b8719bd8407db3dd57db0e7ef1a5d84d",
+      "evidence": [
+        "sskr-repeat-red.command.json",
+        "sskr-repeat-green-final.command.json",
+        "fixes-gates-and-terminal-final.command.json",
+        "masked-repeat-pty.command.json"
+      ]
+    },
+    {
+      "id": "AUD-038-BLD001",
+      "severity": "low",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "runner-stop-red.log",
+        "runner-stop-green.log",
+        "stopped-check-red.command.json",
+        "stopped-check-green.command.json"
+      ]
+    },
+    {
+      "id": "AUD-038-BLD002",
+      "variant": "A repeated advisory harness run labels cached answers as live",
+      "severity": "low",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "advisory-cache-red.log",
+        "advisory-cache-green.log"
+      ]
+    },
+    {
+      "id": "AUD-038-DOC001",
+      "variant": "Report fixCommit identifies release notes instead of program fixes",
+      "severity": "low",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "report-fixcommit-red.log",
+        "report-fixcommit-red.json",
+        "report-validation.json"
+      ]
+    }
+  ],
+  "toolsAndSkills": {
+    "installed": [],
+    "used": [
+      "wallet-release-verification",
+      "wallet-full-audit",
+      "wallet-security-review",
+      "javascript-testing-expert",
+      "property-based-testing",
+      "Vitest",
+      "TypeScript",
+      "oxlint",
+      "Prettier",
+      "Cargo/clippy/rustfmt",
+      "Docker BuildKit",
+      "Python standard-library independent SSKR and real-PTY checks",
+      "Git/GitHub CLI",
+      "retained AUD-026 memory monitor"
+    ],
+    "qualification": "Existing tools and skills only; property principles used for bounded exhaustive rotations without adding a PBT dependency. No Semgrep/CodeQL/Codex Security scan or fuzzing campaign is implied."
+  },
+  "harnessFiles": [
+    {
+      "path": "docs/audits/AUD-038-harnesses/README.md",
+      "sha256": "89984797787a46d15515410e8f8ae52c7dbeb8eef35225a75d2b11ebef7071d4"
+    },
+    {
+      "path": "docs/audits/AUD-038-harnesses/advisories.py",
+      "sha256": "baa6358d94c4eb0a7ffb4b77fad3217a4059fb6672251e78d553cbefd696bdb9"
+    },
+    {
+      "path": "docs/audits/AUD-038-harnesses/check-advisories.py",
+      "sha256": "1aae70417adaa241b2bc3453684e55488356745152ee5fa16e06946dd4444122"
+    },
+    {
+      "path": "docs/audits/AUD-038-harnesses/check-runner.py",
+      "sha256": "66028945c377f0f0abf385f9e137269d7fecf64b173fd897d65a760419f570f5"
+    },
+    {
+      "path": "docs/audits/AUD-038-harnesses/run.py",
+      "sha256": "66a3f87ca8b9978921643043702a95b9acec80764a4ca72316e15d1d12806856"
+    }
+  ],
+  "releaseVerdict": "INCOMPLETE",
+  "limitations": [
+    "No remaining confirmed high/medium code defect in the reviewed and corrected paths; this is not proof that all defects are absent.",
+    "Real Windows/macOS acceptance for this local source requires an authorized push; retained green CI applies to older commits.",
+    "Prior explicit history-rewrite and push holds remain. Unregrouped history remains AUD-037-BLD001.",
+    "The standard pnpm advisory command is blocked by endpoint timeout. A separate fresh official GitHub global-advisory scan of all 217 npm/134 Cargo versions passed with a five-match positive control; repository Dependabot alerts were disabled (403).",
+    "Canonical fresh WASM comparison used the pinned built stage with its cache disabled; cached generated-glue comparison is identified separately.",
+    "Browser/MHFE integration remains deferred by the owner; host API notes were sent for later intake only.",
+    "Rotations are not every permutation. Snapshot-bound static review and automated tests do not constitute independent cryptographic certification."
+  ],
+  "harnessReview": {
+    "finding": "AUD-038-BLD001",
+    "status": "verified",
+    "evidence": [
+      "runner-stop-red.log",
+      "runner-stop-green.log",
+      "stopped-check-red.command.json",
+      "stopped-check-green.command.json"
+    ]
+  },
+  "actionsNotPerformed": [
+    "push",
+    "history rewrite",
+    "tag",
+    "release signing/publication",
+    "peer repository edits"
+  ]
+}
