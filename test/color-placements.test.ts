@@ -11,11 +11,11 @@ import { encodeMnemonic, parseDate } from "../src/core.js";
 import { DatesAnswer } from "../src/core/date-search.js";
 import { MissingCodesSearch } from "../src/core/missing-codes-search.js";
 import { MissingCodes } from "../src/core/missing-codes.js";
-import { DATE, ZERO_ENTROPY_PHRASES } from "./helpers/test-phrase.js";
+import { DATE, TEST_INDEXES, ZERO_ENTROPY_PHRASES } from "./helpers/test-phrase.js";
 
 // Colors with an unread one whose order tags start later than 0, as older records may
-// (AUD-037-FUN004): every placement that the tags read allow is searched, and colors typed in the
-// order of their tags tell it. Public data: the phrases of zero entropy, masked with one date.
+// (AUD-037-FUN004): every placement that the tags read allow is searched, regardless of typed
+// order. Public data: the phrases of zero entropy, masked with one date.
 
 /** The phrases of zero entropy of every length, the shortest first. */
 const PHRASES = Object.values(ZERO_ENTROPY_PHRASES);
@@ -62,6 +62,33 @@ const fingerprint = (mnemonic: string): string =>
   createHash("sha256").update(mnemonic).digest("hex").slice(0, 8);
 
 describe("marked colors of a record whose tags start later", () => {
+  it.each(["colors", "colors-unicode"] as const)(
+    "keeps the original phrase when a missing leading color is moved to the end in %s",
+    (form) => {
+      const colors = indexesToColors(TEST_INDEXES);
+      const rotated = [...colors.slice(1), colors[0]!];
+      using codes = MissingCodes.read(marked(rotated, rotated.length - 1, form), form, "direct");
+      expect(isCandidate(codes, TEST_INDEXES)).toBe(true);
+    },
+  );
+
+  it.each(PHRASES.map((phrase) => [phrase.split(" ").length, phrase] as const))(
+    "preserves every allowed placement through all rotations with each color unread for %i words",
+    (_, phrase) => {
+      const colors = indexesToColors(encodeMnemonic(phrase, [PARSED_DATE]).shiftedIndexes);
+      for (let unread = 0; unread < colors.length; unread += 1) {
+        const marked = colors.map((color, at) => (at === unread ? undefined : color));
+        const placements = wordPositionPlacements(marked);
+        for (let rotation = 1; rotation < marked.length; rotation += 1) {
+          const moved = [...marked.slice(rotation), ...marked.slice(0, rotation)];
+          expect(wordPositionPlacements(moved), `unread ${unread}, rotation ${rotation}`).toEqual(
+            placements,
+          );
+        }
+      }
+    },
+  );
+
   it.each(PHRASES.map((phrase) => [phrase.split(" ").length, phrase] as const))(
     "are found for %i words, the lowest, a middle or the highest color unread",
     async (_, phrase) => {
@@ -108,13 +135,13 @@ describe("marked colors of a record whose tags start later", () => {
     },
   );
 
-  it("take the placement that colors typed in order tell, and every one in another order", () => {
+  it("preserve every tag-compatible start regardless of the typed order", () => {
     const colors = indexesToColors(encodeMnemonic(PHRASES[0]!, [PARSED_DATE]).shiftedIndexes);
-    // Tags from 0 with the first color unread fit a start one step later too: in their order the
-    // colors tell 0, in another order both starts are placements, the lowest first.
+    // Tags from 0 with the first color unread fit a start one step later too. Both starts remain
+    // placements in every typed order, the lowest first.
     const [unread, ...read] = [undefined, ...colors.slice(1)];
-    expect(wordPositionPlacements([unread, ...read])).toHaveLength(1);
     const placements = wordPositionPlacements([...[...read].reverse(), unread]);
+    expect(wordPositionPlacements([unread, ...read])).toEqual(placements);
     expect(placements.map((patterns) => [patterns[0], patterns.at(-1)])).toEqual([
       ["????", expect.stringMatching(/^\d{4}$/u)],
       [expect.stringMatching(/^\d{4}$/u), "????"],
@@ -134,13 +161,16 @@ describe("marked colors of a record whose tags start later", () => {
           .toUpperCase()
           .padStart(6, "0")}`,
     );
-    // Typed in order, the highest unread: the start of 2, and the first color unread: 0.
+    // The same readable tags fit starts of 0 and 2, with the mark first or last alike.
     using last = MissingCodes.read(marked(same, 7, "colors"), "colors", "seedshift");
-    expect(last.placements).toEqual([[11, 12]]);
+    expect(last.placements).toEqual([
+      [1, 2],
+      [11, 12],
+    ]);
     const typedFirst = ["?", ...same.slice(0, 7).map((color) => color.slice(1))].join(" ");
     using first = MissingCodes.read(typedFirst, "colors", "seedshift");
-    expect(first.placements).toEqual([[1, 2]]);
-    // In another order, both: counted and bounded together, and named.
+    expect(first.placements).toEqual(last.placements);
+    // In another order too: counted and bounded together, and named.
     const shuffled = same
       .slice(0, 7)
       .reverse()
@@ -150,8 +180,12 @@ describe("marked colors of a record whose tags start later", () => {
       [1, 2],
       [11, 12],
     ]);
-    expect(both.combinations).toBe(first.combinations + last.combinations);
-    expect(both.expected).toBe(first.expected + last.expected);
+    // 2,048 words times 21 numbers ending in 10 for the missing prefix, plus 100 numbers
+    // starting with 10 times 2,048 words for the suffix; the 12-word checksum keeps 1/16.
+    expect(both.combinations).toBe(247808);
+    expect(both.expected).toBe(15488);
+    expect(first.combinations).toBe(both.combinations);
+    expect(last.combinations).toBe(both.combinations);
     expect(MissingCodesSearch.placesText(both)).toBe("Words 1 and 2 or words 11 and 12");
     // Each placement gives its candidates, and the codes that both give come once.
     const candidates = [...both.candidates()];

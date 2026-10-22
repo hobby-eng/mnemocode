@@ -22,6 +22,7 @@ import { textPieces } from "./pieces.js";
 import { UNICODE_CODE_DIGITS } from "./code-text.js";
 import { assertWordCount } from "./bip39-sizes.js";
 import { defined } from "./defined.js";
+import { wordPositionPlacements } from "./colors.js";
 import { ENCODED_FINGERPRINT, MASKED_ENGLISH, MASKED_NUMBERS } from "./self-test-vectors.js";
 
 /** The masked phrase of the Seedshift vector in colors (MASKED_ENGLISH, MASKED_NUMBERS). */
@@ -96,12 +97,26 @@ function checkMarked(marked: MarkedCase): void {
   expectSame(right, marked.right, `Marked ${marked.format} right codes`);
 }
 
+/** A rotated unread color must not exclude the placement of the published direct-12 vector. */
+function checkColorPlacements(): void {
+  const colors = defined(REPRESENTATION_ANSWERS[0]).forms.colors.split(" ");
+  const placements = wordPositionPlacements([...colors.slice(1), undefined]);
+  // Removing the vector's first six decimal payload digits leaves these four-digit word numbers.
+  const EXPECTED = "???? ??01 0001 0001 0001 0001 0001 0001 0001 0001 0001 0004";
+  expectSame(
+    placements.some((patterns) => patterns.join(" ") === EXPECTED),
+    true,
+    "Reordered colors keep the missing leading color",
+  );
+}
+
 /**
  * The quick known answers: marked word numbers and Unicode codes with their candidates, which
  * codes without Seedshift keep as well and the Original Seedshift, without a checksum of its own,
  * does not narrow; the marks refused; and a share told from the codes of a phrase.
  */
 export function checkBackupReadingStartup(): void {
+  checkColorPlacements();
   const answer = defined(REPRESENTATION_ANSWERS[0]);
   const words = answer.words;
   assertWordCount(words);

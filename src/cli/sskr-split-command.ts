@@ -190,41 +190,42 @@ async function splitChecked(
   });
   if (sheet === CANCELLED) return CANCELLED;
   RenamedOutputs.report();
-  if (
-    !terminalResultHeader("SSKR export", [
-      ["Threshold", `${threshold} of ${count}`],
-      ["Mode", mode],
-      ["Layout", options?.layout ?? "text"],
-    ])
-  )
-    terminalNotice(`SSKR: ${threshold} of ${count} shares required. Mode: ${mode}.`);
-  terminalNotice(`The shares hold ${Masking.of(mode).holds}.`);
-  if (Masking.of(mode).masked)
-    terminalNotice("The shares do not store the dates or the mode; keep them yourself.");
-  if (representation !== undefined && originalCopy === undefined) {
-    using backup = EncodedBackup.encode(mnemonic, dateValues, representation, mode).backup;
-    printEncodedBackup(backup);
-    // Shown for a person who keeps the whole phrase too, with the shares as a reserve.
-    terminalNotice(
-      Masking.of(mode).masked
-        ? "This is the complete backup: no share is needed, but the original dates are still required."
-        : "This is the whole seed phrase: it restores the wallet without any share.",
-      "warning",
-    );
-  }
-  // A complete backup in codes that are words (writtenInWords), shown above with --format alone,
-  // shows the masked words already.
-  const wordsShown =
-    representation !== undefined &&
-    originalCopy === undefined &&
-    EncodedForm.of(representation).writtenInWords;
-  // The optional original copy comes last, so it remains in view after long share blocks.
+  // A repeated result restores every displayed part; only the saves above run once.
   const show = (): void => {
+    if (
+      !terminalResultHeader("SSKR export", [
+        ["Threshold", `${threshold} of ${count}`],
+        ["Mode", mode],
+        ["Layout", options?.layout ?? "text"],
+      ])
+    )
+      terminalNotice(`SSKR: ${threshold} of ${count} shares required. Mode: ${mode}.`);
+    terminalNotice(`The shares hold ${Masking.of(mode).holds}.`);
+    if (Masking.of(mode).masked)
+      terminalNotice("The shares do not store the dates or the mode; keep them yourself.");
+    if (representation !== undefined && originalCopy === undefined) {
+      using backup = EncodedBackup.encode(mnemonic, dateValues, representation, mode).backup;
+      printEncodedBackup(backup);
+      // Shown for a person who keeps the whole phrase too, with the shares as a reserve.
+      terminalNotice(
+        Masking.of(mode).masked
+          ? "This is the complete backup: no share is needed, but the original dates are still required."
+          : "This is the whole seed phrase: it restores the wallet without any share.",
+        "warning",
+      );
+    }
+    // A complete backup in codes that are words (writtenInWords), shown above with --format alone,
+    // shows the masked words already.
+    const wordsShown =
+      representation !== undefined &&
+      originalCopy === undefined &&
+      EncodedForm.of(representation).writtenInWords;
+    // The optional original copy comes last, so it remains in view after long share blocks.
     printShares(inForm(shares, format), undefined, Masking.of(mode).holds);
     if (maskedWords && !wordsShown) printMaskedWords(held, mode);
     if (originalCopy !== undefined) printOriginalCopy(original, originalCopy, representation);
+    printFingerprints(mode, masterFingerprint(original), masterFingerprint(held));
   };
   show();
-  printFingerprints(mode, masterFingerprint(original), masterFingerprint(held));
   return offerShareCheck(original, mode, threshold, show, checkAnswer, dateValues);
 }

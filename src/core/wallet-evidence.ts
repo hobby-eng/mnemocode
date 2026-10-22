@@ -553,13 +553,10 @@ export const EVIDENCE_MATCHED_BY = Object.freeze({
 function evidenceOf(evidence: WalletEvidence, coins: CoinList): Evidence {
   // A JavaScript caller or parsed configuration can pass any kind; an unknown one is an error, not
   // a comparison that failed, which would read as evidence against the wallet. Evidence that is no
-  // object, such as a string, has no kind either and is refused below; `in` would throw a TypeError.
-  if (
-    !isScannedKind(evidence.kind) &&
-    typeof evidence === "object" &&
-    "addresses" in evidence &&
-    evidence.addresses !== undefined
-  )
+  // object has no kind either; refuse it before reading a property or using `in`.
+  if (evidence === null || typeof evidence !== "object")
+    throw ERRORS.create("unsupported-bitcoin-evidence-kind", []);
+  if (!isScannedKind(evidence.kind) && "addresses" in evidence && evidence.addresses !== undefined)
     throw ERRORS.create("only-address-address-another-coin-compressed-public-key", []);
   switch (evidence.kind) {
     case "master-fingerprint":

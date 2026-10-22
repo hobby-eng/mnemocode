@@ -111,7 +111,7 @@ describe("AUD-004 regression contracts", () => {
   });
 
   it("AUD-004-API001: rejects evidence that is no object as of an unknown kind", () => {
-    for (const evidence of ["abc", 7, true])
+    for (const evidence of ["abc", 7, true, null, undefined])
       expect(() =>
         // Evidence that no type allows, fed on purpose as a JavaScript host could.
         assertWalletEvidence(evidence as never),

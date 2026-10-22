@@ -9,6 +9,7 @@ fixtures only.
 import terminal_session as terminal
 from terminal_answers import (
     CLEAR_PROMPT,
+    FIRST_SHARE,
     FINGERPRINT,
     FORGOTTEN_DIGIT,
     HIDDEN_RECORD,
@@ -16,7 +17,10 @@ from terminal_answers import (
     MASK_DATE,
     MASKED_WORD_NUMBERS,
     NEXT_DAY,
+    SEED_PHRASE,
     TEST_PHRASE,
+    THIRD_SHARE,
+    WORD_NUMBERS,
 )
 
 # A wallet that no phrase of the fixtures gives: every search with it
@@ -45,6 +49,9 @@ DATE_RESULT = "MnemoCode · Date recovery"
 DECODE_RESULT = "MnemoCode · Recovered result"
 WORD_RESULT = "MnemoCode · Missing word recovery"
 CONFIRMATION = "Is this the seed phrase to re-encode?"
+# A tall frame holds the complete split and the optional whole backup
+# together, so this check observes the repeated result without paging.
+REPEATED_SPLIT_ROWS = 80
 
 
 def assert_step_screen(session, command, gone):
@@ -72,6 +79,48 @@ def check_steps_after_result():
     check_decode_dates_again()
     check_re_encode_dates_again()
     check_legacy_replacements_page()
+    check_share_result_again()
+
+
+def check_share_result_again():
+    """A wrong written quorum leads back to the whole split result,
+    with its complete backup and fingerprints on the fresh screen.
+    """
+    with terminal.terminal_size(REPEATED_SPLIT_ROWS, 120):
+        session = terminal.Session((
+            "encode", "--sskr", "--ask-secrets", "--mode", "direct",
+            "--format", "2", "--threshold", "2", "--shares", "3",
+        ))
+        try:
+            session.wait_for(SEED_PHRASE)
+            session.type(TEST_PHRASE + terminal.ENTER)
+            session.wait_for("Check the backup now?")
+            session.type("1")
+            session.wait_for("2 shares as written down")
+            # These published fixtures hold the masked phrase, not the
+            # direct original phrase that this command split.
+            session.type(FIRST_SHARE + ";" + THIRD_SHARE + terminal.ENTER)
+            session.wait_for(WHAT_NOW)
+            session.type("2")
+            session.wait_for("Encoded result")
+            session.wait_for("Check the backup now?")
+            terminal.assert_private_result_visible(session, (
+                "MnemoCode · SSKR export", "MnemoCode · Encoded result",
+                WORD_NUMBERS, "SSKR share 1 of 3", "SSKR share 3 of 3",
+                "Original fingerprint " + FINGERPRINT,
+                "Encoded fingerprint " + FINGERPRINT,
+            ))
+            session.type("2")
+            end_at_clear_prompt(session)
+            terminal.assert_kept_private(
+                session, (TEST_PHRASE, WORD_NUMBERS, FIRST_SHARE, THIRD_SHARE)
+            )
+        finally:
+            session.close()
+    print(
+        "SSKR: showing the result again restores its whole backup "
+        "and fingerprints"
+    )
 
 
 def check_recover_date_steps():
