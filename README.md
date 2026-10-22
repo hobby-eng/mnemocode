@@ -5,7 +5,7 @@
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#provenance-and-license)
 [![Build provenance: GitHub attestations](https://img.shields.io/badge/build%20provenance-GitHub%20attestations-2ea44f)](https://github.com/hobby-eng/mnemocode/attestations)
 
-This README describes version 0.1.0, which has not been released.
+This README describes version 0.1.0.
 
 **Have you inherited a backup made with MnemoCode?** Start with [A guide for heirs](docs/HEIRS.md).
 
