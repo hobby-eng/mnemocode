@@ -438,7 +438,7 @@ describe("the codes of refusals off the private screen, with their kind and word
 });
 
 describe("the codes of refusals where the menu asks for a file", () => {
-  it.skipIf(process.getuid?.() === 0)(
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
     "tell a file that is not there from one that cannot be looked at, where the menu asks for one",
     async () => {
       const directory = await mkdtemp(join(tmpdir(), "mnemocode-input-file-"));

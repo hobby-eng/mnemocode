@@ -11,7 +11,51 @@ path is recorded as a coverage gap instead. Tests, source identity and review
 must support a `verified` state. Local verification and external host/platform acceptance are separate states;
 pending host acceptance remains visible even after a local variant is verified.
 
-## Current release follow-up (2026-10-22)
+## Standalone release acceptance (2026-10-22)
+
+Standalone pre-release verification is complete for the three tested native targets. The full [CI run](https://github.com/hobby-eng/mnemocode/actions/runs/39722442871) checked signed source `f980236`; all three source-test and real-terminal jobs passed. No confirmed high/medium code finding remains open in the reviewed release paths. This is bounded verification, not a claim that every possible defect or CORE violation has been ruled out.
+
+| Native target | Passed | Failed | Conditional skips | Test files | Real terminal |
+| ------------- | ------ | ------ | ----------------- | ---------- | ------------- |
+| Linux x64     | 3,490  | 0      | 0                 | 269        | passed        |
+| Windows x64   | 3,427  | 0      | 62                | 269        | passed        |
+| macOS arm64   | 3,487  | 0      | 4                 | 269        | passed        |
+
+Totals belong to each platform and are not added. Conditional skips cover platform-specific Unix signals, permissions, special paths/pipes and local Poppler availability; Linux has no skips. Windows uses a real ConPTY check, while Linux/macOS use real pseudo-terminals. Every applicable test passes; the Unix permission fixture runs on Unix, with portable lookup-fault checks on all three hosts.
+
+The full Linux job also passed mandatory code/duplication/dead-export/type/lint gates, Rust tests and doctests, build, full self-test, PDF/image/QR export, independent SSKR known answers and the standard dependency audit, which reported no known vulnerabilities. The runtime source, native engine, dependencies, assets, embedded manual/vectors and executable-build inputs remain byte-identical to the three accepted [native executable jobs](https://github.com/hobby-eng/mnemocode/actions/runs/39719696645) at `2e8c249`. Those executables were built and tested on their own OS, including empty-folder execution and real terminal checks; their source identity is preserved rather than relabeled as a later rebuild. The Linux artifact also matches the two local builds byte for byte.
+
+| Executable                    | SHA-256                                                            |
+| ----------------------------- | ------------------------------------------------------------------ |
+| `mnemocode-0.1.0-linux-x64`   | `64e5671567f4232131f362a5cf6f02c175830167c81d6e9f83d61bc43717e769` |
+| `mnemocode-0.1.0-macos-arm64` | `f54313585eff93b34e3ec8b0ae9f7963f1b5e880832f8ce21a76dec8960b796c` |
+| `mnemocode-0.1.0-win-x64.exe` | `1d7191ede81a58048733d67677cb8d52d2632d837418e86cf3a71082e0cd72fa` |
+
+No new tool, dependency or skill was installed for this closure. It uses the existing pinned Node/TypeScript/Vitest, Rust/Clippy/rustfmt, canonical Docker SSKR evidence, Git/GitHub Actions and the diagnosis/JavaScript testing skills. Independent read-only CORE-53 review accepted the exact portability changes and retained red/control/green checks.
+
+Browser/MHFE integration remains deferred by the owner; the API handoff is record-only for later intake. No release tag, OpenPGP release signing or publication was performed. The document-only acceptance update does not change the tested runtime or build inputs. Earlier dated checkpoints below retain their original results and former holds; this current acceptance supersedes their pending native/dependency statuses.
+
+### Native portability corrections
+
+The full native run identified these platform-specific cases after the
+frozen AUD-038 report's earlier local snapshot. No public API, mnemonic operation, native engine or executable-build
+input changes in this correction.
+
+| Finding                                           | Correction                                                                                                                                                                                                                                                            | Verification and current limit                                                                                                                                                                                                              |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AUD-038-BLD003 / Git root aliases (low)           | Compare canonical physical directory names on both sides of the Git-root check. A short or aliased root previously made history checks report no checkout and file gates ignore Git's excludes. Nested directories remain rejected.                                   | New real-Git alias/junction regression fails before the correction and passes after it; existing blame and conflict/exclusion cases pass. Native Windows follow-up passed.                                                                  |
+| AUD-038-BLD004 / macOS renderer fixture (low)     | Resolve the fixture's temporary root as the child shell does; exercise every original case with both direct and aliased roots. Production renderer PATH and CWD guards are unchanged.                                                                                 | Original three failures reproduced through an aliased temporary folder; all 16 cases pass. Restoring the faulty fixture makes three new aliased cases fail. Independent review accepted the exact file hash. Native macOS follow-up passed. |
+| AUD-038-BLD005 / Python stderr line endings (low) | Canonicalize only CRLF to LF for the complete exact refusal message. Keep exit status, empty stdout, all inputs and independent Python logic unchanged.                                                                                                               | A real CRLF-configured Python stream reproduces all four failures before correction and passes afterwards. Native Windows follow-up passed.                                                                                                 |
+| AUD-038-BLD006 / Unix permission fixture (low)    | Keep the actual chmod-based search-permission test on non-root Unix hosts. Add path-specific stat faults for missing/non-directory and denied/I/O failures on every host, with exact public and cause codes. Windows chmod cannot remove directory search permission. | Four portable fault cases and the existing applicable real-permission case pass. No production refusal handling changed. Native Windows follow-up passed.                                                                                   |
+
+All seven affected test files pass locally: 93 cases, zero failures/skips.
+Formatting, all mandatory gates, strict types, lint, Rust tests/doctests and
+Git-root and formatting-reference validation pass. The red/control/green checks, exact source hashes,
+resource records and independent reviews stay in local ignored evidence.
+The full native follow-up has now passed on the correction. Conditional
+platform-only cases are explicitly counted in the current acceptance table.
+
+## Earlier local release checkpoint (2026-10-22)
 
 [AUD-038](audits/AUD-038-2026-10-22.md) records the targeted pass-5 and standalone
 release checks after the completed pass-4 continuation. It preserves earlier

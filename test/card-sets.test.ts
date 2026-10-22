@@ -90,7 +90,10 @@ describe("the colors of cards that print codes", () => {
       const reference = paletteReference(...argv);
       expect(reference.status).toBe(1);
       expect(reference.stdout).toBe("");
-      expect(reference.stderr).toBe("Give one whole number of colours, from 1 to 1080.\n");
+      // Python's text stream uses CRLF on Windows; the complete message is the same.
+      expect(reference.stderr.replaceAll("\r\n", "\n")).toBe(
+        "Give one whole number of colours, from 1 to 1080.\n",
+      );
     },
   );
 

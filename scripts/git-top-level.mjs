@@ -6,8 +6,8 @@
 // (audit-files.mjs).
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * The most output git ls-files may give before execFileSync refuses it: 64 MiB, a ceiling far
@@ -20,7 +20,11 @@ export function isRepositoryTopLevel(root) {
   const topLevel = spawnSync("git", ["-C", root, "rev-parse", "--show-toplevel"], {
     encoding: "utf8",
   });
-  return topLevel.status === 0 && resolve(topLevel.stdout.trim()) === root;
+  // Git expands directory aliases, including Windows's short temporary-folder names.
+  return (
+    topLevel.status === 0 &&
+    realpathSync.native(topLevel.stdout.trim()) === realpathSync.native(root)
+  );
 }
 
 /**
