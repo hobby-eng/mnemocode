@@ -1,10 +1,13 @@
 {
-  "about": "Module and dependency map of the Rust MnemoCode (docs/design/architect/ARCHITECTURE.md sections 2 and 3), read by the code-rules gate (scripts/verify-code-rules.mjs). layers: a library module may use the foundation and the modules listed for it ('*': every module); a module of mnemocode-cards or mnemocode-cli uses only the modules before it in 'order'; every listed edge of an existing library module is used. deps: each crate's direct dependencies per target, its devDependencies for its tests, and refusedInTree for every artifact. unsafe: 'forbid' in the crate root, or 'deny' with allow(unsafe_code) only in the files and folders of allowedIn (paths relative to the crate, a folder ending in /). ioModules: the only CLI files whose top may expect clippy's disallowed std methods and types.",
+  "about": "Module and dependency map of the Rust MnemoCode (docs/design/architect/ARCHITECTURE.md sections 2 and 3), read by the code-rules gate (cargo xtask code-rules). layers: a library module may use the foundation and the modules listed for it ('*': every module); a module of mnemocode-cards or mnemocode-cli uses only the modules before it in 'order'; every listed edge of an existing library module is used. deps: each crate's direct dependencies per target, its devDependencies for its tests, and refusedInTree for every artifact. unsafe: 'forbid' in the crate root, or 'deny' with allow(unsafe_code) only in the files and folders of allowedIn (paths relative to the crate, a folder ending in /). ioModules: the only CLI files and folders whose top may expect clippy's disallowed std methods and types, besides test modules and integration test files.",
   "crates": {
     "mnemocode": {
       "unsafe": {
         "level": "deny",
-        "allowedIn": ["src/secret/pages.rs", "src/secret/allocator.rs"]
+        "allowedIn": [
+          "src/secret/pages.rs",
+          "src/secret/allocator.rs"
+        ]
       },
       "dependencies": {
         "all": [
@@ -33,29 +36,82 @@
           "png",
           "zeroize"
         ],
-        "cfg(unix)": ["libc"],
-        "cfg(windows)": ["windows-sys"]
+        "cfg(unix)": [
+          "libc"
+        ],
+        "cfg(windows)": [
+          "windows-sys"
+        ]
       },
-      "foundation": ["secret", "refusal", "checksum", "text", "random", "self_check", "search"],
+      "foundation": [
+        "secret",
+        "refusal",
+        "checksum",
+        "text",
+        "random",
+        "self_check",
+        "search"
+      ],
       "modules": {
-        "secret": [],
+        "secret": [
+          "refusal"
+        ],
         "refusal": [],
         "checksum": [],
-        "text": ["refusal"],
-        "random": ["refusal"],
-        "self_check": ["refusal"],
-        "search": ["refusal"],
+        "text": [
+          "refusal"
+        ],
+        "random": [
+          "refusal"
+        ],
+        "self_check": [
+          "refusal"
+        ],
+        "search": [
+          "refusal",
+          "text"
+        ],
         "bip39": [],
         "dates": [],
-        "bip32": ["bip39"],
-        "pack": ["bip39"],
+        "bip32": [
+          "bip39"
+        ],
+        "pack": [
+          "bip39"
+        ],
         "qr": [],
-        "candidates": ["bip39"],
-        "forms": ["bip39"],
-        "modes": ["bip39", "dates", "bip32"],
-        "wallet": ["bip39", "bip32"],
-        "backup": ["bip39", "dates", "bip32", "forms", "modes", "wallet"],
-        "sskr": ["bip39", "dates", "bip32", "forms", "modes", "wallet", "backup"],
+        "candidates": [
+          "bip39"
+        ],
+        "forms": [
+          "bip39"
+        ],
+        "modes": [
+          "bip39",
+          "dates",
+          "bip32"
+        ],
+        "wallet": [
+          "bip39",
+          "bip32"
+        ],
+        "backup": [
+          "bip39",
+          "dates",
+          "bip32",
+          "forms",
+          "modes",
+          "wallet"
+        ],
+        "sskr": [
+          "bip39",
+          "dates",
+          "bip32",
+          "forms",
+          "modes",
+          "wallet",
+          "backup"
+        ],
         "recovery": [
           "bip39",
           "dates",
@@ -69,7 +125,10 @@
         ],
         "checks": "*",
         "lib": "*"
-      }
+      },
+      "devDependencies": [
+        "serde_json"
+      ]
     },
     "mnemocode-cards": {
       "unsafe": {
@@ -89,7 +148,16 @@
           "libm"
         ]
       },
-      "library": ["foundation", "bip39", "dates", "forms", "modes", "backup", "sskr", "qr"],
+      "library": [
+        "foundation",
+        "bip39",
+        "dates",
+        "forms",
+        "modes",
+        "backup",
+        "sskr",
+        "qr"
+      ],
       "order": [
         "assets",
         "settings",
@@ -111,15 +179,36 @@
     "mnemocode-cli": {
       "unsafe": {
         "level": "deny",
-        "allowedIn": ["src/os.rs", "src/os/"]
+        "allowedIn": [
+          "src/os.rs",
+          "src/os/"
+        ]
       },
       "dependencies": {
-        "all": ["mnemocode", "mnemocode-cards", "getrandom"],
-        "cfg(unix)": ["libc"],
-        "cfg(windows)": ["windows-sys"]
+        "all": [
+          "mnemocode",
+          "mnemocode-cards",
+          "getrandom"
+        ],
+        "cfg(unix)": [
+          "libc"
+        ],
+        "cfg(windows)": [
+          "windows-sys"
+        ]
       },
       "library": "*",
-      "order": ["os", "terminal", "args", "input", "output", "gate", "commands", "menu", "main"],
+      "order": [
+        "os",
+        "terminal",
+        "args",
+        "input",
+        "output",
+        "gate",
+        "commands",
+        "menu",
+        "main"
+      ],
       "ioModules": [
         "src/os.rs",
         "src/terminal.rs",
@@ -134,20 +223,43 @@
         "level": "forbid"
       },
       "dependencies": {
-        "all": ["mnemocode", "mnemocode-cards"],
-        "cfg(target_arch = \"wasm32\")": ["wasm-bindgen", "getrandom"]
+        "all": [
+          "mnemocode",
+          "mnemocode-cards",
+          "wasm-bindgen"
+        ],
+        "cfg(target_arch = \"wasm32\")": [
+          "getrandom"
+        ]
       },
-      "dependencyNotes": "getrandom twice: =0.4.3 with wasm_js for the Random adapter, and =0.3.4 with wasm_js renamed getrandom03, only to give bc-rand's tree its browser backend; mnemocode-cards only with feature browser-cards; no js-sys.",
+      "dependencyNotes": "wasm-bindgen on every target, so that the native clippy and tests build the binding too; getrandom on wasm32 only: =0.4.3 with wasm_js for the Random adapter, and from the sskr increment =0.3.4 with wasm_js renamed getrandom03, only to give bc-rand's tree its browser backend; mnemocode-cards only with feature browser-cards; no js-sys.",
       "library": "*",
       "modules": {
         "host": [],
-        "phrase": ["host"],
-        "wallet": ["host"],
-        "sskr": ["host"],
-        "recovery": ["host"],
-        "candidates": ["host"],
-        "qr": ["host"],
-        "cards": ["host"]
+        "phrase": [
+          "host"
+        ],
+        "wallet": [
+          "host"
+        ],
+        "sskr": [
+          "host"
+        ],
+        "recovery": [
+          "host"
+        ],
+        "candidates": [
+          "host"
+        ],
+        "qr": [
+          "host"
+        ],
+        "cards": [
+          "host"
+        ],
+        "probe": [
+          "host"
+        ]
       }
     },
     "sskr": {
@@ -157,7 +269,12 @@
         "level": "forbid"
       },
       "dependencies": {
-        "all": ["bc-rand", "bc-shamir", "thiserror", "zeroize"]
+        "all": [
+          "bc-rand",
+          "bc-shamir",
+          "thiserror",
+          "zeroize"
+        ]
       }
     },
     "bc-shamir": {
@@ -167,7 +284,12 @@
         "level": "forbid"
       },
       "dependencies": {
-        "all": ["bc-crypto", "bc-rand", "thiserror", "zeroize"]
+        "all": [
+          "bc-crypto",
+          "bc-rand",
+          "thiserror",
+          "zeroize"
+        ]
       }
     },
     "bc-crypto": {
@@ -176,9 +298,33 @@
         "level": "forbid"
       },
       "dependencies": {
-        "all": ["hmac", "sha2", "zeroize"]
+        "all": [
+          "hmac",
+          "sha2",
+          "zeroize"
+        ]
       },
       "lockRule": "Cargo.lock lists bc-crypto without a registry source: an unmatched [patch.crates-io] only warns, and crates.io bc-crypto with its C libsecp256k1 would come back."
+    },
+    "xtask": {
+      "unsafe": {
+        "level": "deny",
+        "allowedIn": [
+          "src/knowndlls.rs"
+        ]
+      },
+      "dependencies": {
+        "all": [
+          "proc-macro2",
+          "serde_json",
+          "sha2",
+          "syn",
+          "wasmi"
+        ],
+        "cfg(windows)": [
+          "windows-sys"
+        ]
+      }
     }
   },
   "refusedInTree": {

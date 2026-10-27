@@ -1,6 +1,6 @@
 [toolchain]
 channel = "1.99.1"
 profile = "minimal"
-# The binding, and the other systems' release targets for clippy (scripts/check.sh).
+# The binding, and the other systems' release targets for clippy (cargo xtask check).
 targets = ["wasm32-unknown-unknown", "x86_64-pc-windows-gnu", "aarch64-apple-darwin"]
 components = ["rustfmt", "clippy"]

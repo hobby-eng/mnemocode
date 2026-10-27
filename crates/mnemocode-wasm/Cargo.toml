@@ -15,12 +15,18 @@ crate-type = ["cdylib", "rlib"]
 # (docs/design/architect/ARCHITECTURE.md §9; wasm-profiles.json names them per page).
 [features]
 default = []
+# The memory scan's own entries, built only into the test profile test/probe, never a page's file.
+browser-probe = []
 
 [dependencies]
 mnemocode.workspace = true
 
+[dependencies.wasm-bindgen]
+workspace = true
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen.workspace = true
+# The browser's randomness (crypto.getRandomValues) for the library's Random port.
+getrandom = { workspace = true, features = ["wasm_js"] }
 
 [lints]
 workspace = true

@@ -269,7 +269,7 @@
     {
       "id": "CAP-CLI-EXECUTABLE-VERIFICATION",
       "crate": "tooling",
-      "module": "scripts/verify-executable.mjs",
+      "module": "xtask/src/verify_executable.rs",
       "status": "port",
       "reason": "Same checks of a built executable, sandbox marks included."
     },
@@ -297,7 +297,7 @@
     {
       "id": "CAP-CLI-LICENSE-NOTICES",
       "crate": "tooling",
-      "module": "scripts/third-party-notices.mjs",
+      "module": "xtask/src/notices.rs",
       "status": "redesign",
       "reason": "Notices from each artifact's Rust dependency tree, fonts, map, artwork and the BIP-39 word lists."
     },
@@ -521,7 +521,7 @@
     {
       "id": "CAP-CLI-RELEASE-SIGNING",
       "crate": "tooling",
-      "module": "scripts/sign-release.mjs",
+      "module": "xtask/src/sign.rs",
       "status": "port",
       "reason": "Same procedure and key."
     },
@@ -612,7 +612,7 @@
     {
       "id": "CAP-CLI-SINGLE-EXECUTABLE",
       "crate": "tooling",
-      "module": "scripts/build-executables.sh",
+      "module": "xtask/src/release.rs",
       "status": "redesign",
       "reason": "cargo build per target with assets compiled in."
     },
@@ -1214,7 +1214,7 @@
     {
       "id": "CAP-SSKR-ENGINE-REPRODUCIBLE-BUILD",
       "crate": "tooling",
-      "module": "scripts/build-reproducible.sh",
+      "module": "xtask/src/reproducible.rs",
       "status": "redesign",
       "reason": "The engine is linked, so the artifacts carry it: the Linux x86-64 and aarch64 and Windows executables and every page's WASM file are rebuilt in the pinned container and compared byte for byte; macOS executables are built on a pinned runner and checked by executable verification and SHA256SUMS; the vendored crates keep UPSTREAM.json and their local-change list."
     },

@@ -33,6 +33,12 @@ unique across all enums. The CLI prints
   (`mapping.json`, defects "Decided"): `missing-checksum` gets its namespace (CORE-23), the two
   calendar codes say year and month, three messages are reworded, and the decided fixes add refusals (a new code where the fix names
   one), each recorded in `refusals-v1.json` from the TS commit that adds it.
+- The port adds codes for conditions TS cannot meet, each in the library and in
+  `refusals-v1.json` as the port's own: `core.secret.capacity-exceeded` (a secret larger than the
+  buffer reserved for it), `core.random.unavailable` (the host's random source failed) and
+  `core.random.empty-range` (a uniform choice below 0).
+- Each refusal keeps TS's kind of JavaScript error (`Refusal::kind`: `Error`, `RangeError`,
+  `TypeError`), which the recordings hold beside the code and message.
 - The bip39 crate's errors and English messages never reach a host: the `bip39` module checks the
   count and each word first and maps a failed checksum to the caller's TS code;
   `core.master-fingerprint.invalid-mnemonic` and the host-PBKDF2 codes are recorded as gone, since

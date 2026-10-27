@@ -1,8 +1,12 @@
 {
- "about": "Known answers of MnemoCode TS, recorded by parity/record.mjs from the build of one commit; the Rust tests replay them (RUST-14).",
+ "about": "Known answers of MnemoCode TS, recorded by its scripts/rust-parity.mjs from the build of one commit; the Rust tests replay them (RUST-14).",
  "repository": "hobby-eng/mnemocode",
- "commit": "7d0d4eeaa4d9ce120e4e4d31a13b8c583a966f9e",
+ "commit": "f89d3043f605efc12dde7f7b34fb3107c8eb6dea",
  "node": "v26.12.1",
- "recorders": {},
- "files": {}
+ "recorders": {
+  "foundation.mjs": "82a5340fdfc0cd485b54ba8a3cd5f1589ea50151ccaa7d9fa43624bbbbfd756a"
+ },
+ "files": {
+  "foundation-v1.json": "3085e55d83b307472dde4aca6ebec3183bade87f4184b016d360e65041ed3036"
+ }
 }

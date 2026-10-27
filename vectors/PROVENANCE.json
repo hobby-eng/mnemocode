@@ -15,11 +15,11 @@
   },
   "bip39-codec-v1.bin": {
    "sha256": "0e08e39105d5297d5f1382a522b556901fd540810584e7716b557e113a2895c3",
-   "source": "985 BIP39 entropy-to-index answers of @scure/bip39 2.4.0 under TS d4776f7, written by the earlier Rust attempt (archived); replaced in increment 3 by a recording of parity/record.mjs"
+   "source": "985 BIP39 entropy-to-index answers of @scure/bip39 2.4.0 under TS d4776f7, written by the earlier Rust attempt (archived); replaced in increment 3 by a recording of the TS repository's pnpm record:rust-parity"
   },
   "date-schedules-v1.bin": {
    "sha256": "a2af3fa98645b71586c130979adc999455d8e5ff4fda292948f041df90058c8e",
-   "source": "50 Seedshift date schedules of TS d4776f7's dist/core/dates.js, written by the earlier Rust attempt (archived); replaced in increment 3 by a recording of parity/record.mjs"
+   "source": "50 Seedshift date schedules of TS d4776f7's dist/core/dates.js, written by the earlier Rust attempt (archived); replaced in increment 3 by a recording of the TS repository's pnpm record:rust-parity"
   }
  }
 }

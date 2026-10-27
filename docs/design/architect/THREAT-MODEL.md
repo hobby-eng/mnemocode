@@ -9,16 +9,16 @@ name it (ADR 0008).
 
 ## Assets
 
-| Id  | Asset                                                                                         | Secret    |
-| --- | --------------------------------------------------------------------------------------------- | --------- |
-| A1  | Seed phrase, entropy, seed, private keys (BIP32, WIF)                                         | yes       |
-| A2  | Seedshift dates: with masked codes they give A1                                               | yes       |
-| A3  | Codes and MNC1 records: in direct mode they are A1; masked, A1 with A2                        | yes       |
-| A4  | Shares: a quorum gives A1 or a masked phrase                                                  | yes       |
-| A5  | BIP39 passphrase, candidate-list passphrase, the Discovery Scanner's one-time X25519 identity | yes       |
-| A6  | Candidate lists of a search                                                                   | yes       |
-| A7  | Exports holding A3 or A4: cards, sheets, page images, QR images, share files, records         | yes       |
-| A8  | Correct results: a backup that does not restore loses A1 as surely as a thief takes it        | integrity |
+| Id | Asset                                                                                         | Secret    |
+| -- | --------------------------------------------------------------------------------------------- | --------- |
+| A1 | Seed phrase, entropy, seed, private keys (BIP32, WIF)                                         | yes       |
+| A2 | Seedshift dates: with masked codes they give A1                                               | yes       |
+| A3 | Codes and MNC1 records: in direct mode they are A1; masked, A1 with A2                        | yes       |
+| A4 | Shares: a quorum gives A1 or a masked phrase                                                  | yes       |
+| A5 | BIP39 passphrase, candidate-list passphrase, the Discovery Scanner's one-time X25519 identity | yes       |
+| A6 | Candidate lists of a search                                                                   | yes       |
+| A7 | Exports holding A3 or A4: cards, sheets, page images, QR images, share files, records         | yes       |
+| A8 | Correct results: a backup that does not restore loses A1 as surely as a thief takes it        | integrity |
 
 Fingerprints, xpub and address evidence and the Scanner's recipient key are not secret; they are
 worded by DOC-05.

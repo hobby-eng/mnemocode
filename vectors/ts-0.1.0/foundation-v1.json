@@ -1,0 +1,1723 @@
+{
+ "ecmascriptSpace": [
+  9,
+  10,
+  11,
+  12,
+  13,
+  32,
+  160,
+  5760,
+  8192,
+  8193,
+  8194,
+  8195,
+  8196,
+  8197,
+  8198,
+  8199,
+  8200,
+  8201,
+  8202,
+  8232,
+  8233,
+  8239,
+  8287,
+  12288,
+  65279
+ ],
+ "whiteSpaceTrimmed": [
+  9,
+  10,
+  11,
+  12,
+  13,
+  32,
+  133,
+  160,
+  5760,
+  8192,
+  8193,
+  8194,
+  8195,
+  8196,
+  8197,
+  8198,
+  8199,
+  8200,
+  8201,
+  8202,
+  8232,
+  8233,
+  8239,
+  8287,
+  12288
+ ],
+ "unsafeDisplay": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20,
+  21,
+  22,
+  23,
+  24,
+  25,
+  26,
+  27,
+  28,
+  29,
+  30,
+  31,
+  127,
+  128,
+  129,
+  130,
+  131,
+  132,
+  133,
+  134,
+  135,
+  136,
+  137,
+  138,
+  139,
+  140,
+  141,
+  142,
+  143,
+  144,
+  145,
+  146,
+  147,
+  148,
+  149,
+  150,
+  151,
+  152,
+  153,
+  154,
+  155,
+  156,
+  157,
+  158,
+  159,
+  1564,
+  8206,
+  8207,
+  8232,
+  8233,
+  8234,
+  8235,
+  8236,
+  8237,
+  8238,
+  8294,
+  8295,
+  8296,
+  8297
+ ],
+ "wholeNumbers": [
+  [
+   "0",
+   1,
+   2048,
+   null
+  ],
+  [
+   "1",
+   1,
+   2048,
+   1
+  ],
+  [
+   "0007",
+   1,
+   2048,
+   7
+  ],
+  [
+   "2048",
+   1,
+   2048,
+   2048
+  ],
+  [
+   "2049",
+   1,
+   2048,
+   null
+  ],
+  [
+   "",
+   1,
+   2048,
+   null
+  ],
+  [
+   " 1",
+   1,
+   2048,
+   null
+  ],
+  [
+   "+1",
+   1,
+   2048,
+   null
+  ],
+  [
+   "1.0",
+   1,
+   2048,
+   null
+  ],
+  [
+   "1e3",
+   1,
+   2048,
+   null
+  ],
+  [
+   "-1",
+   1,
+   2048,
+   null
+  ],
+  [
+   "١",
+   1,
+   2048,
+   null
+  ],
+  [
+   "0",
+   0,
+   2147483647,
+   0
+  ],
+  [
+   "1",
+   0,
+   2147483647,
+   1
+  ],
+  [
+   "0007",
+   0,
+   2147483647,
+   7
+  ],
+  [
+   "2048",
+   0,
+   2147483647,
+   2048
+  ],
+  [
+   "2049",
+   0,
+   2147483647,
+   2049
+  ],
+  [
+   "",
+   0,
+   2147483647,
+   null
+  ],
+  [
+   " 1",
+   0,
+   2147483647,
+   null
+  ],
+  [
+   "+1",
+   0,
+   2147483647,
+   null
+  ],
+  [
+   "1.0",
+   0,
+   2147483647,
+   null
+  ],
+  [
+   "1e3",
+   0,
+   2147483647,
+   null
+  ],
+  [
+   "-1",
+   0,
+   2147483647,
+   null
+  ],
+  [
+   "١",
+   0,
+   2147483647,
+   null
+  ],
+  [
+   "0",
+   1,
+   9007199254740991,
+   null
+  ],
+  [
+   "1",
+   1,
+   9007199254740991,
+   1
+  ],
+  [
+   "0007",
+   1,
+   9007199254740991,
+   7
+  ],
+  [
+   "2048",
+   1,
+   9007199254740991,
+   2048
+  ],
+  [
+   "2049",
+   1,
+   9007199254740991,
+   2049
+  ],
+  [
+   "",
+   1,
+   9007199254740991,
+   null
+  ],
+  [
+   " 1",
+   1,
+   9007199254740991,
+   null
+  ],
+  [
+   "+1",
+   1,
+   9007199254740991,
+   null
+  ],
+  [
+   "1.0",
+   1,
+   9007199254740991,
+   null
+  ],
+  [
+   "1e3",
+   1,
+   9007199254740991,
+   null
+  ],
+  [
+   "-1",
+   1,
+   9007199254740991,
+   null
+  ],
+  [
+   "١",
+   1,
+   9007199254740991,
+   null
+  ]
+ ],
+ "typedRefusal": {
+  "code": "core.typed-number.typed-whole-number-refused",
+  "message": "Type a number from 0 through 2147483647.",
+  "kind": "Error"
+ },
+ "integerRefusals": [
+  "The month must be an integer from 1 through 12.",
+  "The year must be an integer from 0001 through 9999."
+ ],
+ "rangeTexts": [
+  "1 through 2048",
+  "1 to 2048"
+ ],
+ "lists": [
+  [
+   [],
+   "and",
+   ""
+  ],
+  [
+   [
+    2
+   ],
+   "and",
+   "2"
+  ],
+  [
+   [
+    1,
+    2
+   ],
+   "and",
+   "1 and 2"
+  ],
+  [
+   [
+    12,
+    15,
+    18
+   ],
+   "or",
+   "12, 15 or 18"
+  ]
+ ],
+ "placesNamed": [
+  [
+   "Date",
+   [
+    2
+   ],
+   "Date 2"
+  ],
+  [
+   "Date",
+   [
+    1,
+    2
+   ],
+   "Dates 1 and 2"
+  ],
+  [
+   "Share",
+   [
+    1,
+    2,
+    3
+   ],
+   "Shares 1, 2 and 3"
+  ]
+ ],
+ "placeOf": [
+  [
+   [
+    3,
+    5
+   ],
+   2,
+   5
+  ],
+  [
+   [
+    3
+   ],
+   2,
+   2
+  ],
+  [
+   null,
+   4,
+   4
+  ]
+ ],
+ "numberWords": [
+  [
+   0,
+   "zero"
+  ],
+  [
+   1,
+   "one"
+  ],
+  [
+   2,
+   "two"
+  ],
+  [
+   3,
+   "three"
+  ],
+  [
+   4,
+   "four"
+  ],
+  [
+   5,
+   "five"
+  ],
+  [
+   6,
+   "six"
+  ],
+  [
+   7,
+   "seven"
+  ],
+  [
+   8,
+   "eight"
+  ],
+  [
+   9,
+   "nine"
+  ],
+  [
+   10,
+   "ten"
+  ],
+  [
+   11,
+   "eleven"
+  ],
+  [
+   12,
+   "twelve"
+  ],
+  [
+   13,
+   "13"
+  ],
+  [
+   14,
+   "14"
+  ]
+ ],
+ "capitalized": [
+  [
+   "share 2",
+   "Share 2"
+  ],
+  [
+   "",
+   ""
+  ],
+  [
+   "été",
+   "Été"
+  ],
+  [
+   "already",
+   "Already"
+  ],
+  [
+   "𝐀bc",
+   "𝐀bc"
+  ]
+ ],
+ "lowerFirst": [
+  [
+   "Unknown word",
+   "unknown word"
+  ],
+  [
+   "SSKR share",
+   "SSKR share"
+  ],
+  [
+   "MnemoCode reads",
+   "MnemoCode reads"
+  ],
+  [
+   "Mnemo",
+   "mnemo"
+  ],
+  [
+   "PDF",
+   "PDF"
+  ],
+  [
+   "A",
+   "a"
+  ],
+  [
+   "",
+   ""
+  ],
+  [
+   "𝐀BC",
+   "𝐀BC"
+  ]
+ ],
+ "afterPlace": [
+  [
+   "Share",
+   2,
+   "Unknown word.",
+   ": ",
+   "Share 2: unknown word."
+  ]
+ ],
+ "codeTokens": [
+  [
+   "ab,cd; #ef　12",
+   [
+    "AB",
+    "CD",
+    "EF",
+    "12"
+   ]
+  ],
+  [
+   " 07 a4 ",
+   [
+    "07",
+    "A4"
+   ]
+  ],
+  [
+   "#ab, #cd",
+   [
+    "AB",
+    "CD"
+   ]
+  ],
+  [
+   "7684 ?6?4 ?",
+   [
+    "7684",
+    "?6?4",
+    "?"
+   ]
+  ],
+  [
+   "7684",
+   [
+    "7684"
+   ]
+  ],
+  [
+   "76845728",
+   [
+    "76845728"
+   ]
+  ],
+  [
+   "7684?5728",
+   [
+    "7684?5728"
+   ]
+  ],
+  [
+   "768?",
+   [
+    "768?"
+   ]
+  ],
+  [
+   "",
+   []
+  ],
+  [
+   "7684 ????",
+   [
+    "7684",
+    "????"
+   ]
+  ],
+  [
+   "7684 5728",
+   [
+    "7684",
+    "5728"
+   ]
+  ],
+  [
+   "7684 ?728",
+   [
+    "7684",
+    "?728"
+   ]
+  ],
+  [
+   "????",
+   [
+    "????"
+   ]
+  ],
+  [
+   "straße",
+   [
+    "STRASSE"
+   ]
+  ]
+ ],
+ "compactCode": [
+  [
+   "ab,cd; #ef　12",
+   "ABCDEF12"
+  ],
+  [
+   " 07 a4 ",
+   "07A4"
+  ],
+  [
+   "#ab, #cd",
+   "ABCD"
+  ],
+  [
+   "7684 ?6?4 ?",
+   "7684?6?4?"
+  ],
+  [
+   "7684",
+   "7684"
+  ],
+  [
+   "76845728",
+   "76845728"
+  ],
+  [
+   "7684?5728",
+   "7684?5728"
+  ],
+  [
+   "768?",
+   "768?"
+  ],
+  [
+   "",
+   ""
+  ],
+  [
+   "7684 ????",
+   "7684????"
+  ],
+  [
+   "7684 5728",
+   "76845728"
+  ],
+  [
+   "7684 ?728",
+   "7684?728"
+  ],
+  [
+   "????",
+   "????"
+  ],
+  [
+   "straße",
+   "STRASSE"
+  ]
+ ],
+ "unspacedCode": [
+  [
+   "ab,cd; #ef　12",
+   "ABCD#EF12"
+  ],
+  [
+   " 07 a4 ",
+   "07A4"
+  ],
+  [
+   "#ab, #cd",
+   "#AB#CD"
+  ],
+  [
+   "7684 ?6?4 ?",
+   "7684?6?4?"
+  ],
+  [
+   "7684",
+   "7684"
+  ],
+  [
+   "76845728",
+   "76845728"
+  ],
+  [
+   "7684?5728",
+   "7684?5728"
+  ],
+  [
+   "768?",
+   "768?"
+  ],
+  [
+   "",
+   ""
+  ],
+  [
+   "7684 ????",
+   "7684????"
+  ],
+  [
+   "7684 5728",
+   "76845728"
+  ],
+  [
+   "7684 ?728",
+   "7684?728"
+  ],
+  [
+   "????",
+   "????"
+  ],
+  [
+   "straße",
+   "STRASSE"
+  ]
+ ],
+ "hexUnits": [
+  [
+   "ab,cd; #ef　12",
+   4,
+   null,
+   [
+    "ABCD",
+    "EF12"
+   ],
+   [
+    "ABCD",
+    "EF12"
+   ],
+   [
+    "ABCD",
+    "EF12"
+   ],
+   [
+    "ABCD",
+    "EF12"
+   ]
+  ],
+  [
+   "ab,cd; #ef　12",
+   2,
+   [
+    "AB",
+    "CD",
+    "EF",
+    "12"
+   ],
+   [
+    "AB",
+    "CD",
+    "EF",
+    "12"
+   ],
+   [
+    "AB",
+    "CD",
+    "EF",
+    "12"
+   ],
+   [
+    "AB",
+    "CD",
+    "EF",
+    "12"
+   ],
+   [
+    "AB",
+    "CD",
+    "EF",
+    "12"
+   ]
+  ],
+  [
+   " 07 a4 ",
+   4,
+   null,
+   [
+    "07A4"
+   ],
+   [
+    "07A4"
+   ],
+   [
+    "07A4"
+   ],
+   [
+    "07A4"
+   ]
+  ],
+  [
+   " 07 a4 ",
+   2,
+   [
+    "07",
+    "A4"
+   ],
+   [
+    "07",
+    "A4"
+   ],
+   [
+    "07",
+    "A4"
+   ],
+   [
+    "07",
+    "A4"
+   ],
+   [
+    "07",
+    "A4"
+   ]
+  ],
+  [
+   "#ab, #cd",
+   4,
+   null,
+   [
+    "ABCD"
+   ],
+   [
+    "ABCD"
+   ],
+   [
+    "ABCD"
+   ],
+   [
+    "ABCD"
+   ]
+  ],
+  [
+   "#ab, #cd",
+   2,
+   [
+    "AB",
+    "CD"
+   ],
+   [
+    "AB",
+    "CD"
+   ],
+   [
+    "AB",
+    "CD"
+   ],
+   [
+    "AB",
+    "CD"
+   ],
+   [
+    "AB",
+    "CD"
+   ]
+  ],
+  [
+   "7684 ?6?4 ?",
+   4,
+   [
+    "7684",
+    "?6?4",
+    "?"
+   ],
+   null,
+   [
+    "7684",
+    "?6?4",
+    "?"
+   ],
+   [
+    "7684",
+    "?6?4",
+    "?"
+   ],
+   null
+  ],
+  [
+   "7684 ?6?4 ?",
+   2,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  [
+   "7684",
+   4,
+   null,
+   [
+    "7684"
+   ],
+   [
+    "7684"
+   ],
+   [
+    "7684"
+   ],
+   [
+    "7684"
+   ]
+  ],
+  [
+   "7684",
+   2,
+   null,
+   [
+    "76",
+    "84"
+   ],
+   [
+    "76",
+    "84"
+   ],
+   [
+    "76",
+    "84"
+   ],
+   [
+    "76",
+    "84"
+   ]
+  ],
+  [
+   "76845728",
+   4,
+   null,
+   [
+    "7684",
+    "5728"
+   ],
+   [
+    "7684",
+    "5728"
+   ],
+   [
+    "7684",
+    "5728"
+   ],
+   [
+    "7684",
+    "5728"
+   ]
+  ],
+  [
+   "76845728",
+   2,
+   null,
+   [
+    "76",
+    "84",
+    "57",
+    "28"
+   ],
+   [
+    "76",
+    "84",
+    "57",
+    "28"
+   ],
+   [
+    "76",
+    "84",
+    "57",
+    "28"
+   ],
+   [
+    "76",
+    "84",
+    "57",
+    "28"
+   ]
+  ],
+  [
+   "7684?5728",
+   4,
+   null,
+   [
+    "7684",
+    "?",
+    "5728"
+   ],
+   [
+    "7684",
+    "?",
+    "5728"
+   ],
+   [
+    "7684",
+    "?",
+    "5728"
+   ],
+   null
+  ],
+  [
+   "7684?5728",
+   2,
+   null,
+   [
+    "76",
+    "84",
+    "?",
+    "57",
+    "28"
+   ],
+   [
+    "76",
+    "84",
+    "?",
+    "57",
+    "28"
+   ],
+   [
+    "76",
+    "84",
+    "?",
+    "57",
+    "28"
+   ],
+   null
+  ],
+  [
+   "768?",
+   4,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  [
+   "768?",
+   2,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  [
+   "",
+   4,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  [
+   "",
+   2,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  [
+   "7684 ????",
+   4,
+   [
+    "7684",
+    "????"
+   ],
+   [
+    "7684",
+    "?",
+    "?",
+    "?",
+    "?"
+   ],
+   [
+    "7684",
+    "????"
+   ],
+   [
+    "7684",
+    "?"
+   ],
+   null
+  ],
+  [
+   "7684 ????",
+   2,
+   null,
+   [
+    "76",
+    "84",
+    "?",
+    "?",
+    "?",
+    "?"
+   ],
+   [
+    "76",
+    "84",
+    "?",
+    "?",
+    "?",
+    "?"
+   ],
+   [
+    "76",
+    "84",
+    "?",
+    "?",
+    "?",
+    "?"
+   ],
+   null
+  ],
+  [
+   "7684 5728",
+   4,
+   [
+    "7684",
+    "5728"
+   ],
+   [
+    "7684",
+    "5728"
+   ],
+   [
+    "7684",
+    "5728"
+   ],
+   [
+    "7684",
+    "5728"
+   ],
+   [
+    "7684",
+    "5728"
+   ]
+  ],
+  [
+   "7684 5728",
+   2,
+   null,
+   [
+    "76",
+    "84",
+    "57",
+    "28"
+   ],
+   [
+    "76",
+    "84",
+    "57",
+    "28"
+   ],
+   [
+    "76",
+    "84",
+    "57",
+    "28"
+   ],
+   [
+    "76",
+    "84",
+    "57",
+    "28"
+   ]
+  ],
+  [
+   "7684 ?728",
+   4,
+   [
+    "7684",
+    "?728"
+   ],
+   null,
+   [
+    "7684",
+    "?728"
+   ],
+   [
+    "7684",
+    "?728"
+   ],
+   null
+  ],
+  [
+   "7684 ?728",
+   2,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  [
+   "????",
+   4,
+   null,
+   [
+    "?",
+    "?",
+    "?",
+    "?"
+   ],
+   [
+    "?",
+    "?",
+    "?",
+    "?"
+   ],
+   [
+    "?",
+    "?",
+    "?",
+    "?"
+   ],
+   null
+  ],
+  [
+   "????",
+   2,
+   null,
+   [
+    "?",
+    "?",
+    "?",
+    "?"
+   ],
+   [
+    "?",
+    "?",
+    "?",
+    "?"
+   ],
+   [
+    "?",
+    "?",
+    "?",
+    "?"
+   ],
+   null
+  ],
+  [
+   "straße",
+   4,
+   null,
+   null,
+   null,
+   null,
+   null
+  ],
+  [
+   "straße",
+   2,
+   null,
+   null,
+   null,
+   null,
+   null
+  ]
+ ],
+ "joinedMarksHint": [
+  [
+   "ab,cd; #ef　12",
+   "Refused."
+  ],
+  [
+   " 07 a4 ",
+   "Refused."
+  ],
+  [
+   "#ab, #cd",
+   "Refused."
+  ],
+  [
+   "7684 ?6?4 ?",
+   "Refused."
+  ],
+  [
+   "7684",
+   "Refused."
+  ],
+  [
+   "76845728",
+   "Refused."
+  ],
+  [
+   "7684?5728",
+   "Refused. In codes run together, a ? stands for a whole code; to mark one digit, write the codes apart, as the screen shows them."
+  ],
+  [
+   "768?",
+   "Refused. In codes run together, a ? stands for a whole code; to mark one digit, write the codes apart, as the screen shows them."
+  ],
+  [
+   "",
+   "Refused."
+  ],
+  [
+   "7684 ????",
+   "Refused."
+  ],
+  [
+   "7684 5728",
+   "Refused."
+  ],
+  [
+   "7684 ?728",
+   "Refused."
+  ],
+  [
+   "????",
+   "Refused."
+  ],
+  [
+   "straße",
+   "Refused."
+  ]
+ ],
+ "fitsPattern": [
+  [
+   "7?84",
+   "7684",
+   true
+  ],
+  [
+   "7?84",
+   "76840",
+   false
+  ],
+  [
+   "????",
+   "abcd",
+   true
+  ],
+  [
+   "?b",
+   "😀b",
+   false
+  ],
+  [
+   "??b",
+   "😀b",
+   true
+  ]
+ ],
+ "hexCodePoints": [
+  [
+   65,
+   "0041"
+  ],
+  [
+   30340,
+   "7684"
+  ],
+  [
+   65535,
+   "FFFF"
+  ]
+ ],
+ "hexOfBytes": [
+  [
+   [
+    0,
+    171,
+    127
+   ],
+   "00ab7f"
+  ]
+ ],
+ "bytesOfHex": [
+  [
+   "00AB7f",
+   {
+    "value": [
+     0,
+     171,
+     127
+    ]
+   }
+  ],
+  [
+   "",
+   {
+    "value": []
+   }
+  ],
+  [
+   "0",
+   {
+    "code": "core.bits.hexadecimal-text-two-digits-0-9-f-each",
+    "message": "Hexadecimal text has two digits, 0-9 or a-f, for each byte.",
+    "kind": "Error"
+   }
+  ],
+  [
+   "0g",
+   {
+    "code": "core.bits.hexadecimal-text-two-digits-0-9-f-each",
+    "message": "Hexadecimal text has two digits, 0-9 or a-f, for each byte.",
+    "kind": "Error"
+   }
+  ],
+  [
+   "+1",
+   {
+    "code": "core.bits.hexadecimal-text-two-digits-0-9-f-each",
+    "message": "Hexadecimal text has two digits, 0-9 or a-f, for each byte.",
+    "kind": "Error"
+   }
+  ],
+  [
+   " 1",
+   {
+    "code": "core.bits.hexadecimal-text-two-digits-0-9-f-each",
+    "message": "Hexadecimal text has two digits, 0-9 or a-f, for each byte.",
+    "kind": "Error"
+   }
+  ]
+ ],
+ "textPieces": [
+  [
+   "0102ff",
+   2,
+   {
+    "value": [
+     "01",
+     "02",
+     "ff"
+    ]
+   }
+  ],
+  [
+   "的在",
+   1,
+   {
+    "value": [
+     "的",
+     "在"
+    ]
+   }
+  ],
+  [
+   "",
+   3,
+   {
+    "value": []
+   }
+  ],
+  [
+   "010",
+   2,
+   {
+    "code": "core.pieces.length-no-whole-number-pieces",
+    "message": "A length of 3 is no whole number of pieces of 2.",
+    "kind": "RangeError"
+   }
+  ],
+  [
+   "01",
+   0,
+   {
+    "code": "core.pieces.piece-whole-width-at-least-1",
+    "message": "A piece needs a whole width of at least 1.",
+    "kind": "RangeError"
+   }
+  ]
+ ],
+ "notUtf8": {
+  "code": "cli.utf8.strict-utf8text-refused",
+  "message": "The file is not valid UTF-8 text.",
+  "kind": "Error"
+ },
+ "limitName": "1 MiB",
+ "inputTooLarge": {
+  "code": "too-large",
+  "message": "The file exceeds the 1 MiB safety limit.",
+  "kind": "Error"
+ },
+ "selfTestVectors": {
+  "ENCODED_FINGERPRINT": "0d05289e",
+  "MASKED_DATE": "23-09-2026",
+  "MASKED_ENGLISH": "wool abuse actual wool abuse actual wool abuse actual wool abuse congress",
+  "MASKED_NUMBERS": "2027 10 24 2027 10 24 2027 10 24 2027 10 377",
+  "PUBLIC_FINGERPRINT": "73c5da0a",
+  "PUBLIC_MNEMONIC": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+  "PUBLIC_MNEMONIC_24": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
+  "PUBLIC_UNICODE": "768476847684768476847684768476847684768476845728",
+  "PUBLIC_UNICODE_CODES": [
+   "7684",
+   "7684",
+   "7684",
+   "7684",
+   "7684",
+   "7684",
+   "7684",
+   "7684",
+   "7684",
+   "7684",
+   "7684",
+   "5728"
+  ],
+  "SEEDSHIFT_DATES": [
+   "07-11-1951",
+   "08-08-1988",
+   "23-09-2026"
+  ]
+ },
+ "counting": [
+  [
+   0,
+   "0"
+  ],
+  [
+   999,
+   "999"
+  ],
+  [
+   65536,
+   "65,536"
+  ],
+  [
+   2147483648,
+   "2,147,483,648"
+  ]
+ ],
+ "durations": [
+  [
+   0.4,
+   "under a second"
+  ],
+  [
+   1,
+   "about 1 second"
+  ],
+  [
+   59.6,
+   "about 60 seconds"
+  ],
+  [
+   90,
+   "about 2 minutes"
+  ],
+  [
+   150,
+   "about 3 minutes"
+  ],
+  [
+   2.5,
+   "about 3 seconds"
+  ],
+  [
+   32400,
+   "about 9 hours"
+  ],
+  [
+   259200,
+   "about 3 days"
+  ]
+ ],
+ "counted": [
+  [
+   1,
+   "share combination",
+   "1 share combination"
+  ],
+  [
+   2,
+   "candidate",
+   "2 candidates"
+  ]
+ ],
+ "plans": [
+  {
+   "size": "10 date combinations",
+   "count": 10,
+   "seconds": 32400,
+   "limit": 5,
+   "ask": true,
+   "tell": false,
+   "question": "Search 10 date combinations, about 9 hours?",
+   "extent": "The search tries 10 date combinations, about 9 hours.",
+   "notice": "The search tries 10 date combinations, about 9 hours; progress is shown.",
+   "timeNotice": "It takes about 9 hours; progress is shown."
+  },
+  {
+   "size": "128 candidates",
+   "count": 128,
+   "seconds": 180,
+   "limit": null,
+   "ask": false,
+   "tell": true,
+   "question": "Search 128 candidates, about 3 minutes?",
+   "extent": "The search tries 128 candidates, about 3 minutes.",
+   "notice": "The search tries 128 candidates, about 3 minutes; progress is shown.",
+   "timeNotice": "It takes about 3 minutes; progress is shown."
+  },
+  {
+   "size": "4 candidates",
+   "count": 4,
+   "seconds": 0.2,
+   "limit": null,
+   "ask": false,
+   "tell": false,
+   "question": "Search 4 candidates?",
+   "extent": "The search tries 4 candidates.",
+   "notice": "The search tries 4 candidates; progress is shown.",
+   "timeNotice": "It takes under a second; progress is shown."
+  },
+  {
+   "size": "9 shares",
+   "count": 9,
+   "seconds": 50000,
+   "limit": null,
+   "ask": true,
+   "tell": false,
+   "question": "Search 9 shares, about 14 hours?",
+   "extent": "The search tries 9 shares, about 14 hours.",
+   "notice": "The search tries 9 shares, about 14 hours; progress is shown.",
+   "timeNotice": "It takes about 14 hours; progress is shown."
+  }
+ ],
+ "correctWrittenCopy": "Correct the written copy; then check the wallet that comes back.",
+ "keptCount": {
+  "code": "core.search-turns.whole-number-more",
+  "message": "maxShown must be a whole number of 1 or more.",
+  "kind": "RangeError"
+ },
+ "crc32": [
+  [
+   "",
+   0
+  ],
+  [
+   "123456789",
+   3421780262
+  ],
+  [
+   "abandon",
+   2374742136
+  ]
+ ],
+ "selfCheck": [
+  {
+   "code": "core.self-test-check.mismatch",
+   "message": "Word lists mismatch.",
+   "kind": "Error"
+  },
+  {
+   "code": "core.self-test-check.was-accepted",
+   "message": "Case 2 was accepted.",
+   "kind": "Error"
+  },
+  {
+   "code": "core.self-test-check.was-refused-another-reason",
+   "message": "Width was refused for another reason.",
+   "kind": "Error"
+  }
+ ]
+}

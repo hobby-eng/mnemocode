@@ -1,0 +1,6 @@
+# The repository's tools read and write files, run cargo and git and read their arguments: the
+# libraries' bans on std's I/O (../clippy.toml) are not theirs. The rest is the workspace's.
+too-many-lines-threshold = 150
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true

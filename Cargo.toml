@@ -7,6 +7,7 @@ members = [
   "shims/bc-crypto",
   "vendor/sskr-0.12.0",
   "vendor/bc-shamir-0.13.0",
+  "xtask",
 ]
 resolver = "3"
 
@@ -48,10 +49,15 @@ mnemocode = { path = "crates/mnemocode", default-features = false }
 mnemocode-cards = { path = "crates/mnemocode-cards", default-features = false }
 # Text
 unicode-normalization = "=0.1.26"
-unicode-properties = { version = "=0.1.4", default-features = false, features = ["general-category"] }
+unicode-properties = { version = "=0.1.4", default-features = false, features = [
+  "general-category",
+] }
 unicode-script = "=0.5.8"
 # BIP39: words, lists, checksum, entropy and seed (owner, 2026-10-27: no own BIP39 code)
-bip39 = { version = "=3.0.0", default-features = false, features = ["zeroize", "chinese-traditional"] }
+bip39 = { version = "=3.0.0", default-features = false, features = [
+  "zeroize",
+  "chinese-traditional",
+] }
 # Hashes and MAC (one RustCrypto generation)
 sha2 = { version = "=0.11.1", default-features = false }
 hmac = "=0.13.0"
@@ -64,7 +70,10 @@ bs58 = { version = "=0.5.1", default-features = false, features = ["alloc"] }
 # age v1, own format code over these
 chacha20poly1305 = { version = "=0.11.0", default-features = false }
 hkdf = "=0.13.0"
-x25519-dalek = { version = "=3.0.0", default-features = false, features = ["zeroize", "static_secrets"] }
+x25519-dalek = { version = "=3.0.0", default-features = false, features = [
+  "zeroize",
+  "static_secrets",
+] }
 scrypt = { version = "=0.12.0", default-features = false }
 base64ct = "=1.8.3"
 # The SSKR engine, vendored unchanged, and its seeded generator
@@ -92,6 +101,8 @@ getrandom = "=0.4.3"
 libc = "=0.2.191"
 windows-sys = "=0.61.2"
 wasm-bindgen = "=0.2.129"
+# Tests only: the recorded TS answers are JSON (vectors/ts-0.1.0/).
+serde_json = "=1.0.154"
 
 # RUST-12, as mhfe.
 [profile.release]

@@ -1,8 +1,31 @@
 {
-  "about": "The WebAssembly file of each wallet-tools page (docs/design/architect/ARCHITECTURE.md section 9, ADR 0007): per edition and page, the binding's browser-* modules and the library's unit features built into it. scripts/build-wasm.sh <edition>/<page> builds one; the wasm gate builds and tests them all. A profile gains a module with the increment that builds it.",
+  "about": "The WebAssembly file of each wallet-tools page (docs/design/architect/ARCHITECTURE.md section 9, ADR 0007): per edition and page, the binding's browser-* modules and the library's unit features built into it. cargo xtask wasm build <edition>/<page> builds one; cargo xtask wasm verify checks them all. A profile gains a module with the increment that builds it. The edition test holds profiles for the gates alone, such as test/probe, whose module probe no page profile may take.",
   "profiles": {
-    "multi-chain/key-derivation": { "modules": [], "units": [] },
-    "multi-chain/discovery-scanner": { "modules": [], "units": [] },
-    "dash-community/key-derivation": { "modules": [], "units": [] }
+    "multi-chain/key-derivation": {
+      "modules": [],
+      "units": []
+    },
+    "multi-chain/discovery-scanner": {
+      "modules": [],
+      "units": []
+    },
+    "dash-community/key-derivation": {
+      "modules": [],
+      "units": []
+    },
+    "test/probe": {
+      "modules": [
+        "probe"
+      ],
+      "units": []
+    }
+  },
+  "exports": {
+    "probe": [
+      "probeFreed",
+      "probeGrown",
+      "probeStack",
+      "probeRefusal"
+    ]
   }
 }
