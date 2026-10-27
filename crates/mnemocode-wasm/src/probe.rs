@@ -2,13 +2,14 @@
 //! profile `test/probe` (wasm-profiles.json), never into a page's file: each takes a public marker
 //! the way a secret entry takes a secret, and the gate searches the instance's memory for it after
 //! the call (B-WIPE). They show that the zeroing allocator wipes a freed and a reallocated block and
-//! that `after_secret` scrubs the stack of the work it runs; `probeRefusal` shows a refusal's kind
+//! that `after_secret` scrubs the stack of the work it runs, and that a page's string a secret
+//! entry reads (`host::text`) leaves nothing once dropped; `probeRefusal` shows a refusal's kind
 //! and code as a page receives them.
 
 use mnemocode::text::pieces::PiecesError;
 use wasm_bindgen::prelude::*;
 
-use crate::host::{after_secret, refused};
+use crate::host::{after_secret, refused, text};
 
 /// Copies `marker` into a heap block of its own and frees it.
 #[wasm_bindgen(js_name = probeFreed)]
@@ -40,6 +41,17 @@ pub fn probe_stack(marker: &[u8]) {
         let length = marker.len().min(area.len());
         area[..length].copy_from_slice(&marker[..length]);
         std::hint::black_box(&mut area);
+    });
+}
+
+/// Reads `value`, a page's string holding the marker, as a secret entry reads its text, inside
+/// `after_secret`, and drops it.
+#[wasm_bindgen(js_name = probeText)]
+pub fn probe_text(value: JsValue) {
+    after_secret(|| {
+        if let Ok(read) = text(&value) {
+            std::hint::black_box(&read);
+        }
     });
 }
 

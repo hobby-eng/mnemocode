@@ -25,7 +25,7 @@ use super::admission::{
 };
 use super::format::MAX_CANDIDATE_LIST_BYTES;
 use crate::random::{Random, RandomError};
-use crate::refusal::Refusal;
+use crate::refusal::{Refusal, RefusalKind};
 use crate::secret::{SecretBytes, SecretText};
 use crate::text::space::{trim, without_byte_order_mark};
 
@@ -54,6 +54,8 @@ pub enum EncryptionError {
     PassphraseTooShort(usize),
     /// The gate's known answers failed.
     SelfTestFailed,
+    /// A protection that is none of the three a person chooses from.
+    ProtectionChoice,
     /// The host's randomness failed.
     Random(RandomError),
     /// The file's refusal.
@@ -74,6 +76,9 @@ impl fmt::Display for EncryptionError {
             Self::SelfTestFailed => {
                 f.write_str("Candidate encryption is unavailable because its self-test failed.")
             }
+            Self::ProtectionChoice => {
+                f.write_str("The protection of a candidate list must be key, passphrase or none.")
+            }
             Self::Random(error) => error.fmt(f),
             Self::File(error) => error.fmt(f),
         }
@@ -93,8 +98,18 @@ impl Refusal for EncryptionError {
                 "core.candidate-encryption.use-at-least-characters-passphrase-all-protects-seed"
             }
             Self::SelfTestFailed => "core.candidate-encryption.self-test-failed",
+            Self::ProtectionChoice => "core.candidate-encryption.not-protection-choice",
             Self::Random(error) => error.code(),
             Self::File(error) => error.code(),
+        }
+    }
+
+    fn kind(&self) -> RefusalKind {
+        match self {
+            Self::ProtectionChoice => RefusalKind::Type,
+            Self::Random(error) => error.kind(),
+            Self::File(error) => error.kind(),
+            _ => RefusalKind::Error,
         }
     }
 }

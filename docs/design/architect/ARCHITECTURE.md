@@ -79,7 +79,7 @@ read from `module-map.json`; manifests pin each with `=x.y.z`:
 | `mnemocode`                                     | unicode-normalization, unicode-properties, unicode-script; bip39 (`zeroize`, `chinese-traditional`; only the `bip39` module names it, `lib.rs` never imports it); sha2, hmac, ripemd, sha3, k256, bech32, bs58; chacha20poly1305, hkdf, x25519-dalek, scrypt, base64ct (age); sskr (vendored), bc-rand, rand_chacha, rand_core (the engine's seeded generator, TS `sskr-wasm/rust/src/lib.rs:11-12`); qrcodegen, rqrr, png; zeroize; libc on Unix and windows-sys on Windows (`secret::pages`, `secret::allocator`) |
 | `mnemocode-cards`                               | mnemocode; pdf-writer, skrifa, subsetter, tiny-skia, png, miniz_oxide, jpeg-encoder, zune-jpeg, libm                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `mnemocode-cli`                                 | mnemocode, mnemocode-cards; getrandom 0.4.3 (the `Random` adapter); libc on Unix, windows-sys on Windows                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `mnemocode-wasm`                                | mnemocode, mnemocode-cards (feature `browser-cards`); wasm-bindgen 0.2.129 on every target, so that the native clippy and tests build the binding too; on wasm32: getrandom 0.4.3 with `wasm_js` (the `Random` adapter) and getrandom 0.3.4 with `wasm_js`, only to give bc-rand's tree its browser backend; no js-sys                                                                                                                                                                                              |
+| `mnemocode-wasm`                                | mnemocode, mnemocode-cards (feature `browser-cards`); wasm-bindgen 0.2.129 and getrandom 0.4.3 on every target, so that the native clippy and tests build the binding too and its entries that draw randomness run in the tests; on wasm32: getrandom 0.4.3 with `wasm_js` (the `Random` adapter) and getrandom 0.3.4 with `wasm_js`, only to give bc-rand's tree its browser backend; no js-sys                                                                                                                    |
 | `shims/bc-crypto`                               | hmac, sha2, zeroize                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `vendor/sskr-0.12.0`, `vendor/bc-shamir-0.13.0` | as their manifests: bc-rand, thiserror, zeroize; sskr also bc-shamir, bc-shamir also bc-crypto (the stand-in)                                                                                                                                                                                                                                                                                                                                                                                                       |
 
@@ -296,16 +296,22 @@ dumped (L-DUMPABLE; RUST-13 as the owner amended it on 2026-10-27).
 
 The CLI reads the terminal and standard input with read(2) on descriptor 0 (`ReadConsoleInputW` and `ReadFile` on Windows) straight into the answer's `SecretBytes`, and writes secret text with write(2) (`WriteConsoleW`) on its descriptor: std's `stdin()` and `stdout()` never carry a secret: their static `BufReader` (8 KiB) and `LineWriter` are never freed, so the allocator never wipes the last input or unflushed piece (Rust 1.99.1 <https://github.com/rust-lang/rust/blob/1.99.1/library/std/src/io/stdio.rs>, lines 341-345, 647 and 722; mhfe reads typed secrets through `io::stdin().lock()`, `hidden_input.rs:106,114,144`). `clippy.toml` disallows `std::io::stdin` and `std::io::stdout` in the CLI outside `os`, which offers the descriptor reads, writes and terminal checks.
 
-In the WASM: a secret crosses as `&str` or `&[u8]`, as the page holds it; the glue's copies are
-freed through the zeroing allocator once the Rust entry returns. A copy is freed only then: the glue
-checks a later argument (`_assertClass`, `_assertChar`, `_assertNonNull`) after it has copied the
-secret, and a wasm-bindgen enum's `from_abi` throws inside the call, so a throw there leaves the
-copy never freed, so never wiped
-(`wasm-bindgen-cli-support-0.2.129/src/js/binding.rs:836-839,906-914,959-975`,
+In the WASM: a secret text crosses as a `JsValue`, which the entry reads into a Rust `String` inside
+the call (`host::text`, `optional_text` for one TS defaults to empty), and secret bytes as a `&[u8]`
+that is the first argument of a free function; the copies are freed through the zeroing allocator
+once the Rust entry returns. A copy the glue makes is freed only then: the glue checks a later
+argument (`_assertClass`, `_assertChar`, `_assertNonNull`, the length of a string that is
+`undefined`) after it has copied the secret, the receiver of a method is checked inside the call
+(a freed object's null pointer, `wasm-bindgen-0.2.129/src/rt/mod.rs:297,475`), and a wasm-bindgen
+enum's `from_abi` throws inside the call, so a throw there leaves the copy never freed, so never
+wiped (`wasm-bindgen-cli-support-0.2.129/src/js/binding.rs:836-839,906-914,959-975`,
 `wasm-bindgen-macro-support-0.2.129/src/codegen.rs:5064`). A binding entry that takes a secret
 therefore takes every other argument as a number, a boolean or a `JsValue`, converted and refused
-inside Rust: no wasm-bindgen enum or class argument and no `Option` of one (TS AUD-012-SEC001,
-`mnemocode/sskr-wasm/rust/src/lib.rs:89-90,141`). Numbers cross as `f64`, since the glue narrows an
+inside Rust: no `&str`, no wasm-bindgen enum or class argument and no `Option` of one (TS
+AUD-012-SEC001, `mnemocode/sskr-wasm/rust/src/lib.rs:89-90,141`); a text that is not one is
+refused as TS refuses secret storage of another type (`core.secret-value.text`), and a name that
+is not one as the library refuses an unknown name. The bytes a method takes are never secret (an
+encrypted file). Numbers cross as `f64`, since the glue narrows an
 integer type (`js as u8`, `wasm-bindgen-0.2.129/src/convert/impls.rs:292-333`; TS
 `src/sskr/bridge.ts:1-6`, AUD-014-API008). A trap (`panic = "abort"`) runs no `Drop` and leaves
 every live secret in the instance's memory, so the binding's contract tells the page to drop the

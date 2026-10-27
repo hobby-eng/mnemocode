@@ -1,7 +1,10 @@
 //! The test profile's checks of the binding itself (B-WIPE), run on the built file in wasmi, an
 //! interpreter of WebAssembly written in Rust: each probe entry takes a public marker the way a
 //! secret entry takes a secret, and afterwards the instance's whole memory is searched for it; the
-//! search is first shown to find a marker written into the memory. A refusal is followed through
+//! search is first shown to find a marker written into the memory; `probeText` takes it as a
+//! page's string, read into Rust through the glue's `__wbindgen_string_get` (emulated: the string
+//! copied into a block of the instance's allocator, as `passStringToWasm0` copies it), the way a
+//! secret entry reads its text (`host::text`). A refusal is followed through
 //! the glue's imports, which are emulated from their code in the glue (`new RangeError(…)`,
 //! `JSON.parse(…)`, `Object.defineProperty(…)`): it must reach a page as TS's kind of error, with
 //! its message and a `code` defined enumerable and neither writable nor configurable.
@@ -29,6 +32,8 @@ enum Operation {
     DefineProperty,
     /// `takeObject(index)`: the object's reference dropped.
     Drop,
+    /// `__wbindgen_string_get`: a string object copied into the instance's memory.
+    StringGet,
 }
 
 /// An object of the emulated page.
@@ -40,6 +45,8 @@ enum Object {
         properties: Vec<(String, String)>,
     },
     Json(String),
+    /// A page's string.
+    Text(String),
 }
 
 /// The emulated page: its objects by index.
@@ -72,7 +79,9 @@ fn imports_of(glue: &str) -> Vec<(String, Operation)> {
             continue;
         }
         let body = lines.get(index + 1).copied().unwrap_or_default();
-        let operation = if body.contains("new RangeError(") {
+        let operation = if name.contains("__wbindgen_string_get") {
+            Operation::StringGet
+        } else if body.contains("new RangeError(") {
             Operation::NewError("RangeError")
         } else if body.contains("new TypeError(") {
             Operation::NewError("TypeError")
@@ -110,9 +119,54 @@ fn string_at(caller: &Caller<'_, Page>, pointer: i32, length: i32) -> String {
         .unwrap_or_default()
 }
 
-/// A linker that gives every import of `module` the operation the glue gives it; one the probes
-/// need not run traps.
-fn linker(engine: &Engine, module: &Module, glue: &str) -> Result<Linker<Page>, Failure> {
+/// `__wbindgen_string_get` of the object at `index`: its string copied into a block that the
+/// instance's `malloc` gives, the block and its length written at `out`; 0 and 0 for another
+/// object.
+fn string_get(
+    caller: &mut Caller<'_, Page>,
+    malloc: &str,
+    out: i32,
+    index: i32,
+) -> Result<(), wasmi::Error> {
+    let text = match caller.data().get(index) {
+        Some(Object::Text(text)) => Some(text.clone()),
+        _ => None,
+    };
+    let memory = caller
+        .get_export("memory")
+        .and_then(wasmi::Extern::into_memory)
+        .ok_or_else(|| wasmi::Error::new("the probe file exports no memory"))?;
+    let (pointer, length) = match text {
+        Some(text) => {
+            let allocate = caller
+                .get_export(malloc)
+                .and_then(wasmi::Extern::into_func)
+                .ok_or_else(|| wasmi::Error::new("the probe file exports no allocator"))?
+                .typed::<(i32, i32), i32>(&*caller)?;
+            let length = i32::try_from(text.len()).unwrap_or(0);
+            let pointer = allocate.call(&mut *caller, (length, 1))?;
+            let start = usize::try_from(pointer).unwrap_or(0);
+            memory.data_mut(&mut *caller)[start..start + text.len()]
+                .copy_from_slice(text.as_bytes());
+            (pointer, length)
+        }
+        None => (0, 0),
+    };
+    let at = usize::try_from(out).unwrap_or(0);
+    let data = memory.data_mut(&mut *caller);
+    data[at..at + 4].copy_from_slice(&pointer.to_le_bytes());
+    data[at + 4..at + 8].copy_from_slice(&length.to_le_bytes());
+    Ok(())
+}
+
+/// A linker that gives every import of `module` the operation the glue gives it, `malloc` the
+/// instance's allocator; one the probes need not run traps.
+fn linker(
+    engine: &Engine,
+    module: &Module,
+    glue: &str,
+    malloc: &str,
+) -> Result<Linker<Page>, Failure> {
     let known = imports_of(glue);
     let mut linker = Linker::new(engine);
     let fail = |error: wasmi::errors::LinkerError| Failure(format!("wasmi: {error}"));
@@ -185,6 +239,18 @@ fn linker(engine: &Engine, module: &Module, glue: &str) -> Result<Linker<Page>, 
                     .func_wrap(&namespace, &name, |_: Caller<'_, Page>, _index: i32| {})
                     .map_err(fail)?;
             }
+            Some(Operation::StringGet) => {
+                let malloc = malloc.to_owned();
+                linker
+                    .func_wrap(
+                        &namespace,
+                        &name,
+                        move |mut caller: Caller<'_, Page>, out: i32, index: i32| {
+                            string_get(&mut caller, &malloc, out, index)
+                        },
+                    )
+                    .map_err(fail)?;
+            }
             None => {
                 return Err(Failure(format!(
                     "the probe file imports {namespace}.{name}, which the check does not emulate"
@@ -206,18 +272,18 @@ pub(super) fn problems(bytes: &[u8], glue: &str) -> Result<Vec<String>, Failure>
     let wasm_error = |error: wasmi::Error| Failure(format!("wasmi: {error}"));
     let engine = Engine::default();
     let module = Module::new(&engine, bytes).map_err(wasm_error)?;
-    let mut store = Store::new(&engine, Page::default());
-    let instance = linker(&engine, &module, glue)?
-        .instantiate_and_start(&mut store, &module)
-        .map_err(wasm_error)?;
-    let memory: Memory = instance
-        .get_memory(&store, "memory")
-        .ok_or_else(|| Failure("the probe file exports no memory".to_owned()))?;
     let malloc_name = glue
         .split("passArray8ToWasm0(marker, wasm.")
         .nth(1)
         .and_then(|rest| rest.split(')').next())
         .ok_or_else(|| Failure("the glue names no allocator for the probes".to_owned()))?;
+    let mut store = Store::new(&engine, Page::default());
+    let instance = linker(&engine, &module, glue, malloc_name)?
+        .instantiate_and_start(&mut store, &module)
+        .map_err(wasm_error)?;
+    let memory: Memory = instance
+        .get_memory(&store, "memory")
+        .ok_or_else(|| Failure("the probe file exports no memory".to_owned()))?;
     let malloc = instance
         .get_typed_func::<(i32, i32), i32>(&store, malloc_name)
         .map_err(wasm_error)?;
@@ -250,6 +316,17 @@ pub(super) fn problems(bytes: &[u8], glue: &str) -> Result<Vec<String>, Failure>
         if holds_marker(memory.data(&store)) {
             problems.push(format!("{entry} left its marker in the memory"));
         }
+    }
+    let marker = store
+        .data_mut()
+        .add(Object::Text(String::from_utf8_lossy(MARKER).into_owned()));
+    instance
+        .get_typed_func::<i32, ()>(&store, "probeText")
+        .map_err(wasm_error)?
+        .call(&mut store, marker)
+        .map_err(wasm_error)?;
+    if holds_marker(memory.data(&store)) {
+        problems.push("probeText left its marker in the memory".to_owned());
     }
     problems.extend(refusal_problems(&mut store, &instance, &memory)?);
     Ok(problems)

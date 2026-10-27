@@ -6,9 +6,9 @@
 
 use std::fmt;
 
-use crate::bip39::phrase::{Phrase, PhraseError};
+use crate::bip39::phrase::Phrase;
 use crate::checksum::crc32;
-use crate::refusal::Refusal;
+use crate::refusal::{Refusal, RefusalKind};
 use crate::search::plan::counting;
 use crate::secret::{SecretBytes, SecretText};
 
@@ -88,6 +88,8 @@ pub enum ListError {
     TooLarge,
     /// More candidates than a list holds: what to do instead.
     TooManyForList(String),
+    /// A place past the list's last candidate: the binding's own refusal, as TS hands out an array.
+    NoCandidate,
 }
 
 impl fmt::Display for ListError {
@@ -133,6 +135,9 @@ impl fmt::Display for ListError {
                 "More than {} candidates, more than one list holds: {advice}.",
                 counting(MAX_CANDIDATE_RECORDS as u64)
             ),
+            Self::NoCandidate => {
+                f.write_str("The candidate list holds no candidate at this place.")
+            }
         }
     }
 }
@@ -161,6 +166,14 @@ impl Refusal for ListError {
             Self::WrongPadding => "core.candidate-list.candidate-list-wrong-padding",
             Self::TooLarge => "core.candidate-file-refusal.plaintext-list-too-large",
             Self::TooManyForList(_) => "core.candidate-list.too-many-for-list",
+            Self::NoCandidate => "core.candidate-list.no-candidate-at-place",
+        }
+    }
+
+    fn kind(&self) -> RefusalKind {
+        match self {
+            Self::NoCandidate => RefusalKind::Range,
+            _ => RefusalKind::Error,
         }
     }
 }
@@ -251,14 +264,14 @@ impl CandidateList {
         }
     }
 
-    /// The candidate `place`, from 0: its phrase and its BIP39 passphrase.
-    pub fn candidate(&self, place: usize) -> Result<(Phrase, &str), PhraseError> {
+    /// The candidate `place`, from 0: its phrase and its BIP39 passphrase; refused past the last.
+    pub fn candidate(&self, place: usize) -> Result<(Phrase, &str), ListError> {
+        if place >= self.count() {
+            return Err(ListError::NoCandidate);
+        }
         let start = place * self.entropy_length;
-        let entropy = self
-            .entropies
-            .get(start..start + self.entropy_length)
-            .ok_or(PhraseError::WordCount)?;
-        let phrase = Phrase::of_entropy(entropy)?;
+        let entropy = &self.entropies[start..start + self.entropy_length];
+        let phrase = Phrase::of_entropy(entropy).map_err(|_| ListError::WrongEntropyLength)?;
         let own = self.own.get(place).and_then(Option::as_ref);
         let passphrase = own
             .or(self.passphrase.as_ref())

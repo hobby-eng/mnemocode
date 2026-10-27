@@ -370,3 +370,22 @@ the TS capsule (`multi-chain-wallet-tools/packages/recovery-mnemocode`) to the W
   wallet-tools session, 2026-10-27), so no module waits for it. Open: the transcripts of
   the command line (increment 4's `encode`, this one's `--qr`) need the TS recorder to record them,
   once the decided TS fixes, which change some outputs, are in.
+- The binding of increments 3 to 6, 2026-10-27: `browser-phrase` (an encoded backup with its
+  codes, record and fingerprints, the form typed text most likely is, a phrase's master
+  fingerprint), `browser-wallet` (each kind of evidence and its place, compared with a phrase and
+  its passphrase; the coins of the build), `browser-qr` (a payload's PNG and matrix, read back
+  first; a PNG's text) and `browser-candidates` (the Scanner's session key, a list opened with it
+  or a passphrase, a list protected as chosen, a list read candidate by candidate), each with its
+  `selfCheck` over its part's rows (`checks::part_rows`). A secret entry's text crosses as a
+  `JsValue` that Rust reads inside the call and its bytes as a free function's first argument, so
+  nothing the glue checks or throws on follows a copied secret, a freed receiver included; numbers
+  cross as `f64`, a place past a list's end refused (ARCHITECTURE.md §6); every secret entry runs
+  through `after_secret`; the session key has `wipe()`. The Wallet evidence row is in every build,
+  its master-key cases without Bitcoin. Typed dates are read as the command line reads a line of
+  them (`DatesAnswer`). The page profiles hold them: the multi-chain Deriver all four with every
+  coin, the Scanner `candidates` alone, the Dash Deriver phrase, wallet and QR with `coin-dash`.
+  getrandom builds on every target, so that the binding's native tests draw randomness too; the
+  gate runs them with every module. The independent review (one reviewer, six findings, two
+  Medium: secret entries outside the scrub, and glue that could throw after copying a secret) was
+  answered in the same commit, and its re-check's three Low notes too: the memory scan reads a
+  page's string as a secret entry does (`probeText`), and ADR 0004 names the binding's codes.

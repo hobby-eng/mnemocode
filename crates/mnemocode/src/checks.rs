@@ -9,7 +9,6 @@ mod coins;
 pub mod public_vectors;
 mod qr;
 mod re_encoding;
-#[cfg(feature = "coin-bitcoin")]
 mod wallet;
 
 use bip39::{Language, Mnemonic};
@@ -247,11 +246,50 @@ pub fn rows() -> impl Iterator<Item = &'static Row> {
     let coins = coins::ROWS;
     #[cfg(not(feature = "any-coin"))]
     let coins: &[Row] = &[];
-    #[cfg(feature = "coin-bitcoin")]
-    let wallet: &[Row] = &[wallet::ROW];
-    #[cfg(not(feature = "coin-bitcoin"))]
-    let wallet: &[Row] = &[];
-    ROWS.iter().chain(wallet).chain(coins)
+    ROWS.iter().chain([&wallet::ROW]).chain(coins)
+}
+
+/// The parts that the binding's modules compute, each checked by its own rows in the module's
+/// `selfCheck` (ARCHITECTURE.md §6).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Part {
+    /// Phrases, dates, forms, modes and encoded backups.
+    Phrase,
+    /// The evidence of a wallet and the coins' addresses.
+    Wallet,
+    /// Candidate lists and their encryption.
+    Candidates,
+    /// QR codes and the PNG files they are read from.
+    Qr,
+}
+
+/// The rows of the phrase part.
+const PHRASE_ROWS: [&str; 8] = [
+    "Core integrity",
+    "Public vectors",
+    "Representation matrix",
+    "Date ordering",
+    "Word lists",
+    "BIP39 seed",
+    "Word hints",
+    "Re-encoding",
+];
+
+impl Part {
+    /// Whether `row` checks this part.
+    fn holds(self, row: &Row) -> bool {
+        match self {
+            Self::Phrase => PHRASE_ROWS.contains(&row.name),
+            Self::Wallet => row.name == "Wallet evidence" || row.name.ends_with(" addresses"),
+            Self::Candidates => row.name == "Candidate lists",
+            Self::Qr => matches!(row.name, "PNG admission" | "QR adapter"),
+        }
+    }
+}
+
+/// The rows of `part` that this build holds, in the report's order.
+pub fn part_rows(part: Part) -> impl Iterator<Item = &'static Row> {
+    rows().filter(move |row| part.holds(row))
 }
 
 /// The startup cases of every row, before any secret is asked; fails at the first difference.

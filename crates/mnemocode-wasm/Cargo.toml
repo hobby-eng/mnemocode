@@ -17,15 +17,35 @@ crate-type = ["cdylib", "rlib"]
 default = []
 # The memory scan's own entries, built only into the test profile test/probe, never a page's file.
 browser-probe = []
+# One module per library part (ARCHITECTURE.md §9); a page's profile names those it uses.
+browser-phrase = []
+browser-wallet = []
+browser-qr = []
+browser-candidates = []
+# The library's units, which a page's profile names: each coin of the wallet module.
+coin-bitcoin = ["mnemocode/coin-bitcoin"]
+coin-bitcoin-cash = ["mnemocode/coin-bitcoin-cash"]
+coin-cosmos = ["mnemocode/coin-cosmos"]
+coin-dash = ["mnemocode/coin-dash"]
+coin-dogecoin = ["mnemocode/coin-dogecoin"]
+coin-ethereum = ["mnemocode/coin-ethereum"]
+coin-ethereum-classic = ["mnemocode/coin-ethereum-classic"]
+coin-injective = ["mnemocode/coin-injective"]
+coin-litecoin = ["mnemocode/coin-litecoin"]
+coin-tron = ["mnemocode/coin-tron"]
+coin-xrp = ["mnemocode/coin-xrp"]
+coin-zcash = ["mnemocode/coin-zcash"]
 
 [dependencies]
 mnemocode.workspace = true
+# The randomness of the library's Random port: the browser's (crypto.getRandomValues) in the
+# WebAssembly, the system's in the native builds of the gates.
+getrandom.workspace = true
 
 [dependencies.wasm-bindgen]
 workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-# The browser's randomness (crypto.getRandomValues) for the library's Random port.
 getrandom = { workspace = true, features = ["wasm_js"] }
 
 [lints]

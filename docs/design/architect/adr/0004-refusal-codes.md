@@ -27,7 +27,9 @@ unique across all enums. The CLI prints
 ## Consequences
 
 - Codes that guarded JavaScript types or the program's own data are not written; the file records
-  each of them.
+  each of them. The binding, which takes its secrets as JavaScript values, keeps two of TS's for
+  them: `core.secret-value.text` for a secret that is not text, and `core.secret-value.wiped` for
+  the session key used after its `wipe()`.
 - Renaming a code, or fixing an odd message, is an owner decision applied in one place, the
   module's `code()` or `Display`. On 2026-10-27 the owner took such fixes, made in the TS first
   (`mapping.json`, defects "Decided"): `missing-checksum` gets its namespace (CORE-23), the two
@@ -35,8 +37,9 @@ unique across all enums. The CLI prints
   one), each recorded in `refusals-v1.json` from the TS commit that adds it.
 - The port adds codes for conditions TS cannot meet, each in the library and in
   `refusals-v1.json` as the port's own: `core.secret.capacity-exceeded` (a secret larger than the
-  buffer reserved for it), `core.random.unavailable` (the host's random source failed) and
-  `core.random.empty-range` (a uniform choice below 0).
+  buffer reserved for it), `core.random.unavailable` (the host's random source failed),
+  `core.random.empty-range` (a uniform choice below 0) and `core.candidate-list.no-candidate-at-place`
+  (a page asks a read list for a candidate past its last, where TS hands out an array).
 - Each refusal keeps TS's kind of JavaScript error (`Refusal::kind`: `Error`, `RangeError`,
   `TypeError`), which the recordings hold beside the code and message.
 - The bip39 crate's errors and English messages never reach a host: the `bip39` module checks the

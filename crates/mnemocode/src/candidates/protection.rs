@@ -46,6 +46,18 @@ impl Protection {
         Recipient::parse(text).map(Self::Key)
     }
 
+    /// The protection that `kind` names, as a page or a front end gives it: "key" to the Scanner's
+    /// key in `secret`, "passphrase" under the passphrase in `secret`, "none" in the open; refused
+    /// for any other kind, and as the key and the passphrase are refused.
+    pub fn chosen(kind: &str, secret: &str) -> Result<Self, EncryptionError> {
+        match kind {
+            "key" => Self::key(secret),
+            "passphrase" => Self::passphrase(secret),
+            "none" => Ok(Self::None),
+            _ => Err(EncryptionError::ProtectionChoice),
+        }
+    }
+
     /// Under the passphrase `text`, read by [`parse_list_passphrase`].
     pub fn passphrase(text: &str) -> Result<Self, EncryptionError> {
         parse_list_passphrase(text).map(Self::Passphrase)
@@ -121,6 +133,16 @@ mod tests {
             Ok("encrypted with the passphrase")
         );
         assert!(!Protection::None.encrypted());
+        assert!(matches!(
+            Protection::chosen("none", ""),
+            Ok(Protection::None)
+        ));
+        let refusal = Protection::chosen("open", "").unwrap_err();
+        assert_eq!(
+            refusal.code(),
+            "core.candidate-encryption.not-protection-choice"
+        );
+        assert_eq!(refusal.kind(), crate::refusal::RefusalKind::Type);
         assert_eq!(Protection::None.description(), "NOT encrypted");
         assert_eq!(
             Protection::key("age1").map(|chosen| chosen.encrypted()),

@@ -229,13 +229,14 @@
         "all": [
           "mnemocode",
           "mnemocode-cards",
-          "wasm-bindgen"
+          "wasm-bindgen",
+          "getrandom"
         ],
         "cfg(target_arch = \"wasm32\")": [
           "getrandom"
         ]
       },
-      "dependencyNotes": "wasm-bindgen on every target, so that the native clippy and tests build the binding too; getrandom on wasm32 only: =0.4.3 with wasm_js for the Random adapter, and from the sskr increment =0.3.4 with wasm_js renamed getrandom03, only to give bc-rand's tree its browser backend; mnemocode-cards only with feature browser-cards; no js-sys.",
+      "dependencyNotes": "wasm-bindgen and getrandom on every target, so that the native clippy and tests build the binding too and its entries that draw randomness run in the tests, from the system's source; getrandom =0.4.3 with wasm_js on wasm32 for the Random adapter, and from the sskr increment =0.3.4 with wasm_js renamed getrandom03, only to give bc-rand's tree its browser backend; mnemocode-cards only with feature browser-cards; no js-sys.",
       "library": "*",
       "modules": {
         "host": [],

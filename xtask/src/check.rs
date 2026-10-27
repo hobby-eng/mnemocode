@@ -93,6 +93,12 @@ pub(crate) fn run(root: &Path) -> Result<(), Failure> {
         return Err(Failure("cargo doc failed".to_owned()));
     }
     run_tool(root, "cargo", &["test", "--locked", "--workspace"])?;
+    // The binding's modules are features off by default: their tests run with every one.
+    run_tool(
+        root,
+        "cargo",
+        &["test", "--locked", "-p", "mnemocode-wasm", "--all-features"],
+    )?;
     code_rules::self_test(root)?;
     code_rules::run(root)?;
     copies::run(root, &["--self-test"])?;

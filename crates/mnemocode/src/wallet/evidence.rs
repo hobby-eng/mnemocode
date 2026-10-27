@@ -481,7 +481,6 @@ enum Kind {
 
 /// Where a located kind of evidence is looked for: on `network`, under `profiles`, from
 /// `location`, and compared with `addresses` keys from its index (the scan's default without).
-#[cfg(feature = "coin-bitcoin")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Place {
     /// The network.
