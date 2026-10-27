@@ -26,6 +26,14 @@ pub fn hex_code_point(point: u32) -> String {
     format!("{point:0width$X}", width = UNICODE_CODE_DIGITS)
 }
 
+/// `text` without its separators, in its own case: the Private Use symbols of Color Unicode, which
+/// take the same separators as codes written in digits.
+pub fn without_separators(text: &str) -> String {
+    text.chars()
+        .filter(|character| !is_separator(*character))
+        .collect()
+}
+
 /// The elements of `text`, in capitals.
 pub fn code_tokens(text: &str) -> Vec<String> {
     text.to_uppercase()

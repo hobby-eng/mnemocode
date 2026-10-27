@@ -251,9 +251,10 @@ mhfe's AUD-007-SEC001 for the terminal case).
 
 Signals (N-SIGNALS): the handlers for SIGINT, SIGTERM, SIGHUP and SIGQUIT only set a flag (no
 `SA_RESTART`; other threads block them). The main thread wakes on `EINTR` from its terminal read,
-which it does not retry, or checks the flag between `Search::step` calls; it then restores the
-terminal, leaves the private screen, removes the staging folders and exits with 128 + the signal
-number (130 and "Cancelled." for SIGINT and SIGQUIT). Removing folders is not async-signal-safe,
+which it does not retry, checks the flag before each read of standard input or a file, and between
+`Search::step` calls; `main` checks it once more when the command ends, whatever its result. It
+then restores the terminal, leaves the private screen, removes the staging folders and exits with
+128 + the signal number (130 and "Cancelled." for SIGINT and SIGQUIT). Removing folders is not async-signal-safe,
 hence the flag. The Windows console handler sets the flag and, for `CTRL_CLOSE_EVENT`, waits for
 the cleanup within 5 s. SIGTSTP stops the command after restoring the terminal, and on continue raw
 mode and the private screen come back with a redraw flag. The step and progress-line drawing checks

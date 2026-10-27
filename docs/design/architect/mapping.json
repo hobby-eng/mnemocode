@@ -759,14 +759,14 @@
     {
       "id": "CAP-PHRASE-FORMATS-ENCODED-BACKUP",
       "crate": "mnemocode",
-      "module": "backup::encoded",
+      "module": "backup",
       "status": "port",
       "reason": "Codes kept as word indexes in a secret owner and lent by reference; encode exists only for encodable modes."
     },
     {
       "id": "CAP-PHRASE-FORMATS-ENCODED-FINGERPRINT",
       "crate": "mnemocode",
-      "module": "backup::fingerprint",
+      "module": "backup",
       "status": "port",
       "reason": "Same fingerprint of the codes over bip32's master fingerprint."
     },
@@ -829,7 +829,7 @@
     {
       "id": "CAP-PHRASE-FORMATS-LAST-WORD-REPLACEMENT-READING",
       "crate": "mnemocode",
-      "module": "backup::legacy",
+      "module": "backup",
       "status": "port",
       "reason": "Same offer; the front ends match the refusal by its variant, not its message."
     },
@@ -962,7 +962,7 @@
     {
       "id": "CAP-PHRASE-FORMATS-SHORTER-PHRASES",
       "crate": "mnemocode",
-      "module": "backup::shorter",
+      "module": "backup",
       "status": "port",
       "reason": "Same notice; only the expected outcome is a value, every other error passes on (CORE-22)."
     },

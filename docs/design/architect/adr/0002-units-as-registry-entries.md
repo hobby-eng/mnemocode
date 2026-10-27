@@ -35,3 +35,7 @@ features: every host takes them.
   (every push) keep the cfg lines honest.
 - Shared readers (Base58Check, Bech32, EVM, places, marked codes) are built with any unit that uses
   them; a unit never reaches another unit's module.
+- Amended with increments 3 and 4 (2026-10-27): forms and modes, which no build leaves out, are
+  closed enums, not traits: a sixth form or a fifth mode is a variant whose every `match` the
+  compiler names, without a trait object or a list for what never varies by build. Coins, share
+  forms, templates and searches stay entries behind their features.

@@ -88,8 +88,7 @@
         ],
         "modes": [
           "bip39",
-          "dates",
-          "bip32"
+          "dates"
         ],
         "wallet": [
           "bip39",
@@ -100,8 +99,7 @@
           "dates",
           "bip32",
           "forms",
-          "modes",
-          "wallet"
+          "modes"
         ],
         "sskr": [
           "bip39",
@@ -188,7 +186,8 @@
         "all": [
           "mnemocode",
           "mnemocode-cards",
-          "getrandom"
+          "getrandom",
+          "zeroize"
         ],
         "cfg(unix)": [
           "libc"
@@ -211,7 +210,9 @@
       ],
       "ioModules": [
         "src/os.rs",
+        "src/os/",
         "src/terminal.rs",
+        "src/terminal/",
         "src/input.rs",
         "src/output.rs",
         "src/menu.rs",
