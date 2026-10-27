@@ -6,8 +6,8 @@
 
 use std::fmt;
 
-use super::{Date, maximum_dates, parse_date, parse_date_pattern, too_many_dates_message};
 use super::{DatePattern, DatesError, check_keys, combination_count, is_date_pattern};
+use super::{Dates, maximum_dates, parse_date, parse_date_pattern, too_many_dates_message};
 use crate::refusal::Refusal;
 use crate::search::plan::counting;
 use crate::text::space::is_ecmascript_space;
@@ -105,7 +105,7 @@ fn check_counts(dates: usize, incomplete: usize, words: usize) -> Result<(), Ans
 /// The dates of one answer: the complete ones in the order typed, and the patterns with the places
 /// they were typed at.
 pub struct DatesAnswer {
-    known: Vec<Date>,
+    known: Dates,
     patterns: Vec<DatePattern>,
     incomplete_places: Vec<usize>,
     combinations: u64,
@@ -172,7 +172,7 @@ impl DatesAnswer {
             return Err(AnswerError::TooManyCombinations);
         }
         Ok(Self {
-            known,
+            known: Dates::new(&known),
             patterns: found,
             incomplete_places,
             combinations,
@@ -180,7 +180,7 @@ impl DatesAnswer {
     }
 
     /// The complete dates, in the order typed.
-    pub fn known(&self) -> &[Date] {
+    pub const fn known(&self) -> &Dates {
         &self.known
     }
 
@@ -203,13 +203,17 @@ impl DatesAnswer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dates::Date;
 
     #[test]
     fn complete_dates_are_read_in_order() {
         let answer =
             DatesAnswer::parse(" 23-09-2026, 1951-11-07;08-08-1988 ", Some(12), false).unwrap();
         assert_eq!(answer.known().len(), 3);
-        assert_eq!(answer.known()[1], Date::new(1951, 11, 7).unwrap());
+        assert_eq!(
+            answer.known().iter().nth(1),
+            Some(Date::new(1951, 11, 7).unwrap())
+        );
         assert_eq!(answer.combinations(), 1);
     }
 

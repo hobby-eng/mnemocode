@@ -442,3 +442,60 @@ mod landlock {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use mnemocode::candidates::age::Opener;
+    use mnemocode::candidates::format::{
+        CandidateList, MAX_CANDIDATE_RECORDS, MAX_PASSPHRASE_BYTES,
+    };
+    use mnemocode::candidates::gate::Gate;
+    use mnemocode::candidates::protection::Protection;
+    use mnemocode::candidates::writer::{ListOutcome, Writer};
+    use mnemocode::secret::SecretBytes;
+
+    use super::*;
+    use crate::os::random::SystemRandom;
+
+    /// A public test passphrase for the list's file.
+    const FILE_PASSPHRASE: &str = "public memory cap test passphrase";
+
+    /// The heaviest operation of a command, as the child process runs it: the largest list the
+    /// writer makes (every record, the longest BIP39 passphrase for all) encrypted with a
+    /// passphrase through scrypt at 2^18, and opened and read again, under the memory cap.
+    #[test]
+    #[ignore = "the child process of the_heaviest_operation_runs_under_the_memory_cap: it sets this process's cap"]
+    fn heaviest_operation_under_the_cap() {
+        set_limit(libc::RLIMIT_DATA, MEMORY_CAP_BYTES).unwrap();
+        let entropies = SecretBytes::zeroed("test entropies", MAX_CANDIDATE_RECORDS * 32);
+        let protection = Protection::passphrase(FILE_PASSPHRASE).unwrap();
+        let writer = Writer::new(protection, &"p".repeat(MAX_PASSPHRASE_BYTES)).unwrap();
+        let mut gate = Gate::new();
+        let written = writer
+            .write(entropies, 32, &mut gate, &mut SystemRandom)
+            .unwrap();
+        let ListOutcome::List(file) = written else {
+            panic!("no list was written");
+        };
+        let plain = gate
+            .decrypt(&file.bytes, Opener::Passphrase(FILE_PASSPHRASE))
+            .unwrap();
+        let list = CandidateList::decode(&plain).unwrap();
+        assert_eq!(list.count(), MAX_CANDIDATE_RECORDS);
+    }
+
+    #[test]
+    #[expect(
+        clippy::disallowed_types,
+        reason = "the test starts its own binary as the child that runs under the cap"
+    )]
+    fn the_heaviest_operation_runs_under_the_memory_cap() {
+        let test = "os::linux::tests::heaviest_operation_under_the_cap";
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--ignored", "--exact", "--quiet", test])
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "{test} failed under the memory cap");
+    }
+}

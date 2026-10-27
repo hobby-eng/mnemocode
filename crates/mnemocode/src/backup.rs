@@ -5,6 +5,7 @@
 //! a [`record`] or as [`json`], and decoded with the dates.
 
 pub mod json;
+pub mod re_encoding;
 pub mod record;
 
 use std::fmt;
@@ -44,7 +45,7 @@ impl fmt::Display for BackupError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::CodeCount(count, unit) => write!(f, "These are {count} {unit}; an encoded seed phrase has {}.", word_counts_text()),
-            Self::FormAlwaysMasked => f.write_str("This form is always masked with a Seedshift: unmasked, it shows the seed phrase itself."),
+            Self::FormAlwaysMasked => f.write_str("English words and word numbers are always masked: unmasked, they are the seed phrase itself. Choose a Seedshift, or Unicode codes or colors."),
             Self::NotEncodable => f.write_str("To create a legacy checksum-valid record, select legacy Seedshift and enable the checksum-word replacement."),
             Self::ReplacementLegacyOnly => f.write_str("The legacy checksum-word replacement is available only in legacy Seedshift mode."),
             Self::GivesSeveral => f.write_str("The Original Seedshift with a valid last word gives several phrases: take its candidates."),

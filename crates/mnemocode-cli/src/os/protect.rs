@@ -175,7 +175,9 @@ impl Protection {
 /// The memory cap of a command's process (decision 5, `L-RLIMIT-DATA`, `W-JOB-MEMORY`): the
 /// heaviest operation's measured peak plus a quarter, rounded up to a multiple of 64 MiB. The
 /// increments that bring the heaviest operations (the encrypted candidate list, the card export)
-/// measure them and run them under it.
+/// measure them and run them under it: the largest list the writer makes, encrypted through scrypt
+/// and opened again, peaks at 293 MiB resident (increment 6, `os::linux` tests); the card export,
+/// measured with increment 9, sets the cap.
 pub(super) const MEMORY_CAP_BYTES: u64 = 768 * 1024 * 1024;
 
 /// The read-back of a system where nothing changes after start: the core dumps as they were

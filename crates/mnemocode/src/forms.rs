@@ -106,10 +106,11 @@ impl From<SizesError> for FormError {
 }
 
 /// The order in which the forms are guessed from typed text: the most telling characters first,
-/// English words last, which every other text is taken for.
+/// English words last, which every other text is taken for. A Private Use symbol says more than a
+/// #, which separates Color Unicode symbols too, and colors never read text that holds one.
 const LIKELY_ORDER: [Form; 5] = [
-    Form::Colors,
     Form::ColorsUnicode,
+    Form::Colors,
     Form::Indexes,
     Form::Unicode,
     Form::English,
@@ -380,6 +381,15 @@ fn owned(pieces: Vec<&str>) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn symbols_with_a_hash_before_them_are_guessed_as_color_unicode() {
+        assert_eq!(
+            Form::likely("#\u{e000}\u{e000} #\u{e000}\u{e001}"),
+            Form::ColorsUnicode
+        );
+        assert_eq!(Form::likely("#01AB63 #000000"), Form::Colors);
+    }
 
     #[test]
     fn every_form_reads_back_what_it_writes() {

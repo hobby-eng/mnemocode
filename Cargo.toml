@@ -59,8 +59,10 @@ bip39 = { version = "=3.0.0", default-features = false, features = [
   "chinese-traditional",
 ] }
 # Hashes and MAC (one RustCrypto generation)
-sha2 = { version = "=0.11.1", default-features = false }
-hmac = "=0.13.0"
+# The zeroize features of the hashes, MACs and ciphers wipe their states and keys when they are
+# dropped (CORE-24).
+sha2 = { version = "=0.11.1", default-features = false, features = ["zeroize"] }
+hmac = { version = "=0.13.0", features = ["zeroize"] }
 ripemd = { version = "=0.2.0", default-features = false }
 sha3 = { version = "=0.12.0", default-features = false }
 # Keys and addresses
@@ -68,14 +70,14 @@ k256 = { version = "=0.14.0", default-features = false, features = ["arithmetic"
 bech32 = { version = "=0.12.0", default-features = false, features = ["alloc"] }
 bs58 = { version = "=0.5.1", default-features = false, features = ["alloc"] }
 # age v1, own format code over these
-chacha20poly1305 = { version = "=0.11.0", default-features = false }
+chacha20poly1305 = { version = "=0.11.0", default-features = false, features = ["zeroize"] }
 hkdf = "=0.13.0"
 x25519-dalek = { version = "=3.0.0", default-features = false, features = [
   "zeroize",
   "static_secrets",
 ] }
 scrypt = { version = "=0.12.0", default-features = false }
-base64ct = "=1.8.3"
+base64ct = { version = "=1.8.3", default-features = false, features = ["alloc"] }
 # The SSKR engine, vendored unchanged, and its seeded generator
 sskr = { version = "=0.12.0", path = "vendor/sskr-0.12.0" }
 bc-rand = "=0.5.0"
@@ -110,6 +112,13 @@ panic = "abort"
 lto = true
 codegen-units = 1
 strip = true
+
+# The cryptographic primitives run unoptimized at a fraction of their speed: scrypt at the candidate
+# files' work factor 2^18 takes half a minute, a list of 16 MiB seconds. The debug builds of the tests
+# and the self-test optimize the dependencies, never the workspace's own crates; overflow checks and
+# debug assertions stay on.
+[profile.dev.package."*"]
+opt-level = 3
 
 # The WebAssembly files: the release profile, built for size, as the TS SSKR engine was
 # (sskr-wasm/rust/Cargo.toml).

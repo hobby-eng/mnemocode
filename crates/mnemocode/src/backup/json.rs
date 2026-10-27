@@ -28,7 +28,10 @@ pub fn json(result: &Masked) -> Result<String, FormError> {
             "dates",
             array(result.dates.iter().map(|date| quoted(&date.to_string()))),
         ),
-        ("shifts", array(result.shifts.iter().map(u16::to_string))),
+        (
+            "shifts",
+            array(result.shifts.iter().map(|shift| shift.to_string())),
+        ),
         ("english", array(english.split(' ').map(quoted))),
         (
             "indexes",

@@ -18,7 +18,7 @@ use crate::bip39::phrase::{Phrase, PhraseError, valid_last_word_indexes};
 use crate::bip39::sizes::{
     DICTIONARY_SIZE, SizesError, check_word_count, check_word_indexes, last_word_entropy_bits,
 };
-use crate::dates::{Date, DatesError, derive_shifts};
+use crate::dates::{Date, Dates, DatesError, Shifts, derive_shifts};
 
 /// Word indexes, from 0, wiped when dropped.
 #[derive(Clone, PartialEq, Eq)]
@@ -199,9 +199,9 @@ pub struct Masked {
     /// The masked word indexes.
     pub shifted: Indexes,
     /// The dates, earliest first.
-    pub dates: Vec<Date>,
+    pub dates: Dates,
     /// The shift of each word.
-    pub shifts: Vec<u16>,
+    pub shifts: Shifts,
 }
 
 /// Redacted: it holds the dates, which are part of the secret.
@@ -239,8 +239,8 @@ pub fn mask(phrase: &Phrase, dates: &[Date]) -> Result<Masked, ShiftError> {
     moved_entropy.zeroize();
     Ok(Masked {
         shifted: Indexes(shifted),
-        dates,
-        shifts,
+        dates: Dates::new(&dates),
+        shifts: Shifts::new(&shifts),
     })
 }
 
@@ -252,8 +252,8 @@ pub fn mask_legacy(phrase: &Phrase, dates: &[Date]) -> Result<Masked, ShiftError
     indexes.zeroize();
     Ok(Masked {
         shifted: Indexes(shifted),
-        dates,
-        shifts,
+        dates: Dates::new(&dates),
+        shifts: Shifts::new(&shifts),
     })
 }
 
@@ -287,9 +287,9 @@ pub struct Unmasked {
     /// The recovered word indexes.
     pub recovered: Indexes,
     /// The dates, earliest first.
-    pub dates: Vec<Date>,
+    pub dates: Dates,
     /// The shift of each word.
-    pub shifts: Vec<u16>,
+    pub shifts: Shifts,
     /// Whether the recovered phrase keeps the BIP39 checksum.
     pub checksum_valid: bool,
 }
@@ -337,8 +337,8 @@ fn unmasked(recovered: Vec<u16>, dates: Vec<Date>, shifts: Vec<u16>) -> Unmasked
     let checksum_valid = keeps_checksum(&recovered);
     Unmasked {
         recovered: Indexes(recovered),
-        dates,
-        shifts,
+        dates: Dates::new(&dates),
+        shifts: Shifts::new(&shifts),
         checksum_valid,
     }
 }
@@ -367,8 +367,8 @@ pub fn unmask_legacy_valid(indexes: &Indexes, dates: &[Date]) -> Result<Vec<Unma
             recovered.push(u16::try_from(last).unwrap_or(0));
             Unmasked {
                 recovered: Indexes(recovered),
-                dates: dates.clone(),
-                shifts: shifts.clone(),
+                dates: Dates::new(&dates),
+                shifts: Shifts::new(&shifts),
                 checksum_valid: true,
             }
         })
@@ -381,8 +381,8 @@ pub fn direct(indexes: &Indexes) -> Result<Unmasked, ShiftError> {
     let checksum_valid = keeps_checksum(&indexes.0);
     Ok(Unmasked {
         recovered: indexes.clone(),
-        dates: Vec::new(),
-        shifts: vec![0; indexes.0.len()],
+        dates: Dates::new(&[]),
+        shifts: Shifts::new(&vec![0; indexes.0.len()]),
         checksum_valid,
     })
 }

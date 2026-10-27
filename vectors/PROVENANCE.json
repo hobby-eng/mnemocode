@@ -20,6 +20,498 @@
   "date-schedules-v1.bin": {
    "sha256": "a2af3fa98645b71586c130979adc999455d8e5ff4fda292948f041df90058c8e",
    "source": "50 Seedshift date schedules of TS d4776f7's dist/core/dates.js, written by the earlier Rust attempt (archived); replaced in increment 3 by a recording of the TS repository's pnpm record:rust-parity"
+  },
+  "cctv-age/armor": {
+   "sha256": "143390373f44a0876267946c2475718c8f3081e6e3a7264d6f50b4d19be18d1a",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_crlf": {
+   "sha256": "6efd94649ebdbf9160244ec8bb3d5e91c282c587bc8c6341d7165fdcbe4f3803",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_empty": {
+   "sha256": "278f248467f28b73ad014a8a01f7ee1ff8bcb3b023a5581c96a680e45e4f721c",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_empty_last_line": {
+   "sha256": "d361b243d0de22aa9589c52e7531b264dfee0e6d1ab5f6d931968081f3f2f7aa",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_empty_line_begin": {
+   "sha256": "66aef276d5364eabed6ac0d0313c3bfb0ab87ce68cc931596e1ec221cb2a29dd",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_empty_line_end": {
+   "sha256": "f9aea870ee3b7e2475a43589dde16c59d46dc7a1eed9ac4d876a4f4bc190cd5c",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_eol_between_padding": {
+   "sha256": "ed825f35dfb2a7c962391127e00268b30c3e61bd9f3b125fe196eba1f6fd38b2",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_full_last_line": {
+   "sha256": "7f9b635738342446df1a48741de5a2ef418e0dfb599533e89db7a295a3ceb8c3",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_garbage_encoded": {
+   "sha256": "d19d779dd80289de5e536448a881381eeb52f72306bab407445ce125060a5dfe",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_garbage_leading": {
+   "sha256": "946479eb1273f11f7e03e40375f95e89538fc198dad8310c7e5d853b64ddd4c2",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_garbage_trailing": {
+   "sha256": "f66944d46216ffcc8665180c178a276fb15f9434613fea6c0bbb54ee9236322e",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_header_crlf": {
+   "sha256": "4902ad1ab7166b2e67bf7bb08a7f6eaa9ed11d2bd6972f20ff90ba127cc4e07f",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_headers": {
+   "sha256": "615ec012c252bff1e80fb0e5ae1db3efae3d1f86001357f575c010ad183cff8c",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_invalid_character_header": {
+   "sha256": "138ceae902d220c2d3398db18b44027121c4f41c3ab1688096da078e955ca800",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_invalid_character_payload": {
+   "sha256": "f4fbaacbbb7ce773dae478eefe89cbef2e4a947e29eec376ab72f32e4e4f0222",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_long_line": {
+   "sha256": "7cb52912cfb1fd457c129dc18c9e12992efac0be56d6ab20cc4406de3b23a40b",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_lowercase": {
+   "sha256": "dc28d479184bf4058262a775a82996c3e9db54df79f9123da146a723efb36871",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_no_end_line": {
+   "sha256": "16a73f88b52a001b7b18d2fda09fa24e5e6dc7c93b9a1fe74ad76991376ba5a2",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_no_eol": {
+   "sha256": "efcbf0ffa50942288002f77df164c14511e3e1b9edff0735f5c0caeb16de8140",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_no_match": {
+   "sha256": "606726f4602a61701db2673bb1cc852d4fcc45b856c93b25ef537b8a3a315f3e",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_no_padding": {
+   "sha256": "61d5d8eb465bc20e77bc75e9e694c2dc64a19d93293be6ba381a5cef06271adf",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_not_canonical": {
+   "sha256": "78c42e6ce93716c4cba5a1dd22edf784f98e1b31cc7817048b1f00c28232af80",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_pgp_checksum": {
+   "sha256": "8613af6b578b12e7dae8e322cc76edbd68787387a0e7ec97ce249fa40d5e7430",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_short_line": {
+   "sha256": "1ca9911ad7bf7800cac018e9aa920c4cab615100c045f21890b62563f2c3d466",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_whitespace_begin": {
+   "sha256": "2692853eb6fdf493cb55a104788b6194e610517a80fe371937d13c0922dae10b",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_whitespace_end": {
+   "sha256": "fba5203e7716b6fae2e9bc9f2730d660d86e4d00e81ec02b98694888b10ab126",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_whitespace_eol": {
+   "sha256": "2794ed81154208cb727d5997baddc87389c1c165979955425807ce615a1cf10b",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_whitespace_last_line": {
+   "sha256": "22a0da87359934b0a0b4e7fe5b22565b27e3a9547c0d35b5ed83cb79f8ecaa0d",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_whitespace_line_start": {
+   "sha256": "a1f1868e5ff1bb6588170f4f240e89f9ebcfa24d68d798598cf83a692769e77c",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_whitespace_outside": {
+   "sha256": "7e30b2e48f33c2c2ab499cc17ce2535d8f93f6fd149451f8ac5300edd58e9364",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/armor_wrong_type": {
+   "sha256": "dbf0320506439302d9ee276008a18d40d4a4e4d28bb2e0514b4d244fc167a23c",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/empty": {
+   "sha256": "898891448a35f6db9b70878db483a0a1f514b98d94d881f3cce668e00a4c3de7",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/header_crlf": {
+   "sha256": "a152ced12c1a52249d218b43b19d34267f9cd712113cc2e8098c92e267702c3d",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/hmac_bad": {
+   "sha256": "07b287717c1cac4e99b0389d9aa7f94efddd6e3f5faa95963684f4d0abca3561",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/hmac_extra_space": {
+   "sha256": "f98b62cd56628b844a46c75eac9e14aed54ab96ac37f4d273800c5ab58a18dc5",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/hmac_garbage": {
+   "sha256": "0e2bcfc4d98bc286a01b9f3a69a71ed50b481f2ee0a20416ea7c1613cdaed10a",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/hmac_missing": {
+   "sha256": "40503e56cf692a67c295d95e0c3f02a350c26398016e9f0d59723f7476721b13",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/hmac_no_space": {
+   "sha256": "6497b5cb51a58b4382d7e9419afacfd70df82d5e1ea36564c5da0e5ccfa300ad",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/hmac_not_canonical": {
+   "sha256": "215c684fb5926db5a833de5b01d6b138b58f5838378d1e2b1859c4f9c9e4c81a",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/hmac_trailing_space": {
+   "sha256": "daf7151c8a5f6f48af641f4e0b3cdb41cb5876dbe0e4f6f24a3a4d0a452f7eb6",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/hmac_truncated": {
+   "sha256": "574748f519eddde3f8f7fd4eef8691d393d726d63b322e8c67f2377ea39b0841",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt": {
+   "sha256": "4eedf64d8e648634bfe3345bc45ee71b1cee5dab32b90211fb1c3a61a1eda15e",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_and_x25519": {
+   "sha256": "b7d9a55b3d9a990fdbc6589ff56be66c83274235e6ffc4bc9b16a5d722ec896c",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_bad_tag": {
+   "sha256": "45f0fb65f887dec449f12c65bb532ccf12e5dc9a7d4c39085dfb6636f3f0ba7f",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_double": {
+   "sha256": "4e077d31f798a2b2be806f745ee2fa0896a3876b1154dac49ffa9ed3f78a6a08",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_extra_argument": {
+   "sha256": "08e55082ccc699783624a4c22ba3870bd811be8db9936ae9b65b213974c39742",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_long_file_key": {
+   "sha256": "619178c5678bd897701acf8bc04419663d0f1da6b2ca90ebf4ee963b8eed74f5",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_no_match": {
+   "sha256": "d250b7a8bd09804576e211223d7ca982148dd5ad9792c7b5299b7529ca84a7b9",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_not_canonical_body": {
+   "sha256": "7fe6d2ddf6ec83fcb7e66e9cc1c5e98269c1843db7e3ba89b19f8a47b09cc8de",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_not_canonical_salt": {
+   "sha256": "6cd09483286de4be9c881e079c87db684aace4538218c0fbe3092d751339a76e",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_salt_long": {
+   "sha256": "03a02da288669bfdbe89d448a8d168bfdaf2735ca20069def0858bc7a9df6628",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_salt_missing": {
+   "sha256": "8e934a32e7b435f494f018f4a3c4c9b612cc478aad5e79d9e0305364ed360dbb",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_salt_short": {
+   "sha256": "cba4cb2c682bc1c1ce2b7a1a8c4d024b352b9e0c2a03d80590e8e0be958cd5fb",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_uppercase": {
+   "sha256": "ae3055bc7568594c7dcf506d9c1599d8df7f9e699152358be35fcb20cf8a8087",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_work_factor_23": {
+   "sha256": "d2cc2863cd0fedb99265871b8cea654d41997de37f660699fbc4d8d3c5391770",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_work_factor_hex": {
+   "sha256": "701f161e64f6a43c9c34b22890d84911eb9b4135296c197ecf1fa625d6d9cd1f",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_work_factor_leading_garbage": {
+   "sha256": "3d3e86bc8c40a3b4341d4f7a674e7bacccb6d480088cce066c4869403ec5e8ce",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_work_factor_leading_plus": {
+   "sha256": "fc8699a2263765b5e38f0435941f3a8578c3acb81091137bf2068f0f34bc7046",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_work_factor_leading_zero_decimal": {
+   "sha256": "4d76c4758cfaf4a89d41902e2d0dfe5be6137bf7ea17f549f15b31ef23115f3f",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_work_factor_leading_zero_octal": {
+   "sha256": "c1a94feeab19a89f7d4c2f72ec5039b2ea88f4854da32d1e82f3da75d55fcb25",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_work_factor_missing": {
+   "sha256": "e60129370690a5c33f9831535608133da7be1ed17071511340fababd76abb21a",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_work_factor_negative": {
+   "sha256": "a89a9d5f038666b226ec188f815f043a6517794fa1d01c1ddca385f0fbe69bf1",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_work_factor_overflow": {
+   "sha256": "532fdb8afca25916c724da9b991569340752068cc8d47fa26c643331e133ec7e",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_work_factor_trailing_garbage": {
+   "sha256": "3d3e86bc8c40a3b4341d4f7a674e7bacccb6d480088cce066c4869403ec5e8ce",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_work_factor_wrong": {
+   "sha256": "565290c68accd2b94dbcf434927049d4fcfc8ab8fe169a6c33e546606e5cf65c",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/scrypt_work_factor_zero": {
+   "sha256": "bdac47d76667aa0f14270df58573b873c806ea838b2e026d62789287f0413239",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_bad_start": {
+   "sha256": "e2ba22a45e0913065e920629ba6f6a06e04169e2fe5f49579c769893e46d71de",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_base64_padding": {
+   "sha256": "7bf0dbb73084606ab26cd7a06b9fccc09b6f57b9cdd4b646f8b7e00c2402334e",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_empty_argument": {
+   "sha256": "89ea531b7224b5e6dac6b55cb365e990c7a8caa6bba31840a19bb2f74e078497",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_empty_body": {
+   "sha256": "2c2fd1650f43d4d347bfbd729b05bff56e0ba30dfebc0625d461b42c12bb2552",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_empty_last_line": {
+   "sha256": "f5760b7b3d27ac60c4390adab63f2387fec9a472dc71d68a94031e28174b6f14",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_invalid_character": {
+   "sha256": "fc50cb20219d50837086cb295832a28a52feca62e142cca3b4aeda3ead50e954",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_long_line": {
+   "sha256": "488be43646e7668cdc1db3260e0f84fd7b71ee40d797d22530d237b8c90d37b7",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_missing_body": {
+   "sha256": "2eb67c8cb24fcbd9dc37b9853ae1ddc0dac40ac17be8f7893909921a7bfefb2c",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_missing_final_line": {
+   "sha256": "4dbbba0f136f577469141a5010e8ea474c9c532ab66187e63b6aac9bd23bc52a",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_multiple_short_lines": {
+   "sha256": "e5146580aadb6942543acfb975ef2964f4a8a5eb2fd770c40d7da7b4a95f8834",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_no_arguments": {
+   "sha256": "730062e37e6fa0c0e1de5f8cee90662f61da99b7bb1a4996847a68afefaf8a1f",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_not_canonical": {
+   "sha256": "e2516017cdfa589e9ebc18c1646664d375c56e6f594191ae814da614add0a9f4",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_spurious_cr": {
+   "sha256": "0a58d23cc4398edf6a16c034c4a61da2e2006e4010377654ad50017468baa39d",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stanza_valid_characters": {
+   "sha256": "115085567f8719b20e0903973873c20acae854b48975567f73cd15d29bd93a4d",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_257_chunks": {
+   "sha256": "3ffc51d9314c11f84d049ad627d031ab8407abc1199df29144861fc6c4da92b8",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_257_chunks_full": {
+   "sha256": "c55d0a954b0b25f13874734e25ca863a19e1b695af8dad5e3853176fbe2298c2",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_258_chunks": {
+   "sha256": "0aff2b07b9cb6575863aa6b03ea78e40a49dc17ffa3bcb452a74c5bc7cd46ea6",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_bad_tag": {
+   "sha256": "b302d219368735ca621d8237a49906831b0aa0f6116c05a1863aba18c421d9fe",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_bad_tag_second_chunk": {
+   "sha256": "2763f46ed2ad05eace35a23084f14493b4593e03a85f8cbe15c4e608e2aaa324",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_bad_tag_second_chunk_full": {
+   "sha256": "30e7a10c2725ff919e5d471be8022084485cc9eb447ab86bd7f7a6a3fb9dab08",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_empty_payload": {
+   "sha256": "c04491b616be7f9c72f0dfaaf2b0b7ff0a6a716d0afd37d96b1dfc1800367762",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_last_chunk_empty": {
+   "sha256": "4810c276566fe9977021a15b4e739bea2319ad5ddf0847f1dfba6fc1556d582a",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_last_chunk_full": {
+   "sha256": "2dd3be61247bc2284cdac2df1cce6a18db0e00574157f19439e3c228245bfccd",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_last_chunk_full_second": {
+   "sha256": "51008a18664460b97c6c621d71da607b09960141d08286a6b82e7a6818cc9efa",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_missing_tag": {
+   "sha256": "51f96aba6a55c0c7634490a0b76ac53cfef383c44130f01de0b20cf0cad5ffcc",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_no_chunks": {
+   "sha256": "506e93c795d1cab3cec64d6789f7fe45be545f10bff0b8a4d35d2472c58b5bd1",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_no_final": {
+   "sha256": "22221d2161e2d579479f11a02061d30fa2004c3e55f256e3e7c33c4b1b8cf4b7",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_no_final_full": {
+   "sha256": "23bce401fd7f428fa4b24d45c5054fef4cf3462a69047193032a17a2a043604c",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_no_final_two_chunks": {
+   "sha256": "0e1b1ae57c213c738f8ecb5367bd65d894e7ce78208cdee1ffef51d220d9d222",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_no_final_two_chunks_full": {
+   "sha256": "060b80ffaf5ae85aae6cf13cfcf0210927ab87cd63b03c20799d1c304261f27d",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_no_nonce": {
+   "sha256": "c849c71e932e72e87c576610ce2321ca80bd6500920c34c65230296c9fb7bcad",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_short_chunk": {
+   "sha256": "0c7b3c918f717c8fc047143ddcd244937a94aa3d9d81115fbb7c429991656d5b",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_short_nonce": {
+   "sha256": "89ac7c59680477968325e3e0ffb67973743ad63c42d601685f7d7513a6c2ff32",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_short_second_chunk": {
+   "sha256": "6c719858e51bb460ce192bebff1e9a60c62296976c6a616b84a8b0dd1aae951e",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_three_chunks": {
+   "sha256": "65228acff4093f43666daca36557be239315153dfce50730ff7a7c79fbbb7d9c",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_trailing_garbage_long": {
+   "sha256": "a019543f7c6d36a193e2f84ee348735e9e964f8785fdd5219e9cadef51211fc9",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_trailing_garbage_short": {
+   "sha256": "42ab8680743ba4bdae15a991ce53a6ecac747d269cced7ebc85f7e3ceaec5a01",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_two_chunks": {
+   "sha256": "51008a18664460b97c6c621d71da607b09960141d08286a6b82e7a6818cc9efa",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_two_final_chunks": {
+   "sha256": "f29f4769f00b3e07fdf510b15e961d45b82137e86fe0282bb5e53a82a82ee1fa",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_two_final_chunks_full": {
+   "sha256": "faacbff4a2d17dad128ec4f2e527411a613ed304c45798edc7d7a37b70b14306",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_two_final_chunks_second": {
+   "sha256": "10d2df215cb75721451d956dacd8e48aa67889dc16d651eb03fa0eee9db29ee2",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/stream_two_final_chunks_short": {
+   "sha256": "481f70693cce27ae33a9ab1b5721dee652d218703efc0c37078c9e066cae24a3",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/version_unsupported": {
+   "sha256": "a13d6b218009563a1190ae5a19184a7325238903ec68d4ffe8593497ef4d7523",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519": {
+   "sha256": "b8ae31af64f6a16718233844b77f117663753157c57238c8a30f0cdb4f1f434a",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519_bad_tag": {
+   "sha256": "fb1a75b536696818855ec4ef82fabbd81cdf726a480565e88cc19152c7530c37",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519_extra_argument": {
+   "sha256": "ae66b80fa68a9d08cbeea61c1cfa9489c27531e24939d7fdc33e93c877fde5ba",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519_grease": {
+   "sha256": "9d7f37bae2cc3932b8675e60efc9e27d56f902d6c1bab2a74d8452c39fc88f9e",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519_identity": {
+   "sha256": "b74d781e4e5ca702923d68aac000102e557d3b9faf707c388ec128a6aae6dd7a",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519_long_file_key": {
+   "sha256": "5196f3a6181304fbe3f34247f86a13b3bacd6c87d76e5e479c1d0aea211cdc52",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519_long_share": {
+   "sha256": "3ed95619171b724a7af89d6d87478989fac2a4c2cb02221d26377b4a14e2841b",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519_low_order": {
+   "sha256": "050745ff5f2d5981849852cb437e721579dd8fd84cefe7d687eb5b6addb4be07",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519_lowercase": {
+   "sha256": "e5d37db1970674982e5e6fd526bf173378fe003082beaa363e152470d1a62853",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519_multiple_recipients": {
+   "sha256": "4fa8ea5b02b3d8415f041a0f7f62c28b1d3b1ae4128b90ab42ef8ac114d2870a",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519_no_match": {
+   "sha256": "106bf9a30497a59beda392a70e58b85d03c314ff305101dcbdafd66a77f3be77",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519_not_canonical_body": {
+   "sha256": "b58c0df974726a612334934f3251c59de07bc437eb76ae310bfb439e4959eb18",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519_not_canonical_share": {
+   "sha256": "d7c5157679bdaffc2b141c7efa56346225be19131f9f33c499c00f55ec532d1d",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
+  },
+  "cctv-age/x25519_short_share": {
+   "sha256": "2ab19ad9c1554db0598acb4de1ef731b42cc77f2ab855cbc4191e5be50ae2759",
+   "source": "the age test kit of C2SP CCTV (https://github.com/C2SP/CCTV/tree/main/age) as the age crate 0.12.1 from crates.io (MIT OR Apache-2.0) carries it in tests/testdata/testkit/, byte for byte"
   }
  }
 }

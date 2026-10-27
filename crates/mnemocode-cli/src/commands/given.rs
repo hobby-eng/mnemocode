@@ -147,7 +147,10 @@ pub(crate) fn dates(parsed: &Parsed) -> Result<Vec<Date>, Stop> {
         return Err(GivenError::BothSources("the dates").into());
     }
     let text = read_input_text(path, "The dates file", DATES_LIMIT)?;
-    Ok(DatesAnswer::parse(&text, None, false)?.known().to_vec())
+    Ok(DatesAnswer::parse(&text, None, false)?
+        .known()
+        .iter()
+        .collect())
 }
 
 /// Refuses a count of dates `mode` does not take, unless they are asked later; a dates file counts
@@ -195,7 +198,7 @@ pub(crate) fn ask_phrase() -> Result<Asked<Phrase>, Stop> {
 pub(crate) fn ask_dates(word_count: Option<usize>) -> Result<Asked<Vec<Date>>, Stop> {
     let ask = secret_ask(&dates_prompt(word_count), "the dates", DATES_LIMIT);
     Ok(ask_until(&ask, true, |line| {
-        DatesAnswer::parse(line, word_count, false).map(|answer| answer.known().to_vec())
+        DatesAnswer::parse(line, word_count, false).map(|answer| answer.known().iter().collect())
     })?)
 }
 

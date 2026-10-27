@@ -153,6 +153,16 @@ impl Phrase {
         Ok(Self { indexes: bytes })
     }
 
+    /// The phrase of BIP39 `entropy`, 16 to 32 bytes; refused for another length.
+    pub fn of_entropy(entropy: &[u8]) -> Result<Self, PhraseError> {
+        let mnemonic = Mnemonic::from_entropy_in(Language::English, entropy)
+            .map_err(|_| PhraseError::WordCount)?;
+        let mut indexes: Vec<usize> = mnemonic.word_indices().collect();
+        let phrase = Self::of_indexes(&indexes);
+        indexes.zeroize();
+        phrase
+    }
+
     /// The number of words.
     pub fn len(&self) -> usize {
         self.indexes.len() / 2

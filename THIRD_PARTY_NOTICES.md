@@ -28,55 +28,153 @@ uses it under and the text of that licence.
 
 ### Crates
 
-- `arrayvec` 0.7.8: `MIT OR Apache-2.0`, used under MIT; [text 1](#text-1).
-- `base16ct` 1.0.0: `Apache-2.0 OR MIT`, used under MIT; [text 2](#text-2).
-- `bip39` 3.0.0: `CC0-1.0`, used under CC0-1.0; [text 3](#text-3).
-- `bitcoin_hashes` 0.14.101: `CC0-1.0`, used under CC0-1.0; [text 3](#text-3).
+- `adler2` 2.0.1: `0BSD OR MIT OR Apache-2.0`, used under MIT; [text 1](#text-1).
+- `aead` 0.6.1: `MIT OR Apache-2.0`, used under MIT; [text 2](#text-2).
+- `arrayvec` 0.7.8: `MIT OR Apache-2.0`, used under MIT; [text 3](#text-3).
+- `base16ct` 1.0.0: `Apache-2.0 OR MIT`, used under MIT; [text 4](#text-4).
+- `base64ct` 1.8.3: `Apache-2.0 OR MIT`, used under MIT; [text 5](#text-5).
+- `bech32` 0.12.0: `MIT`, used under MIT; [text 6](#text-6).
+- `bip39` 3.0.0: `CC0-1.0`, used under CC0-1.0; [text 7](#text-7).
+- `bitcoin_hashes` 0.14.101: `CC0-1.0`, used under CC0-1.0; [text 7](#text-7).
   The crate publishes no licence file. This is the CC0 1.0 legal code as other crates in this list ship it.
-- `block-buffer` 0.12.1: `MIT OR Apache-2.0`, used under MIT; [text 4](#text-4).
-- `bs58` 0.5.1: `MIT/Apache-2.0`, used under MIT; [text 5](#text-5).
-- `cfg-if` 1.0.5: `MIT OR Apache-2.0`, used under MIT; [text 6](#text-6).
-- `cmov` 0.5.4: `Apache-2.0 OR MIT`, used under MIT; [text 7](#text-7).
-- `const-oid` 0.10.2: `Apache-2.0 OR MIT`, used under MIT; [text 8](#text-8).
-- `cpubits` 0.1.1: `MIT OR Apache-2.0`, used under MIT; [text 9](#text-9).
-- `cpufeatures` 0.3.1: `MIT OR Apache-2.0`, used under MIT; [text 8](#text-8).
-- `crypto-bigint` 0.7.10: `Apache-2.0 OR MIT`, used under MIT; [text 10](#text-10).
-- `crypto-common` 0.2.2: `MIT OR Apache-2.0`, used under MIT; [text 11](#text-11).
-- `ctutils` 0.4.6: `Apache-2.0 OR MIT`, used under MIT; [text 12](#text-12).
-- `der` 0.8.3: `Apache-2.0 OR MIT`, used under MIT; [text 8](#text-8).
-- `digest` 0.11.3: `MIT OR Apache-2.0`, used under MIT; [text 13](#text-13).
-- `elliptic-curve` 0.14.3: `Apache-2.0 OR MIT`, used under MIT; [text 14](#text-14).
-- `ff` 0.14.0: `MIT/Apache-2.0`, used under MIT; [text 15](#text-15).
-- `getrandom` 0.4.3: `MIT OR Apache-2.0`, used under MIT; [text 16](#text-16).
-- `group` 0.14.0: `MIT/Apache-2.0`, used under MIT; [text 17](#text-17).
-- `hex-conservative` 0.2.3: `CC0-1.0`, used under CC0-1.0; [text 3](#text-3).
-- `hmac` 0.13.0: `MIT OR Apache-2.0`, used under MIT; [text 18](#text-18).
-- `hybrid-array` 0.4.15: `MIT OR Apache-2.0`, used under MIT; [text 7](#text-7).
-- `k256` 0.14.0: `Apache-2.0 OR MIT`, used under MIT; [text 19](#text-19).
-- `libc` 0.2.191: `MIT OR Apache-2.0`, used under MIT; [text 20](#text-20).
-- `num-traits` 0.2.19: `MIT OR Apache-2.0`, used under MIT; [text 21](#text-21).
-- `once_cell` 1.21.4: `MIT OR Apache-2.0`, used under MIT; [text 17](#text-17).
-- `primefield` 0.14.0: `Apache-2.0 OR MIT`, used under MIT; [text 22](#text-22).
-- `primeorder` 0.14.0: `Apache-2.0 OR MIT`, used under MIT; [text 23](#text-23).
-- `rand_core` 0.10.1: `MIT OR Apache-2.0`, used under MIT; [text 24](#text-24).
-- `ripemd` 0.2.0: `MIT OR Apache-2.0`, used under MIT; [text 10](#text-10).
-- `sec1` 0.8.1: `Apache-2.0 OR MIT`, used under MIT; [text 10](#text-10).
-- `sha2` 0.11.1: `MIT OR Apache-2.0`, used under MIT; [text 25](#text-25).
-- `subtle` 2.6.1: `BSD-3-Clause`, used under BSD-3-Clause; [text 26](#text-26).
-- `tinyvec` 1.13.3: `Zlib OR Apache-2.0 OR MIT`, used under MIT; [text 27](#text-27).
-- `typenum` 1.20.1: `MIT OR Apache-2.0`, used under MIT; [text 28](#text-28).
-- `unicode-ident` 1.0.27: `(MIT OR Apache-2.0) AND Unicode-3.0`, used under MIT and Unicode-3.0; [text 17](#text-17), [text 29](#text-29).
-- `unicode-normalization` 0.1.26: `(MIT OR Apache-2.0) AND Unicode-3.0`, used under MIT and Unicode-3.0; [text 30](#text-30), [text 29](#text-29).
-- `wasm-bindgen` 0.2.129: `MIT OR Apache-2.0`, used under MIT; [text 6](#text-6).
-- `wasm-bindgen-shared` 0.2.129: `MIT OR Apache-2.0`, used under MIT; [text 6](#text-6).
-- `windows-link` 0.2.1: `MIT OR Apache-2.0`, used under MIT; [text 31](#text-31).
-- `windows-sys` 0.61.2: `MIT OR Apache-2.0`, used under MIT; [text 31](#text-31).
-- `wnaf` 0.14.1: `Apache-2.0 OR MIT`, used under MIT; [text 32](#text-32).
-- `zeroize` 1.9.1: `Apache-2.0 OR MIT`, used under MIT; [text 33](#text-33).
+- `bitflags` 2.13.2: `MIT OR Apache-2.0`, used under MIT; [text 8](#text-8).
+- `block-buffer` 0.12.1: `MIT OR Apache-2.0`, used under MIT; [text 9](#text-9).
+- `bs58` 0.5.1: `MIT/Apache-2.0`, used under MIT; [text 10](#text-10).
+- `cfg-if` 1.0.5: `MIT OR Apache-2.0`, used under MIT; [text 11](#text-11).
+- `chacha20` 0.10.2: `MIT OR Apache-2.0`, used under MIT; [text 12](#text-12).
+- `chacha20poly1305` 0.11.0: `Apache-2.0 OR MIT`, used under MIT; [text 12](#text-12).
+- `cipher` 0.5.2: `MIT OR Apache-2.0`, used under MIT; [text 13](#text-13).
+- `cmov` 0.5.4: `Apache-2.0 OR MIT`, used under MIT; [text 14](#text-14).
+- `const-oid` 0.10.2: `Apache-2.0 OR MIT`, used under MIT; [text 15](#text-15).
+- `cpubits` 0.1.1: `MIT OR Apache-2.0`, used under MIT; [text 16](#text-16).
+- `cpufeatures` 0.3.1: `MIT OR Apache-2.0`, used under MIT; [text 15](#text-15).
+- `crc32fast` 1.5.3: `MIT OR Apache-2.0`, used under MIT; [text 17](#text-17).
+- `crypto-bigint` 0.7.10: `Apache-2.0 OR MIT`, used under MIT; [text 18](#text-18).
+- `crypto-common` 0.2.2: `MIT OR Apache-2.0`, used under MIT; [text 19](#text-19).
+- `ctutils` 0.4.6: `Apache-2.0 OR MIT`, used under MIT; [text 20](#text-20).
+- `curve25519-dalek` 5.0.0: `BSD-3-Clause`, used under BSD-3-Clause; [text 21](#text-21).
+- `der` 0.8.3: `Apache-2.0 OR MIT`, used under MIT; [text 15](#text-15).
+- `digest` 0.11.3: `MIT OR Apache-2.0`, used under MIT; [text 22](#text-22).
+- `elliptic-curve` 0.14.3: `Apache-2.0 OR MIT`, used under MIT; [text 23](#text-23).
+- `fdeflate` 0.3.7: `MIT OR Apache-2.0`, used under MIT; [text 24](#text-24).
+- `ff` 0.14.0: `MIT/Apache-2.0`, used under MIT; [text 25](#text-25).
+- `flate2` 1.1.10: `MIT OR Apache-2.0`, used under MIT; [text 26](#text-26).
+- `foldhash` 0.2.0: `Zlib`, used under Zlib; [text 27](#text-27).
+- `g2p` 1.2.2: `MIT/Apache-2.0`, used under MIT; [text 28](#text-28).
+- `g2poly` 1.2.2: `MIT/Apache-2.0`, used under MIT; [text 28](#text-28).
+- `getrandom` 0.4.3: `MIT OR Apache-2.0`, used under MIT; [text 29](#text-29).
+- `group` 0.14.0: `MIT/Apache-2.0`, used under MIT; [text 1](#text-1).
+- `hashbrown` 0.17.1: `MIT OR Apache-2.0`, used under MIT; [text 30](#text-30).
+- `hex-conservative` 0.2.3: `CC0-1.0`, used under CC0-1.0; [text 7](#text-7).
+- `hkdf` 0.13.0: `MIT OR Apache-2.0`, used under MIT; [text 31](#text-31).
+- `hmac` 0.13.0: `MIT OR Apache-2.0`, used under MIT; [text 32](#text-32).
+- `hybrid-array` 0.4.15: `MIT OR Apache-2.0`, used under MIT; [text 14](#text-14).
+- `inout` 0.2.5: `MIT OR Apache-2.0`, used under MIT; [text 33](#text-33).
+- `k256` 0.14.0: `Apache-2.0 OR MIT`, used under MIT; [text 34](#text-34).
+- `keccak` 0.2.2: `Apache-2.0 OR MIT`, used under MIT; [text 35](#text-35).
+- `libc` 0.2.191: `MIT OR Apache-2.0`, used under MIT; [text 36](#text-36).
+- `lru` 0.18.5: `MIT`, used under MIT; [text 37](#text-37).
+- `miniz_oxide` 0.8.9: `MIT OR Zlib OR Apache-2.0`, used under MIT; [text 38](#text-38).
+- `miniz_oxide` 0.9.1: `MIT OR Zlib OR Apache-2.0`, used under MIT; [text 38](#text-38).
+- `num-traits` 0.2.19: `MIT OR Apache-2.0`, used under MIT; [text 8](#text-8).
+- `once_cell` 1.21.4: `MIT OR Apache-2.0`, used under MIT; [text 1](#text-1).
+- `pbkdf2` 0.13.0: `MIT OR Apache-2.0`, used under MIT; [text 39](#text-39).
+- `png` 0.18.1: `MIT OR Apache-2.0`, used under MIT; [text 40](#text-40).
+- `poly1305` 0.9.1: `Apache-2.0 OR MIT`, used under MIT; [text 41](#text-41).
+- `primefield` 0.14.0: `Apache-2.0 OR MIT`, used under MIT; [text 42](#text-42).
+- `primeorder` 0.14.0: `Apache-2.0 OR MIT`, used under MIT; [text 43](#text-43).
+- `qrcodegen` 1.8.0: `MIT`, used under MIT; [text 44](#text-44).
+  The crate publishes no licence file. This is the standard SPDX MIT text with the copyright holders taken from the crate's `authors`.
+- `rand_core` 0.10.1: `MIT OR Apache-2.0`, used under MIT; [text 45](#text-45).
+- `ripemd` 0.2.0: `MIT OR Apache-2.0`, used under MIT; [text 18](#text-18).
+- `rqrr` 0.11.0: `(MIT OR Apache-2.0) AND ISC`, used under MIT and ISC; [text 46](#text-46), [text 47](#text-47).
+- `salsa20` 0.11.0: `MIT OR Apache-2.0`, used under MIT; [text 48](#text-48).
+- `scrypt` 0.12.0: `MIT OR Apache-2.0`, used under MIT; [text 18](#text-18).
+- `sec1` 0.8.1: `Apache-2.0 OR MIT`, used under MIT; [text 18](#text-18).
+- `sha2` 0.11.1: `MIT OR Apache-2.0`, used under MIT; [text 49](#text-49).
+- `sha3` 0.12.0: `MIT OR Apache-2.0`, used under MIT; [text 50](#text-50).
+- `simd-adler32` 0.3.10: `MIT`, used under MIT; [text 51](#text-51).
+- `sponge-cursor` 0.1.0: `MIT OR Apache-2.0`, used under MIT; [text 52](#text-52).
+- `subtle` 2.6.1: `BSD-3-Clause`, used under BSD-3-Clause; [text 53](#text-53).
+- `tinyvec` 1.13.3: `Zlib OR Apache-2.0 OR MIT`, used under MIT; [text 54](#text-54).
+- `typenum` 1.20.1: `MIT OR Apache-2.0`, used under MIT; [text 55](#text-55).
+- `unicode-ident` 1.0.27: `(MIT OR Apache-2.0) AND Unicode-3.0`, used under MIT and Unicode-3.0; [text 1](#text-1), [text 56](#text-56).
+- `unicode-normalization` 0.1.26: `(MIT OR Apache-2.0) AND Unicode-3.0`, used under MIT and Unicode-3.0; [text 57](#text-57), [text 56](#text-56).
+- `universal-hash` 0.6.1: `MIT OR Apache-2.0`, used under MIT; [text 58](#text-58).
+- `wasm-bindgen` 0.2.129: `MIT OR Apache-2.0`, used under MIT; [text 11](#text-11).
+- `wasm-bindgen-shared` 0.2.129: `MIT OR Apache-2.0`, used under MIT; [text 11](#text-11).
+- `windows-link` 0.2.1: `MIT OR Apache-2.0`, used under MIT; [text 59](#text-59).
+- `windows-sys` 0.61.2: `MIT OR Apache-2.0`, used under MIT; [text 59](#text-59).
+- `wnaf` 0.14.1: `Apache-2.0 OR MIT`, used under MIT; [text 60](#text-60).
+- `x25519-dalek` 3.0.0: `BSD-3-Clause`, used under BSD-3-Clause; [text 61](#text-61).
+- `zeroize` 1.9.1: `Apache-2.0 OR MIT`, used under MIT; [text 35](#text-35).
 
 ### Licence texts
 
 #### Text 1
+
+MIT, for adler2 2.0.1, group 0.14.0, once_cell 1.21.4, unicode-ident 1.0.27.
+
+```
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 2
+
+MIT, for aead 0.6.1.
+
+```
+Copyright (c) 2019-2026 The RustCrypto Project Developers
+Copyright (c) 2019 MobileCoin, LLC
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 3
 
 MIT, for arrayvec 0.7.8.
 
@@ -108,7 +206,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 2
+#### Text 4
 
 MIT, for base16ct 1.0.0.
 
@@ -141,7 +239,72 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 3
+#### Text 5
+
+MIT, for base64ct 1.8.3.
+
+```
+Copyright (c) 2014 Steve "Sc00bz" Thomas (steve at tobtu dot com)
+Copyright (c) 2021-2025 The RustCrypto Project Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 6
+
+MIT, for bech32 0.12.0.
+
+```
+Copyright (c) 2017 Clark Moody
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 7
 
 CC0-1.0, for bip39 3.0.0, bitcoin_hashes 0.14.101, hex-conservative 0.2.3.
 
@@ -269,7 +432,39 @@ express Statement of Purpose.
     this CC0 or use of the Work.
 ```
 
-#### Text 4
+#### Text 8
+
+MIT, for bitflags 2.13.2, num-traits 0.2.19.
+
+```
+Copyright (c) 2014 The Rust Project Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 9
 
 MIT, for block-buffer 0.12.1.
 
@@ -301,7 +496,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 5
+#### Text 10
 
 MIT, for bs58 0.5.1.
 
@@ -328,7 +523,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-#### Text 6
+#### Text 11
 
 MIT, for cfg-if 1.0.5, wasm-bindgen 0.2.129, wasm-bindgen-shared 0.2.129.
 
@@ -360,7 +555,71 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 7
+#### Text 12
+
+MIT, for chacha20 0.10.2, chacha20poly1305 0.11.0.
+
+```
+Copyright (c) 2019-2026 The RustCrypto Project Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 13
+
+MIT, for cipher 0.5.2.
+
+```
+Copyright (c) 2016-2025 RustCrypto Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 14
 
 MIT, for cmov 0.5.4, hybrid-array 0.4.15.
 
@@ -392,7 +651,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 8
+#### Text 15
 
 MIT, for const-oid 0.10.2, cpufeatures 0.3.1, der 0.8.3.
 
@@ -424,7 +683,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 9
+#### Text 16
 
 MIT, for cpubits 0.1.1.
 
@@ -456,9 +715,37 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 10
+#### Text 17
 
-MIT, for crypto-bigint 0.7.10, ripemd 0.2.0, sec1 0.8.1.
+MIT, for crc32fast 1.5.3.
+
+```
+MIT License
+
+Copyright (c) 2018 Sam Rijs, Alex Crichton and contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+#### Text 18
+
+MIT, for crypto-bigint 0.7.10, ripemd 0.2.0, scrypt 0.12.0, sec1 0.8.1.
 
 ```
 Copyright (c) 2021-2026 The RustCrypto Project Developers
@@ -488,7 +775,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 11
+#### Text 19
 
 MIT, for crypto-common 0.2.2.
 
@@ -520,7 +807,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 12
+#### Text 20
 
 MIT, for ctutils 0.4.6.
 
@@ -552,7 +839,43 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 13
+#### Text 21
+
+BSD-3-Clause, for curve25519-dalek 5.0.0.
+
+```
+Copyright (c) 2016-2021 isis agora lovecruft. All rights reserved.
+Copyright (c) 2016-2021 Henry de Valence. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+1. Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+#### Text 22
 
 MIT, for digest 0.11.3.
 
@@ -585,7 +908,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 14
+#### Text 23
 
 MIT, for elliptic-curve 0.14.3.
 
@@ -617,7 +940,39 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 15
+#### Text 24
+
+MIT, for fdeflate 0.3.7.
+
+```
+MIT License
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 25
 
 MIT, for ff 0.14.0.
 
@@ -645,7 +1000,92 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-#### Text 16
+#### Text 26
+
+MIT, for flate2 1.1.10.
+
+```
+Copyright (c) 2014-2026 Alex Crichton
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 27
+
+Zlib, for foldhash 0.2.0.
+
+```
+Copyright (c) 2024 Orson Peters
+
+This software is provided 'as-is', without any express or implied warranty. In
+no event will the authors be held liable for any damages arising from the use of
+this software.
+
+Permission is granted to anyone to use this software for any purpose, including
+commercial applications, and to alter it and redistribute it freely, subject to
+the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not claim
+    that you wrote the original software. If you use this software in a product,
+    an acknowledgment in the product documentation would be appreciated but is
+    not required.
+
+2. Altered source versions must be plainly marked as such, and must not be
+    misrepresented as being the original software.
+
+3. This notice may not be removed or altered from any source distribution.
+```
+
+#### Text 28
+
+MIT, for g2p 1.2.2, g2poly 1.2.2.
+
+```
+The MIT License (MIT)
+Copyright (c) 2018 Moritz 'WanzenBug' Wanzenböck
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 29
 
 MIT, for getrandom 0.4.3.
 
@@ -678,11 +1118,13 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 17
+#### Text 30
 
-MIT, for group 0.14.0, once_cell 1.21.4, unicode-ident 1.0.27.
+MIT, for hashbrown 0.17.1.
 
 ```
+Copyright (c) 2016 Amanieu d'Antras
+
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
 documentation files (the "Software"), to deal in the
@@ -708,7 +1150,40 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 18
+#### Text 31
+
+MIT, for hkdf 0.13.0.
+
+```
+Copyright (c) 2015-2018 Vlad Filippov
+Copyright (c) 2018-2021 RustCrypto Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 32
 
 MIT, for hmac 0.13.0.
 
@@ -740,7 +1215,40 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 19
+#### Text 33
+
+MIT, for inout 0.2.5.
+
+```
+Copyright (c) 2022-2025 The RustCrypto Project Developers
+Copyright (c) 2022 Artyom Pavlov
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 34
 
 MIT, for k256 0.14.0.
 
@@ -772,7 +1280,39 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 20
+#### Text 35
+
+MIT, for keccak 0.2.2, zeroize 1.9.1.
+
+```
+Copyright (c) 2018-2026 The RustCrypto Project Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 36
 
 MIT, for libc 0.2.191.
 
@@ -804,12 +1344,72 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 21
+#### Text 37
 
-MIT, for num-traits 0.2.19.
+MIT, for lru 0.18.5.
 
 ```
-Copyright (c) 2014 The Rust Project Developers
+MIT License
+
+Copyright (c) 2016 Jerome Froelich
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+#### Text 38
+
+MIT, for miniz_oxide 0.8.9, miniz_oxide 0.9.1.
+
+```
+MIT License
+
+Copyright 2013-2014 RAD Game Tools and Valve Software
+Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
+Copyright (c) 2017 Frommi
+Copyright (c) 2017-2024 oyvindln
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+#### Text 39
+
+MIT, for pbkdf2 0.13.0.
+
+```
+Copyright (c) 2017 Artyom Pavlov
+Copyright (c) 2018-2023 The RustCrypto Project Developers
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
@@ -836,7 +1436,71 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 22
+#### Text 40
+
+MIT, for png 0.18.1.
+
+```
+Copyright (c) 2015 nwin
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 41
+
+MIT, for poly1305 0.9.1.
+
+```
+Copyright (c) 2015-2026 The RustCrypto Project Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 42
 
 MIT, for primefield 0.14.0.
 
@@ -868,7 +1532,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 23
+#### Text 43
 
 MIT, for primeorder 0.14.0.
 
@@ -900,7 +1564,35 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 24
+#### Text 44
+
+MIT, for qrcodegen 1.8.0.
+
+```
+MIT License
+
+Copyright (c) Project Nayuki
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+#### Text 45
 
 MIT, for rand_core 0.10.1.
 
@@ -932,7 +1624,93 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 25
+#### Text 46
+
+MIT, for rqrr 0.11.0.
+
+```
+Copyright 2019 Moritz Wanzenböck <moritz@wanzenbug.xyz>
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject
+to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+#### Text 47
+
+ISC, for rqrr 0.11.0.
+
+```
+quirc -- QR-code recognition library
+Copyright (C) 2010-2012 Daniel Beer <dlbeer@gmail.com>
+
+ISC License
+===========
+
+Permission to use, copy, modify, and/or distribute this software for
+any purpose with or without fee is hereby granted, provided that the
+above copyright notice and this permission notice appear in all
+copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+```
+
+#### Text 48
+
+MIT, for salsa20 0.11.0.
+
+```
+Copyright (c) 2019-2026 The RustCrypto Project Developers
+Copyright (c) 2019 Eric McCorkle
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 49
 
 MIT, for sha2 0.11.1.
 
@@ -967,7 +1745,103 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 26
+#### Text 50
+
+MIT, for sha3 0.12.0.
+
+```
+Copyright (c) 2020-2026 The RustCrypto Project Developers
+Copyright (c) 2016-2023 Artyom Pavlov, Marek Kotewicz
+Copyright (c) 2014 Sébastien Martini
+Copyright (c) 2009-2013 Mozilla Foundation
+Copyright (c) 2006-2009 Graydon Hoare
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 51
+
+MIT, for simd-adler32 0.3.10.
+
+```
+MIT License
+
+Copyright (c) [2021] [Marvin Countryman]
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+#### Text 52
+
+MIT, for sponge-cursor 0.1.0.
+
+```
+Copyright (c) 2026 The RustCrypto Project Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 53
 
 BSD-3-Clause, for subtle 2.6.1.
 
@@ -1003,7 +1877,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-#### Text 27
+#### Text 54
 
 MIT, for tinyvec 1.13.3.
 
@@ -1015,7 +1889,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 28
+#### Text 55
 
 MIT, for typenum 1.20.1.
 
@@ -1043,7 +1917,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-#### Text 29
+#### Text 56
 
 Unicode-3.0, for unicode-ident 1.0.27, unicode-normalization 0.1.26.
 
@@ -1089,7 +1963,7 @@ dealings in these Data Files or Software without prior written
 authorization of the copyright holder.
 ```
 
-#### Text 30
+#### Text 57
 
 MIT, for unicode-normalization 0.1.26.
 
@@ -1121,7 +1995,39 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 31
+#### Text 58
+
+MIT, for universal-hash 0.6.1.
+
+```
+Copyright (c) 2019-2025 RustCrypto Developers
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+#### Text 59
 
 MIT, for windows-link 0.2.1, windows-sys 0.61.2.
 
@@ -1149,7 +2055,7 @@ MIT, for windows-link 0.2.1, windows-sys 0.61.2.
     SOFTWARE
 ```
 
-#### Text 32
+#### Text 60
 
 MIT, for wnaf 0.14.1.
 
@@ -1182,34 +2088,38 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 33
+#### Text 61
 
-MIT, for zeroize 1.9.1.
+BSD-3-Clause, for x25519-dalek 3.0.0.
 
 ```
-Copyright (c) 2018-2026 The RustCrypto Project Developers
+Copyright (c) 2017-2021 isis agora lovecruft. All rights reserved.
+Copyright (c) 2019-2021 DebugSteven. All rights reserved.
 
-Permission is hereby granted, free of charge, to any
-person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the
-Software without restriction, including without
-limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software
-is furnished to do so, subject to the following
-conditions:
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
 
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions
-of the Software.
+1. Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+2. Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```

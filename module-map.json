@@ -34,6 +34,7 @@
           "qrcodegen",
           "rqrr",
           "png",
+          "miniz_oxide",
           "zeroize"
         ],
         "cfg(unix)": [
@@ -99,7 +100,8 @@
           "dates",
           "bip32",
           "forms",
-          "modes"
+          "modes",
+          "wallet"
         ],
         "sskr": [
           "bip39",

@@ -99,6 +99,11 @@ pub fn expect_same<T: PartialEq + ?Sized>(
     }
 }
 
+/// `result`'s value, or its refusal as the failure of the check that called the rule.
+pub fn ok<T, E: Refusal>(result: Result<T, E>) -> Result<T, CheckFailure> {
+    result.map_err(|refusal| CheckFailure::refused(&refusal))
+}
+
 /// Fails, naming the case, unless `result` is a refusal with `code`: a case the rule must refuse,
 /// for the reason it must refuse it.
 pub fn expect_refused<T, E: Refusal>(

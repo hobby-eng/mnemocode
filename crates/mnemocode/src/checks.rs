@@ -3,7 +3,14 @@
 //! known answers and refusals, run before any secret is asked ([`Tier::Startup`]) or on request
 //! ([`Tier::Full`]). The rows of each part join here with the increment that builds the part.
 
+mod candidates;
+#[cfg(feature = "any-coin")]
+mod coins;
 pub mod public_vectors;
+mod qr;
+mod re_encoding;
+#[cfg(feature = "coin-bitcoin")]
+mod wallet;
 
 use bip39::{Language, Mnemonic};
 use sha2::{Digest, Sha256};
@@ -18,7 +25,7 @@ use crate::forms::Form;
 use crate::forms::hints::{BIP39, LineWordHints, WordHint, WordHints, codes_list};
 use crate::modes::Mode;
 use crate::modes::seedshift::Indexes;
-use crate::refusal::Refusal;
+pub(crate) use crate::self_check::ok;
 use crate::self_check::vectors::{
     MASKED_DATE, MASKED_ENGLISH, PUBLIC_MNEMONIC, PUBLIC_MNEMONIC_24, SEEDSHIFT_DATES,
 };
@@ -166,6 +173,17 @@ pub struct Row {
     run: fn(Tier) -> Result<(), CheckFailure>,
 }
 
+impl Row {
+    /// A row named `name`, covering `detail`, whose cases `run` runs.
+    pub(crate) const fn new(
+        name: &'static str,
+        detail: &'static str,
+        run: fn(Tier) -> Result<(), CheckFailure>,
+    ) -> Self {
+        Self { name, detail, run }
+    }
+}
+
 impl Check for Row {
     fn name(&self) -> &'static str {
         self.name
@@ -181,7 +199,7 @@ impl Check for Row {
 }
 
 /// The library's rows, in the report's order.
-pub const ROWS: [Row; 7] = [
+pub const ROWS: [Row; 11] = [
     Row {
         name: "Core integrity",
         detail: "word list and fixed forward/reverse vectors",
@@ -217,16 +235,28 @@ pub const ROWS: [Row; 7] = [
         detail: "BIP39 words below a word typed, Tab completion, codes without hints",
         run: word_hints,
     },
+    re_encoding::ROW,
+    candidates::ROW,
+    qr::PNG_ADMISSION,
+    qr::QR_ADAPTER,
 ];
+
+/// Every row of this build: the library's, then the coins' it holds.
+pub fn rows() -> impl Iterator<Item = &'static Row> {
+    #[cfg(feature = "any-coin")]
+    let coins = coins::ROWS;
+    #[cfg(not(feature = "any-coin"))]
+    let coins: &[Row] = &[];
+    #[cfg(feature = "coin-bitcoin")]
+    let wallet: &[Row] = &[wallet::ROW];
+    #[cfg(not(feature = "coin-bitcoin"))]
+    let wallet: &[Row] = &[];
+    ROWS.iter().chain(wallet).chain(coins)
+}
 
 /// The startup cases of every row, before any secret is asked; fails at the first difference.
 pub fn startup() -> Result<(), CheckFailure> {
-    ROWS.iter().try_for_each(|row| row.run(Tier::Startup))
-}
-
-/// `result`'s value, or its refusal as the failure of the check that called the rule.
-fn ok<T, E: Refusal>(result: Result<T, E>) -> Result<T, CheckFailure> {
-    result.map_err(|refusal| CheckFailure::refused(&refusal))
+    rows().try_for_each(|row| row.run(Tier::Startup))
 }
 
 /// The dates written DD-MM-YYYY.
@@ -657,7 +687,7 @@ mod tests {
 
     #[test]
     fn every_row_passes_in_both_tiers() {
-        for row in &ROWS {
+        for row in rows() {
             assert_eq!(row.run(Tier::Startup), Ok(()), "{}", row.name());
             assert_eq!(row.run(Tier::Full), Ok(()), "{}", row.name());
         }

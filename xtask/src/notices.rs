@@ -36,7 +36,7 @@ const OWN: [&str; 6] = [
     "xtask",
 ];
 /// Licence file names to look for, per licence, before the generic names.
-const FILE_NAMES: [(&str, &[&str]); 4] = [
+const FILE_NAMES: [(&str, &[&str]); 5] = [
     (
         "MIT",
         &[
@@ -57,12 +57,13 @@ const FILE_NAMES: [(&str, &[&str]); 4] = [
             "LICENSE-APACHE-2.0",
         ],
     ),
+    ("ISC", &["LICENSE-ISC"]),
     ("Unicode-3.0", &["LICENSE-UNICODE"]),
     ("Zlib", &["LICENSE-ZLIB", "LICENSE-ZLIB.md"]),
 ];
 const GENERIC_NAMES: [&str; 5] = ["LICENSE", "LICENSE.md", "LICENSE.txt", "LICENCE", "COPYING"];
 /// A phrase every text of the licence contains, so that no other licence's file is copied.
-const MARKERS: [(&str, &str); 7] = [
+const MARKERS: [(&str, &str); 8] = [
     ("MIT", "Permission is hereby granted, free of charge"),
     ("Apache-2.0", "Apache License"),
     (
@@ -74,6 +75,10 @@ const MARKERS: [(&str, &str); 7] = [
         "Redistribution and use in source and binary forms",
     ),
     ("CC0-1.0", "CC0 1.0 Universal"),
+    (
+        "ISC",
+        "Permission to use, copy, modify, and/or distribute this software for",
+    ),
     ("Unicode-3.0", "UNICODE LICENSE V3"),
     (
         "Zlib",

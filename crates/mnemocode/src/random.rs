@@ -71,6 +71,17 @@ pub trait Random {
     }
 }
 
+/// A source that gives no randomness: for what draws none, such as a candidate list written in the
+/// open, which the self-test writes; any draw from it is refused.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct NoRandomness;
+
+impl Random for NoRandomness {
+    fn fill(&mut self, _bytes: &mut [u8]) -> Result<(), RandomError> {
+        Err(RandomError::Unavailable)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -11,16 +11,54 @@ publish.workspace = true
 # Each unit (a coin, a share form, a search) gets its feature with the increment that builds it
 # (docs/design/architect/ARCHITECTURE.md §8, §9).
 [features]
-default = []
+default = [
+  "coin-bitcoin",
+  "coin-bitcoin-cash",
+  "coin-cosmos",
+  "coin-dash",
+  "coin-dogecoin",
+  "coin-ethereum",
+  "coin-ethereum-classic",
+  "coin-injective",
+  "coin-litecoin",
+  "coin-tron",
+  "coin-xrp",
+  "coin-zcash",
+]
+# Implied by every coin: the code all coins share. Not a coin, so not chosen on its own.
+any-coin = []
+coin-bitcoin = ["any-coin"]
+coin-bitcoin-cash = ["any-coin"]
+coin-cosmos = ["any-coin"]
+coin-dash = ["any-coin"]
+coin-dogecoin = ["any-coin"]
+coin-ethereum = ["any-coin"]
+coin-ethereum-classic = ["any-coin"]
+coin-injective = ["any-coin"]
+coin-litecoin = ["any-coin"]
+coin-tron = ["any-coin"]
+coin-xrp = ["any-coin"]
+coin-zcash = ["any-coin"]
 
 [dependencies]
+base64ct.workspace = true
+bech32.workspace = true
 bip39.workspace = true
 bs58.workspace = true
+chacha20poly1305.workspace = true
+hkdf.workspace = true
 hmac.workspace = true
 k256.workspace = true
+miniz_oxide.workspace = true
+png.workspace = true
+qrcodegen.workspace = true
 ripemd.workspace = true
+rqrr.workspace = true
+scrypt.workspace = true
 sha2.workspace = true
+sha3.workspace = true
 unicode-normalization.workspace = true
+x25519-dalek.workspace = true
 zeroize.workspace = true
 
 [target.'cfg(unix)'.dependencies]

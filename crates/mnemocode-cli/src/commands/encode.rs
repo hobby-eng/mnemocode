@@ -1,8 +1,9 @@
 //! `mnemocode encode` (MnemoCode TS 0.1.0's `cli/encode-command.ts`, `encode-report.ts` and the
-//! record of `encode-export.ts`, CAP-PHRASE-FORMATS-ENCODE): a seed phrase written as codes in one
-//! form, masked with the dates where the mode masks; shown on the private screen with both
-//! fingerprints, and saved as an MNC1 record where --output asks. Cards, shares, QR codes, the
-//! sheet for heirs and the backup check come with their increments.
+//! record and QR code of `encode-export.ts`, CAP-PHRASE-FORMATS-ENCODE and -ENCODE-QR): a seed
+//! phrase written as codes in one form, masked with the dates where the mode masks; shown on the
+//! private screen with both fingerprints, and saved as an MNC1 record where --output asks and as
+//! the library's verified QR image where --qr asks. Cards, shares, the sheet for heirs and the
+//! backup check come with their increments.
 
 use std::fmt;
 use std::path::Path;
@@ -28,7 +29,7 @@ use crate::terminal::{
 };
 
 /// The options `encode` takes.
-pub(crate) const OPTIONS: [&str; 11] = [
+pub(crate) const OPTIONS: [&str; 12] = [
     "mode",
     "mnemonic",
     "mnemonic-file",
@@ -39,6 +40,7 @@ pub(crate) const OPTIONS: [&str; 11] = [
     "show-masked-words",
     "show-original",
     "output",
+    "qr",
     "legacy-valid-last-word",
 ];
 
@@ -255,6 +257,18 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
         let record = format!("{}\n", encoding.backup.record()?);
         os::publish_new_file(&path, record.as_bytes())?;
         saved(&format!("Saved MnemoCode record: {}", printable(output)));
+    }
+    if let Some(qr) = value(parsed, "qr") {
+        let path = os::resolve(Path::new(qr), terminal::environment().current.as_deref());
+        // The image is read back as the backup's codes before it is given out (qr::png).
+        let image = mnemocode::qr::png(&encoding.backup.text()?)?;
+        os::publish_new_file(&path, &image)?;
+        saved("QR code verified.");
+        saved(&format!(
+            "Saved QR code ({}): {}",
+            encoding.backup.form().name(),
+            printable(qr)
+        ));
     }
     Ok(())
 }

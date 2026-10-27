@@ -329,8 +329,44 @@ the TS capsule (`multi-chain-wallet-tools/packages/recovery-mnemocode`) to the W
   lists, BIP39 seed (the 24 published vectors in the full tier) and Word hints. Moved: decode and
   re-encode to increment 8, where the backup reading they start from arrives (`recovery::reading`
   uses `sskr` and the marked codes); the Re-encoding row to increment 5 (its confirmation is a
-  wallet check); the binding's `phrase` module to the coordination with the wallet-tools session,
-  whose pages still import the TS capsule's modules. Forms and modes are closed enums, not traits
+  wallet check); the binding's `phrase` module to the binding commit after increment 6. Forms and modes are closed enums, not traits
   (ADR 0002 amended): every host takes all of them, and the compiler finds each place a new one
   touches. The command line expects dead code until its last command arrives (increment 9): the
   parts of the terminal, the files and the protections that the later commands use came with it.
+- Increment 5, 2026-10-27: the library's `wallet`: the twelve coins as static entries behind their
+  `coin-*` features (ADR 0002), each reading its addresses into a type and a commitment (Base58Check
+  over bs58, Bech32 and Bech32m over bech32, SegWit, Taproot, Keccak accounts with EIP-55, CashAddr,
+  Dash Platform payments) and naming the BIP32 paths of its keys; the address scan; the evidence
+  of a wallet (master fingerprint, master and account keys in their ten SLIP-132 forms, a Bitcoin
+  address, a compressed key or a WIF at its place under the selected profiles, and an address of
+  another coin), compared with the keys of the master key, each one's private half wiped; `bip32`
+  gains the place of a key and the serialization of extended public keys; `backup::re_encoding`
+  holds an old backup's phrase until the person or the wallet confirmed it; the dates and shifts of
+  a mask live in `dates::{Dates, Shifts}`, locked owners with a redacted Debug. Rows: each coin
+  family's (built with any of its coins, a case of another left out), Wallet evidence, Re-encoding.
+  Every feature set builds and passes its tests (all coins, none, Dash alone, Litecoin alone).
+  Moved: the wallet options of the command line to increment 8, with `decode` and the searches
+  that take them; the binding's `wallet` module to the binding commit after increment 6.
+- Increment 6, 2026-10-27: the library's `candidates`: the MNCL list (`format`, every published
+  list byte for byte, the damaged ones refused), its `writer` (one owner reserved at the list's
+  exact size), the `protection` a person chooses (the Scanner's key, a passphrase of at least 12
+  characters, or none), age v1 (`age`, own format code over chacha20poly1305, hkdf, hmac,
+  x25519-dalek, scrypt and base64ct: the file key wrapped by its one recipient, the header's MAC,
+  the payload in 64 KiB chunks; the refusals in age-encryption 0.3.1's words, as TS gives them),
+  the `admission` of a file before any key, and the `gate` that runs the known answers of age
+  before the first operation and again on request; `qr`: the matrix at level M through qrcodegen,
+  the PNG of 720 pixels with the quiet zone of four modules, both read back with rqrr before they
+  are given out, and a PNG read after its `admission` and an inflation bounded to its scanline
+  bytes; `encode --qr`. Checked with C2SP CCTV's age test kit (`vectors/cctv-age/`, 123 files:
+  every one-recipient binary file that age opens opens here, every other is refused) and TS's age
+  files. Rows: Candidate lists (scrypt's known answer in the full tier), PNG admission, QR adapter
+  (full tier). The heaviest operation of a command, the largest list the writer makes encrypted
+  through scrypt and opened again, peaks at 293 MiB resident and runs under the memory cap (a test
+  of `os::linux`); the cap stays until increment 9 measures the card export. The debug builds
+  optimize the dependencies, so that scrypt's 2^18 takes seconds in the tests. Moved: `--qr-file`
+  to increment 8 with `decode`, the command that reads it; the bindings `qr` and `candidates` and
+  the Scanner's profile to the binding commit that follows. The binding modules are designed for
+  MnemoCode's own needs, and wallet-tools adapts to MnemoCode's releases (the owner, through the
+  wallet-tools session, 2026-10-27), so no module waits for it. Open: the transcripts of
+  the command line (increment 4's `encode`, this one's `--qr`) need the TS recorder to record them,
+  once the decided TS fixes, which change some outputs, are in.

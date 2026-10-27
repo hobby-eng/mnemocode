@@ -13,7 +13,7 @@ use crate::bip39::phrase::{Phrase, PhraseError};
 use crate::bip39::sizes::{
     DICTIONARY_SIZE, SizesError, check_word_count, checksum_bits, last_word_entropy_bits,
 };
-use crate::dates::Date;
+use crate::dates::{Date, Dates, Shifts};
 use crate::refusal::Refusal;
 use seedshift::{Indexes, Masked, ShiftError, Unmasked};
 
@@ -340,9 +340,9 @@ impl Mode {
                     .map(|place| u16::try_from(phrase.index(place).unwrap_or(0)).unwrap_or(0))
                     .collect();
                 Masked {
-                    shifts: vec![0; indexes.len()],
+                    shifts: Shifts::new(&vec![0; indexes.len()]),
                     shifted: Indexes::new(indexes),
-                    dates: Vec::new(),
+                    dates: Dates::new(&[]),
                 }
             }
             Self::Seedshift => seedshift::mask(phrase, dates)?,

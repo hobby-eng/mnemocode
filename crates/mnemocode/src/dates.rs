@@ -12,6 +12,7 @@ use std::fmt;
 
 use crate::refusal::Refusal;
 use crate::search::{CountRefused, kept_count};
+use crate::secret::SecretBytes;
 use crate::text::numbers::{WholeRange, integer_refusal};
 use crate::text::space::trim;
 
@@ -22,6 +23,100 @@ pub struct Date {
     year: u16,
     month: u8,
     day: u8,
+}
+
+/// Dates kept as a secret (ARCHITECTURE.md §6): in a locked buffer, four bytes a date, wiped when
+/// dropped and redacted when printed.
+pub struct Dates(SecretBytes);
+
+impl Dates {
+    /// `dates`, held.
+    pub fn new(dates: &[Date]) -> Self {
+        let mut bytes = SecretBytes::zeroed("dates", dates.len() * 4);
+        for (held, date) in bytes.as_chunks_mut::<4>().0.iter_mut().zip(dates) {
+            held[..2].copy_from_slice(&date.year.to_be_bytes());
+            held[2] = date.month;
+            held[3] = date.day;
+        }
+        Self(bytes)
+    }
+
+    /// How many.
+    pub fn len(&self) -> usize {
+        self.0.len() / 4
+    }
+
+    /// Whether there are none.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The dates, in their order.
+    pub fn iter(&self) -> impl Iterator<Item = Date> + '_ {
+        self.0.as_chunks::<4>().0.iter().map(|held| Date {
+            year: u16::from_be_bytes([held[0], held[1]]),
+            month: held[2],
+            day: held[3],
+        })
+    }
+}
+
+impl Clone for Dates {
+    fn clone(&self) -> Self {
+        Self(SecretBytes::copy_of("dates", &self.0))
+    }
+}
+
+impl fmt::Debug for Dates {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        crate::secret::redacted(f, "dates")
+    }
+}
+
+/// The shift of each word, kept as a secret like the dates it comes from: two bytes a shift in a
+/// locked buffer.
+pub struct Shifts(SecretBytes);
+
+impl Shifts {
+    /// `shifts`, held.
+    pub fn new(shifts: &[u16]) -> Self {
+        let mut bytes = SecretBytes::zeroed("shifts", shifts.len() * 2);
+        for (held, shift) in bytes.as_chunks_mut::<2>().0.iter_mut().zip(shifts) {
+            held.copy_from_slice(&shift.to_be_bytes());
+        }
+        Self(bytes)
+    }
+
+    /// How many.
+    pub fn len(&self) -> usize {
+        self.0.len() / 2
+    }
+
+    /// Whether there are none.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The shifts, in word order.
+    pub fn iter(&self) -> impl Iterator<Item = u16> + '_ {
+        self.0
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|held| u16::from_be_bytes(*held))
+    }
+}
+
+impl Clone for Shifts {
+    fn clone(&self) -> Self {
+        Self(SecretBytes::copy_of("shifts", &self.0))
+    }
+}
+
+impl fmt::Debug for Shifts {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        crate::secret::redacted(f, "shifts")
+    }
 }
 
 /// The values each part of a date takes.

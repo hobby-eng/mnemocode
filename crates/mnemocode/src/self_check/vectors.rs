@@ -1,8 +1,9 @@
 //! The public data the self-checks check the rules with, each written once (TS
 //! `src/core/self-test-vectors.ts`): the phrase of all-zero entropy, the first BIP39 vector, its
 //! master fingerprint, its Unicode codes, its Seedshift vector (vectors/mnemocode-v1.json: direct-12
-//! and checksum-valid-seedshift-12), the 24-word phrase of all-zero entropy, and the dates of the
-//! Seedshift vectors of 15 to 24 words.
+//! and checksum-valid-seedshift-12), the 24-word phrase of all-zero entropy, the dates of the
+//! Seedshift vectors of 15 to 24 words, and the candidate list of three phrases
+//! (vectors/candidates-v1.json).
 
 /// The public test phrase of all-zero entropy, the first BIP39 vector.
 pub const PUBLIC_MNEMONIC: &str =
@@ -31,6 +32,17 @@ pub const MASKED_NUMBERS: &str = "2027 10 24 2027 10 24 2027 10 24 2027 10 377";
 /// The master fingerprint of the masked phrase, the encoded fingerprint that Encode shows, computed
 /// independently with Python's hashlib and a plain secp256k1 that first reproduce BIP84 and BIP86.
 pub const ENCODED_FINGERPRINT: &str = "0d05289e";
+
+/// vectors/candidates-v1.json, "three phrases": the entropy of the public phrases of BIP39's first,
+/// second and fourth vectors.
+pub const THREE_PHRASES_ENTROPY: [&str; 3] = [
+    "00000000000000000000000000000000",
+    "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
+    "ffffffffffffffffffffffffffffffff",
+];
+/// Their list without passphrases, in hexadecimal: the known answer of the writer and the reader,
+/// and the plaintext of the published age files.
+pub const THREE_PHRASES_LIST: &str = "4d4e434c01001000000003000000000000000000000000000000007f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7fffffffffffffffffffffffffffffffff98854aa000";
 
 #[cfg(test)]
 mod tests {
