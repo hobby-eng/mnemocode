@@ -1,0 +1,2086 @@
+{
+  "capabilities": [
+    {
+      "id": "CAP-CARDS-BACKUP-CONTENT",
+      "crate": "mnemocode-cards",
+      "module": "content",
+      "status": "port",
+      "reason": "Same content."
+    },
+    {
+      "id": "CAP-CARDS-BUNDLED-ASSETS",
+      "crate": "mnemocode-cards",
+      "module": "assets",
+      "status": "redesign",
+      "reason": "Files compiled in with include_bytes, each with its template's feature; the run-time allowlist check goes (CORE-54); the world-map generator and its byte check stay."
+    },
+    {
+      "id": "CAP-CARDS-BUSINESS-RENDER",
+      "crate": "mnemocode-cards",
+      "module": "templates::business",
+      "status": "port",
+      "reason": "Eight registry entries, one feature each."
+    },
+    {
+      "id": "CAP-CARDS-CARD-SESSION",
+      "crate": "mnemocode-cards",
+      "module": "details",
+      "status": "port",
+      "reason": "Same session state without the impossible name guard; it takes the employer's sector as a value, which the caller reads from the template entry (TS card-session.ts:80 looked the design up)."
+    },
+    {
+      "id": "CAP-CARDS-CLI-CARD-OPTIONS",
+      "crate": "mnemocode-cli",
+      "module": "output",
+      "status": "port",
+      "reason": "Front end: card options checked by the cards crate's rules before any secret."
+    },
+    {
+      "id": "CAP-CARDS-CODE-PALETTE",
+      "crate": "mnemocode-cards",
+      "module": "palette",
+      "status": "port",
+      "reason": "Colour maths with libm so every host gives the same colour."
+    },
+    {
+      "id": "CAP-CARDS-COLLECTION-QR",
+      "crate": "mnemocode-cards",
+      "module": "sheet",
+      "status": "port",
+      "reason": "QR beside a sheet from the library's verified QR; the CLI saves it."
+    },
+    {
+      "id": "CAP-CARDS-COLLECTION-SHEET-DRAW",
+      "crate": "mnemocode-cards",
+      "module": "sheet",
+      "status": "port",
+      "reason": "Draws into the scene."
+    },
+    {
+      "id": "CAP-CARDS-CONTENT-CHECK",
+      "crate": "mnemocode-cards",
+      "module": "content",
+      "status": "port",
+      "reason": "Same refusal when QR and printed codes differ."
+    },
+    {
+      "id": "CAP-CARDS-DECOYS-AND-PLAN",
+      "crate": "mnemocode-cards",
+      "module": "plan",
+      "status": "port",
+      "reason": "One plan per export, drawn to PDF and raster from the same scene."
+    },
+    {
+      "id": "CAP-CARDS-HEIR-SHEET-PDF",
+      "crate": "mnemocode-cards",
+      "module": "heir",
+      "status": "port",
+      "reason": "Same A5/A6 PDF; the font's character set checked before drawing."
+    },
+    {
+      "id": "CAP-CARDS-HEIR-SHEET-TEXT",
+      "crate": "mnemocode-cards",
+      "module": "heir",
+      "status": "port",
+      "reason": "Same words from public facts only."
+    },
+    {
+      "id": "CAP-CARDS-INDIVIDUAL-CARDS",
+      "crate": "mnemocode-cards",
+      "module": "export",
+      "status": "port",
+      "reason": "Same files per card."
+    },
+    {
+      "id": "CAP-CARDS-INVENTED-DETAILS",
+      "crate": "mnemocode-cards",
+      "module": "details",
+      "status": "port",
+      "reason": "Uniform choices from the Random port; consumption order as TS 0.1.0 (owner, 2026-10-27)."
+    },
+    {
+      "id": "CAP-CARDS-MATERIAL-RENDER",
+      "crate": "mnemocode-cards",
+      "module": "templates::material",
+      "status": "port",
+      "reason": "Five registry entries, one feature each."
+    },
+    {
+      "id": "CAP-CARDS-MENU-CARD-QUESTIONS",
+      "crate": "mnemocode-cli",
+      "module": "menu",
+      "status": "port",
+      "reason": "Front end: questions whose answers the cards crate checks."
+    },
+    {
+      "id": "CAP-CARDS-PAGE-IMAGES",
+      "crate": "mnemocode-cards",
+      "module": "raster",
+      "status": "redesign",
+      "reason": "Pages rasterised in process from the scene (tiny-skia, png, jpeg-encoder); no pdftocairo, no pipe, no child (N-NO-SECRET-CHILD)."
+    },
+    {
+      "id": "CAP-CARDS-PAGE-SETTINGS",
+      "crate": "mnemocode-cards",
+      "module": "settings",
+      "status": "port",
+      "reason": "Same sizes and orientations."
+    },
+    {
+      "id": "CAP-CARDS-PALETTE-EXPORT",
+      "crate": "mnemocode-cards",
+      "module": "export",
+      "status": "port",
+      "reason": "Same library export."
+    },
+    {
+      "id": "CAP-CARDS-PDF-DOCUMENTS",
+      "crate": "mnemocode-cards",
+      "module": "pdf",
+      "status": "port",
+      "reason": "pdf-writer with the bundled font subset (fontations), no metadata unless written."
+    },
+    {
+      "id": "CAP-CARDS-PDF-READER",
+      "crate": "none",
+      "module": "none",
+      "status": "drop",
+      "reason": "The browser gets pixels from the same scene (raster) instead of reading PDFs back (crates report decision 5)."
+    },
+    {
+      "id": "CAP-CARDS-PRINTABILITY-PREFLIGHT",
+      "crate": "mnemocode-cards",
+      "module": "preflight",
+      "status": "port",
+      "reason": "Same check before any secret."
+    },
+    {
+      "id": "CAP-CARDS-QR-PNG-EXPORT",
+      "crate": "mnemocode",
+      "module": "qr",
+      "status": "port",
+      "reason": "Encode, decode back and compare in the library, so a page saves QR images without browser-cards; the CLI publishes."
+    },
+    {
+      "id": "CAP-CARDS-QR-VECTOR",
+      "crate": "mnemocode-cards",
+      "module": "scene",
+      "status": "port",
+      "reason": "Modules from the library's verified QR matrix drawn as vectors."
+    },
+    {
+      "id": "CAP-CARDS-RENDER-PLATFORM",
+      "crate": "mnemocode-cards",
+      "module": "scene",
+      "status": "redesign",
+      "reason": "No host render platform: codecs and assets linked; randomness through the Random port."
+    },
+    {
+      "id": "CAP-CARDS-RENDER-SHEETS-PDF",
+      "crate": "mnemocode-cards",
+      "module": "export",
+      "status": "port",
+      "reason": "Same sheets."
+    },
+    {
+      "id": "CAP-CARDS-SAMPLE-PREVIEW",
+      "crate": "mnemocode-cards",
+      "module": "export",
+      "status": "port",
+      "reason": "Same preview; the sample phrase from the Random port."
+    },
+    {
+      "id": "CAP-CARDS-SHARE-CARD-SET",
+      "crate": "mnemocode-cards",
+      "module": "export",
+      "status": "port",
+      "reason": "Same planning of share cards; the share-card content type (TS SskrCardContent) is the content module's, since templates draw it; export asks the template whether it draws separate cards (TS sskr-content.ts:97)."
+    },
+    {
+      "id": "CAP-CARDS-SHARE-CARDS-EXPORT",
+      "crate": "mnemocode-cli",
+      "module": "commands::sskr_export",
+      "status": "port",
+      "reason": "Front end: one file or folder per share around the cards crate's drawings."
+    },
+    {
+      "id": "CAP-CARDS-SHARE-CARDS-TO-SEPARATE",
+      "crate": "mnemocode-cards",
+      "module": "export",
+      "status": "port",
+      "reason": "Same conversion."
+    },
+    {
+      "id": "CAP-CARDS-SHARE-KEEPING-NOTE",
+      "crate": "mnemocode",
+      "module": "sskr::keeping",
+      "status": "port",
+      "reason": "Text only, no drawing: in sskr, so share files get it without the cards crate."
+    },
+    {
+      "id": "CAP-CARDS-TEMPLATE-CATALOG",
+      "crate": "mnemocode-cards",
+      "module": "templates",
+      "status": "port",
+      "reason": "The template registry: stable order, ids and numbers; one card kind, so the no-template error cannot occur. Each entry names its employer's sector and whether it draws separate cards (TS card-identities.ts:140-152, template-catalog.ts:118), so details and content need no list of designs."
+    },
+    {
+      "id": "CAP-CARDS-TERMINAL-COLOR-CARDS",
+      "crate": "mnemocode-cli",
+      "module": "terminal",
+      "status": "port",
+      "reason": "Front end: draws the cards crate's palette with terminal colours."
+    },
+    {
+      "id": "CAP-CARDS-TEXT-RULES",
+      "crate": "mnemocode-cards",
+      "module": "text_rules",
+      "status": "port",
+      "reason": "Same text rules, one hide marker in the API."
+    },
+    {
+      "id": "CAP-CLI-CLOUD-FOLDER-WARNING",
+      "crate": "mnemocode-cli",
+      "module": "output",
+      "status": "port",
+      "reason": "Same warning."
+    },
+    {
+      "id": "CAP-CLI-COLOR-RULE",
+      "crate": "mnemocode-cli",
+      "module": "terminal",
+      "status": "port",
+      "reason": "Same colour rule (CORE-38)."
+    },
+    {
+      "id": "CAP-CLI-COMMAND-DISPATCH",
+      "crate": "mnemocode-cli",
+      "module": "main",
+      "status": "port",
+      "reason": "Same dispatch; the permission-model relaunch is replaced by the protections of a fresh process."
+    },
+    {
+      "id": "CAP-CLI-CORE-SELF-TEST-GATE",
+      "crate": "mnemocode-cli",
+      "module": "gate",
+      "status": "port",
+      "reason": "Runs the library's startup rows (checks module) before any question."
+    },
+    {
+      "id": "CAP-CLI-EXECUTABLE-VERIFICATION",
+      "crate": "tooling",
+      "module": "scripts/verify-executable.mjs",
+      "status": "port",
+      "reason": "Same checks of a built executable, sandbox marks included."
+    },
+    {
+      "id": "CAP-CLI-FAILURE-AND-EXIT",
+      "crate": "mnemocode-cli",
+      "module": "main",
+      "status": "port",
+      "reason": "Prints the Display of any refusal; same exit codes."
+    },
+    {
+      "id": "CAP-CLI-HELP",
+      "crate": "mnemocode-cli",
+      "module": "args",
+      "status": "port",
+      "reason": "Help pages as data; option lists read from the registries."
+    },
+    {
+      "id": "CAP-CLI-INTERRUPTION",
+      "crate": "mnemocode-cli",
+      "module": "os",
+      "status": "port",
+      "reason": "Ctrl+C at a question cancels as before. SIGINT, SIGTERM, SIGHUP and SIGQUIT handlers only set a flag; the main thread restores the terminal, leaves the private screen, removes the staging folders and exits with 128 + the signal (130 and 'Cancelled.' for SIGINT and SIGQUIT); the Windows console handler sets the same flag. SIGTSTP restores the terminal, leaves the private screen and stops, and on continue the private screen and raw mode come back (N-SIGNALS)."
+    },
+    {
+      "id": "CAP-CLI-LICENSE-NOTICES",
+      "crate": "tooling",
+      "module": "scripts/third-party-notices.mjs",
+      "status": "redesign",
+      "reason": "Notices from each artifact's Rust dependency tree, fonts, map, artwork and the BIP-39 word lists."
+    },
+    {
+      "id": "CAP-CLI-LINUX-LANDLOCK",
+      "crate": "mnemocode-cli",
+      "module": "os",
+      "status": "redesign",
+      "reason": "Rights by ABI, TSYNC from ABI 8, TCP rights from ABI 4 (platform report): no rule granted for a command that saves nothing, as TS; a rule on the parent folder of each output, a missing parent made before the secret and left after a cancel, on the private screen too (CLI-SAVE-RETRY, re-encode; owner, 2026-10-27). Write rules need ABI 2 (REFER): on ABI 1 a command that saves applies no Landlock, and the Protection line says so (L-LANDLOCK-WRITES)."
+    },
+    {
+      "id": "CAP-CLI-LINUX-NO-CORE-DUMPS",
+      "crate": "mnemocode-cli",
+      "module": "os",
+      "status": "port",
+      "reason": "RLIMIT_CORE and PR_SET_DUMPABLE, both read back."
+    },
+    {
+      "id": "CAP-CLI-LINUX-SECCOMP",
+      "crate": "mnemocode-cli",
+      "module": "os",
+      "status": "redesign",
+      "reason": "TSYNC filter: other architectures, x32, socket, socketpair, io_uring; no exec denial (owner, 2026-10-27; TS 0.1.0 denies execve), since a started program inherits the filter."
+    },
+    {
+      "id": "CAP-CLI-LONG-SEARCH-CONTROL",
+      "crate": "mnemocode-cli",
+      "module": "terminal",
+      "status": "redesign",
+      "reason": "One driver steps any library search, shows progress, asks consent and stops on Ctrl+C or Ctrl+\\; Ctrl+Z read as a key only sends SIGTSTP to the process group, as TS 0.1.0, and the N-SIGNALS handler leaves and takes raw mode; after continue the driver redraws its screen when the redraw flag is set (no job control on Windows)."
+    },
+    {
+      "id": "CAP-CLI-MACOS-DENY-DEBUGGER",
+      "crate": "mnemocode-cli",
+      "module": "os",
+      "status": "port",
+      "reason": "PT_DENY_ATTACH, reported as requested."
+    },
+    {
+      "id": "CAP-CLI-MACOS-NO-CORE-DUMPS",
+      "crate": "mnemocode-cli",
+      "module": "os",
+      "status": "port",
+      "reason": "RLIMIT_CORE, now read back."
+    },
+    {
+      "id": "CAP-CLI-MACOS-SEATBELT",
+      "crate": "mnemocode-cli",
+      "module": "os",
+      "status": "redesign",
+      "reason": "sandbox_init denying the network; no exec denial (owner, 2026-10-27; TS 0.1.0 denies new programs), since a started program inherits the profile."
+    },
+    {
+      "id": "CAP-CLI-MENU-COMMAND-PROCESS",
+      "crate": "mnemocode-cli",
+      "module": "menu",
+      "status": "port",
+      "reason": "Each command a fresh process of the same executable (N-FRESH-PROCESS)."
+    },
+    {
+      "id": "CAP-CLI-MENU-DECODE",
+      "crate": "mnemocode-cli",
+      "module": "menu",
+      "status": "port",
+      "reason": "Menu entry 3."
+    },
+    {
+      "id": "CAP-CLI-MENU-ENCODE",
+      "crate": "mnemocode-cli",
+      "module": "menu",
+      "status": "port",
+      "reason": "Menu entry 1; answers from the registries."
+    },
+    {
+      "id": "CAP-CLI-MENU-FILE-QUESTIONS",
+      "crate": "mnemocode-cli",
+      "module": "menu",
+      "status": "port",
+      "reason": "Same file and folder questions."
+    },
+    {
+      "id": "CAP-CLI-MENU-PREVIEW",
+      "crate": "mnemocode-cli",
+      "module": "menu",
+      "status": "port",
+      "reason": "Menu entry 7."
+    },
+    {
+      "id": "CAP-CLI-MENU-RECOVER",
+      "crate": "mnemocode-cli",
+      "module": "menu",
+      "status": "port",
+      "reason": "Menu entry 6."
+    },
+    {
+      "id": "CAP-CLI-MENU-REENCODE",
+      "crate": "mnemocode-cli",
+      "module": "menu",
+      "status": "port",
+      "reason": "Menu entry 2."
+    },
+    {
+      "id": "CAP-CLI-MENU-RESTORE",
+      "crate": "mnemocode-cli",
+      "module": "menu",
+      "status": "port",
+      "reason": "Menu entry 5."
+    },
+    {
+      "id": "CAP-CLI-MENU-SPLIT",
+      "crate": "mnemocode-cli",
+      "module": "menu",
+      "status": "port",
+      "reason": "Menu entry 4."
+    },
+    {
+      "id": "CAP-CLI-MENU-TABLE",
+      "crate": "mnemocode-cli",
+      "module": "menu",
+      "status": "port",
+      "reason": "Menu entry 8."
+    },
+    {
+      "id": "CAP-CLI-NOTICES-AND-LINKS",
+      "crate": "mnemocode-cli",
+      "module": "terminal",
+      "status": "port",
+      "reason": "Same notices and links."
+    },
+    {
+      "id": "CAP-CLI-NPM-PACKAGE",
+      "crate": "none",
+      "module": "none",
+      "status": "drop",
+      "reason": "Only Node.js needs it: the Rust program ships as executables and per-page WASM files that wallet-tools vendors (ADR 0007); Node.js users of the library get no package unless the owner asks for one."
+    },
+    {
+      "id": "CAP-CLI-NUMBERED-NAMES",
+      "crate": "mnemocode-cli",
+      "module": "output",
+      "status": "port",
+      "reason": "Same numbered names."
+    },
+    {
+      "id": "CAP-CLI-OPTION-PARSING",
+      "crate": "mnemocode-cli",
+      "module": "args",
+      "status": "port",
+      "reason": "Own parser (messages and help are RUST-14 results); the option table is data. The whole number in a range, its wording and core.typed-number.typed-whole-number-refused are the library's text module (TS typed-number.ts), which bip39, dates, wallet and others use."
+    },
+    {
+      "id": "CAP-CLI-OUTPUT-PREFLIGHT",
+      "crate": "mnemocode-cli",
+      "module": "output",
+      "status": "port",
+      "reason": "Every output checked and its folder opened before any secret, which Landlock then needs."
+    },
+    {
+      "id": "CAP-CLI-PERMISSION-MODEL",
+      "crate": "none",
+      "module": "none",
+      "status": "drop",
+      "reason": "Only Node.js needs it; the per-system protections applied with the command's needs take its place (platform report)."
+    },
+    {
+      "id": "CAP-CLI-PNG-ADMISSION",
+      "crate": "mnemocode",
+      "module": "qr::admission",
+      "status": "port",
+      "reason": "Same admission before decoding."
+    },
+    {
+      "id": "CAP-CLI-PORTABLE-PARTS",
+      "crate": "mnemocode",
+      "module": "lib",
+      "status": "redesign",
+      "reason": "Parts become library modules with a checked module map, unit features and a binding module each; the portable-modules test becomes the layers and dependency gates."
+    },
+    {
+      "id": "CAP-CLI-PRIVATE-FILE-PUBLICATION",
+      "crate": "mnemocode-cli",
+      "module": "output",
+      "status": "port",
+      "reason": "Same create-new 0600/0700, staging beside the destination, link or rename."
+    },
+    {
+      "id": "CAP-CLI-PRIVATE-SCREEN",
+      "crate": "mnemocode-cli",
+      "module": "terminal",
+      "status": "redesign",
+      "reason": "Same alternate screen rules; without a terminal for it a secret result is refused when standard output is a terminal and written as TS to a file or a pipe (owner, 2026-10-27), and --ask-secrets is refused there (N-PRIVATE-SCREEN)."
+    },
+    {
+      "id": "CAP-CLI-QR-IMAGE-INPUT",
+      "crate": "mnemocode",
+      "module": "qr",
+      "status": "port",
+      "reason": "Decoding (admission, inflate budget, rqrr; rqrr reports no segment modes, so the TS refusal of Kanji and ECI segments goes, owner, 2026-10-27) in the library for both front ends; the CLI reads the file within 16 MiB."
+    },
+    {
+      "id": "CAP-CLI-QUESTIONS",
+      "crate": "mnemocode-cli",
+      "module": "terminal",
+      "status": "port",
+      "reason": "Same questions."
+    },
+    {
+      "id": "CAP-CLI-RAW-LINE-EDITOR",
+      "crate": "mnemocode-cli",
+      "module": "terminal",
+      "status": "redesign",
+      "reason": "Raw mode through the termios or console-mode calls of os; each answer in one buffer at its question's limit (PLAN, Owner decisions; TS: one 1 MiB limit, MAX_ANSWER_BYTES), which answer-too-long names, a SecretBytes at a secret question, locked within the lock budget (ADR 0003)."
+    },
+    {
+      "id": "CAP-CLI-RELEASE-PIPELINE",
+      "crate": "tooling",
+      "module": ".github/workflows/release.yml",
+      "status": "redesign",
+      "reason": "Cargo builds per target and the WASM file of each page profile instead of Node SEA and the engine container."
+    },
+    {
+      "id": "CAP-CLI-RELEASE-SIGNING",
+      "crate": "tooling",
+      "module": "scripts/sign-release.mjs",
+      "status": "port",
+      "reason": "Same procedure and key."
+    },
+    {
+      "id": "CAP-CLI-RESULT-PAGING",
+      "crate": "mnemocode-cli",
+      "module": "terminal",
+      "status": "port",
+      "reason": "Pages drawn from the secret owner on each repaint."
+    },
+    {
+      "id": "CAP-CLI-RESULT-PRESENTATION",
+      "crate": "mnemocode-cli",
+      "module": "terminal",
+      "status": "port",
+      "reason": "Same presentation."
+    },
+    {
+      "id": "CAP-CLI-SAFE-DISPLAY-TEXT",
+      "crate": "mnemocode",
+      "module": "text",
+      "status": "port",
+      "reason": "The rule (which characters show, and how) is the library's, beside the cell widths, so the CLI needs no Unicode crate and only writes."
+    },
+    {
+      "id": "CAP-CLI-SANDBOX-REPORT",
+      "crate": "mnemocode-cli",
+      "module": "os",
+      "status": "redesign",
+      "reason": "One report from the read-backs (N-REPORT): startup checks, Protection line, self-test rows; the TS labels without 'no other programs', since no program start is denied (owner, 2026-10-27)."
+    },
+    {
+      "id": "CAP-CLI-SAVE-RETRY",
+      "crate": "mnemocode-cli",
+      "module": "output",
+      "status": "redesign",
+      "reason": "Same retry, but the new name is taken only in the folders ruled before the secret, so Landlock applies on the private screen (owner, 2026-10-27; ADR 0008)."
+    },
+    {
+      "id": "CAP-CLI-SECRET-ANSWER-FILE-PATH",
+      "crate": "mnemocode-cli",
+      "module": "input",
+      "status": "port",
+      "reason": "Same rule."
+    },
+    {
+      "id": "CAP-CLI-SECRET-ARGV-REFUSAL",
+      "crate": "mnemocode-cli",
+      "module": "args",
+      "status": "port",
+      "reason": "Refused before parsing; no code reads the values."
+    },
+    {
+      "id": "CAP-CLI-SECRET-FILE-INPUT",
+      "crate": "mnemocode-cli",
+      "module": "input",
+      "status": "redesign",
+      "reason": "Bounded strict reads straight into a secret owner, at the limit of the question the file or standard input answers (owner, 2026-10-27; TS: 1 MiB, bounded-read.ts:15)."
+    },
+    {
+      "id": "CAP-CLI-SECRET-GATE",
+      "crate": "mnemocode-cli",
+      "module": "gate",
+      "status": "redesign",
+      "reason": "Refuses a secret only when the core-dump protection does not read back or a tracer is attached on Linux (owner, 2026-10-27); everything else is reported."
+    },
+    {
+      "id": "CAP-CLI-SECRET-PROMPT",
+      "crate": "mnemocode-cli",
+      "module": "input",
+      "status": "port",
+      "reason": "Same private-screen prompts."
+    },
+    {
+      "id": "CAP-CLI-SELF-TEST-COMMAND",
+      "crate": "mnemocode-cli",
+      "module": "commands::self_test",
+      "status": "port",
+      "reason": "Runs and times the library's rows (checks module) and the CLI's own rows; same report."
+    },
+    {
+      "id": "CAP-CLI-SHELL-QUOTED-COMMAND",
+      "crate": "mnemocode-cli",
+      "module": "menu",
+      "status": "port",
+      "reason": "Same quoting."
+    },
+    {
+      "id": "CAP-CLI-SINGLE-EXECUTABLE",
+      "crate": "tooling",
+      "module": "scripts/build-executables.sh",
+      "status": "redesign",
+      "reason": "cargo build per target with assets compiled in."
+    },
+    {
+      "id": "CAP-CLI-START-MENU",
+      "crate": "mnemocode-cli",
+      "module": "menu",
+      "status": "port",
+      "reason": "Same menu; it builds a command line and starts it as a fresh process."
+    },
+    {
+      "id": "CAP-CLI-STEP-SCREENS",
+      "crate": "mnemocode-cli",
+      "module": "terminal",
+      "status": "port",
+      "reason": "Same step screens; a step draws itself again when the N-SIGNALS redraw flag is set after a continue, since re-entering the alternate screen (ESC[?1049h) clears it."
+    },
+    {
+      "id": "CAP-CLI-SWAP-WARNING",
+      "crate": "mnemocode-cli",
+      "module": "os",
+      "status": "port",
+      "reason": "A system reading (/proc/swaps, /sys/block), so in os with the other readings; the gate shows it. zram counts only without backing_dev; hibernation named (platform report)."
+    },
+    {
+      "id": "CAP-CLI-TEMPORARY-FOLDERS",
+      "crate": "mnemocode-cli",
+      "module": "os",
+      "status": "port",
+      "reason": "Same tracking; removal also on SIGTERM and SIGHUP."
+    },
+    {
+      "id": "CAP-CLI-TERMINAL-LAYOUT",
+      "crate": "mnemocode-cli",
+      "module": "terminal",
+      "status": "port",
+      "reason": "Same layout; widths from the library's cell-width rule (text module)."
+    },
+    {
+      "id": "CAP-CLI-TYPED-AHEAD-DROP",
+      "crate": "mnemocode-cli",
+      "module": "terminal",
+      "status": "port",
+      "reason": "Same rule."
+    },
+    {
+      "id": "CAP-CLI-VERSION",
+      "crate": "mnemocode-cli",
+      "module": "args",
+      "status": "port",
+      "reason": "Same output."
+    },
+    {
+      "id": "CAP-CLI-WINDOWS-JOB-NO-CHILDREN",
+      "crate": "mnemocode-cli",
+      "module": "os",
+      "status": "redesign",
+      "reason": "The job object carries the memory cap (W-JOB-MEMORY) and no limit on child processes (owner, 2026-10-27; TS 0.1.0 has one)."
+    },
+    {
+      "id": "CAP-CLI-WINDOWS-MITIGATIONS",
+      "crate": "mnemocode-cli",
+      "module": "os",
+      "status": "port",
+      "reason": "Same mitigation policies, plus the DLL search order (W-DLL-SEARCH)."
+    },
+    {
+      "id": "CAP-CLI-WINDOWS-WER-NO-HEAP",
+      "crate": "mnemocode-cli",
+      "module": "os",
+      "status": "port",
+      "reason": "WerSetFlags read back; the LocalDumps setting named."
+    },
+    {
+      "id": "CAP-CLI-WORD-HINTS-TYPING",
+      "crate": "mnemocode-cli",
+      "module": "terminal",
+      "status": "port",
+      "reason": "Front end: shows the library's hints under the line."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-BACKUP-READING",
+      "crate": "mnemocode",
+      "module": "recovery::reading",
+      "status": "port",
+      "reason": "Reads codes, records, shares and marked codes, so it sits above sskr and the marked-code reader; the TS order of checks (header, share, mode, form, codes) is kept so refusals come in the same order."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-COLOR-PLACEMENTS",
+      "crate": "mnemocode",
+      "module": "forms::colors",
+      "status": "port",
+      "reason": "Same placements of unreadable colours; part of the colour form's module."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-DATE-PATTERNS",
+      "crate": "mnemocode",
+      "module": "dates::patterns",
+      "status": "port",
+      "reason": "Same patterns and counts; counts use the search module's bounded counts (CORE-50)."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-DATES",
+      "crate": "mnemocode",
+      "module": "dates",
+      "status": "port",
+      "reason": "Same calendar rules, order and refusal codes; trimmed by the one rule, Unicode White_Space at the ends (owner, 2026-10-27; TS first)."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-DECODE-FROM-OPTIONS",
+      "crate": "mnemocode-cli",
+      "module": "commands::decode",
+      "status": "port",
+      "reason": "Front end: options to the library's backup reading and decode; no rule of its own (CORE-01)."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-DECODE-QUESTIONS",
+      "crate": "mnemocode-cli",
+      "module": "commands::decode",
+      "status": "port",
+      "reason": "Front end: private-screen questions around the same library calls."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-ENCODE",
+      "crate": "mnemocode-cli",
+      "module": "commands::encode",
+      "status": "port",
+      "reason": "The command orchestrates outputs (screen, record, QR, cards, shares, heir sheet); the encoding itself is backup::encoded, which the binding calls too."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-ENCODE-QR",
+      "crate": "mnemocode-cli",
+      "module": "commands::encode",
+      "status": "port",
+      "reason": "Saves the library's verified QR PNG (qr module) through private-file publication."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-ENCODE-RECORD-FILE",
+      "crate": "mnemocode-cli",
+      "module": "commands::encode",
+      "status": "port",
+      "reason": "Saves the library's MNC1 record text through private-file publication."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-ENCODED-BACKUP",
+      "crate": "mnemocode",
+      "module": "backup::encoded",
+      "status": "port",
+      "reason": "Codes kept as word indexes in a secret owner and lent by reference; encode exists only for encodable modes."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-ENCODED-FINGERPRINT",
+      "crate": "mnemocode",
+      "module": "backup::fingerprint",
+      "status": "port",
+      "reason": "Same fingerprint of the codes over bip32's master fingerprint."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-FORM-COLOR-UNICODE",
+      "crate": "mnemocode",
+      "module": "forms::color_unicode",
+      "status": "port",
+      "reason": "Form 4 as one registry entry."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-FORM-COLORS",
+      "crate": "mnemocode",
+      "module": "forms::colors",
+      "status": "port",
+      "reason": "Form 5 as one registry entry."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-FORM-DETECTION",
+      "crate": "mnemocode",
+      "module": "forms::detection",
+      "status": "port",
+      "reason": "Asks each registered form whether the text looks like it, in registry order."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-FORM-ENGLISH",
+      "crate": "mnemocode",
+      "module": "forms::english",
+      "status": "port",
+      "reason": "Form 1 as one registry entry."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-FORM-INDEXES",
+      "crate": "mnemocode",
+      "module": "forms::indexes",
+      "status": "port",
+      "reason": "Form 2 as one registry entry."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-FORM-SELECTION",
+      "crate": "mnemocode",
+      "module": "forms",
+      "status": "port",
+      "reason": "The forms registry: number, name and every fact asked of a form (CORE-06, CORE-14)."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-FORM-UNICODE",
+      "crate": "mnemocode",
+      "module": "forms::unicode",
+      "status": "port",
+      "reason": "Form 3 as one registry entry over the bip39 crate's Traditional Chinese list."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-JSON-OUTPUT",
+      "crate": "mnemocode",
+      "module": "backup::json",
+      "status": "port",
+      "reason": "Same JSON text from an own writer (no serde, crates report)."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-LAST-WORD-REPLACEMENT-READING",
+      "crate": "mnemocode",
+      "module": "backup::legacy",
+      "status": "port",
+      "reason": "Same offer; the front ends match the refusal by its variant, not its message."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-LEGACY-VALID-LAST-WORD",
+      "crate": "mnemocode",
+      "module": "modes::legacy_valid",
+      "status": "port",
+      "reason": "Same search of checksum-valid last words, through the bip39 crate: the known words' entropy, each value of its free last bits through from_entropy_in; the mode is read-only (not encodable) by type."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-MASKING-RULES",
+      "crate": "mnemocode",
+      "module": "modes",
+      "status": "port",
+      "reason": "The modes registry with what each allows; the share-form mirroring moves to sskr::forms so modes never uses sskr."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-MODE-DIRECT",
+      "crate": "mnemocode",
+      "module": "modes::direct",
+      "status": "port",
+      "reason": "One registry entry."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-MODE-LEGACY",
+      "crate": "mnemocode",
+      "module": "modes::legacy",
+      "status": "port",
+      "reason": "One registry entry."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-MODE-SEEDSHIFT",
+      "crate": "mnemocode",
+      "module": "modes::seedshift",
+      "status": "port",
+      "reason": "One registry entry; entropy in fixed secret buffers, no bit strings."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-NUMBERED-DICTIONARIES",
+      "crate": "mnemocode",
+      "module": "bip39::dictionaries",
+      "status": "port",
+      "reason": "Text of the numbered dictionaries in the library; the table command and the binding save or show it."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-PHRASE-VALIDATION",
+      "crate": "mnemocode",
+      "module": "bip39::phrase",
+      "status": "port",
+      "reason": "The bip39 crate 3.0.0 (owner, 2026-10-27): tokens, count and word places are MnemoCode's, the checksum and entropy the crate's (parse_in_normalized, to_entropy_array); a validated Phrase type, so later steps never re-check."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-RE-ENCODE",
+      "crate": "mnemocode-cli",
+      "module": "commands::re_encode",
+      "status": "port",
+      "reason": "Front end over backup::re_encoding."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-RE-ENCODE-QUESTIONS",
+      "crate": "mnemocode-cli",
+      "module": "commands::re_encode",
+      "status": "redesign",
+      "reason": "Front end; the permission-model step it had is replaced by the protections the fresh process applies; it asks the new backup's outputs before the old phrase, so Landlock applies on the private screen too (owner, 2026-10-27; ADR 0008)."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-RECORD",
+      "crate": "mnemocode",
+      "module": "backup::record",
+      "status": "port",
+      "reason": "Same MNC1 text and refusals; writing takes a mode value, so an unsupported mode cannot be written."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-RECOVERY-GUIDE",
+      "crate": "mnemocode",
+      "module": "pack",
+      "status": "port",
+      "reason": "The guide text is bundled in the library, so the browser offers it too; the CLI publishes it."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-RECOVERY-PACK",
+      "crate": "mnemocode",
+      "module": "pack",
+      "status": "port",
+      "reason": "The pack's files (guide, dictionaries) as named byte strings; the front ends save them."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-REENCODING-CONFIRMATION",
+      "crate": "mnemocode",
+      "module": "backup::re_encoding",
+      "status": "port",
+      "reason": "Holds the decoded phrase until confirmed by wallet evidence (wallet module)."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-REFUSAL-CODES",
+      "crate": "mnemocode",
+      "module": "refusal",
+      "status": "redesign",
+      "reason": "One error enum per module with a stable code() equal to the TS code and Display as the one message; the run-time catalog checks vanish."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-SECRET-OWNERS",
+      "crate": "mnemocode",
+      "module": "secret",
+      "status": "redesign",
+      "reason": "Fixed-capacity zeroizing owners with locked pages and redacted Debug; no decoded views, no cleanup aggregate (Drop is one attempt)."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-SECRET-SOURCES",
+      "crate": "mnemocode-cli",
+      "module": "input",
+      "status": "port",
+      "reason": "One source per secret: file, standard input, QR image or prompt; argv refused before parsing."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-SELF-TEST-KNOWN-ANSWERS",
+      "crate": "mnemocode",
+      "module": "checks",
+      "status": "port",
+      "reason": "Rows of word lists, forms and modes with the public vectors; the host times the rows."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-SHIFT-SCHEDULE",
+      "crate": "mnemocode",
+      "module": "dates::schedule",
+      "status": "port",
+      "reason": "Same shifts from dates."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-SHORTER-PHRASES",
+      "crate": "mnemocode",
+      "module": "backup::shorter",
+      "status": "port",
+      "reason": "Same notice; only the expected outcome is a value, every other error passes on (CORE-22)."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-SHOW-MASKED-WORDS",
+      "crate": "mnemocode-cli",
+      "module": "commands::encode",
+      "status": "port",
+      "reason": "Front end: shows the library's masked words on the private screen."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-SHOW-ORIGINAL-WORDS",
+      "crate": "mnemocode-cli",
+      "module": "commands::encode",
+      "status": "port",
+      "reason": "Front end: shows the validated phrase on the private screen."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-WORD-HINTS",
+      "crate": "mnemocode",
+      "module": "forms::hints",
+      "status": "port",
+      "reason": "Hints over the static lists; the list-shape guards go (CORE-54)."
+    },
+    {
+      "id": "CAP-PHRASE-FORMATS-WORD-TABLE-LOOKUP",
+      "crate": "mnemocode",
+      "module": "bip39::table",
+      "status": "port",
+      "reason": "Same row lookup from word, number or Unicode code, over the bip39 crate's lists."
+    },
+    {
+      "id": "CAP-RECOVERY-BACKUP-CHECK",
+      "crate": "mnemocode",
+      "module": "recovery::backup_check",
+      "status": "port",
+      "reason": "Same check after encode; the front ends ask, the library compares."
+    },
+    {
+      "id": "CAP-RECOVERY-BACKUP-CHECK-CODES",
+      "crate": "mnemocode",
+      "module": "recovery::backup_check",
+      "status": "port",
+      "reason": "Codes or a record compared without the redundant final comparison (CORE-54)."
+    },
+    {
+      "id": "CAP-RECOVERY-BACKUP-CHECK-SHARES",
+      "crate": "mnemocode",
+      "module": "recovery::backup_check",
+      "status": "port",
+      "reason": "Built with the sskr feature."
+    },
+    {
+      "id": "CAP-RECOVERY-CANDIDATE-DECRYPT",
+      "crate": "mnemocode",
+      "module": "candidates::age",
+      "status": "port",
+      "reason": "Own age v1 over RustCrypto and dalek (crates report decision 4), checked with the C2SP CCTV vectors."
+    },
+    {
+      "id": "CAP-RECOVERY-CANDIDATE-ENCRYPT-KEY",
+      "crate": "mnemocode",
+      "module": "candidates::age",
+      "status": "port",
+      "reason": "X25519 recipient in Rust; no WebCrypto."
+    },
+    {
+      "id": "CAP-RECOVERY-CANDIDATE-ENCRYPT-PASSPHRASE",
+      "crate": "mnemocode",
+      "module": "candidates::age",
+      "status": "port",
+      "reason": "scrypt work area falls under the zeroing allocator."
+    },
+    {
+      "id": "CAP-RECOVERY-CANDIDATE-ENCRYPTION-GATE",
+      "crate": "mnemocode",
+      "module": "candidates::gate",
+      "status": "redesign",
+      "reason": "Known answers checked once per process with an explicit recheck; failure epochs and recheck barriers go (CORE-54)."
+    },
+    {
+      "id": "CAP-RECOVERY-CANDIDATE-FILE-ADMISSION",
+      "crate": "mnemocode",
+      "module": "candidates::admission",
+      "status": "port",
+      "reason": "Same header admission; refusals returned directly, no catch-and-rethrow."
+    },
+    {
+      "id": "CAP-RECOVERY-CANDIDATE-LIST-FORMAT",
+      "crate": "mnemocode",
+      "module": "candidates::format",
+      "status": "port",
+      "reason": "MNCL v1 unchanged; reading gives English phrases from the entropies, so candidates uses bip39 (TS candidate-list.ts:14-15), an edge the model's graph misses; the CRC-32 comes from the checksum module."
+    },
+    {
+      "id": "CAP-RECOVERY-CANDIDATE-LIST-SAVE",
+      "crate": "mnemocode-cli",
+      "module": "output",
+      "status": "port",
+      "reason": "Front end: preflight, protection choice and private publication of the library's list."
+    },
+    {
+      "id": "CAP-RECOVERY-CANDIDATE-LIST-WRITER",
+      "crate": "mnemocode",
+      "module": "candidates::writer",
+      "status": "port",
+      "reason": "One secret owner for the whole list, reserved at its exact size from the count (ADR 0003); phrases checked with the bip39 crate (TS candidate-list-writer.ts:14-18)."
+    },
+    {
+      "id": "CAP-RECOVERY-CANDIDATE-PROTECTION-CHOICE",
+      "crate": "mnemocode",
+      "module": "candidates::protection",
+      "status": "port",
+      "reason": "Same choice; recipient and passphrase trimmed by the one rule (owner, 2026-10-27; TS first)."
+    },
+    {
+      "id": "CAP-RECOVERY-DATE-CANDIDATES",
+      "crate": "mnemocode",
+      "module": "recovery::date_search",
+      "status": "port",
+      "reason": "Feature search-date."
+    },
+    {
+      "id": "CAP-RECOVERY-DATE-SEARCH",
+      "crate": "mnemocode",
+      "module": "recovery::date_search",
+      "status": "redesign",
+      "reason": "A resumable search the host steps (ADR 0005); feature search-date; the self-decode guard goes (CORE-54)."
+    },
+    {
+      "id": "CAP-RECOVERY-DATES-ANSWER",
+      "crate": "mnemocode",
+      "module": "dates::answer",
+      "status": "port",
+      "reason": "Lower than the searches so every date input uses it; patterns refused where the build has no date search, as TS does for a host without one."
+    },
+    {
+      "id": "CAP-RECOVERY-LEGACY-LAST-WORDS",
+      "crate": "mnemocode",
+      "module": "recovery::word_search",
+      "status": "port",
+      "reason": "Feature search-word; the wallet check goes through the same evidence path as every search."
+    },
+    {
+      "id": "CAP-RECOVERY-MARKED-CODES",
+      "crate": "mnemocode",
+      "module": "recovery::marked",
+      "status": "port",
+      "reason": "The reader of marked codes is always built, since backup reading needs it; only the search is a feature."
+    },
+    {
+      "id": "CAP-RECOVERY-MARKED-CODES-BY-ENCODED-FINGERPRINT",
+      "crate": "mnemocode",
+      "module": "recovery::marked_search",
+      "status": "port",
+      "reason": "Feature search-marked-codes."
+    },
+    {
+      "id": "CAP-RECOVERY-MARKED-CODES-BY-WALLET",
+      "crate": "mnemocode",
+      "module": "recovery::marked_search",
+      "status": "port",
+      "reason": "Feature search-marked-codes; uses the date search when the dates are partly forgotten."
+    },
+    {
+      "id": "CAP-RECOVERY-MARKED-CODES-LIST",
+      "crate": "mnemocode",
+      "module": "recovery::marked_search",
+      "status": "port",
+      "reason": "Feature search-marked-codes."
+    },
+    {
+      "id": "CAP-RECOVERY-MARKED-CODES-SEARCH",
+      "crate": "mnemocode",
+      "module": "recovery::marked_search",
+      "status": "redesign",
+      "reason": "A resumable search the host steps (ADR 0005)."
+    },
+    {
+      "id": "CAP-RECOVERY-SEARCH-PLAN",
+      "crate": "mnemocode",
+      "module": "search::plan",
+      "status": "redesign",
+      "reason": "Size, time and consent from the pace of the search's TS sample over public data, which the host times before consent (ADR 0005); the library reads no clock and checks no secret candidate before consent."
+    },
+    {
+      "id": "CAP-RECOVERY-SEARCH-TURNS",
+      "crate": "mnemocode",
+      "module": "search",
+      "status": "redesign",
+      "reason": "Searches return after a work budget the host gives; stopping is a returned partial outcome (CORE-22), no event-loop turns or abort signal."
+    },
+    {
+      "id": "CAP-RECOVERY-WORD-SEARCH-MISSING",
+      "crate": "mnemocode",
+      "module": "recovery::word_search",
+      "status": "port",
+      "reason": "Feature search-word."
+    },
+    {
+      "id": "CAP-RECOVERY-WORD-SEARCH-PLACES",
+      "crate": "mnemocode",
+      "module": "recovery::places",
+      "status": "port",
+      "reason": "The place reader and its checksum-valid combinations are always built: the marked-code reader uses them."
+    },
+    {
+      "id": "CAP-RECOVERY-WORD-SEARCH-RUN",
+      "crate": "mnemocode",
+      "module": "recovery::word_search",
+      "status": "redesign",
+      "reason": "A resumable search the host steps (ADR 0005); feature search-word."
+    },
+    {
+      "id": "CAP-SSKR-COMBINE-COMMAND",
+      "crate": "mnemocode-cli",
+      "module": "commands::sskr_combine",
+      "status": "port",
+      "reason": "Front end over recovery::shares and sskr::restore."
+    },
+    {
+      "id": "CAP-SSKR-COMBINE-LIBRARY",
+      "crate": "mnemocode",
+      "module": "sskr::restore",
+      "status": "port",
+      "reason": "One call restores complete or marked shares without questions."
+    },
+    {
+      "id": "CAP-SSKR-ENGINE-COMBINE",
+      "crate": "mnemocode",
+      "module": "sskr::engine",
+      "status": "redesign",
+      "reason": "The vendored engine linked in; its refusal is a Result variant, not a host code."
+    },
+    {
+      "id": "CAP-SSKR-ENGINE-LOAD-VERIFIED",
+      "crate": "none",
+      "module": "none",
+      "status": "drop",
+      "reason": "Nothing is loaded at run time: the engine is linked into the executable and the WASM, whose integrity the signed, reproducible release carries."
+    },
+    {
+      "id": "CAP-SSKR-ENGINE-MEMORY-WIPE",
+      "crate": "mnemocode",
+      "module": "sskr::engine",
+      "status": "redesign",
+      "reason": "Owners wipe; the zeroing allocator wipes every freed block, wasm-bindgen's copies and reallocated string buffers included, so no glue rewrite; a secret entry takes its other arguments as numbers, booleans or JsValue converted in Rust (AUD-012-SEC001); the binding runs the stack scrub (secret::scrub_stack), sized from the deepest measured secret entry, after every secret call."
+    },
+    {
+      "id": "CAP-SSKR-ENGINE-REPRODUCIBLE-BUILD",
+      "crate": "tooling",
+      "module": "scripts/build-reproducible.sh",
+      "status": "redesign",
+      "reason": "The engine is linked, so the artifacts carry it: the Linux x86-64 and aarch64 and Windows executables and every page's WASM file are rebuilt in the pinned container and compared byte for byte; macOS executables are built on a pinned runner and checked by executable verification and SHA256SUMS; the vendored crates keep UPSTREAM.json and their local-change list."
+    },
+    {
+      "id": "CAP-SSKR-ENGINE-SPLIT",
+      "crate": "mnemocode",
+      "module": "sskr::engine",
+      "status": "redesign",
+      "reason": "Linked engine; the seed comes from the Random port."
+    },
+    {
+      "id": "CAP-SSKR-EXPORT-COMMAND",
+      "crate": "mnemocode-cli",
+      "module": "commands::sskr_export",
+      "status": "port",
+      "reason": "Front end over recovery::shares and sskr::export."
+    },
+    {
+      "id": "CAP-SSKR-EXPORT-REPAIR-FLOW",
+      "crate": "mnemocode",
+      "module": "recovery::shares",
+      "status": "port",
+      "reason": "Above the restore steps, which use the date search."
+    },
+    {
+      "id": "CAP-SSKR-EXPORT-SET",
+      "crate": "mnemocode",
+      "module": "sskr::export",
+      "status": "port",
+      "reason": "Same export rules."
+    },
+    {
+      "id": "CAP-SSKR-FORM-BYTEWORDS",
+      "crate": "mnemocode",
+      "module": "sskr::forms::bytewords",
+      "status": "port",
+      "reason": "Registry entry, feature share-form-words; the one Bytewords implementation."
+    },
+    {
+      "id": "CAP-SSKR-FORM-CHOICE",
+      "crate": "mnemocode",
+      "module": "sskr::forms",
+      "status": "port",
+      "reason": "The share-form registry with names, defaults and the encoded form each mirrors."
+    },
+    {
+      "id": "CAP-SSKR-FORM-COLOR-UNICODE",
+      "crate": "mnemocode",
+      "module": "sskr::forms::color_unicode",
+      "status": "port",
+      "reason": "Registry entry, feature share-form-colors-unicode."
+    },
+    {
+      "id": "CAP-SSKR-FORM-COLORS",
+      "crate": "mnemocode",
+      "module": "sskr::forms::colors",
+      "status": "port",
+      "reason": "Registry entry, feature share-form-colors."
+    },
+    {
+      "id": "CAP-SSKR-FORM-UNICODE",
+      "crate": "mnemocode",
+      "module": "sskr::forms::unicode",
+      "status": "port",
+      "reason": "Registry entry, feature share-form-unicode."
+    },
+    {
+      "id": "CAP-SSKR-FORM-UR",
+      "crate": "mnemocode",
+      "module": "sskr::forms::ur",
+      "status": "port",
+      "reason": "Registry entry, feature share-form-ur."
+    },
+    {
+      "id": "CAP-SSKR-FORM-WORD-NUMBERS",
+      "crate": "mnemocode",
+      "module": "sskr::forms::indexes",
+      "status": "port",
+      "reason": "Registry entry, feature share-form-indexes."
+    },
+    {
+      "id": "CAP-SSKR-HOST-PLATFORM",
+      "crate": "mnemocode",
+      "module": "sskr::engine",
+      "status": "redesign",
+      "reason": "No host platform: engine and HMAC linked, randomness through the Random port."
+    },
+    {
+      "id": "CAP-SSKR-JOINT-ASSESS",
+      "crate": "mnemocode",
+      "module": "sskr::joint",
+      "status": "port",
+      "reason": "Same assessment; the impossible GF(256) guards go (CORE-54)."
+    },
+    {
+      "id": "CAP-SSKR-JOINT-SEARCH",
+      "crate": "mnemocode",
+      "module": "sskr::joint",
+      "status": "redesign",
+      "reason": "A resumable search the host steps (ADR 0005)."
+    },
+    {
+      "id": "CAP-SSKR-MARK-SYNTAX",
+      "crate": "mnemocode",
+      "module": "sskr::marks",
+      "status": "port",
+      "reason": "Same marks; the code tokens and hex units are the text module's (TS code-text.ts), which bip39, forms and recovery read with."
+    },
+    {
+      "id": "CAP-SSKR-MIXED-LAYOUT",
+      "crate": "mnemocode",
+      "module": "sskr::layout",
+      "status": "port",
+      "reason": "Same versioned layout; the bit packing of word indexes is bip39's (TS bits.ts)."
+    },
+    {
+      "id": "CAP-SSKR-REPAIR-ONE-SHARE",
+      "crate": "mnemocode",
+      "module": "sskr::repair",
+      "status": "port",
+      "reason": "Same repair; internal API, not a public one."
+    },
+    {
+      "id": "CAP-SSKR-REPAIR-REPORT",
+      "crate": "mnemocode",
+      "module": "sskr::repair",
+      "status": "port",
+      "reason": "Cost from the pace of the TS sample, 10,000 digest checks on zero bytes, which the host times before consent (ADR 0005)."
+    },
+    {
+      "id": "CAP-SSKR-RESTORE-COMPLETE",
+      "crate": "mnemocode",
+      "module": "sskr::restore",
+      "status": "port",
+      "reason": "Every share checked against the restored set."
+    },
+    {
+      "id": "CAP-SSKR-RESTORE-HANDOFF",
+      "crate": "mnemocode-cli",
+      "module": "commands::sskr_combine",
+      "status": "port",
+      "reason": "Backup reading returns a share as an outcome; the front end continues the restore."
+    },
+    {
+      "id": "CAP-SSKR-RESTORE-STEPS",
+      "crate": "mnemocode",
+      "module": "recovery::shares",
+      "status": "redesign",
+      "reason": "Host-neutral steps as values and resumable searches; above the date search."
+    },
+    {
+      "id": "CAP-SSKR-RESTORED-SET-FACTS",
+      "crate": "mnemocode",
+      "module": "sskr::restore",
+      "status": "port",
+      "reason": "Same facts."
+    },
+    {
+      "id": "CAP-SSKR-SAVE-SHARE-FILE",
+      "crate": "mnemocode-cli",
+      "module": "output",
+      "status": "port",
+      "reason": "Front end: private publication of the library's share text and keeping note."
+    },
+    {
+      "id": "CAP-SSKR-SAVE-SHARE-QR",
+      "crate": "mnemocode-cli",
+      "module": "output",
+      "status": "port",
+      "reason": "Front end: private publication of the library's verified QR PNGs."
+    },
+    {
+      "id": "CAP-SSKR-SEARCH-CONSENT",
+      "crate": "mnemocode",
+      "module": "recovery::shares",
+      "status": "port",
+      "reason": "Uses the search plan, repair report and date search; their paces come from the public samples the host times before consent (ADR 0005)."
+    },
+    {
+      "id": "CAP-SSKR-SET-CHECK",
+      "crate": "mnemocode",
+      "module": "sskr::set",
+      "status": "port",
+      "reason": "Same checks before the engine."
+    },
+    {
+      "id": "CAP-SSKR-SET-CHOICE",
+      "crate": "mnemocode",
+      "module": "sskr::set",
+      "status": "port",
+      "reason": "Same N of M rules."
+    },
+    {
+      "id": "CAP-SSKR-SHARE-ANY-FORM",
+      "crate": "mnemocode",
+      "module": "sskr::forms",
+      "status": "port",
+      "reason": "Reads in registry order, writes any registered form; one reader (the TS and old Rust readers disagreed)."
+    },
+    {
+      "id": "CAP-SSKR-SHARE-BYTES-METADATA",
+      "crate": "mnemocode",
+      "module": "sskr::share",
+      "status": "port",
+      "reason": "Same bytes and metadata."
+    },
+    {
+      "id": "CAP-SSKR-SHARE-QR-MATCH",
+      "crate": "mnemocode",
+      "module": "sskr::share",
+      "status": "port",
+      "reason": "Same comparison."
+    },
+    {
+      "id": "CAP-SSKR-SHARE-SOURCES",
+      "crate": "mnemocode-cli",
+      "module": "input",
+      "status": "port",
+      "reason": "Files, standard input, QR images and the prompt; --share refused before parsing."
+    },
+    {
+      "id": "CAP-SSKR-SHARE-TROUBLE",
+      "crate": "mnemocode",
+      "module": "sskr::typed",
+      "status": "port",
+      "reason": "Same naming of the wrong share; the list and place wording is the text module's (TS places.ts), which bip39, forms, dates and wallet use too."
+    },
+    {
+      "id": "CAP-SSKR-SPLIT-BACKUP",
+      "crate": "mnemocode",
+      "module": "sskr::split",
+      "status": "port",
+      "reason": "Masks first in its mode; keeps the restore check of each split."
+    },
+    {
+      "id": "CAP-SSKR-SPLIT-COMMAND",
+      "crate": "mnemocode-cli",
+      "module": "commands::sskr_split",
+      "status": "port",
+      "reason": "Front end for encode --sskr, sskr-split and re-encode --sskr."
+    },
+    {
+      "id": "CAP-SSKR-SPLIT-PHRASE",
+      "crate": "mnemocode",
+      "module": "sskr::split",
+      "status": "port",
+      "reason": "Same split of one group."
+    },
+    {
+      "id": "CAP-SSKR-TYPED-SHARES",
+      "crate": "mnemocode",
+      "module": "sskr::typed",
+      "status": "port",
+      "reason": "Same reading by place."
+    },
+    {
+      "id": "CAP-SSKR-UNMASK-SHARES",
+      "crate": "mnemocode",
+      "module": "recovery::shares",
+      "status": "redesign",
+      "reason": "Unmasking with partly forgotten dates is a resumable search over the date search."
+    },
+    {
+      "id": "CAP-SSKR-WALLET-CHECK-SETS",
+      "crate": "mnemocode",
+      "module": "sskr::restore",
+      "status": "port",
+      "reason": "Filters restored phrases by the wallet evidence given as data."
+    },
+    {
+      "id": "CAP-WALLET-ADDRESS-LOCATION",
+      "crate": "mnemocode",
+      "module": "wallet::location",
+      "status": "port",
+      "reason": "Same account, branch and index rules."
+    },
+    {
+      "id": "CAP-WALLET-ADDRESS-SCAN",
+      "crate": "mnemocode",
+      "module": "wallet::scan",
+      "status": "port",
+      "reason": "The count of addresses is a required argument; the front ends pass the one library default (20)."
+    },
+    {
+      "id": "CAP-WALLET-BIP39-PASSPHRASE-INPUT",
+      "crate": "mnemocode-cli",
+      "module": "input",
+      "status": "redesign",
+      "reason": "File and prompt reading into a secret owner, bounded at 4 KiB, a question without a longest answer of its own (owner, 2026-10-27; TS: 1 MiB); a leading byte order mark kept as TS 0.1.0, with a warning (owner, 2026-10-27; TS first)."
+    },
+    {
+      "id": "CAP-WALLET-BIP39-SEED",
+      "crate": "mnemocode",
+      "module": "bip39::seed",
+      "status": "port",
+      "reason": "The bip39 crate's to_seed_normalized with the NFKD passphrase in a SecretText; takes a validated Phrase, so unvalidated text cannot reach it; core.master-fingerprint.invalid-mnemonic is recorded as gone."
+    },
+    {
+      "id": "CAP-WALLET-BITCOIN-NETWORKS",
+      "crate": "mnemocode",
+      "module": "wallet::coins::bitcoin",
+      "status": "port",
+      "reason": "Part of the Bitcoin coin unit."
+    },
+    {
+      "id": "CAP-WALLET-BITCOIN-PROFILES",
+      "crate": "mnemocode",
+      "module": "wallet::coins::bitcoin",
+      "status": "port",
+      "reason": "Part of the Bitcoin coin unit."
+    },
+    {
+      "id": "CAP-WALLET-COIN-BITCOIN",
+      "crate": "mnemocode",
+      "module": "wallet::coins::bitcoin",
+      "status": "port",
+      "reason": "Registry entry, feature coin-bitcoin, with its own known answers."
+    },
+    {
+      "id": "CAP-WALLET-COIN-BITCOIN-CASH",
+      "crate": "mnemocode",
+      "module": "wallet::coins::bitcoin_cash",
+      "status": "port",
+      "reason": "Registry entry, feature coin-bitcoin-cash."
+    },
+    {
+      "id": "CAP-WALLET-COIN-COSMOS",
+      "crate": "mnemocode",
+      "module": "wallet::coins::cosmos",
+      "status": "port",
+      "reason": "Registry entry, feature coin-cosmos."
+    },
+    {
+      "id": "CAP-WALLET-COIN-DASH",
+      "crate": "mnemocode",
+      "module": "wallet::coins::dash",
+      "status": "port",
+      "reason": "Registry entry, feature coin-dash; the Dash edition builds it alone."
+    },
+    {
+      "id": "CAP-WALLET-COIN-DOGECOIN",
+      "crate": "mnemocode",
+      "module": "wallet::coins::dogecoin",
+      "status": "port",
+      "reason": "Registry entry, feature coin-dogecoin."
+    },
+    {
+      "id": "CAP-WALLET-COIN-ETHEREUM",
+      "crate": "mnemocode",
+      "module": "wallet::coins::ethereum",
+      "status": "port",
+      "reason": "Registry entry, feature coin-ethereum."
+    },
+    {
+      "id": "CAP-WALLET-COIN-ETHEREUM-CLASSIC",
+      "crate": "mnemocode",
+      "module": "wallet::coins::ethereum_classic",
+      "status": "port",
+      "reason": "Registry entry, feature coin-ethereum-classic (shares the EVM address module)."
+    },
+    {
+      "id": "CAP-WALLET-COIN-INJECTIVE",
+      "crate": "mnemocode",
+      "module": "wallet::coins::injective",
+      "status": "port",
+      "reason": "Registry entry, feature coin-injective."
+    },
+    {
+      "id": "CAP-WALLET-COIN-LITECOIN",
+      "crate": "mnemocode",
+      "module": "wallet::coins::litecoin",
+      "status": "port",
+      "reason": "Registry entry, feature coin-litecoin."
+    },
+    {
+      "id": "CAP-WALLET-COIN-REGISTRY",
+      "crate": "mnemocode",
+      "module": "wallet::coins",
+      "status": "port",
+      "reason": "The coin registry and the shared address readers; the CLI's --coin values, help and menu answers come from it."
+    },
+    {
+      "id": "CAP-WALLET-COIN-SELF-TESTS",
+      "crate": "mnemocode",
+      "module": "wallet::coins",
+      "status": "port",
+      "reason": "Each coin's known answers live in its module and reach the self-test through the registry (CORE-31)."
+    },
+    {
+      "id": "CAP-WALLET-COIN-TRON",
+      "crate": "mnemocode",
+      "module": "wallet::coins::tron",
+      "status": "port",
+      "reason": "Registry entry, feature coin-tron."
+    },
+    {
+      "id": "CAP-WALLET-COIN-XRP",
+      "crate": "mnemocode",
+      "module": "wallet::coins::xrp",
+      "status": "port",
+      "reason": "Registry entry, feature coin-xrp."
+    },
+    {
+      "id": "CAP-WALLET-COIN-ZCASH",
+      "crate": "mnemocode",
+      "module": "wallet::coins::zcash",
+      "status": "port",
+      "reason": "Registry entry, feature coin-zcash."
+    },
+    {
+      "id": "CAP-WALLET-EVIDENCE-ACCOUNT-XPUB",
+      "crate": "mnemocode",
+      "module": "wallet::evidence",
+      "status": "port",
+      "reason": "Same evidence; place options beside it refused, as beside the master evidence (owner, 2026-10-27; TS first)."
+    },
+    {
+      "id": "CAP-WALLET-EVIDENCE-BITCOIN-ADDRESS",
+      "crate": "mnemocode",
+      "module": "wallet::evidence",
+      "status": "port",
+      "reason": "Derives only the profile of the address's own type; an address of an unselected type refused before any secret (owner, 2026-10-27; TS first)."
+    },
+    {
+      "id": "CAP-WALLET-EVIDENCE-CHECK",
+      "crate": "mnemocode",
+      "module": "wallet::evidence",
+      "status": "port",
+      "reason": "Evidence is data the host gives; the check is the library's own, returning a typed match."
+    },
+    {
+      "id": "CAP-WALLET-EVIDENCE-COIN-ADDRESS",
+      "crate": "mnemocode",
+      "module": "wallet::evidence",
+      "status": "port",
+      "reason": "Dispatches to the registry's coin."
+    },
+    {
+      "id": "CAP-WALLET-EVIDENCE-MASTER-XPUB",
+      "crate": "mnemocode",
+      "module": "wallet::evidence",
+      "status": "port",
+      "reason": "Same evidence."
+    },
+    {
+      "id": "CAP-WALLET-EVIDENCE-OPTIONS",
+      "crate": "mnemocode-cli",
+      "module": "input",
+      "status": "port",
+      "reason": "Front end: options and files to evidence data; values checked by the library before any secret."
+    },
+    {
+      "id": "CAP-WALLET-EVIDENCE-PUBLIC-KEY",
+      "crate": "mnemocode",
+      "module": "wallet::evidence",
+      "status": "port",
+      "reason": "Same evidence."
+    },
+    {
+      "id": "CAP-WALLET-EVIDENCE-WIF",
+      "crate": "mnemocode",
+      "module": "wallet::evidence",
+      "status": "port",
+      "reason": "WIF parsed from a secret owner into a secret key owner; the CLI reads the file."
+    },
+    {
+      "id": "CAP-WALLET-FINGERPRINT-EVIDENCE",
+      "crate": "mnemocode",
+      "module": "wallet::evidence",
+      "status": "port",
+      "reason": "Same evidence."
+    },
+    {
+      "id": "CAP-WALLET-HOST-CHECK-CONTRACT",
+      "crate": "mnemocode",
+      "module": "wallet::evidence",
+      "status": "redesign",
+      "reason": "No host callback: the host gives evidence as data and gets a typed WalletMatch; the malformed-answer refusals cannot occur."
+    },
+    {
+      "id": "CAP-WALLET-MASTER-FINGERPRINT",
+      "crate": "mnemocode",
+      "module": "bip32",
+      "status": "port",
+      "reason": "Master key and fingerprint in bip32, below the forms that print fingerprints."
+    },
+    {
+      "id": "CAP-WALLET-NODE-EVIDENCE-API",
+      "crate": "mnemocode",
+      "module": "wallet::evidence",
+      "status": "redesign",
+      "reason": "The library's evidence API serves every host; the Node.js PBKDF2 binding and the alias names go."
+    }
+  ],
+  "defects": [
+    {
+      "defect": "CORE-54: WordList (core/word-hints.ts) is no package export and is built only from the program's static lists (BIP39 English, Bytewords). Its constructor still refuses bad lists with three core.word-hints.* codes, and word-hints-self-test.ts passes a sparse list on purpose. This guards against a failure nobody can cause.",
+      "how": "The word lists are static data compiled in; forms::hints takes a &'static [&'static str] and has no list-shape refusals (CORE-54), and its self-test feeds no malformed list."
+    },
+    {
+      "defect": "CORE-54: core.pieces.piece-whole-width-at-least-1 guards piece widths that are always program constants.",
+      "how": "Piece widths are constants of each form entry; no run-time guard."
+    },
+    {
+      "defect": "CORE-54: EncodedBackup.words asserts again the word count its constructor already checked. ReEncoding's constructor catch and its #result view check again (ownedDates) the dates the library decoded itself, and wipe on a failure no input can cause.",
+      "how": "A validated Phrase and an EncodedBackup are built once and carry their count by type; ReEncoding holds the library's own decoded values without re-checks or a catch that wipes on an impossible failure."
+    },
+    {
+      "defect": "CORE-54 (shared module used by every catalog of this domain): ErrorCatalog.create checks at run time for an unknown code or a message that is not text, although both come from static, typed program data.",
+      "how": "Codes are enum variants with a code() match and a Display impl per module; an unknown code or a non-text message cannot be written, so there is no run-time catalog check."
+    },
+    {
+      "defect": "CORE-23: MissingChecksumError (core/masking.ts) is the domain's only refusal outside an ErrorCatalog. Its code 'missing-checksum' has no namespace, unlike every other code.",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: the code gets the core.masking namespace inside the modes error enum (CORE-23); the wallet-tools session is told."
+    },
+    {
+      "defect": "CORE-23: words.ts and word-table.ts each build an ErrorCatalog with the same namespace 'core.words'. Code uniqueness across the two modules holds only by convention.",
+      "how": "Each module has its own enum; a test over the refusal known-answer file (vectors/ts-0.1.0/refusals-v1.json) checks that every code across all enums is unique."
+    },
+    {
+      "defect": "CORE-23: in re-encode-command.ts, phraseEndingWith recognises the refusal by comparing error.message with NO_SUCH_LAST_WORD instead of using its code core.re-encoding.no-such-last-word.",
+      "how": "The front end matches the refusal's variant (ReEncodingError::NoSuchLastWord), never its message."
+    },
+    {
+      "defect": "Code naming: core.dates.assert-calendar-date-refused and assert-calendar-date-refused-2 stand for 'year out of range' and 'month out of range', but their names do not say which, so a host cannot choose its words by the code.",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: core.dates.year-out-of-range and core.dates.month-out-of-range, variants YearOutOfRange and MonthOutOfRange; the wallet-tools session is told."
+    },
+    {
+      "defect": "One code covers two conditions: bitsToBytes refuses both a length that is not a multiple of 8 and a character other than 0/1 with core.bits.entropy-contain-whole-number-bytes. This goes against the catalog's own 'two conditions take two codes' rule, and its input always comes from the program's own bit strings.",
+      "how": "Entropy comes from the bip39 crate (to_entropy_array of a validated phrase) into a fixed owner; no 0/1 strings exist, so the condition and its code cannot occur and are dropped."
+    },
+    {
+      "defect": "Inconsistent trimming: parseDate, isDatePattern, parseDatePattern, WordTable.lookup, serializeRecord/parseRecord and re-encode's last-word file use String.prototype.trim. white-space.ts makes trimWhiteSpace the one rule, and the two differ on U+FEFF and U+0085.",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: one rule everywhere, Unicode White_Space at the ends (TS trimWhiteSpace, Rust str::trim), written once in text::."
+    },
+    {
+      "defect": "Secret hygiene: seedshift.ts moves entropy through '0'/'1' JavaScript strings (bitsOfIndexes, bytesToBits, shiftedEntropyBits) that cannot be wiped. Every read of EncodedBackup.indexes also returns a fresh frozen copy that cannot be wiped. A Rust version should keep entropy and indexes in zeroizing buffers and lend them by reference.",
+      "how": "Entropy, indexes and shifted entropy live in SecretBytes owners (locked, zeroized) and are lent by reference; no fresh copies per read."
+    },
+    {
+      "defect": "The compatibility exports decodeInput, decodeInputLegacy and decodeInputDirect do not wipe the index arrays they parse, unlike EncodedBackup.read.",
+      "how": "There are no compatibility decode entries in Rust: one decode path, whose index arrays sit in a secret owner."
+    },
+    {
+      "defect": "EncodedBackup.shorterPhrases catches and drops every error of a shorter start (catch {} return []), wiped-secret refusals included. CORE-22 says no error is swallowed.",
+      "how": "shorter_phrases returns Result: only the expected 'not a phrase' outcome becomes an empty list; every other error passes on (CORE-22)."
+    },
+    {
+      "defect": "EncodedForm.cardCodes does not hold its indexes to assertPhraseIndexes, while codes() and elements() do.",
+      "how": "Card codes are written from the validated Phrase's indexes, which cannot hold an out-of-range index."
+    },
+    {
+      "defect": "Color Unicode reading uses two separator rules: the hex path splits at white space, commas, semicolons and #, but the symbol path (colorUnicodePoints, colorSymbolsOf) drops white space only, so Private Use symbols separated by commas are refused.",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: one separator rule for both paths of forms::color_unicode (white space, commas, semicolons and #)."
+    },
+    {
+      "defect": "record.unsupported-mode is raised only by serializeRecord. parseRecord reports an unknown mode in a header as record.malformed-header, but an unknown format as record.unsupported-format.",
+      "how": "serialize takes a Mode value, so an unsupported mode cannot be written and that path's code is gone; parse keeps record.malformed-header and record.unsupported-format as TS 0.1.0."
+    },
+    {
+      "defect": "Front ends differ: EncodedForm.alwaysMasked (forms 1 and 2) is enforced only by the menu. 'encode --mode direct --format 1|2' is accepted on the command line.",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: the library refuses --mode direct with forms 1 and 2 for every front end, before any secret; the wallet-tools session is told."
+    },
+    {
+      "defect": "In the library, Masking.of('seedshift-legacy-valid').encode works, although the mode is not encodable and EncodedBackup.assertEncodable refuses it.",
+      "how": "Only encodable modes have an encode method (a separate EncodableMode type), so the library cannot encode in seedshift-legacy-valid."
+    },
+    {
+      "defect": "The message 'Unicode code N is not a BIP39 word.' (core.words.unicode-code-not-bip39-word) puts the code's place where a reader expects the code, so it reads as if N were the code.",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: the message names the place as a place ('The Unicode code at place N is not a BIP39 word.')."
+    },
+    {
+      "defect": "Misleading comments: self-test-vectors.ts and re-encoding-self-test.ts say the Unicode codes come from bip-0039/chinese_simplified.txt, while WordTable uses the Traditional Chinese list. The answers happen to match for 的 and 在, and MANUAL_RECOVERY.md forbids substituting the Simplified list.",
+      "how": "Comments and the known-answer provenance name the Traditional Chinese list, which word_table/chinese_traditional.rs holds."
+    },
+    {
+      "defect": "The task names a package entry 'mnemocode/core', but package.json has no such export. src/core.ts is reachable only through 'mnemocode'.",
+      "how": "Library paths are crate modules named in ARCHITECTURE.md's module map; the binding exposes one module per part."
+    },
+    {
+      "defect": "Bitcoin address evidence whose type is in none of the selected --bitcoin-profile values is accepted by assertWalletEvidence and can never match. Confirmed against dist/: the BIP84 address with profiles ['legacy'] passes the check and never matches, while ['native-segwit'] matches. A long search then reports 'not matched' for every candidate instead of refusing the evidence before any secret is typed (src/core/wallet-evidence.ts:697, 630).",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: evidence of an address type outside the selected profiles is refused before any secret, with a new code; the wallet-tools session is told."
+    },
+    {
+      "defect": "LocatedEvidence.compare derives the branch key and every scanned child in every selected profile, even for 'address' evidence, where only the profile of the address's own type can match. That is up to 4x wasted BIP32 derivations per candidate, which also inflates the search-time estimates (src/core/wallet-evidence.ts:652).",
+      "how": "Address evidence derives only in the profile its address type belongs to; results are the same, with fewer derivations and a truer time estimate."
+    },
+    {
+      "defect": "--account-xpub accepts --branch and --index, validates them, then silently ignores them. Place options beside a master fingerprint or master xpub are refused precisely because they 'would be ignored' (src/cli/bitcoin-options.ts:211, src/core/wallet-evidence.ts:679).",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: --branch and --index beside --account-xpub are refused, as beside the master evidence."
+    },
+    {
+      "defect": "The list passphrase (parseListPassphrase) and the Scanner recipient (parseRecipient) are trimmed with String.prototype.trim instead of the shared trimWhiteSpace, which follows Rust str::trim. The two differ on U+0085 and U+FEFF, so a Rust writer and a TypeScript reader can disagree on a list passphrase (src/core/candidate-encryption.ts:71, src/core/candidate-cipher.ts:168).",
+      "how": "Decided (owner, 2026-10-27): fixed with the trimming defect: the list passphrase and the recipient are trimmed by the one rule."
+    },
+    {
+      "defect": "--bip39-passphrase-file keeps a leading byte order mark, while the WIF file and the list-passphrase file strip it. A BOM added by an editor silently selects another wallet (src/cli/bitcoin-options.ts:228).",
+      "how": "Decided (owner, 2026-10-27): kept, since stripping it would select another wallet for an existing file; the program warns when the file starts with U+FEFF (TS first)."
+    },
+    {
+      "defect": "Bip39Seed raises 'Invalid mnemonic' only for a wrong word count. It does not check the words or the checksum, so the public entry points masterFingerprint and matchWalletEvidence derive a seed from any 12-word text. This matches @scure/bip39 mnemonicToSeed but is misleading for a library entry (src/core/master-fingerprint.ts:93).",
+      "how": "Seed derivation takes a validated Phrase, so no unvalidated text reaches it from any entry."
+    },
+    {
+      "defect": "CORE-54: CandidateEncryption's gate keeps failure epochs, recheck barriers and retires results when a recheck fails mid-operation. This defends against the runtime changing its own known answers during a session, which nothing can cause; a check-once gate with an explicit recheck is enough (src/core/candidate-encryption.ts:111-348).",
+      "how": "candidates::gate checks the known answers once per process and on an explicit recheck; no epochs, barriers or retired results."
+    },
+    {
+      "defect": "CORE-54: the guard 'dates-found-do-not-decode-codes-wallet-matched' re-decodes found codes only to catch a disagreement between MnemoCode's own date search and its own decoder (src/core/missing-codes-search.ts:858).",
+      "how": "The re-decode guard is not written: the date search and the decoder are the program's own code (CORE-54)."
+    },
+    {
+      "defect": "CORE-54: EncodedBackupCheck.#compareRestored runs after codes and dates were already found equal to the result's; its own comment says only a fault of MnemoCode can give a finding there (src/core/backup-check.ts:503).",
+      "how": "The final comparison is not written (CORE-54)."
+    },
+    {
+      "defect": "CORE-54: CandidatesFile.#save throws TooManyForListError for the outcome 'full', which its comment calls only a fault of MnemoCode, since the searches refuse earlier (src/cli/candidates-file.ts:231).",
+      "how": "The searches bound their counts before any secret, so the writer has no 'full' outcome to refuse."
+    },
+    {
+      "defect": "CORE-54: several redundant guards. address-scan publicKeyOf has a null check (unable-derive-public-key) that a private HDKey cannot trigger. scanBranch re-runs addressCount on ranges its callers checked, and Coin.branchPathsOf re-checks a location CoinAddressComparison already checked. DateSearch.pace re-asserts the word count of its own copy. equalKeyBytes handles null keys that parsed or derived HDKeys always have. The DatesAnswer constructor's try/catch wipes earlier SecretValues if a later allocation of its own fails.",
+      "how": "Derived keys are typed and always present; ranges are checked once at the boundary (CORE-48) and not again inside."
+    },
+    {
+      "defect": "CORE-22: CandidateFileAdmission.#lock throws its own code core.candidate-file-admission.invalid-supported-header and catches it at once to rethrow header-malformed. This is control flow by exception, and the code never reaches a host (src/core/candidate-file-admission.ts:247-260).",
+      "how": "Admission returns header-malformed directly; no error is thrown to be caught."
+    },
+    {
+      "defect": "CORE-23: two ErrorCatalogs share the prefix core.candidates (candidates.ts and word-candidate.ts), and two share core.words (words.ts and word-table.ts). Nearby, core.dates has the non-descriptive pair assert-calendar-date-refused and assert-calendar-date-refused-2.",
+      "how": "A uniqueness test over every code of every enum (see the shared-namespace defect)."
+    },
+    {
+      "defect": "Not to be ported: wallet-check ownedAnswer walks the host answer's prototype chain and re-binds its methods and getters (AUD-016). This is JavaScript-host plumbing; a typed Rust wallet-check trait needs none of it.",
+      "how": "Not ported: evidence is data and WalletMatch a typed value; there is no host object to walk."
+    },
+    {
+      "defect": "Documentation and code differ: docs/CANDIDATES.md says 'rich|rice' needs at least two words, but 'zoo|zoo' is accepted as a known place.",
+      "how": "Decided (owner, 2026-10-27): fixed in the documents, TS first: 'zoo|zoo' stays accepted and CANDIDATES.md is corrected to the code (DOC-06)."
+    },
+    {
+      "defect": "The two defaults for addresses compared from a place are a trap: the library default is 1 when `addresses` is omitted, the command-line and screen default is 20. A host that relies on the library default compares a single address.",
+      "how": "wallet::scan takes the address count as a required argument and both front ends pass the one constant DEFAULT_SCAN_ADDRESSES (20); the library has no default."
+    },
+    {
+      "defect": "Inconsistency: recover-word's legacy replacements call the wallet check directly (walletCheck?.(phrase)) instead of through askWallet, unlike every other search (src/cli/recover-word-command.ts:226).",
+      "how": "Every search, legacy replacements included, checks a candidate through the same evidence path; results are unchanged."
+    },
+    {
+      "defect": "runtime.ts: the glue JS is hashed from one read but run through a separate import() (inside the single executable, from the bundle), so the pin does not bind the code that runs; integrity.json sits beside the files it pins, so only accidental corruption is caught",
+      "how": "No run-time loading: the engine is linked into the executable and the WASM; release integrity is the signed, reproducible artifact."
+    },
+    {
+      "defect": "gf256.ts: sskr.gf256.zero-no-inverse-gf-256 can never fire, because gfInverse only receives xi^xj of points already proved distinct (CORE-54)",
+      "how": "The joint solver picks distinct members by construction; no zero-inverse guard."
+    },
+    {
+      "defect": "gf256.ts: sskr.gf256.shamir-points-distinct cannot fire from its callers, because joint-solve baseOf always picks distinct members (CORE-54)",
+      "how": "No distinct-points guard; the callers' construction guarantees it."
+    },
+    {
+      "defect": "bridge.ts:164-166: re-checks with byte-array-required that three arrays the function itself just pushed exist (CORE-54)",
+      "how": "The bridge passes typed slices; no re-check of arrays it built."
+    },
+    {
+      "defect": "runtime.ts: sskr.runtime.bundle-reader type-checks a typed parameter whose only caller passes the default (CORE-54)",
+      "how": "No bundle reader exists."
+    },
+    {
+      "defect": "split.ts: the checks of the engine's output (unexpected-share-count, another-split-than-asked, did-not-reconstruct-source-entropy) and randomness-left-seed-unfilled guard the program's own pinned engine and the OS CSPRNG; only a foreign host platform can trigger them (CORE-54, borderline; at most keep the restore check)",
+      "how": "The engine output checks and the 'randomness left unfilled' check are dropped (CORE-54); the restore of every new split is kept as the product's promise that written shares restore, like the QR read-back."
+    },
+    {
+      "defect": "repair.ts: repairCandidates and its freeBits budget (0..8, default 4) are documented as library API in docs/SSKR.md, but no package entry exports them; sskr.repair.free-bits-budget is reachable only from the self-test",
+      "how": "repair candidates and the free-bits budget are pub(crate); the repository's SSKR document lists only public API."
+    },
+    {
+      "defect": "cli/share-repair.ts:163: TypedShares.given reads values(args, 'share'), but --share is always refused on argv before parsing, so this path is dead",
+      "how": "--share is refused before parsing and no code reads share values from arguments."
+    },
+    {
+      "defect": "The engine's Bytewords encoding (create_sskr_shares_formatted / recover_sskr_shares_formatted with code 1) is used by no MnemoCode path; TypeScript writes and reads Bytewords itself, so there are two implementations of Bytewords",
+      "how": "The bridge calls only the binary share functions; Bytewords has one implementation, sskr::forms::bytewords."
+    },
+    {
+      "defect": "The TypeScript and Rust share readers disagree: TypeScript accepts a CBOR tag inside a UR, a non-shortest 0x58 byte-string head and, through JS 'iu' case folding, U+212A KELVIN SIGN as k anywhere and U+017F LONG S as s in the 'ur:sskr/' prefix; Rust refuses all of these. TypeScript canonicalises before the engine, so the looser rule wins end to end",
+      "how": "Decided (owner, 2026-10-27): kept: one Rust reader reproduces the looser TS 0.1.0 acceptance, so a share the TS reads, another tool's included, still restores; the engine checks every share."
+    },
+    {
+      "defect": "--format means the share form in sskr-split and sskr-export, but the complete masked backup in encode --sskr, where --share-format is the share form: one option with two meanings",
+      "how": "Decided (owner, 2026-10-27): kept: renaming options breaks the scripts and documents that use them."
+    },
+    {
+      "defect": "share_text.rs: u64::try_from(len).unwrap_or(u64::MAX) and u8::try_from(index).ok() over the 256-word list guard cases that cannot happen (CORE-54, minor)",
+      "how": "The bridge holds no such conversions; lengths are typed."
+    },
+    {
+      "defect": "transport.ts readShare: a damaged Unicode-code share is refused with the colour reader's message, because colours come first among the hex forms",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: the refusal names the reader of the form the text is written in."
+    },
+    {
+      "defect": "transport.ts MAX_COLOR_TEXT_LENGTH (1024) counts numbers for word numbers but UTF-16 characters for colours and Unicode codes: inconsistent unit",
+      "how": "Decided (owner, 2026-10-27): kept: each limit a named constant with its unit in its name; the limits bound input, and one unit would change nothing a person sees."
+    },
+    {
+      "defect": "Inconsistent: --card-qr is silently ignored for share cards with --card-layout individual (no QR drawn, no refusal), while business-size seed-phrase cards refuse it (export.content-kinds.qr-code-printed-on-sheet-only-choose-size); src/export/sskr-render.ts:218",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: --card-qr with individual share cards is refused before any secret, as for business-size seed-phrase cards."
+    },
+    {
+      "defect": "CLI/library gap: ShareCardSet accepts a sheet title, but no share command offers --title (sskr-split refuses it in SSKR mode, SSKR_EXPORT_OPTIONS lacks it)",
+      "how": "Decided (owner, 2026-10-27): kept: adding the option is a feature, not a fix (CORE-54)."
+    },
+    {
+      "defect": "NoCardTemplateError for a kind not in CARD_KIND_NAMES prints 'supports undefined cards'; the error and the CLI's noCardTemplateMessage/card-template-refused path are unreachable with the fixed 13-design catalog (src/export/template-catalog.ts:163)",
+      "how": "The card kind is an enum with one value; the no-template error and its CLI wrapper cannot occur and are dropped."
+    },
+    {
+      "defect": "QR PNG export uses a 1-module quiet zone (qrcode margin: 1, src/export/qr-image.ts:31) while printed QR codes use the ISO/IEC 18004 4-module zone",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: the ISO/IEC 18004 4-module quiet zone, so saved and printed QR codes scan reliably; the QR known answers change."
+    },
+    {
+      "defect": "Material sample choice uses unrounded Math.cbrt/Math.hypot (src/export/material-artwork.ts:512,632), so decorative samples may differ between JS engines, contrary to card-palette.ts's rule of rounding to millionths for engine independence",
+      "how": "Colour maths uses libm, the same on every host and target; any difference from V8's Math.cbrt in a decorative sample falls under the page-image tolerance (PLAN, \"Parity with TS 0.1.0\")."
+    },
+    {
+      "defect": "MIN_MODULE_MM = 0.4 (src/export/card-qr.ts:17) is a default only tests use; every production caller passes 0.3 mm",
+      "how": "One constant, the production 0.3 mm; no unused default."
+    },
+    {
+      "defect": "colorCardsFit skips Unicode-code cards (format 3) and Encode runs it only with --ask-secrets, so a typed detail too long for its card is refused at save time after the result is shown (src/cli/cards-fit.ts:41, src/cli/encode-command.ts:174)",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: every form's fit, Unicode-code cards included, is checked before any secret."
+    },
+    {
+      "defect": "sskr-export without --format checks printability in colors only; Unicode shares with material-enclosure or material-tile (32/27 samples < 33 codes) are refused only after the shares are typed",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: the chosen share form's own cards are checked before the shares are typed."
+    },
+    {
+      "defect": "Two hide markers for a design text: '-' via CLI/overrides, '' via a host's whole presentation (checkedCardPresentation)",
+      "how": "The library API has one Hidden value; the CLI's '-' and a host's empty text both map to it in the front ends."
+    },
+    {
+      "defect": "Preview plans decoys separately for its PDF and its page images (encode and shares share one plan)",
+      "how": "Preview draws its PDF and its images from one plan and one scene."
+    },
+    {
+      "defect": "renderHeirSheet does not check the font's character set; a host route with characters outside the DejaVu subset fails with pdf-lib's own uncoded error",
+      "how": "Decided with the 25 (2026-10-27): fixed, TS first: the heir sheet checks its text against the font subset's character map before drawing and refuses with a new code of its catalog."
+    },
+    {
+      "defect": "CORE-54 (guard against nothing): export.card-session.card-session-no-name (own state, comment admits it)",
+      "how": "No such guard: the session's state is typed."
+    },
+    {
+      "defect": "CORE-54: export.collection-sheet.missing-design-study-qr-area cannot occur (layout is computed with the same QR matrix that is drawn)",
+      "how": "The layout is computed from the drawn matrix in one function; no missing-area guard."
+    },
+    {
+      "defect": "CORE-54: export.collection-layout.invalid-design-study-layout appears unreachable (constant aspects; empty content refused earlier by the content check)",
+      "how": "Not written (constant aspects; content refused earlier)."
+    },
+    {
+      "defect": "CORE-54: export.card-decoys.cards-their-decoys-already unreachable (withPlannedDecoys handles counted decoys before withDecoyPool; module is no package entry)",
+      "how": "Not written (counted decoys handled first)."
+    },
+    {
+      "defect": "CORE-54: readRenderAsset's export.platform.unknown-card-asset only ever checks the program's own constant paths",
+      "how": "Assets are compiled-in constants; no allowlist check."
+    },
+    {
+      "defect": "CORE-54: export.card-values.shape TypeError check; CardValues is constructed only from typed internal values",
+      "how": "CardValues is built only from typed values; no shape check."
+    },
+    {
+      "defect": "CORE-54: export.export-details.snapshot-keys; the only caller passes objects and WeakMap already throws",
+      "how": "No snapshot-keys check; the type system holds the shape."
+    },
+    {
+      "defect": "CORE-54: empty-catalog guards (CardPreview.jobs selectTemplate() call, preview's 'No card designs are installed.')",
+      "how": "The template registry is a non-empty constant list (a unit test); no empty-catalog guard."
+    },
+    {
+      "defect": "CORE-54: export.qr-image.qr-payload-not-empty reachable only from the self-test's deliberate call",
+      "how": "The payload type is non-empty by construction; the self-test case is dropped."
+    },
+    {
+      "defect": "CORE-54: cli.qr-input.qr-decoder-unavailable typeof check on a bundled dependency's export",
+      "how": "rqrr is linked; no run-time check of a decoder function."
+    },
+    {
+      "defect": "CORE-54: EncodeCardExport shares a pending plan for a re-entrant host callback that the sequential CLI never makes; it also uses an empty SecretValue only as a liveness flag",
+      "how": "Each export holds its own plan by value; no shared pending plan and no empty owner used as a flag."
+    },
+    {
+      "defect": "CORE-54 owner decision: every QR matrix from qrcode is rasterised and decoded with jsQR before drawing (QrPngReader.checkedModules) - guards a dependency, a cause CORE-54 does not name, but documented as a product promise",
+      "how": "Kept as the owner's product promise: qr verifies every matrix by drawing and decoding it with rqrr before it is drawn or saved."
+    },
+    {
+      "defect": "ExportDetails re-settles complete profiles and still consumes random choices (createCardIdentity picks a sector even with a given company) only to keep fixed-seed test output; a port need not copy it",
+      "how": "Decided (owner, 2026-10-27): kept, so fixed-seed outputs stay byte-equal; a leaner order changes nothing a person sees."
+    },
+    {
+      "defect": "Security note: separate-card file names contain the printed secret code ('01-ABCDEF.pdf'), exposing codes in directory listings and file metadata (documented behaviour)",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: separate-card file names carry the card's number, not its code, and the documents say so."
+    },
+    {
+      "defect": "Dead secret-value paths: argv refuses --mnemonic/--input/--share/--date/--dates/--old-date/--old-dates/--last-word before parsing (src/cli/arguments.ts:51, src/cli/command-line.ts:84), but code still reads their values: textInput direct text (src/cli/input.ts:74), dateInputText (src/cli/input.ts:272), share values (src/cli/share-repair.ts:163), the --dates/--old-dates list branch and flagOf (src/cli/arguments.ts:106,145)",
+      "how": "The secret flags are refused before parsing and no code reads their values; the dead branches are not written."
+    },
+    {
+      "defect": "Misleading refusal: cli.input.provide-as-direct-text-file-through-ask-secrets offers 'direct text', which is always refused (src/cli/input.ts:50); provide-either-as-direct-text-file-but-not cannot happen from the command line",
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: the message no longer offers direct text."
+    },
+    {
+      "defect": "CORE-54 guards against failures nobody can cause: cli.ask.question-after-failure-choice (src/cli/ask.ts:306), cli.ask.answer-question-stop-value (src/cli/ask.ts:351), cli.input-bytes.byte (src/cli/input-bytes.ts:23), cli.protection.mnemo-code-could-not-find-own-program-file (src/cli/protection.ts:97), core.defined.missing-value everywhere (src/core/defined.ts), cli.candidates-file.wiped (src/cli/candidates-file.ts:154), the rethrow of non-TypeError in strictUtf8Text (src/core/utf8-text.ts:27)",
+      "how": "None of these guards is written (CORE-54)."
+    },
+    {
+      "defect": "Cleanup written as more than one attempt: readLine nests try/finally so readAgain.wipe() runs if answer.wipe() throws, but fill(0) cannot throw (src/cli/terminal-input.ts:650-652)",
+      "how": "Wiping is Drop, one attempt; no nested cleanup."
+    },
+    {
+      "defect": "swap-check encrypted() stops at depth 8 for a loop in /sys that the kernel cannot produce (src/cli/swap-check.ts:101)",
+      "how": "No depth limit: the device walk follows what the kernel lists, which has no loops."
+    },
+    {
+      "defect": "One error namespace in two modules: share-repair.ts declares a second catalog 'cli.sskr-restore-command' (src/cli/share-repair.ts:78); the core module utf8-text.ts uses namespace 'cli.utf8' (src/core/utf8-text.ts:4)",
+      "how": "Each module's own enum carries its TS codes; a module never shares an enum with another; the uniqueness test covers the codes."
+    },
+    {
+      "defect": "Codes outside ErrorCatalog with bare names and messages built in their classes (CORE-23): UnusableAnswerError answer-too-long/answer-not-utf8 (src/cli/typed-answer.ts:27), InputTooLargeError too-large (src/core/byte-units.ts:10), the private-file error classes left-staging-copy etc. (src/export/private-file.ts:49)",
+      "how": "These codes become variants of their modules' enums with their TS strings kept (RUST-14); their messages come from Display like every other."
+    },
+    {
+      "defect": "Overloaded option names: --format is the code form in encode/decode/re-encode/recover-date but the share form in sskr-split/sskr-export, while encode --sskr calls that --share-format; --index is a word number (table) and an address index (wallet); --words, --all and --output each have two or three meanings",
+      "how": "Decided (owner, 2026-10-27): kept: renaming options breaks the scripts and documents that use them."
+    },
+    {
+      "defect": "Only SIGINT is handled (src/cli/interruption.ts:33). SIGHUP (terminal closed), SIGTERM, and SIGQUIT (Ctrl+\\ between questions) end the process without leaving the alternate screen or removing private staging folders, which may hold a copy of a secret export",
+      "how": "SIGINT, SIGTERM, SIGHUP and SIGQUIT (and the Windows console handler) restore the terminal, leave the private screen and remove staging folders; SIGTSTP restores the terminal, leaves the private screen and stops, and on continue the private screen and raw mode come back (N-SIGNALS)."
+    },
+    {
+      "defect": "Menu echo-off depends on /bin/stty (src/cli/menu-runner.ts:18). Where it is missing, echo silently stays on, so keys typed early can reach the scrollback",
+      "how": "Echo is switched off through termios or the console API directly; no /bin/stty."
+    },
+    {
+      "defect": "ProgressLine truncates by UTF-16 length rather than display width (src/cli/terminal.ts:399)",
+      "how": "The progress line is cut by display cells (the same cell-width rule as the layout)."
+    },
+    {
+      "defect": "preflightFileDestination(path, allowOverwrite) never overwrites. true only means 'existing is fine, it will be numbered' (src/cli/output-paths.ts:266)",
+      "how": "The preflight's parameter is named for what it does (number an existing name), and it never overwrites."
+    },
+    {
+      "defect": "Rights are dropped from options before assertAllowedArguments validates them (src/cli/command-line.ts:120-125); harmless but misordered",
+      "how": "Options are validated first, then the protections are applied for the validated needs; there is no permission model."
+    },
+    {
+      "defect": "Inconsistent sandbox labels: Windows uses 'Windows: no other programs' (src/cli/sandbox-windows.ts:189), while Linux and macOS use 'kernel: ...' and 'sandbox: ...', and verify-executable.mjs matches these strings",
+      "how": "Decided (owner, 2026-10-27): kept: verify-executable matches the labels, and they change no protection. The Rust port prints no 'no other programs' label, since it denies no program start (owner, 2026-10-27)."
+    },
+    {
+      "defect": "Unwipeable string copies of shown and read secrets (a JS limitation, do not copy): PrivatePage.text() decodes the page on each repaint (src/cli/private-page.ts:79), and file and typed secrets become strings (text-file.ts, bitcoin-options.ts:232)",
+      "how": "Shown and read secrets stay in locked owners; a repaint writes from the owner to the terminal without a String copy."
+    },
+    {
+      "defect": "Over-built: build-executable.mjs backs up the previous release set and rolls back renames with PublicationRollbackError (scripts/build-executable.mjs:180-210) for an output that can simply be rebuilt into a fresh folder",
+      "how": "Executables are built into a fresh folder; no backup or rollback."
+    }
+  ]
+}

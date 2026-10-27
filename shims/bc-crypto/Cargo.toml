@@ -1,0 +1,16 @@
+[package]
+name = "bc-crypto"
+version = "0.14.0"
+edition.workspace = true
+rust-version.workspace = true
+license = "MIT OR Apache-2.0"
+description = "The three items of bc-crypto 0.14.0 that the vendored bc-shamir 0.13.0 uses, over hmac, sha2 and zeroize."
+publish = false
+
+[dependencies]
+hmac.workspace = true
+sha2.workspace = true
+zeroize.workspace = true
+
+[lints]
+workspace = true

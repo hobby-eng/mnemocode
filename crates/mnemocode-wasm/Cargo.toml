@@ -1,0 +1,26 @@
+[package]
+name = "mnemocode-wasm"
+description = "MnemoCode's WebAssembly binding: one class per operation, built once per page profile."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# One `browser-*` feature per binding module, each added with its library part
+# (docs/design/architect/ARCHITECTURE.md §9; wasm-profiles.json names them per page).
+[features]
+default = []
+
+[dependencies]
+mnemocode.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen.workspace = true
+
+[lints]
+workspace = true

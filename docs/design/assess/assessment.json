@@ -1,0 +1,489 @@
+{
+  "components": [
+    {
+      "path": "mnemocode-rust/Cargo.toml",
+      "verdict": "rework",
+      "reason": "The lints table and release profile meet RUST-01 and RUST-12; members, licence and pins are stale (MIT only; sha2 0.11.0 and libc 0.2.190 where mhfe pins 0.11.1 and 0.2.191).",
+      "evidence": [
+        "mnemocode-rust/Cargo.toml:9",
+        "mnemocode-rust/Cargo.toml:13-15",
+        "mnemocode-rust/Cargo.toml:17-33",
+        "mhfe/Cargo.toml:37",
+        "mhfe/Cargo.toml:59"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/Cargo.lock",
+      "verdict": "delete",
+      "reason": "Regenerated with the new crates.",
+      "evidence": ["mnemocode-rust/Cargo.lock"]
+    },
+    {
+      "path": "mnemocode-rust/clippy.toml",
+      "verdict": "keep",
+      "reason": "Exactly the RUST-01 settings.",
+      "evidence": ["mnemocode-rust/clippy.toml:1-4"]
+    },
+    {
+      "path": "mnemocode-rust/rust-toolchain.toml",
+      "verdict": "rework",
+      "reason": "Pins 1.99.0; mhfe, the SSKR crate and AGENTS.md use 1.99.1; no wasm32 target listed.",
+      "evidence": [
+        "mnemocode-rust/rust-toolchain.toml:2",
+        "mhfe/rust-toolchain.toml",
+        "multi-chain-wallet-tools/packages/recovery-sskr-wasm/rust/rust-toolchain.toml"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/.gitignore",
+      "verdict": "keep",
+      "reason": "Ignores target, output, export-* and test-results as the workspace asks.",
+      "evidence": ["mnemocode-rust/.gitignore:1-4"]
+    },
+    {
+      "path": "mnemocode-rust/.prettierrc.json",
+      "verdict": "keep",
+      "reason": "The CORE-21 settings.",
+      "evidence": ["mnemocode-rust/.prettierrc.json:1"]
+    },
+    {
+      "path": "mnemocode-rust/.prettierignore",
+      "verdict": "keep",
+      "reason": "Keeps vectors and audit records out of formatting (DOC-04).",
+      "evidence": ["mnemocode-rust/.prettierignore:1-4"]
+    },
+    {
+      "path": "mnemocode-rust/LICENSE",
+      "verdict": "rework",
+      "reason": "MIT only; MnemoCode is MIT OR Apache-2.0 with LICENSE-MIT and LICENSE-APACHE.",
+      "evidence": ["mnemocode-rust/LICENSE:1", "mnemocode/package.json:424"]
+    },
+    {
+      "path": "mnemocode-rust/README.md",
+      "verdict": "delete",
+      "reason": "Describes reviews and acceptances (DOC-03), baseline d4776f7, Rust 1.99.0.",
+      "evidence": [
+        "mnemocode-rust/README.md:7-12",
+        "mnemocode-rust/README.md:16-18",
+        "mnemocode-rust/README.md:21"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/AGENTS.md",
+      "verdict": "delete",
+      "reason": "Procedures no longer used (one Cargo worker, ../workingspace/cargo-target, 3 GiB reserve); points at PORTING.md.",
+      "evidence": ["mnemocode-rust/AGENTS.md:11-15"]
+    },
+    {
+      "path": "mnemocode-rust/THIRD_PARTY_NOTICES.md",
+      "verdict": "rework",
+      "reason": "Reasons per dependency are right; versions stale and the text records how the work was approved, not the program.",
+      "evidence": [
+        "mnemocode-rust/THIRD_PARTY_NOTICES.md:3",
+        "mnemocode-rust/THIRD_PARTY_NOTICES.md:8-9",
+        "mnemocode-rust/THIRD_PARTY_NOTICES.md:32-33"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core",
+      "verdict": "rework",
+      "reason": "One crate for every module, without features or a WASM binding; requirements 3 and 5 need capability units chosen at build time (RUST-15).",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-core/Cargo.toml:1-15",
+        "mnemocode-rust/crates/mnemocode-core/src/lib.rs:7-23"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/lib.rs",
+      "verdict": "delete",
+      "reason": "A list of pub mods of the crate being replaced.",
+      "evidence": ["mnemocode-rust/crates/mnemocode-core/src/lib.rs:7-23"]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/memory.rs",
+      "verdict": "delete",
+      "reason": "An allocator parameter (&impl SecretAllocator) on every constructor and copy of a secret owner, with no browser adapter to pass, fork revocation and length checks of its own adapter (CORE-13, CORE-54); the model asks for a zeroizing buffer with Drop and redacted Debug and Display. Replace with mhfe's LockedBytes and LockedText.",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-core/src/memory.rs:73-94",
+        "mnemocode-rust/crates/mnemocode-core/src/memory.rs:112",
+        "mnemocode-rust/crates/mnemocode-core/src/memory.rs:135-146",
+        "mnemocode-rust/crates/mnemocode-core/src/memory/error.rs:12-16",
+        "mhfe/src/memory.rs:18-160",
+        "tmp/rust-arch/model/capabilities.json CAP-PHRASE-FORMATS-SECRET-OWNERS"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/memory/units.rs",
+      "verdict": "delete",
+      "reason": "Little-endian u16 storage inside byte owners; a zeroizing [u16; 24] serves.",
+      "evidence": ["mnemocode-rust/crates/mnemocode-core/src/memory/units.rs:1-60"]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/memory/self_test.rs",
+      "verdict": "delete",
+      "reason": "A startup check of the program's own wiping, which only a trusted part could fail (CORE-54).",
+      "evidence": ["mnemocode-rust/crates/mnemocode-core/src/memory/self_test.rs:12"]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/memory/testing.rs",
+      "verdict": "delete",
+      "reason": "Fake of the deleted allocator seam.",
+      "evidence": ["mnemocode-rust/crates/mnemocode-core/src/memory/testing.rs:1-100"]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/secret_text.rs",
+      "verdict": "delete",
+      "reason": "SecretText becomes LockedText; SecretCodeUnits keeps opaque UTF-16, a JavaScript storage detail of SecretValue.utf16Texts that no Rust capability needs (CORE-52).",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-core/src/secret_text.rs:69",
+        "mnemocode/src/core/secret-value.ts:207"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/text_rules.rs",
+      "verdict": "keep",
+      "reason": "The ECMAScript trim and token rule the current readers use, checked against every scalar value; drop its error and self_test modules.",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-core/src/text_rules.rs:2-3",
+        "mnemocode-rust/crates/mnemocode-core/src/text_rules.rs:27-31",
+        "mnemocode-rust/crates/mnemocode-core/src/text_rules/tests.rs:9-24"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/text_rules/self_test.rs",
+      "verdict": "delete",
+      "reason": "Startup check of a pure rule already covered by an exhaustive test; nothing breaks without it.",
+      "evidence": ["mnemocode-rust/crates/mnemocode-core/src/text_rules/self_test.rs:1-16"]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/bip39_shape.rs",
+      "verdict": "keep",
+      "reason": "BIP39 lengths and last-word sizes for Seedshift, the search plans and the messages, with TypeScript's refusal codes; validity is the bip39 crate's, and one test pins every size to it; drop self_test; core.bip39-sizes.entropy-length has no TypeScript counterpart.",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-core/src/bip39_shape.rs:22-90",
+        "mnemocode-rust/crates/mnemocode-core/src/bip39_shape/error.rs:22",
+        "mnemocode/src/core/bip39-sizes.ts:15-18"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/word_table.rs",
+      "verdict": "delete",
+      "reason": "The bip39 crate's find_word and lists take it (owner, 2026-10-27).",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-core/src/word_table.rs:44-50",
+        "tmp/rust-arch/model/capabilities.json CAP-PHRASE-FORMATS-WORD-TABLE-LOOKUP"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/word_table/english.rs",
+      "verdict": "delete",
+      "reason": "The bip39 crate's English list is equal entry for entry (owner, 2026-10-27: the crate, as mhfe).",
+      "evidence": [
+        "mnemocode-rust/docs/reference-wordlists.json:7-19",
+        "mnemocode/package.json:400",
+        "mhfe/Cargo.toml:26"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/word_table/chinese_traditional.rs",
+      "verdict": "delete",
+      "reason": "The bip39 crate's Traditional Chinese list is equal entry for entry (owner, 2026-10-27).",
+      "evidence": ["mnemocode-rust/docs/reference-wordlists.json:20-31"]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/word_indexes.rs",
+      "verdict": "delete",
+      "reason": "An owner of u16 indexes over byte storage and the allocator seam; a zeroizing fixed array newtype serves.",
+      "evidence": ["mnemocode-rust/crates/mnemocode-core/src/word_indexes.rs:18-34"]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/bip39_codec.rs",
+      "verdict": "delete",
+      "reason": "The bip39 crate takes it (owner, 2026-10-27); 985 known answers pass against the crate.",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-core/src/bip39_codec.rs:25-50",
+        "mnemocode-rust/crates/mnemocode-core/src/bip39_codec.rs:35",
+        "mnemocode-rust/crates/mnemocode-core/src/bip39_codec.rs:81"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/calendar.rs",
+      "verdict": "rework",
+      "reason": "Layouts, ranges, messages and codes match dates.ts at 7d0d4ee; compare and copy return Result because of the allocator seam.",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-core/src/calendar.rs:76-87",
+        "mnemocode-rust/crates/mnemocode-core/src/calendar/error.rs:25-35",
+        "mnemocode/src/core/dates.ts:9-22"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-core/src/date_schedule.rs",
+      "verdict": "rework",
+      "reason": "Sorting, at most n/3 dates and repeated year, month, day shifts match deriveShifts; rebuilt on plain zeroizing dates; stray doc line.",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-core/src/date_schedule.rs:19",
+        "mnemocode-rust/crates/mnemocode-core/src/date_schedule.rs:32-89",
+        "mnemocode/src/core/dates.ts:281-293"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-native",
+      "verdict": "rework",
+      "reason": "Linux-only, fail-closed protections; rebuilt from mhfe's protect.rs and memory.rs with the per-output Landlock rules and TSYNC of this crate, reporting instead of refusing.",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-native/src/protection.rs:35",
+        "mnemocode-rust/crates/mnemocode-native/src/memory.rs:43",
+        "mnemocode-rust/crates/mnemocode-native/src/isolation.rs:53",
+        "tmp/rust-arch/model/capabilities.json CAP-CLI-SECRET-GATE"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-native/src/protection.rs",
+      "verdict": "rework",
+      "reason": "Same calls as mhfe's harden_process, but a PID-bound token and refusal instead of a self-check row.",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-native/src/protection.rs:18",
+        "mnemocode-rust/crates/mnemocode-native/src/protection.rs:42",
+        "mhfe/src/bin/mhfe/protect.rs:34-49",
+        "mhfe/src/bin/mhfe/protect.rs:202-216"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-native/src/memory.rs",
+      "verdict": "delete",
+      "reason": "A dedicated mmap per secret with guard pages, a locked page, DONTDUMP, WIPEONFORK and a full smaps parse per allocation; about 2048 live secrets under an 8 MiB memlock limit, and refusal ends the operation.",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-native/src/memory.rs:85-96",
+        "mnemocode-rust/crates/mnemocode-native/src/memory/linux/sys.rs:48-130",
+        "mnemocode-rust/crates/mnemocode-native/src/memory/linux/sys.rs:126-128",
+        "mnemocode-rust/crates/mnemocode-native/src/memory/linux.rs:29",
+        "mnemocode-rust/crates/mnemocode-native/src/memory/linux/maps.rs:32-42",
+        "mnemocode-rust/crates/mnemocode-native/src/memory/linux/sys.rs:88",
+        "mnemocode-rust/crates/mnemocode-native/src/memory/linux/sys.rs:184"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-native/src/isolation.rs",
+      "verdict": "rework",
+      "reason": "seccomp with TSYNC is worth keeping; the namespace uses CLONE_NEWNET alone, which needs CAP_SYS_ADMIN (observed: not permitted); refuses on threads and inherited sockets against the owner's report-only rule (a tracer refuses by the owner's decision of 2026-10-27); calls beyond the current program's set (ptrace, bpf, recvmsg...).",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-native/src/isolation/linux.rs:29",
+        "mnemocode-rust/crates/mnemocode-native/src/isolation/linux.rs:61-89",
+        "mnemocode-rust/crates/mnemocode-native/src/isolation/linux/descriptors.rs:25-31",
+        "mnemocode-rust/crates/mnemocode-native/src/isolation/linux/seccomp.rs:11-25",
+        "https://man7.org/linux/man-pages/man2/unshare.2.html",
+        "mhfe/src/bin/mhfe/protect.rs:611"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-native/src/output_policy.rs",
+      "verdict": "rework",
+      "reason": "Landlock rules for only the requested files and export folders fit MnemoCode's secret commands that save; the ABI 5 minimum, inherited-writer refusal, terminal ioctl and metadata filters go; ABI-graded best effort as the Landlock docs advise.",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-native/src/output_policy/linux/sys.rs:11",
+        "mnemocode-rust/crates/mnemocode-native/src/output_policy/linux/sys.rs:86",
+        "mnemocode-rust/crates/mnemocode-native/src/output_policy/linux/sys.rs:92-143",
+        "mnemocode-rust/crates/mnemocode-native/src/output_policy/linux/sys.rs:173-222",
+        "mnemocode-rust/crates/mnemocode-native/src/output_policy/linux.rs:63-92",
+        "https://docs.kernel.org/userspace-api/landlock.html"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-native/src/syscall_filter.rs",
+      "verdict": "rework",
+      "reason": "Keep the small TSYNC install; drop the refusal of every syscall above 471 and the terminal ioctl branch (CORE-54).",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-native/src/syscall_filter.rs:21",
+        "mnemocode-rust/crates/mnemocode-native/src/syscall_filter.rs:61",
+        "mnemocode-rust/crates/mnemocode-native/src/syscall_filter.rs:82-104",
+        "mnemocode-rust/crates/mnemocode-native/src/syscall_filter/terminal_ioctls.rs:1-65"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/crates/mnemocode-native-probes",
+      "verdict": "delete",
+      "reason": "A test-only binary; integration tests of the real command line replace it; its tests write into the repository's output folder.",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-native-probes/src/main.rs:1",
+        "mnemocode-rust/crates/mnemocode-native-probes/tests/outputs.rs:12"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/docs/PORTING.md",
+      "verdict": "delete",
+      "reason": "A check log of the d4776f7 port (DOC-03); counts stale (328 option uses, now 341); superseded by the capability model.",
+      "evidence": [
+        "mnemocode-rust/docs/PORTING.md:3-8",
+        "mnemocode-rust/docs/PORTING.md:33-218",
+        "mnemocode/dist/cli/command-options.js COMMAND_OPTIONS"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/docs/SECURITY.md",
+      "verdict": "delete",
+      "reason": "True of the code but states the fail-closed plan the owner rejected; the namespace it names is never created for a normal user.",
+      "evidence": [
+        "mnemocode-rust/docs/SECURITY.md:43",
+        "mnemocode-rust/docs/SECURITY.md:57",
+        "mnemocode-rust/docs/SECURITY.md:78-79"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/docs/WALLET-TOOLS-MIGRATION.md",
+      "verdict": "delete",
+      "reason": "Stale (200-file capsule, now 217 at 7d0d4ee) and asks for opaque UTF-16 keys no Rust capability needs; nothing actionable.",
+      "evidence": [
+        "mnemocode-rust/docs/WALLET-TOOLS-MIGRATION.md:4",
+        "mnemocode-rust/docs/WALLET-TOOLS-MIGRATION.md:34-35",
+        "multi-chain-wallet-tools/packages/recovery-mnemocode/source.json"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/docs/BIP39-WORDLISTS.md",
+      "verdict": "delete",
+      "reason": "Its attribution moves to THIRD_PARTY_NOTICES.md, the word lists named as provided by the bip39 crate.",
+      "evidence": ["mnemocode-rust/docs/BIP39-WORDLISTS.md:22-27", "mnemocode/package.json:400"]
+    },
+    {
+      "path": "mnemocode-rust/docs/reference-cli.json",
+      "verdict": "delete",
+      "reason": "Stale: 328 option uses against 341; lacks --dates-file (7 commands), --qr-dir (4), --last-word-file and --old-dates-file; superseded by cli.optionAssignments.",
+      "evidence": [
+        "mnemocode-rust/docs/reference-cli.json:2",
+        "tmp/rust-arch/design/assess/current-cli.json"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/docs/reference-vectors.json",
+      "verdict": "delete",
+      "reason": "True but redundant: the vector files equal mnemocode/vectors at 7d0d4ee byte for byte.",
+      "evidence": ["mnemocode-rust/docs/reference-vectors.json:6-31", "mnemocode/vectors/"]
+    },
+    {
+      "path": "mnemocode-rust/docs/reference-wordlists.json",
+      "verdict": "rework",
+      "reason": "Facts hold; status says review pending, contradicting PORTING.md:177; folded into one provenance record.",
+      "evidence": [
+        "mnemocode-rust/docs/reference-wordlists.json:32",
+        "mnemocode-rust/docs/PORTING.md:177"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/docs/reference-bip39-codec.json",
+      "verdict": "rework",
+      "reason": "Facts hold (@scure/bip39 2.4.0); its oracle lives only in ignored output/; folded into one provenance record.",
+      "evidence": ["mnemocode-rust/docs/reference-bip39-codec.json:6", "mnemocode/package.json:400"]
+    },
+    {
+      "path": "mnemocode-rust/docs/reference-calendar.json",
+      "verdict": "delete",
+      "reason": "Provenance of a fixture not carried over.",
+      "evidence": ["mnemocode-rust/docs/reference-calendar.json:9-11"]
+    },
+    {
+      "path": "mnemocode-rust/docs/reference-date-schedules.json",
+      "verdict": "rework",
+      "reason": "Bound to d4776f7 hashes; dates.ts changed (patterns and refactors) and its oracle refuses changed source, while complete-date sorting and shifts are unchanged.",
+      "evidence": [
+        "mnemocode-rust/docs/reference-date-schedules.json:3",
+        "mnemocode-rust/output/checks/date-schedule-reference.mjs:16",
+        "mnemocode/src/core/dates.ts:281-293"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/docs/reference-whitespace.json",
+      "verdict": "delete",
+      "reason": "True; the same facts are in text_rules.rs and its tests.",
+      "evidence": [
+        "mnemocode-rust/crates/mnemocode-core/src/text_rules.rs:2-3",
+        "mnemocode-rust/crates/mnemocode-core/src/text_rules/tests.rs:3-8"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/vectors/mnemocode-v1.json",
+      "verdict": "keep",
+      "reason": "Byte-identical to mnemocode/vectors/mnemocode-v1.json at 7d0d4ee (RUST-14).",
+      "evidence": ["mnemocode/vectors/mnemocode-v1.json"]
+    },
+    {
+      "path": "mnemocode-rust/vectors/sskr-v1.json",
+      "verdict": "keep",
+      "reason": "Byte-identical to mnemocode/vectors/sskr-v1.json at 7d0d4ee.",
+      "evidence": ["mnemocode/vectors/sskr-v1.json"]
+    },
+    {
+      "path": "mnemocode-rust/vectors/candidates-v1.json",
+      "verdict": "keep",
+      "reason": "Byte-identical to mnemocode/vectors/candidates-v1.json at 7d0d4ee.",
+      "evidence": ["mnemocode/vectors/candidates-v1.json"]
+    },
+    {
+      "path": "mnemocode-rust/vectors/bip39-codec-v1.bin",
+      "verdict": "keep",
+      "reason": "985 entropy-to-index known answers from @scure/bip39 2.4.0; they now test the bip39 crate.",
+      "evidence": [
+        "mnemocode-rust/docs/reference-bip39-codec.json:3-6",
+        "mnemocode-rust/crates/mnemocode-core/src/bip39_codec/tests.rs:34-75"
+      ]
+    },
+    {
+      "path": "mnemocode-rust/vectors/word-tables-v1.bin",
+      "verdict": "delete",
+      "reason": "The self-test's Word lists row checks the crate's two lists against the same TS SHA-256 constants.",
+      "evidence": ["mnemocode-rust/docs/reference-wordlists.json:33-40"]
+    },
+    {
+      "path": "mnemocode-rust/vectors/date-schedules-v1.bin",
+      "verdict": "keep",
+      "reason": "50 sorting and shift known answers from the old program; behaviour unchanged at 7d0d4ee.",
+      "evidence": ["mnemocode-rust/docs/reference-date-schedules.json:5-9"]
+    },
+    {
+      "path": "mnemocode-rust/vectors/calendar-month-lengths-v1.bin",
+      "verdict": "delete",
+      "reason": "120 KB of month lengths for a three-line leap rule; literal leap-century controls suffice.",
+      "evidence": ["mnemocode-rust/docs/reference-calendar.json:9-17"]
+    },
+    {
+      "path": "mnemocode-rust/output",
+      "verdict": "delete",
+      "reason": "Ignored local logs, reviews, patches and oracles of the old port (about 150 files).",
+      "evidence": ["mnemocode-rust/.gitignore:2"]
+    }
+  ],
+  "checks": [
+    {
+      "command": "cargo fmt --check",
+      "result": "exit 0"
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "result": "exit 0"
+    },
+    {
+      "command": "cargo test --locked",
+      "result": "exit 0: 99 passed (core 71, native 17, probes network 4, outputs 7), 2 ignored child helpers; 3 s, 211 MB peak; output/probe-fixtures created and removed"
+    },
+    {
+      "command": "target/debug/mnemocode-native-probes network",
+      "result": "exit 0: Network restrictions verified; namespace: not permitted"
+    }
+  ],
+  "recommendation": "Start over. The code finishes none of the 244 capabilities; its secret memory costs a locked mmap and an smaps parse per secret, fails the operation once the lock budget is used up, and puts an allocator parameter on every secret owner's constructor with no browser adapter; its fail-closed sandbox contradicts the owner's 2026-10-13 rule that missing sandbox parts are only reported; it runs no secret command off Linux and has no WASM binding or capability units. Base the protections and secret memory on mhfe's protect.rs and memory.rs, add this code's per-output Landlock rules and seccomp TSYNC, and carry over the listed files.",
+  "carryOver": [
+    "mnemocode-rust/clippy.toml",
+    "mnemocode-rust/.prettierrc.json",
+    "mnemocode-rust/.gitignore",
+    "mnemocode-rust/.prettierignore",
+    "mnemocode-rust/crates/mnemocode-core/src/text_rules.rs",
+    "mnemocode-rust/crates/mnemocode-core/src/text_rules/tests.rs",
+    "mnemocode-rust/crates/mnemocode-core/src/bip39_shape.rs",
+    "mnemocode-rust/crates/mnemocode-core/src/bip39_shape/error.rs",
+    "mnemocode-rust/crates/mnemocode-core/src/bip39_shape/tests.rs",
+    "mnemocode-rust/vectors/bip39-codec-v1.bin",
+    "mnemocode-rust/vectors/date-schedules-v1.bin",
+    "mnemocode-rust/vectors/mnemocode-v1.json",
+    "mnemocode-rust/vectors/sskr-v1.json",
+    "mnemocode-rust/vectors/candidates-v1.json"
+  ]
+}

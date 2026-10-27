@@ -1,0 +1,25 @@
+{
+ "about": "The vector files carried into this repository, each with its SHA-256 and where it comes from; the code-rules gate checks every file of vectors/ but ts-0.1.0/ against it (DOC-04). The recordings of ts-0.1.0/ have their own PROVENANCE.json.",
+ "files": {
+  "candidates-v1.json": {
+   "sha256": "8ba4af242a30f54028c8a87488b9adb246a544f0c4384fb943eb22a5eea5a2f1",
+   "source": "hobby-eng/mnemocode 7d0d4ee, vectors/candidates-v1.json, byte for byte"
+  },
+  "mnemocode-v1.json": {
+   "sha256": "ba96fabfb53a02dfa4106df98d65ec72323ca2cf798500159eed935444829048",
+   "source": "hobby-eng/mnemocode 7d0d4ee, vectors/mnemocode-v1.json, byte for byte"
+  },
+  "sskr-v1.json": {
+   "sha256": "28456673dcfc4abbfae40aac7ae3c5f021b58d19eb001ef4b14d290d141c7066",
+   "source": "hobby-eng/mnemocode 7d0d4ee, vectors/sskr-v1.json, byte for byte"
+  },
+  "bip39-codec-v1.bin": {
+   "sha256": "0e08e39105d5297d5f1382a522b556901fd540810584e7716b557e113a2895c3",
+   "source": "985 BIP39 entropy-to-index answers of @scure/bip39 2.4.0 under TS d4776f7, written by the earlier Rust attempt (archived); replaced in increment 3 by a recording of parity/record.mjs"
+  },
+  "date-schedules-v1.bin": {
+   "sha256": "a2af3fa98645b71586c130979adc999455d8e5ff4fda292948f041df90058c8e",
+   "source": "50 Seedshift date schedules of TS d4776f7's dist/core/dates.js, written by the earlier Rust attempt (archived); replaced in increment 3 by a recording of parity/record.mjs"
+  }
+ }
+}

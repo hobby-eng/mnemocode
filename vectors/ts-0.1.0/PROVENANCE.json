@@ -1,0 +1,8 @@
+{
+ "about": "Known answers of MnemoCode TS, recorded by parity/record.mjs from the build of one commit; the Rust tests replay them (RUST-14).",
+ "repository": "hobby-eng/mnemocode",
+ "commit": "7d0d4eeaa4d9ce120e4e4d31a13b8c583a966f9e",
+ "node": "v26.12.1",
+ "recorders": {},
+ "files": {}
+}

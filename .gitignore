@@ -1,0 +1,7 @@
+/target/
+/output/
+/export-*/
+/test-results/
+/node_modules/
+/dist/
+docs/audits/*-evidence/

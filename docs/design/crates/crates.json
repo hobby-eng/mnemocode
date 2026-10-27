@@ -1,0 +1,1670 @@
+{
+  "blocks": [
+    {
+      "need": "BIP39 word lists (English, Traditional Chinese), word lookup, words to entropy and checksum, entropy to words",
+      "capabilities": [
+        "CAP-CARDS-BACKUP-CONTENT",
+        "CAP-CARDS-CONTENT-CHECK",
+        "CAP-CARDS-HEIR-SHEET-TEXT",
+        "CAP-CARDS-SAMPLE-PREVIEW",
+        "CAP-CLI-MENU-TABLE",
+        "CAP-CLI-WORD-HINTS-TYPING",
+        "CAP-PHRASE-FORMATS-COLOR-PLACEMENTS",
+        "CAP-PHRASE-FORMATS-DECODE-FROM-OPTIONS",
+        "CAP-PHRASE-FORMATS-DECODE-QUESTIONS",
+        "CAP-PHRASE-FORMATS-ENCODE",
+        "CAP-PHRASE-FORMATS-ENCODED-FINGERPRINT",
+        "CAP-PHRASE-FORMATS-FORM-COLOR-UNICODE",
+        "CAP-PHRASE-FORMATS-FORM-COLORS",
+        "CAP-PHRASE-FORMATS-FORM-ENGLISH",
+        "CAP-PHRASE-FORMATS-FORM-INDEXES",
+        "CAP-PHRASE-FORMATS-FORM-UNICODE",
+        "CAP-PHRASE-FORMATS-LAST-WORD-REPLACEMENT-READING",
+        "CAP-PHRASE-FORMATS-LEGACY-VALID-LAST-WORD",
+        "CAP-PHRASE-FORMATS-MODE-DIRECT",
+        "CAP-PHRASE-FORMATS-MODE-LEGACY",
+        "CAP-PHRASE-FORMATS-MODE-SEEDSHIFT",
+        "CAP-PHRASE-FORMATS-NUMBERED-DICTIONARIES",
+        "CAP-PHRASE-FORMATS-PHRASE-VALIDATION",
+        "CAP-PHRASE-FORMATS-RE-ENCODE",
+        "CAP-PHRASE-FORMATS-RE-ENCODE-QUESTIONS",
+        "CAP-PHRASE-FORMATS-REENCODING-CONFIRMATION",
+        "CAP-PHRASE-FORMATS-SELF-TEST-KNOWN-ANSWERS",
+        "CAP-PHRASE-FORMATS-SHORTER-PHRASES",
+        "CAP-PHRASE-FORMATS-WORD-HINTS",
+        "CAP-PHRASE-FORMATS-WORD-TABLE-LOOKUP",
+        "CAP-RECOVERY-CANDIDATE-LIST-FORMAT",
+        "CAP-RECOVERY-CANDIDATE-LIST-WRITER",
+        "CAP-RECOVERY-DATE-SEARCH",
+        "CAP-RECOVERY-LEGACY-LAST-WORDS",
+        "CAP-RECOVERY-MARKED-CODES",
+        "CAP-RECOVERY-WORD-SEARCH-MISSING",
+        "CAP-RECOVERY-WORD-SEARCH-PLACES",
+        "CAP-RECOVERY-WORD-SEARCH-RUN",
+        "CAP-SSKR-COMBINE-COMMAND",
+        "CAP-SSKR-FORM-UNICODE",
+        "CAP-SSKR-FORM-WORD-NUMBERS",
+        "CAP-SSKR-MIXED-LAYOUT",
+        "CAP-SSKR-RESTORE-COMPLETE",
+        "CAP-SSKR-SPLIT-BACKUP",
+        "CAP-SSKR-SPLIT-PHRASE",
+        "CAP-SSKR-TYPED-SHARES",
+        "CAP-SSKR-UNMASK-SHARES",
+        "CAP-WALLET-BIP39-PASSPHRASE-INPUT",
+        "CAP-WALLET-BIP39-SEED",
+        "CAP-WALLET-EVIDENCE-CHECK",
+        "CAP-WALLET-MASTER-FINGERPRINT",
+        "CAP-WALLET-NODE-EVIDENCE-API"
+      ],
+      "current": "@scure/bip39 2.4.0 (word lists, validateMnemonic, entropyToMnemonic, mnemonicToEntropy; mnemocode/package.json:400) and own code for tokens, lookup, packing and positions (src/core/english-words.ts, words.ts, bip39-sizes.ts, bits.ts).",
+      "candidates": [
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "Rejected by the owner (owner, 2026-10-27): no own BIP39 code. Two 2048-word tables as data (verified tables exist in mnemocode-rust/crates/mnemocode-core/src/word_table/), pinned by the SHA-256 known answers the startup self-test already checks; checksum with sha2; checked with the published BIP39 vectors."
+        },
+        {
+          "crate": "bip39",
+          "version": "3.0.0",
+          "notes": "tree 12 crates native, 12 wasm32; no unsafe; CC0-1.0, released 2026-09-17. mhfe/Cargo.toml:26 (features zeroize; here zeroize and chinese-traditional without std, which pulls serde, or alloc; 10 crates). Brings bitcoin_hashes 0.14.101: a second SHA-256/HMAC/PBKDF2 family next to RustCrypto. Phrase-level API; splits on Unicode White_Space, not on the JS \\s that the TS uses (U+FEFF), so tokenizing stays own code anyway."
+        }
+      ],
+      "recommendation": "bip39 =3.0.0 (default-features = false, features zeroize, chinese-traditional)",
+      "reason": "The owner's decision (owner, 2026-10-27): BIP39 comes from the ready crate, as in mhfe, never from own code. Its lists equal @scure/bip39 2.4.0 and the TS self-test hashes; the 985 recorded scure answers agree; typed phrases and search candidates go through parse_in_normalized (1.57 µs natively, 1.63 µs in WASM, no allocation), entropy through to_entropy_array and from_entropy_in. +4 crates to the core WASM, all in mhfe's tree. Tokens, count and place refusals, the share layouts' packing, sizes and messages stay MnemoCode's (work/bip39-crate)."
+    },
+    {
+      "need": "Unicode normalization: NFKD (phrase, passphrase, candidate lists), NFC (card texts)",
+      "capabilities": [
+        "CAP-CARDS-TEXT-RULES",
+        "CAP-PHRASE-FORMATS-PHRASE-VALIDATION",
+        "CAP-RECOVERY-CANDIDATE-LIST-FORMAT",
+        "CAP-RECOVERY-WORD-SEARCH-PLACES",
+        "CAP-WALLET-BIP39-PASSPHRASE-INPUT",
+        "CAP-WALLET-BIP39-SEED"
+      ],
+      "current": "String.prototype.normalize of Node.js 26.12.1 (ICU 78.3, Unicode 17.0, measured with process.versions).",
+      "candidates": [
+        {
+          "crate": "unicode-normalization",
+          "version": "0.1.26",
+          "notes": "tree 2 crates native, 2 wasm32; unsafe x5; (MIT OR Apache-2.0) AND Unicode-3.0, released 2026-10-16. UNICODE_VERSION (18, 0, 0) at src/tables.rs:18; mhfe/Cargo.toml:41; data under Unicode-3.0 (notice)."
+        },
+        {
+          "crate": "icu_normalizer",
+          "version": "2.4.0",
+          "notes": "tree 27 crates native, 27 wasm32; unsafe x35; Unicode-3.0, released 2026-10-22. ICU4X; Unicode-3.0; zerovec/yoke data stack."
+        }
+      ],
+      "recommendation": "unicode-normalization =0.1.26",
+      "reason": "Unicode 18 as the owner wants, shared with mhfe, 2 crates. Characters new in Unicode 18 normalize differently from the TS (Unicode 17): a RUST-14 difference to record."
+    },
+    {
+      "need": "Unicode properties: Cc, Cf, Zl, Zp, M, Mn/Me, Script=Latin, Bidi_Control; terminal cell widths",
+      "capabilities": [
+        "CAP-CARDS-TEXT-RULES",
+        "CAP-CLI-RAW-LINE-EDITOR",
+        "CAP-CLI-RESULT-PAGING",
+        "CAP-CLI-SAFE-DISPLAY-TEXT"
+      ],
+      "current": "JS regular expressions \\p{...} (V8, Unicode 17.0) and own wide ranges with \\p{Mn}\\p{Me} (src/cli/terminal-geometry.ts:124-160).",
+      "candidates": [
+        {
+          "crate": "unicode-properties",
+          "version": "0.1.4",
+          "notes": "tree 1 crate native, 1 wasm32; no unsafe; MIT/Apache-2.0, released 2025-10-30. default-features = false, features general-category; Unicode 17.0.0 (src/tables.rs)."
+        },
+        {
+          "crate": "unicode-script",
+          "version": "0.5.8",
+          "notes": "tree 1 crate native, 1 wasm32; no unsafe; MIT OR Apache-2.0, released 2025-12-03. Unicode 17.0.0."
+        },
+        {
+          "crate": "unicode-general-category",
+          "version": "1.1.0",
+          "notes": "tree 1 crate native, 1 wasm32; no unsafe; Apache-2.0, released 2025-09-16. Unicode 16.0.0: older than the TS."
+        },
+        {
+          "crate": "unicode-width",
+          "version": "0.2.2",
+          "notes": "tree 1 crate native, 1 wasm32; no unsafe, forbids or denies unsafe_code; MIT OR Apache-2.0, released 2025-10-06. Not needed: the TS width model is its own short range list."
+        },
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "Tables generated from the UCD by a pinned script: Unicode 18, but a generator and its check to keep."
+        }
+      ],
+      "recommendation": "unicode-properties =0.1.4 (general-category) and unicode-script =0.5.8; Bidi_Control (12 code points) and the wide ranges as own constants",
+      "reason": "Zero dependencies, no unsafe, and the same Unicode 17.0 the TS uses today, so the same refusals (RUST-14). Case folding uses std char::to_lowercase."
+    },
+    {
+      "need": "PBKDF2-HMAC-SHA512 (BIP39 seed: fingerprints, wallet checks, searches)",
+      "capabilities": [
+        "CAP-CLI-PORTABLE-PARTS",
+        "CAP-CLI-SELF-TEST-COMMAND",
+        "CAP-PHRASE-FORMATS-ENCODED-FINGERPRINT",
+        "CAP-PHRASE-FORMATS-LEGACY-VALID-LAST-WORD",
+        "CAP-PHRASE-FORMATS-RE-ENCODE",
+        "CAP-PHRASE-FORMATS-SHORTER-PHRASES",
+        "CAP-RECOVERY-DATE-SEARCH",
+        "CAP-RECOVERY-MARKED-CODES-BY-ENCODED-FINGERPRINT",
+        "CAP-RECOVERY-MARKED-CODES-BY-WALLET",
+        "CAP-RECOVERY-MARKED-CODES-LIST",
+        "CAP-RECOVERY-MARKED-CODES-SEARCH",
+        "CAP-RECOVERY-WORD-SEARCH-RUN",
+        "CAP-SSKR-COMBINE-COMMAND",
+        "CAP-SSKR-EXPORT-REPAIR-FLOW",
+        "CAP-SSKR-SPLIT-COMMAND",
+        "CAP-SSKR-UNMASK-SHARES",
+        "CAP-SSKR-WALLET-CHECK-SETS",
+        "CAP-WALLET-BIP39-SEED",
+        "CAP-WALLET-COIN-SELF-TESTS",
+        "CAP-WALLET-EVIDENCE-CHECK",
+        "CAP-WALLET-EVIDENCE-COIN-ADDRESS",
+        "CAP-WALLET-FINGERPRINT-EVIDENCE",
+        "CAP-WALLET-MASTER-FINGERPRINT",
+        "CAP-WALLET-NODE-EVIDENCE-API"
+      ],
+      "current": "Supplied by the host: node:crypto (OpenSSL) on the command line, the page's own in a browser (CAP-CLI-PORTABLE-PARTS).",
+      "candidates": [
+        {
+          "crate": "pbkdf2",
+          "version": "0.13.0",
+          "notes": "tree 9 crates native, 9 wasm32; no unsafe; MIT OR Apache-2.0, released 2026-04-21. default-features = false, features hmac; digest 0.11 generation, as hmac 0.13.0 and sha2 0.11.1 (mhfe/Cargo.toml:32,37)."
+        },
+        {
+          "crate": "bip39",
+          "version": "3.0.0",
+          "notes": "tree 12 crates native, 12 wasm32; no unsafe; CC0-1.0, released 2026-09-17. Mnemonic::to_seed_normalized over bitcoin_hashes, as mhfe/src/wallet.rs:1071."
+        },
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "The PBKDF2 loop over hmac: about 20 lines, but the crate is the reviewed one (CORE-47)."
+        }
+      ],
+      "recommendation": "bip39 =3.0.0 Mnemonic::to_seed_normalized; pbkdf2 0.13.0 only inside scrypt",
+      "reason": "BIP39's seed rule is the crate's (owner, 2026-10-27): 1.10 ms per seed natively and 1.61 ms in WASM, against 0.91 and 1.45 ms for pbkdf2 0.13 (work/bip39-crate/run2.log); taking pbkdf2 for the seed would be own BIP39 seed code and a second seed path. The tree does not change."
+    },
+    {
+      "need": "Hashes and MAC: SHA-256, SHA-512, HMAC-SHA256/512, RIPEMD-160 (HASH160), Keccak-256",
+      "capabilities": [
+        "CAP-CARDS-BUNDLED-ASSETS",
+        "CAP-CLI-PORTABLE-PARTS",
+        "CAP-CLI-RELEASE-SIGNING",
+        "CAP-CLI-SINGLE-EXECUTABLE",
+        "CAP-PHRASE-FORMATS-ENCODED-FINGERPRINT",
+        "CAP-PHRASE-FORMATS-MODE-SEEDSHIFT",
+        "CAP-PHRASE-FORMATS-SELF-TEST-KNOWN-ANSWERS",
+        "CAP-RECOVERY-WORD-SEARCH-PLACES",
+        "CAP-SSKR-COMBINE-COMMAND",
+        "CAP-SSKR-COMBINE-LIBRARY",
+        "CAP-SSKR-ENGINE-COMBINE",
+        "CAP-SSKR-ENGINE-LOAD-VERIFIED",
+        "CAP-SSKR-ENGINE-REPRODUCIBLE-BUILD",
+        "CAP-SSKR-EXPORT-COMMAND",
+        "CAP-SSKR-EXPORT-REPAIR-FLOW",
+        "CAP-SSKR-HOST-PLATFORM",
+        "CAP-SSKR-JOINT-SEARCH",
+        "CAP-SSKR-REPAIR-REPORT",
+        "CAP-WALLET-BIP39-SEED",
+        "CAP-WALLET-COIN-BITCOIN",
+        "CAP-WALLET-COIN-COSMOS",
+        "CAP-WALLET-COIN-DASH",
+        "CAP-WALLET-COIN-DOGECOIN",
+        "CAP-WALLET-COIN-ETHEREUM",
+        "CAP-WALLET-COIN-ETHEREUM-CLASSIC",
+        "CAP-WALLET-COIN-INJECTIVE",
+        "CAP-WALLET-COIN-REGISTRY",
+        "CAP-WALLET-COIN-TRON",
+        "CAP-WALLET-COIN-XRP",
+        "CAP-WALLET-COIN-ZCASH",
+        "CAP-WALLET-MASTER-FINGERPRINT"
+      ],
+      "current": "@noble/hashes 2.4.0 (sha256, ripemd160, keccak_256; package.json:396), node:crypto HMAC for SSKR repair (CAP-SSKR-HOST-PLATFORM).",
+      "candidates": [
+        {
+          "crate": "sha2",
+          "version": "0.11.1",
+          "notes": "tree 8 crates native, 7 wasm32; unsafe x39; MIT OR Apache-2.0, released 2026-10-12. mhfe/Cargo.toml:37; default-features = false."
+        },
+        {
+          "crate": "hmac",
+          "version": "0.13.0",
+          "notes": "tree 8 crates native, 8 wasm32; no unsafe; MIT OR Apache-2.0, released 2026-03-29. mhfe/Cargo.toml:32."
+        },
+        {
+          "crate": "ripemd",
+          "version": "0.2.0",
+          "notes": "tree 6 crates native, 6 wasm32; no unsafe, forbids or denies unsafe_code; MIT OR Apache-2.0, released 2026-03-27. RustCrypto, digest 0.11."
+        },
+        {
+          "crate": "sha3",
+          "version": "0.12.0",
+          "notes": "tree 8 crates native, 8 wasm32; no unsafe, forbids or denies unsafe_code; MIT OR Apache-2.0, released 2026-05-15. Keccak256; mhfe/Cargo.toml:39."
+        },
+        {
+          "crate": "bitcoin_hashes",
+          "version": "0.14.101",
+          "notes": "tree 3 crates native, 3 wasm32; unsafe x17; CC0-1.0, released 2026-06-24. In the tree only through bip39; mhfe/Cargo.toml:28 for hash160; second SHA-2 family; newest is 1.2.0."
+        }
+      ],
+      "recommendation": "sha2 =0.11.1, hmac =0.13.0, ripemd =0.2.0, sha3 =0.12.0",
+      "reason": "One RustCrypto generation (digest 0.11) for every hash, MAC and KDF of the program; three of four shared with mhfe. bitcoin_hashes comes only inside the bip39 crate; no MnemoCode code calls it."
+    },
+    {
+      "need": "BIP32: master key, child keys, fingerprints, extended public keys with SLIP-132 versions",
+      "capabilities": [
+        "CAP-PHRASE-FORMATS-ENCODED-FINGERPRINT",
+        "CAP-RECOVERY-MARKED-CODES-BY-ENCODED-FINGERPRINT",
+        "CAP-SSKR-EXPORT-REPAIR-FLOW",
+        "CAP-SSKR-RESTORED-SET-FACTS",
+        "CAP-SSKR-WALLET-CHECK-SETS",
+        "CAP-WALLET-ADDRESS-LOCATION",
+        "CAP-WALLET-ADDRESS-SCAN",
+        "CAP-WALLET-BIP39-SEED",
+        "CAP-WALLET-BITCOIN-NETWORKS",
+        "CAP-WALLET-EVIDENCE-ACCOUNT-XPUB",
+        "CAP-WALLET-EVIDENCE-BITCOIN-ADDRESS",
+        "CAP-WALLET-EVIDENCE-CHECK",
+        "CAP-WALLET-EVIDENCE-COIN-ADDRESS",
+        "CAP-WALLET-EVIDENCE-MASTER-XPUB",
+        "CAP-WALLET-EVIDENCE-PUBLIC-KEY",
+        "CAP-WALLET-FINGERPRINT-EVIDENCE",
+        "CAP-WALLET-MASTER-FINGERPRINT",
+        "CAP-WALLET-NODE-EVIDENCE-API"
+      ],
+      "current": "@scure/bip32 2.4.0 HDKey (package.json:399).",
+      "candidates": [
+        {
+          "crate": "own code from mhfe",
+          "version": "-",
+          "notes": "mhfe/src/wallet.rs (ExtendedKey::child :1134) over k256 and HMAC-SHA512; serialization and SLIP-132 versions are a table."
+        },
+        {
+          "crate": "bip32",
+          "version": "0.6.0",
+          "notes": "tree 40 crates native, 38 wasm32; no unsafe, forbids or denies unsafe_code; Apache-2.0 OR MIT, released 2026-09-23. features k256; brings bs58 with sha2 0.10, ecdsa, rfc6979."
+        },
+        {
+          "crate": "bitcoin",
+          "version": "0.32.102",
+          "notes": "tree 11 crates native, 11 wasm32; unsafe x27; CC0-1.0, released 2026-07-15. Default secp256k1 C library; whole Bitcoin data model."
+        }
+      ],
+      "recommendation": "own code taken from mhfe",
+      "reason": "About 150 lines already reviewed in mhfe; RUST rules say take mhfe's code where it fits; no crate beyond k256 and hmac."
+    },
+    {
+      "need": "secp256k1: public keys, SEC 1 encodings, BIP340/341 Taproot tweak",
+      "capabilities": [
+        "CAP-SSKR-WALLET-CHECK-SETS",
+        "CAP-WALLET-COIN-BITCOIN",
+        "CAP-WALLET-COIN-BITCOIN-CASH",
+        "CAP-WALLET-COIN-COSMOS",
+        "CAP-WALLET-COIN-DASH",
+        "CAP-WALLET-COIN-DOGECOIN",
+        "CAP-WALLET-COIN-ETHEREUM",
+        "CAP-WALLET-COIN-ETHEREUM-CLASSIC",
+        "CAP-WALLET-COIN-INJECTIVE",
+        "CAP-WALLET-COIN-LITECOIN",
+        "CAP-WALLET-COIN-TRON",
+        "CAP-WALLET-COIN-XRP",
+        "CAP-WALLET-COIN-ZCASH",
+        "CAP-WALLET-EVIDENCE-BITCOIN-ADDRESS",
+        "CAP-WALLET-EVIDENCE-CHECK",
+        "CAP-WALLET-EVIDENCE-COIN-ADDRESS",
+        "CAP-WALLET-EVIDENCE-PUBLIC-KEY",
+        "CAP-WALLET-EVIDENCE-WIF"
+      ],
+      "current": "@noble/curves 2.4.0 (secp256k1, schnorr; package.json:395).",
+      "candidates": [
+        {
+          "crate": "k256",
+          "version": "0.14.0",
+          "notes": "tree 22 crates native, 22 wasm32; no unsafe, forbids or denies unsafe_code; Apache-2.0 OR MIT, released 2026-07-08. default-features = false, features arithmetic; mhfe/Cargo.toml:34; pure Rust; resolves crypto-bigint 0.7.10, past RUSTSEC-2026-0387 (patched >= 0.7.6)."
+        },
+        {
+          "crate": "secp256k1",
+          "version": "0.33.1",
+          "notes": "tree 2 crates native, 2 wasm32; unsafe x131; CC0-1.0, released 2026-08-29. Binding to the C libsecp256k1: a C toolchain and sysroot for wasm32; its -sys crate 0.11.0 (under bc-crypto) failed to compile for wasm32 with the system clang 21 (work/build-probe.log)."
+        },
+        {
+          "crate": "libsecp256k1",
+          "version": "0.7.2",
+          "notes": "tree 31 crates native, 29 wasm32; unsafe x2; Apache-2.0, released 2025-03-14. RUSTSEC-2025-0161 unmaintained."
+        }
+      ],
+      "recommendation": "k256 =0.14.0 (default-features = false, features arithmetic); Taproot tagged hash and tweak as own code from mhfe/src/wallet.rs:1029-1060",
+      "reason": "Pure Rust, shared with mhfe, builds for wasm32 (probe), forbids unsafe."
+    },
+    {
+      "need": "Address and key encodings of the coin registry: Base58Check (Bitcoin family, Tron, Zcash, Dash, WIF), XRP Base58, Bech32/Bech32m with segwit and DIP18, CashAddr, EIP-55, SLIP-132",
+      "capabilities": [
+        "CAP-RECOVERY-CANDIDATE-ENCRYPT-KEY",
+        "CAP-WALLET-COIN-BITCOIN",
+        "CAP-WALLET-COIN-BITCOIN-CASH",
+        "CAP-WALLET-COIN-COSMOS",
+        "CAP-WALLET-COIN-DASH",
+        "CAP-WALLET-COIN-DOGECOIN",
+        "CAP-WALLET-COIN-ETHEREUM",
+        "CAP-WALLET-COIN-ETHEREUM-CLASSIC",
+        "CAP-WALLET-COIN-INJECTIVE",
+        "CAP-WALLET-COIN-LITECOIN",
+        "CAP-WALLET-COIN-REGISTRY",
+        "CAP-WALLET-COIN-SELF-TESTS",
+        "CAP-WALLET-COIN-TRON",
+        "CAP-WALLET-COIN-XRP",
+        "CAP-WALLET-COIN-ZCASH",
+        "CAP-WALLET-EVIDENCE-ACCOUNT-XPUB",
+        "CAP-WALLET-EVIDENCE-BITCOIN-ADDRESS",
+        "CAP-WALLET-EVIDENCE-COIN-ADDRESS",
+        "CAP-WALLET-EVIDENCE-MASTER-XPUB",
+        "CAP-WALLET-EVIDENCE-WIF"
+      ],
+      "current": "@scure/base 2.4.0 (base58, base58xrp, bech32, bech32m), @scure/btc-signer 2.4.1 (WIF), own base58-check.ts and CashAddr in src/core/coins/.",
+      "candidates": [
+        {
+          "crate": "bs58",
+          "version": "0.5.1",
+          "notes": "tree 1 crate native, 1 wasm32; unsafe x1; MIT/Apache-2.0, released 2024-03-19. default-features = false, features alloc; RIPPLE alphabet built in; its check feature pulls sha2 0.10 (mhfe Cargo.lock: bs58 -> sha2 0.10.9); repository last pushed 2024-05-24, a finished format."
+        },
+        {
+          "crate": "bs58",
+          "version": "0.5.1",
+          "notes": "tree 9 crates native, 8 wasm32; MIT/Apache-2.0, released 2024-03-19. with features check: the second SHA-2 generation in the tree."
+        },
+        {
+          "crate": "bech32",
+          "version": "0.12.0",
+          "notes": "tree 1 crate native, 1 wasm32; no unsafe; MIT, released 2026-06-12. mhfe/Cargo.toml:25; Bech32 and Bech32m, segwit helpers, 90-character limit (age keys fit)."
+        },
+        {
+          "crate": "base58ck",
+          "version": "0.5.0",
+          "notes": "tree 5 crates native, 5 wasm32; no unsafe; CC0-1.0, released 2026-08-05. rust-bitcoin; bitcoin_hashes 1.x."
+        },
+        {
+          "crate": "own code from mhfe",
+          "version": "-",
+          "notes": "CashAddr (mhfe/src/wallet.rs:599-660), Base58Check checksum (double SHA-256), EIP-55 (sha3), WIF and SLIP-132 version bytes."
+        }
+      ],
+      "recommendation": "bs58 =0.5.1 (alloc, without check), bech32 =0.12.0 (alloc); checksum, CashAddr, EIP-55, WIF and versions as own code",
+      "reason": "Both crates are mhfe's, one crate each with no dependency; without the check feature no sha2 0.10 enters the tree."
+    },
+    {
+      "need": "SSKR split and combine (Shamir over GF(2^8), share metadata), ChaCha20 seeded by 32 host bytes",
+      "capabilities": [
+        "CAP-CARDS-CONTENT-CHECK",
+        "CAP-CARDS-SHARE-CARD-SET",
+        "CAP-CARDS-SHARE-CARDS-EXPORT",
+        "CAP-CARDS-SHARE-KEEPING-NOTE",
+        "CAP-CLI-MENU-SPLIT",
+        "CAP-CLI-PORTABLE-PARTS",
+        "CAP-CLI-SELF-TEST-COMMAND",
+        "CAP-PHRASE-FORMATS-BACKUP-READING",
+        "CAP-RECOVERY-BACKUP-CHECK",
+        "CAP-RECOVERY-BACKUP-CHECK-SHARES",
+        "CAP-SSKR-COMBINE-COMMAND",
+        "CAP-SSKR-COMBINE-LIBRARY",
+        "CAP-SSKR-ENGINE-COMBINE",
+        "CAP-SSKR-ENGINE-LOAD-VERIFIED",
+        "CAP-SSKR-ENGINE-MEMORY-WIPE",
+        "CAP-SSKR-ENGINE-SPLIT",
+        "CAP-SSKR-EXPORT-COMMAND",
+        "CAP-SSKR-EXPORT-REPAIR-FLOW",
+        "CAP-SSKR-FORM-BYTEWORDS",
+        "CAP-SSKR-HOST-PLATFORM",
+        "CAP-SSKR-JOINT-ASSESS",
+        "CAP-SSKR-JOINT-SEARCH",
+        "CAP-SSKR-RESTORE-COMPLETE",
+        "CAP-SSKR-SET-CHECK",
+        "CAP-SSKR-SET-CHOICE",
+        "CAP-SSKR-SHARE-ANY-FORM",
+        "CAP-SSKR-SHARE-BYTES-METADATA",
+        "CAP-SSKR-SHARE-TROUBLE",
+        "CAP-SSKR-SPLIT-BACKUP",
+        "CAP-SSKR-SPLIT-COMMAND",
+        "CAP-SSKR-SPLIT-PHRASE"
+      ],
+      "current": "Vendored sskr 0.12.0 and bc-shamir 0.13.0 with wipe fixes (sskr-wasm/rust/vendor/*/UPSTREAM.json), bc-rand 0.5.0, rand_chacha 0.9.0, compiled to its own WASM in Docker (Dockerfile.sskr) and loaded with SHA-256 pins.",
+      "candidates": [
+        {
+          "crate": "sskr",
+          "version": "0.12.0",
+          "notes": "tree 61 crates native, 58 wasm32; no unsafe; BSD-2-Clause-Patent, released 2025-12-05. As vendored: bc-shamir requires bc-crypto 0.14.0 with default features (secp256k1 C library, ed25519, argon2, scrypt, chacha20poly1305 0.10, x25519-dalek 2) while it uses only hash::hmac_sha256, memzero and memzero_vec_vec_u8 (bc-shamir src/shamir.rs:1, interpolate.rs:1, hazmat.rs:1, recovery_secret.rs:52). wasm32 build fails with the system clang 21 (work/build-probe.log)."
+        },
+        {
+          "crate": "sskr",
+          "version": "0.12.0",
+          "notes": "BSD-2-Clause-Patent, released 2025-12-05. (d) The vendored files unchanged; the workspace's [patch.crates-io] bc-crypto = { path = \"shims/bc-crypto\" }: own crate bc-crypto 0.14.0 with those three items over hmac 0.13.0, sha2 0.11.1 and zeroize 1.9.1, unsafe forbidden, no features (bc-shamir names none) (work/shim/bc-crypto). No C code, no older RustCrypto generation: engine tree 30 crates on wasm32 (32 native), core WASM 82, whole set 124 native with the bip39 crate and without harfrust (78 and 122 before); in two versions only getrandom 0.3/0.4 and rand_core 0.9/0.10 (bc-rand), miniz_oxide (inside png) and syn. Checked (work/build-probe-d.log, build-probe-d2.log): copies byte-equal to sskr-wasm/rust/vendor; the bridge's 22 tests, the vendored crates' 7 tests and 5 doc tests pass natively; the 30 published BCR-2020-011 quorums, its Bytewords set and the five recorded deterministic splits of mnemocode/vectors/sskr-v1.json give the same bytes (work/engine-d/tests/vectors.rs); wasm32 release builds without RUSTFLAGS; no cc in the wasm32 or native tree; clippy of the stand-in clean on Rust 1.99.1. No cryptography of its own (RustCrypto hmac and sha2, zeroize); the same bytes as the published bc-crypto 0.14.0 on the RFC 4231 answers and 2010 inputs, the same wiping (work/online-bc/diff-check.log). Nothing ready replaces it on 2026-10-27: no newer upstream release, bc-shamir-rust issue #4 open since 2026-08-07, no other BCR-2020-011 crate (work/online-bc)."
+        },
+        {
+          "crate": "sskr",
+          "version": "0.12.0",
+          "notes": "BSD-2-Clause-Patent, released 2025-12-05. (b) The vendored bc-shamir manifest with bc-crypto default-features = false: no C code; engine tree 53 crates on wasm32 (56 native); the proposed set builds for wasm32 without RUSTFLAGS (work/build-probe-2.log); core WASM 111 crates, whole set 149 native; 23 crates in two or three versions, 19 of them only through bc-crypto's older RustCrypto generation; its rand_core 0.6 needs getrandom 0.2.17 with the js feature on wasm32, which brings js-sys back. Edits a vendored file."
+        },
+        {
+          "crate": "sskr",
+          "version": "0.12.0",
+          "notes": "BSD-2-Clause-Patent, released 2025-12-05. (c) The vendored bc-shamir with hmac 0.13.0 and sha2 0.11.1 in place of bc-crypto (4 source files and the manifest): engine tree 29 crates on wasm32 (31 native), core WASM 77, whole set 121 native; in two versions the same 4 as (d) (work/probe-c, tree only, not built). Edits vendored files."
+        },
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "Own Shamir: refused by CORE-47 (secret sharing from the established dependency)."
+        }
+      ],
+      "recommendation": "vendored sskr =0.12.0 and bc-shamir =0.13.0 unchanged, bc-rand =0.5.0, rand_chacha =0.9.0, rand_core =0.9.5, linked into the WASM (no separate engine file, no pins); bc-crypto replaced by the workspace's own stand-in through [patch.crates-io] (d, owner, 2026-10-27); (b) and (c) were the alternatives; thiserror =2.0.21, as the vendored manifests pin it (the engine's error derive; thiserror-impl, syn, quote and proc-macro2 at build time)",
+      "reason": "CORE-47 and the published SSKR vectors keep the established engine. bc-crypto's defaults compile libsecp256k1 that nothing calls, and it is what ties today's build to the pinned clang and wasi-libc of Dockerfile.sskr. (d) removes it without touching a vendored file (ARCHITECTURE section 2, the owner's 2026-10-20 rule); (b) and (c) edit vendored files."
+    },
+    {
+      "need": "Bytewords, compact UR (ur:sskr/...), deterministic CBOR heads of a share",
+      "capabilities": [
+        "CAP-CARDS-SHARE-CARD-SET",
+        "CAP-CLI-MENU-SPLIT",
+        "CAP-CLI-WORD-HINTS-TYPING",
+        "CAP-PHRASE-FORMATS-WORD-HINTS",
+        "CAP-SSKR-ENGINE-COMBINE",
+        "CAP-SSKR-ENGINE-SPLIT",
+        "CAP-SSKR-FORM-BYTEWORDS",
+        "CAP-SSKR-FORM-UR",
+        "CAP-SSKR-SHARE-BYTES-METADATA"
+      ],
+      "current": "Own CBOR heads, CRC-32 and Bytewords text in sskr-wasm/rust/src/share_text.rs:1-160 (and in TS src/sskr/transport.ts, bytewords-list.ts); bc-ur 0.19.2 only for the 256-word list (share_text.rs:17), bc-tags 0.12.0 only for two tag numbers (:23, :25); bc-ur's coder only in tests (lib.rs:271-300).",
+      "candidates": [
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "256-word table, two CBOR heads in the fewest bytes, the UR prefix; checked with the BCR-2020-012 and BCR-2020-005 published vectors."
+        },
+        {
+          "crate": "bc-ur",
+          "version": "0.19.2",
+          "notes": "tree 34 crates native, 45 wasm32; no unsafe; BSD-2-Clause-Patent, released 2026-03-28. dcbor, chrono, phf, minicbor 0.19, ur 0.4."
+        },
+        {
+          "crate": "ur",
+          "version": "0.5.2",
+          "notes": "tree 10 crates native, 10 wasm32; no unsafe, forbids or denies unsafe_code; MIT, released 2026-07-29. MIT; bitcoin_hashes 1.x, minicbor 2."
+        },
+        {
+          "crate": "dcbor",
+          "version": "0.25.2",
+          "notes": "tree 19 crates native, 30 wasm32; no unsafe; BSD-2-Clause-Patent, released 2026-03-16. chrono, half, unicode-normalization."
+        },
+        {
+          "crate": "minicbor",
+          "version": "2.3.1",
+          "notes": "tree 1 crate native, 1 wasm32; unsafe x6; BlueOak-1.0.0, released 2026-10-18. BlueOak-1.0.0."
+        },
+        {
+          "crate": "ciborium",
+          "version": "0.2.2",
+          "notes": "tree 15 crates native, 15 wasm32; no unsafe; Apache-2.0, released 2024-01-24. serde; last release 2024-01."
+        }
+      ],
+      "recommendation": "own code",
+      "reason": "The running engine already writes and reads these itself and takes only a list and two numbers from bc-ur and bc-tags (34 to 45 crates); bc-ur's encoder leaves freed lists that name share bytes (share_text.rs:6-8). The model asks for one Bytewords writer (CAP-SSKR-ENGINE-SPLIT notes)."
+    },
+    {
+      "need": "CRC-32/ISO-HDLC (shares, candidate lists, PNG admission)",
+      "capabilities": [
+        "CAP-CLI-PNG-ADMISSION",
+        "CAP-RECOVERY-CANDIDATE-LIST-FORMAT",
+        "CAP-SSKR-ENGINE-SPLIT",
+        "CAP-SSKR-MIXED-LAYOUT",
+        "CAP-SSKR-REPAIR-ONE-SHARE",
+        "CAP-SSKR-SHARE-BYTES-METADATA"
+      ],
+      "current": "Own (src/sskr/checksum.ts; sskr-wasm share_text.rs, polynomial 0xEDB88320).",
+      "candidates": [
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "A 256-entry table or a bitwise loop, about 15 lines."
+        },
+        {
+          "crate": "crc32fast",
+          "version": "1.5.3",
+          "notes": "tree 2 crates native, 2 wasm32; unsafe x15; MIT OR Apache-2.0, released 2026-10-20. SIMD; inside png's tree anyway."
+        },
+        {
+          "crate": "crc",
+          "version": "3.4.0",
+          "notes": "tree 2 crates native, 2 wasm32; no unsafe, forbids or denies unsafe_code; MIT OR Apache-2.0, released 2025-11-26. crc-catalog."
+        }
+      ],
+      "recommendation": "own code",
+      "reason": "Tiny, already own in both programs; the core must not depend on the rendering crates."
+    },
+    {
+      "need": "age v1: encrypt and decrypt candidate lists to an X25519 recipient or a scrypt passphrase (log2 N = 18); one-time X25519 identities; header admission",
+      "capabilities": [
+        "CAP-CLI-MENU-RECOVER",
+        "CAP-RECOVERY-CANDIDATE-DECRYPT",
+        "CAP-RECOVERY-CANDIDATE-ENCRYPT-KEY",
+        "CAP-RECOVERY-CANDIDATE-ENCRYPT-PASSPHRASE",
+        "CAP-RECOVERY-CANDIDATE-ENCRYPTION-GATE",
+        "CAP-RECOVERY-CANDIDATE-FILE-ADMISSION",
+        "CAP-RECOVERY-CANDIDATE-LIST-SAVE",
+        "CAP-RECOVERY-CANDIDATE-PROTECTION-CHOICE"
+      ],
+      "current": "age-encryption 0.3.1 (package.json:402) with WebCrypto X25519; own admission of the header with @scure/base base64nopad (src/core/candidate-file-admission.ts).",
+      "candidates": [
+        {
+          "crate": "age",
+          "version": "0.12.1",
+          "notes": "tree 136 crates native, 134 wasm32; no unsafe, forbids or denies unsafe_code; MIT OR Apache-2.0, released 2026-07-14. Older generation (sha2 0.10, hmac 0.12, chacha20poly1305 0.10, scrypt 0.11, x25519-dalek 2), i18n-embed, fluent, rust-embed, ml-kem, p256; its p256 pulls crypto-bigint 0.5.5, affected by RUSTSEC-2026-0387 with no patched 0.5 release (cargo audit, advisory-db a78282a1); RUSTSEC-2024-0433 (plugins) patched."
+        },
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "Header, X25519 and scrypt stanzas, header HMAC and the STREAM payload in 64 KiB chunks over the crates below; checked with the C2SP CCTV age vectors (https://github.com/C2SP/CCTV/tree/main/age)."
+        },
+        {
+          "crate": "chacha20poly1305",
+          "version": "0.11.0",
+          "notes": "tree 15 crates native, 14 wasm32; no unsafe; Apache-2.0 OR MIT, released 2026-06-28. default-features = false."
+        },
+        {
+          "crate": "hkdf",
+          "version": "0.13.0",
+          "notes": "tree 9 crates native, 9 wasm32; no unsafe; MIT OR Apache-2.0, released 2026-03-30."
+        },
+        {
+          "crate": "x25519-dalek",
+          "version": "3.0.0",
+          "notes": "tree 12 crates native, 6 wasm32; no unsafe; BSD-3-Clause, released 2026-07-06. default-features = false, features zeroize, static_secrets; curve25519-dalek 5.0.0 (RUSTSEC-2024-0344 fixed since 4.1.3)."
+        },
+        {
+          "crate": "scrypt",
+          "version": "0.12.0",
+          "notes": "tree 16 crates native, 15 wasm32; unsafe x10; MIT OR Apache-2.0, released 2026-04-22. default-features = false."
+        },
+        {
+          "crate": "base64ct",
+          "version": "1.8.3",
+          "notes": "tree 1 crate native, 1 wasm32; unsafe x4; Apache-2.0 OR MIT, released 2026-01-12. Constant-time Base64 without padding; in the sskr-wasm and mhfe locks."
+        }
+      ],
+      "recommendation": "own age v1 code over chacha20poly1305 =0.11.0, hkdf =0.13.0, x25519-dalek =3.0.0, scrypt =0.12.0, base64ct =1.8.3 (and the shared hmac, sha2, bech32)",
+      "reason": "The admission rules (one stanza of the expected kind, the exact work factor, sizes) are MnemoCode's own already; the format is small and is checked as a protocol with published vectors (CORE-47); the age crate brings 136 crates and a current advisory. In the WASM, X25519 no longer needs WebCrypto."
+    },
+    {
+      "need": "QR encoding, error correction M (vector cards, 720-pixel PNG with 1-module margin)",
+      "capabilities": [
+        "CAP-CARDS-COLLECTION-QR",
+        "CAP-CARDS-PALETTE-EXPORT",
+        "CAP-CARDS-QR-PNG-EXPORT",
+        "CAP-CARDS-QR-VECTOR",
+        "CAP-CARDS-RENDER-PLATFORM",
+        "CAP-CARDS-SHARE-CARD-SET",
+        "CAP-CLI-PORTABLE-PARTS",
+        "CAP-CLI-QR-IMAGE-INPUT",
+        "CAP-PHRASE-FORMATS-ENCODE-QR",
+        "CAP-PHRASE-FORMATS-SECRET-SOURCES",
+        "CAP-SSKR-SAVE-SHARE-QR",
+        "CAP-SSKR-SHARE-SOURCES"
+      ],
+      "current": "qrcode 1.5.4 (npm; package.json:406): its own segment optimisation and mask choice (src/export/platform-node.ts:25, qr-image.ts:29-31).",
+      "candidates": [
+        {
+          "crate": "qrcodegen",
+          "version": "1.8.0",
+          "notes": "tree 1 crate native, 1 wasm32; no unsafe, forbids or denies unsafe_code; MIT, released 2022-04-17. Nayuki; repository active (pushed 2026-08-31); QrCode::encode_segments_advanced takes explicit segments, mask and boostecl."
+        },
+        {
+          "crate": "qrcode",
+          "version": "0.14.1",
+          "notes": "tree 1 crate native, 1 wasm32; no unsafe; MIT OR Apache-2.0, released 2024-07-05. default-features = false; last release 2024-07."
+        },
+        {
+          "crate": "fast_qr",
+          "version": "0.14.0",
+          "notes": "tree 1 crate native, 1 wasm32; no unsafe, forbids or denies unsafe_code; MIT, released 2026-09-01."
+        }
+      ],
+      "recommendation": "qrcodegen =1.8.0 with segments built as npm qrcode builds them (own port of its segmentation) and boostecl false",
+      "reason": "No dependency, no unsafe. QrSegment::make_segments uses one mode for a whole text and the mask penalty may differ from npm qrcode: a test compares payload, version and error-correction level of every payload kind with the TS output; the mask may differ (the owner's parity level, owner, 2026-10-27)."
+    },
+    {
+      "need": "QR decoding (a person's PNG of a backup or share; read-back of every QR before saving)",
+      "capabilities": [
+        "CAP-CARDS-COLLECTION-QR",
+        "CAP-CARDS-PALETTE-EXPORT",
+        "CAP-CARDS-QR-PNG-EXPORT",
+        "CAP-CARDS-QR-VECTOR",
+        "CAP-CARDS-RENDER-PLATFORM",
+        "CAP-CARDS-SHARE-CARD-SET",
+        "CAP-CLI-PORTABLE-PARTS",
+        "CAP-CLI-QR-IMAGE-INPUT",
+        "CAP-PHRASE-FORMATS-ENCODE-QR",
+        "CAP-PHRASE-FORMATS-SECRET-SOURCES",
+        "CAP-SSKR-SAVE-SHARE-QR",
+        "CAP-SSKR-SHARE-SOURCES"
+      ],
+      "current": "jsqr 1.4.0 with inversionAttempts attemptBoth (src/export/qr-reader.ts:48,158); refuses Kanji and ECI segments.",
+      "candidates": [
+        {
+          "crate": "rqrr",
+          "version": "0.11.0",
+          "notes": "tree 11 crates native, 11 wasm32; no unsafe; (MIT OR Apache-2.0) AND ISC, released 2026-09-02. default-features = false; quirc port (ISC part); released 2026-09-02; skips ECI and decodes Kanji without reporting segment modes (src/decode.rs:147-163), corrected stream private."
+        },
+        {
+          "crate": "quircs",
+          "version": "0.10.3",
+          "notes": "tree 10 crates native, 10 wasm32; unsafe x3; MIT, released 2025-10-20. Another quirc port."
+        },
+        {
+          "crate": "bardecoder",
+          "version": "0.5.0",
+          "notes": "tree 52 crates native, 50 wasm32; no unsafe; MIT, released 2023-07-29. image 0.24; last release 2023-07."
+        },
+        {
+          "crate": "rxing",
+          "version": "0.9.3",
+          "notes": "tree 137 crates native, 144 wasm32; no unsafe; Apache-2.0, released 2026-09-16. ZXing port with every barcode format."
+        }
+      ],
+      "recommendation": "rqrr =0.11.0 (default-features = false); inversion retry and the matrix check through rqrr's BitGrid as own code",
+      "reason": "Small, no unsafe, maintained. The refusal cli.qr-input.qr-segment-not-written goes: rqrr reports no segment modes, and a payload is admitted by its content (owner, 2026-10-27)."
+    },
+    {
+      "need": "PNG read and write (QR images, bundled business artwork), admission and inflate budget",
+      "capabilities": [
+        "CAP-CARDS-BUNDLED-ASSETS",
+        "CAP-CARDS-BUSINESS-RENDER",
+        "CAP-CARDS-COLLECTION-QR",
+        "CAP-CARDS-INDIVIDUAL-CARDS",
+        "CAP-CARDS-PAGE-IMAGES",
+        "CAP-CARDS-PALETTE-EXPORT",
+        "CAP-CARDS-QR-PNG-EXPORT",
+        "CAP-CARDS-RENDER-PLATFORM",
+        "CAP-CARDS-SHARE-CARDS-EXPORT",
+        "CAP-CLI-PNG-ADMISSION",
+        "CAP-CLI-PORTABLE-PARTS",
+        "CAP-CLI-QR-IMAGE-INPUT",
+        "CAP-PHRASE-FORMATS-ENCODE-QR",
+        "CAP-PHRASE-FORMATS-SECRET-SOURCES",
+        "CAP-SSKR-SAVE-SHARE-QR",
+        "CAP-SSKR-SHARE-SOURCES"
+      ],
+      "current": "pngjs 7.0.0 (package.json:405) and node:zlib inflateSync with maxOutputLength; own admission (src/core/png-admission.ts).",
+      "candidates": [
+        {
+          "crate": "png",
+          "version": "0.18.1",
+          "notes": "tree 10 crates native, 10 wasm32; no unsafe, forbids or denies unsafe_code; MIT OR Apache-2.0, released 2026-02-14. image-rs; decoder Limits; brings fdeflate, flate2, miniz_oxide 0.8 and 0.9, crc32fast."
+        },
+        {
+          "crate": "zune-png",
+          "version": "0.5.2",
+          "notes": "tree 4 crates native, 4 wasm32; unsafe x12; MIT OR Apache-2.0 OR Zlib, released 2026-03-11."
+        },
+        {
+          "crate": "image",
+          "version": "0.25.10",
+          "notes": "tree 18 crates native, 18 wasm32; unsafe x6; MIT OR Apache-2.0, released 2026-03-10. default-features = false, features png, jpeg."
+        }
+      ],
+      "recommendation": "png =0.18.1, behind the ported admission check",
+      "reason": "Forbids unsafe, decodes every colour type with memory limits, encodes. Byte parity with pngjs files is not possible (other deflate): parity of PNGs is decoded pixels (owner)."
+    },
+    {
+      "need": "Deflate for PDF streams and the recoloured artwork",
+      "capabilities": [
+        "CAP-CARDS-BUNDLED-ASSETS",
+        "CAP-CARDS-BUSINESS-RENDER",
+        "CAP-CARDS-INDIVIDUAL-CARDS",
+        "CAP-CARDS-PAGE-IMAGES",
+        "CAP-CARDS-PALETTE-EXPORT",
+        "CAP-CARDS-PDF-DOCUMENTS",
+        "CAP-CARDS-RENDER-PLATFORM",
+        "CAP-CARDS-SHARE-CARDS-EXPORT"
+      ],
+      "current": "pako inside pdf-lib; zlib inside pngjs.",
+      "candidates": [
+        {
+          "crate": "miniz_oxide",
+          "version": "0.9.1",
+          "notes": "tree 2 crates native, 2 wasm32; no unsafe, forbids or denies unsafe_code; MIT OR Zlib OR Apache-2.0, released 2026-03-13. Already in png's tree (through flate2)."
+        },
+        {
+          "crate": "flate2",
+          "version": "1.1.10",
+          "notes": "tree 6 crates native, 6 wasm32; unsafe x36; MIT OR Apache-2.0, released 2026-08-28. Wrapper over the same backend."
+        },
+        {
+          "crate": "zlib-rs",
+          "version": "0.6.8",
+          "notes": "tree 1 crate native, 1 wasm32; unsafe x453; Zlib, released 2026-09-15. Zlib licence."
+        }
+      ],
+      "recommendation": "miniz_oxide =0.9.1",
+      "reason": "No new crate: the version flate2 already resolves."
+    },
+    {
+      "need": "JPEG: bundled material photographs in PDFs, JPEG page images (quality 90), decoding the photographs for raster images",
+      "capabilities": [
+        "CAP-CARDS-BUNDLED-ASSETS",
+        "CAP-CARDS-INDIVIDUAL-CARDS",
+        "CAP-CARDS-MATERIAL-RENDER",
+        "CAP-CARDS-PAGE-IMAGES",
+        "CAP-CARDS-SHARE-CARDS-EXPORT"
+      ],
+      "current": "pdf-lib embeds the bundled JPEGs (DCTDecode); pdftocairo writes JPEG page images.",
+      "candidates": [
+        {
+          "crate": "jpeg-encoder",
+          "version": "0.7.1",
+          "notes": "tree 1 crate native, 1 wasm32; unsafe x6; (MIT OR Apache-2.0) AND IJG, released 2026-07-27. No dependency; the IJG part of its licence needs a notice; without its simd feature it forbids unsafe_code (src/lib.rs:26)."
+        },
+        {
+          "crate": "zune-jpeg",
+          "version": "0.5.15",
+          "notes": "tree 2 crates native, 2 wasm32; unsafe x79; MIT OR Apache-2.0 OR Zlib, released 2026-03-26. Decoder used by image; SIMD unsafe."
+        },
+        {
+          "crate": "jpeg-decoder",
+          "version": "0.3.2",
+          "notes": "tree 1 crate native, 1 wasm32; unsafe x16; MIT OR Apache-2.0, released 2025-06-21. Superseded by zune-jpeg in image."
+        },
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "Reading the SOF size of a bundled JPEG to embed it as it is: a few lines."
+        }
+      ],
+      "recommendation": "jpeg-encoder =0.7.1 and zune-jpeg =0.5.15; embedding passes the JPEG bytes",
+      "reason": "Needed only because page images are drawn in-process (raster block)."
+    },
+    {
+      "need": "PDF writing: cards, sheets, heir sheet; no Info dictionary; Color blend, even-odd clip, images, embedded TrueType subset",
+      "capabilities": [
+        "CAP-CARDS-BUSINESS-RENDER",
+        "CAP-CARDS-COLLECTION-SHEET-DRAW",
+        "CAP-CARDS-HEIR-SHEET-PDF",
+        "CAP-CARDS-INDIVIDUAL-CARDS",
+        "CAP-CARDS-MATERIAL-RENDER",
+        "CAP-CARDS-PAGE-IMAGES",
+        "CAP-CARDS-PALETTE-EXPORT",
+        "CAP-CARDS-PDF-DOCUMENTS",
+        "CAP-CARDS-PDF-READER",
+        "CAP-CARDS-PRINTABILITY-PREFLIGHT",
+        "CAP-CARDS-QR-VECTOR",
+        "CAP-CARDS-RENDER-SHEETS-PDF",
+        "CAP-CARDS-SHARE-CARD-SET",
+        "CAP-CARDS-SHARE-CARDS-EXPORT"
+      ],
+      "current": "pdf-lib 1.17.1 and @pdf-lib/fontkit 1.1.1 (package.json:397,404; src/export/pdf-documents.ts:32 embedFont with subset).",
+      "candidates": [
+        {
+          "crate": "pdf-writer",
+          "version": "0.15.0",
+          "notes": "tree 5 crates native, 5 wasm32; no unsafe, forbids or denies unsafe_code; MIT OR Apache-2.0, released 2026-05-27. typst; low-level, writes only what is asked."
+        },
+        {
+          "crate": "krilla",
+          "version": "0.8.2",
+          "notes": "tree 67 crates native, 67 wasm32; no unsafe, forbids or denies unsafe_code; MIT OR Apache-2.0, released 2026-06-04. High-level; pulls rustybuzz and ttf-parser (unmaintained)."
+        },
+        {
+          "crate": "lopdf",
+          "version": "0.46.0",
+          "notes": "tree 57 crates native, 53 wasm32; no unsafe, forbids or denies unsafe_code; MIT, released 2026-10-21. default-features = false; RUSTSEC-2026-0187 fixed since 0.42."
+        },
+        {
+          "crate": "printpdf",
+          "version": "0.12.8",
+          "notes": "tree 111 crates native, 114 wasm32; unsafe x2; MIT, released 2026-09-05."
+        }
+      ],
+      "recommendation": "pdf-writer =0.15.0",
+      "reason": "5 crates, forbids unsafe, maintained, and writes exactly the program's subset of PDF with no metadata unless asked. Byte parity with pdf-lib output is not possible (owner)."
+    },
+    {
+      "need": "PDF reading of the program's own pages (hosts without Poppler, page images)",
+      "capabilities": ["CAP-CARDS-PAGE-IMAGES", "CAP-CARDS-PDF-READER"],
+      "current": "Own reader of pdf-lib's subset (src/export/card-drawing.ts) over pdf-lib and fontkit.",
+      "candidates": [
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "No reader: one drawing scene rendered into pdf-writer and into tiny-skia."
+        },
+        {
+          "crate": "lopdf",
+          "version": "0.46.0",
+          "notes": "tree 57 crates native, 53 wasm32; no unsafe, forbids or denies unsafe_code; MIT, released 2026-10-21."
+        },
+        {
+          "crate": "pdf",
+          "version": "0.10.0",
+          "notes": "tree 64 crates native, 74 wasm32; unsafe x6; MIT, released 2026-03-02."
+        }
+      ],
+      "recommendation": "no crate and no reader",
+      "reason": "The reader exists because the TS draws with pdf-lib (CAP-CARDS-PDF-READER notes); drawing the same scene twice removes it."
+    },
+    {
+      "need": "Font loading, metrics, outlines and subsetting for cards",
+      "capabilities": [
+        "CAP-CARDS-BUNDLED-ASSETS",
+        "CAP-CARDS-BUSINESS-RENDER",
+        "CAP-CARDS-COLLECTION-SHEET-DRAW",
+        "CAP-CARDS-DECOYS-AND-PLAN",
+        "CAP-CARDS-HEIR-SHEET-PDF",
+        "CAP-CARDS-HEIR-SHEET-TEXT",
+        "CAP-CARDS-MATERIAL-RENDER",
+        "CAP-CARDS-PDF-DOCUMENTS",
+        "CAP-CARDS-PDF-READER",
+        "CAP-CARDS-PRINTABILITY-PREFLIGHT",
+        "CAP-CARDS-SHARE-CARD-SET"
+      ],
+      "current": "@pdf-lib/fontkit 1.1.1: layout() applies the default GSUB features, widths are the hmtx advances of the substituted glyphs (pdf-lib CustomFontEmbedder.js:61-65), positions are ignored. assets/fonts/DejaVuSans-UI.ttf has GSUB ccmp, liga (ff, fi, fl, ffi, ffl), locl and GPOS kern, mark, mkmk (read with fontTools).",
+      "candidates": [
+        {
+          "crate": "skrifa",
+          "version": "0.49.0",
+          "notes": "tree 18 crates native, 18 wasm32; no unsafe, forbids or denies unsafe_code; MIT OR Apache-2.0, released 2026-10-21. Google fontations; charmap, metrics, outlines."
+        },
+        {
+          "crate": "harfrust",
+          "version": "0.15.0",
+          "notes": "tree 19 crates native, 19 wasm32; no unsafe, forbids or denies unsafe_code; MIT, released 2026-10-22. HarfBuzz organisation; on the same read-fonts as skrifa. Not taken: ligatures dropped (owner, 2026-10-27)."
+        },
+        {
+          "crate": "subsetter",
+          "version": "0.2.6",
+          "notes": "tree 2 crates native, 2 wasm32; no unsafe, forbids or denies unsafe_code; MIT OR Apache-2.0, released 2026-06-04. default-features = false; typst."
+        },
+        {
+          "crate": "ttf-parser",
+          "version": "0.25.1",
+          "notes": "tree 1 crate native, 1 wasm32; no unsafe, forbids or denies unsafe_code; MIT OR Apache-2.0, released 2024-11-29. RUSTSEC-2026-0192 unmaintained."
+        },
+        {
+          "crate": "rustybuzz",
+          "version": "0.20.1",
+          "notes": "tree 12 crates native, 12 wasm32; unsafe x14; MIT, released 2024-11-12. RUSTSEC-2026-0206 unmaintained."
+        },
+        {
+          "crate": "fontdue",
+          "version": "0.9.5",
+          "notes": "tree 8 crates native, 8 wasm32; unsafe x29; MIT OR Apache-2.0 OR Zlib, released 2026-10-19. On ttf-parser."
+        },
+        {
+          "crate": "ab_glyph",
+          "version": "0.2.32",
+          "notes": "tree 4 crates native, 4 wasm32; no unsafe; Apache-2.0, released 2025-09-28. On ttf-parser."
+        }
+      ],
+      "recommendation": "skrifa =0.49.0, subsetter =0.2.6 (default-features = false); no shaper",
+      "reason": "Maintained, forbid unsafe, one parsing layer. The owner dropped ligatures (owner, 2026-10-27), so glyphs come from the cmap and widths are the characters' hmtx advances; harfrust goes."
+    },
+    {
+      "need": "Raster drawing: page images (PNG with transparent paper, JPEG) at 300 dpi, artwork resampling",
+      "capabilities": [
+        "CAP-CARDS-BUSINESS-RENDER",
+        "CAP-CARDS-INDIVIDUAL-CARDS",
+        "CAP-CARDS-PAGE-IMAGES",
+        "CAP-CARDS-PDF-READER",
+        "CAP-CARDS-QR-VECTOR",
+        "CAP-CARDS-SAMPLE-PREVIEW",
+        "CAP-CARDS-SHARE-CARDS-EXPORT",
+        "CAP-CLI-SELF-TEST-COMMAND"
+      ],
+      "current": "pdftocairo (Poppler) as a child process that receives the whole PDF through a pipe (src/export/image-export.ts); own bilinear resampling and recolouring.",
+      "candidates": [
+        {
+          "crate": "tiny-skia",
+          "version": "0.12.0",
+          "notes": "tree 8 crates native, 8 wasm32; unsafe x151; BSD-3-Clause, released 2026-02-02. default-features = false, features std, simd; linebender; Color blend and even-odd clip; unsafe in its SIMD pipelines."
+        },
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "Keep pdftocairo: no crate, but the backup leaves the process."
+        }
+      ],
+      "recommendation": "tiny-skia =0.12.0 (std, simd); resampling and recolouring own as the TS",
+      "reason": "Removes the external program that receives the backup (CAP-CARDS-PAGE-IMAGES security), so no command needs to start a program; the page gets the same images. Pixels differ from cairo's (owner)."
+    },
+    {
+      "need": "Colour maths: OKLab, CIE Lab D65, sRGB transfer, HSV tints, BT.601 and BT.709 luma, colour forms",
+      "capabilities": [
+        "CAP-CARDS-BUSINESS-RENDER",
+        "CAP-CARDS-CODE-PALETTE",
+        "CAP-CARDS-MATERIAL-RENDER",
+        "CAP-CARDS-TERMINAL-COLOR-CARDS",
+        "CAP-CLI-COLOR-RULE",
+        "CAP-PHRASE-FORMATS-COLOR-PLACEMENTS",
+        "CAP-PHRASE-FORMATS-FORM-COLOR-UNICODE",
+        "CAP-PHRASE-FORMATS-FORM-COLORS",
+        "CAP-SSKR-FORM-COLOR-UNICODE",
+        "CAP-SSKR-FORM-COLORS"
+      ],
+      "current": "Own (src/export/color-math.ts, card-palette.ts, business-tint.ts, src/core/colors.ts).",
+      "candidates": [
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "Port of the TS arithmetic in its order."
+        },
+        {
+          "crate": "libm",
+          "version": "0.2.16",
+          "notes": "tree 1 crate native, 1 wasm32; unsafe x56; MIT, released 2026-01-24. In multi-chain's dash-shielded lock."
+        },
+        {
+          "crate": "palette",
+          "version": "0.7.7",
+          "notes": "tree 8 crates native, 8 wasm32; unsafe x121; MIT OR Apache-2.0, released 2026-08-02."
+        }
+      ],
+      "recommendation": "own code with libm =0.2.16 for cbrt, pow and hypot",
+      "reason": "The system libm differs between glibc, macOS, the MSVC runtime and wasm32, so the same code could choose other palette colours or material samples on another system; the model's material-sample defect is that very case."
+    },
+    {
+      "need": "Randomness: OS or browser CSPRNG from the host, uniform choice, SSKR seed",
+      "capabilities": [
+        "CAP-CARDS-CARD-SESSION",
+        "CAP-CARDS-DECOYS-AND-PLAN",
+        "CAP-CARDS-INVENTED-DETAILS",
+        "CAP-CARDS-RENDER-PLATFORM",
+        "CAP-CARDS-SAMPLE-PREVIEW",
+        "CAP-CLI-PORTABLE-PARTS",
+        "CAP-RECOVERY-CANDIDATE-ENCRYPT-KEY",
+        "CAP-RECOVERY-CANDIDATE-ENCRYPT-PASSPHRASE",
+        "CAP-SSKR-ENGINE-SPLIT",
+        "CAP-SSKR-HOST-PLATFORM",
+        "CAP-SSKR-SPLIT-BACKUP",
+        "CAP-SSKR-SPLIT-COMMAND",
+        "CAP-SSKR-SPLIT-PHRASE"
+      ],
+      "current": "node:crypto randomFillSync and randomInt, crypto.getRandomValues in pages; ChaCha20 (rand_chacha 0.9.0) inside the engine.",
+      "candidates": [
+        {
+          "crate": "getrandom",
+          "version": "0.4.3",
+          "notes": "tree 3 crates native, 12 wasm32; unsafe x109; MIT OR Apache-2.0, released 2026-06-17. mhfe/Cargo.toml:54; on wasm32 the wasm_js feature alone selects the backend (src/backends.rs:172-178), no RUSTFLAGS; js-sys only with target_feature atomics (Cargo.toml:98-101)."
+        },
+        {
+          "crate": "getrandom",
+          "version": "0.3.4",
+          "notes": "tree 3 crates native, 12 wasm32; unsafe x92; MIT OR Apache-2.0, released 2025-10-14 (CHANGELOG.md:7). In bc-rand's tree (bc-rand 0.5.0 Cargo.toml:40-41); on wasm32 its wasm_js feature alone selects the backend (src/backends.rs:188-192, CHANGELOG.md:9-17); js-sys only with target_feature atomics (Cargo.toml:82). Declared the same way today in mnemocode/sskr-wasm/rust/Cargo.toml:24 and multi-chain-wallet-tools/packages/recovery-sskr-wasm/rust/Cargo.toml:24."
+        },
+        {
+          "crate": "rand_core",
+          "version": "0.10.1",
+          "notes": "tree 1 crate native, 1 wasm32; no unsafe; MIT OR Apache-2.0, released 2026-04-13. Already in k256's and x25519-dalek's trees."
+        },
+        {
+          "crate": "rand",
+          "version": "0.10.3",
+          "notes": "tree 7 crates native, 5 wasm32; unsafe x16; MIT OR Apache-2.0, released 2026-09-20. RUSTSEC-2026-0097 (custom logger) fixed in 0.10.1."
+        }
+      ],
+      "recommendation": "getrandom =0.4.3 in the native and WASM adapters; the library takes a fill-bytes trait of its own (CORE-46) and does uniform choice by rejection itself; the binding declares getrandom =0.3.4 with wasm_js as a wasm32 dependency, only to give bc-rand's tree its backend",
+      "reason": "No rand crate is needed. Without the direct getrandom 0.3.4 line with wasm_js the wasm32 build stops at its compile_error (src/backends.rs:194-200); no RUSTFLAGS are needed (work/build-probe-d.log; Dockerfile.sskr:67-74 sets a cfg that 0.3.4 no longer needs)."
+    },
+    {
+      "need": "Wiping secrets and owner types with redacted Debug",
+      "capabilities": [
+        "CAP-CARDS-BACKUP-CONTENT",
+        "CAP-CARDS-BUSINESS-RENDER",
+        "CAP-CARDS-CODE-PALETTE",
+        "CAP-CARDS-COLLECTION-QR",
+        "CAP-CARDS-COLLECTION-SHEET-DRAW",
+        "CAP-CARDS-CONTENT-CHECK",
+        "CAP-CARDS-DECOYS-AND-PLAN",
+        "CAP-CARDS-INDIVIDUAL-CARDS",
+        "CAP-CARDS-MATERIAL-RENDER",
+        "CAP-CARDS-PAGE-IMAGES",
+        "CAP-CARDS-PALETTE-EXPORT",
+        "CAP-CARDS-PDF-DOCUMENTS",
+        "CAP-CARDS-PDF-READER",
+        "CAP-CARDS-QR-PNG-EXPORT",
+        "CAP-CARDS-QR-VECTOR",
+        "CAP-CARDS-RENDER-SHEETS-PDF",
+        "CAP-CARDS-SHARE-CARD-SET",
+        "CAP-CARDS-SHARE-CARDS-EXPORT",
+        "CAP-CARDS-SHARE-CARDS-TO-SEPARATE",
+        "CAP-CARDS-SHARE-KEEPING-NOTE",
+        "CAP-CARDS-TERMINAL-COLOR-CARDS",
+        "CAP-CLI-PNG-ADMISSION",
+        "CAP-CLI-PRIVATE-FILE-PUBLICATION",
+        "CAP-CLI-QR-IMAGE-INPUT",
+        "CAP-CLI-RAW-LINE-EDITOR",
+        "CAP-CLI-RELEASE-SIGNING",
+        "CAP-CLI-RESULT-PAGING",
+        "CAP-CLI-RESULT-PRESENTATION",
+        "CAP-CLI-SECRET-ANSWER-FILE-PATH",
+        "CAP-CLI-SECRET-ARGV-REFUSAL",
+        "CAP-CLI-SECRET-FILE-INPUT",
+        "CAP-CLI-SECRET-PROMPT",
+        "CAP-CLI-TYPED-AHEAD-DROP",
+        "CAP-CLI-WORD-HINTS-TYPING",
+        "CAP-PHRASE-FORMATS-BACKUP-READING",
+        "CAP-PHRASE-FORMATS-COLOR-PLACEMENTS",
+        "CAP-PHRASE-FORMATS-DATE-PATTERNS",
+        "CAP-PHRASE-FORMATS-DATES",
+        "CAP-PHRASE-FORMATS-DECODE-FROM-OPTIONS",
+        "CAP-PHRASE-FORMATS-DECODE-QUESTIONS",
+        "CAP-PHRASE-FORMATS-ENCODE",
+        "CAP-PHRASE-FORMATS-ENCODE-QR",
+        "CAP-PHRASE-FORMATS-ENCODE-RECORD-FILE",
+        "CAP-PHRASE-FORMATS-ENCODED-BACKUP",
+        "CAP-PHRASE-FORMATS-ENCODED-FINGERPRINT",
+        "CAP-PHRASE-FORMATS-FORM-COLOR-UNICODE",
+        "CAP-PHRASE-FORMATS-FORM-COLORS",
+        "CAP-PHRASE-FORMATS-FORM-DETECTION",
+        "CAP-PHRASE-FORMATS-FORM-ENGLISH",
+        "CAP-PHRASE-FORMATS-FORM-INDEXES",
+        "CAP-PHRASE-FORMATS-FORM-UNICODE",
+        "CAP-PHRASE-FORMATS-JSON-OUTPUT",
+        "CAP-PHRASE-FORMATS-LAST-WORD-REPLACEMENT-READING",
+        "CAP-PHRASE-FORMATS-LEGACY-VALID-LAST-WORD",
+        "CAP-PHRASE-FORMATS-MODE-DIRECT",
+        "CAP-PHRASE-FORMATS-MODE-LEGACY",
+        "CAP-PHRASE-FORMATS-MODE-SEEDSHIFT",
+        "CAP-PHRASE-FORMATS-PHRASE-VALIDATION",
+        "CAP-PHRASE-FORMATS-RE-ENCODE",
+        "CAP-PHRASE-FORMATS-RE-ENCODE-QUESTIONS",
+        "CAP-PHRASE-FORMATS-RECORD",
+        "CAP-PHRASE-FORMATS-REENCODING-CONFIRMATION",
+        "CAP-PHRASE-FORMATS-SECRET-OWNERS",
+        "CAP-PHRASE-FORMATS-SECRET-SOURCES",
+        "CAP-PHRASE-FORMATS-SHIFT-SCHEDULE",
+        "CAP-PHRASE-FORMATS-SHORTER-PHRASES",
+        "CAP-PHRASE-FORMATS-SHOW-MASKED-WORDS",
+        "CAP-PHRASE-FORMATS-SHOW-ORIGINAL-WORDS",
+        "CAP-PHRASE-FORMATS-WORD-HINTS",
+        "CAP-RECOVERY-BACKUP-CHECK",
+        "CAP-RECOVERY-BACKUP-CHECK-CODES",
+        "CAP-RECOVERY-BACKUP-CHECK-SHARES",
+        "CAP-RECOVERY-CANDIDATE-DECRYPT",
+        "CAP-RECOVERY-CANDIDATE-ENCRYPT-KEY",
+        "CAP-RECOVERY-CANDIDATE-ENCRYPT-PASSPHRASE",
+        "CAP-RECOVERY-CANDIDATE-LIST-FORMAT",
+        "CAP-RECOVERY-CANDIDATE-LIST-SAVE",
+        "CAP-RECOVERY-CANDIDATE-LIST-WRITER",
+        "CAP-RECOVERY-CANDIDATE-PROTECTION-CHOICE",
+        "CAP-RECOVERY-DATE-CANDIDATES",
+        "CAP-RECOVERY-DATE-SEARCH",
+        "CAP-RECOVERY-DATES-ANSWER",
+        "CAP-RECOVERY-LEGACY-LAST-WORDS",
+        "CAP-RECOVERY-MARKED-CODES",
+        "CAP-RECOVERY-MARKED-CODES-BY-ENCODED-FINGERPRINT",
+        "CAP-RECOVERY-MARKED-CODES-BY-WALLET",
+        "CAP-RECOVERY-MARKED-CODES-LIST",
+        "CAP-RECOVERY-MARKED-CODES-SEARCH",
+        "CAP-RECOVERY-WORD-SEARCH-MISSING",
+        "CAP-RECOVERY-WORD-SEARCH-PLACES",
+        "CAP-RECOVERY-WORD-SEARCH-RUN",
+        "CAP-SSKR-COMBINE-COMMAND",
+        "CAP-SSKR-COMBINE-LIBRARY",
+        "CAP-SSKR-ENGINE-COMBINE",
+        "CAP-SSKR-ENGINE-SPLIT",
+        "CAP-SSKR-EXPORT-COMMAND",
+        "CAP-SSKR-EXPORT-REPAIR-FLOW",
+        "CAP-SSKR-EXPORT-SET",
+        "CAP-SSKR-FORM-BYTEWORDS",
+        "CAP-SSKR-FORM-COLOR-UNICODE",
+        "CAP-SSKR-FORM-COLORS",
+        "CAP-SSKR-FORM-UNICODE",
+        "CAP-SSKR-FORM-UR",
+        "CAP-SSKR-FORM-WORD-NUMBERS",
+        "CAP-SSKR-JOINT-ASSESS",
+        "CAP-SSKR-JOINT-SEARCH",
+        "CAP-SSKR-MARK-SYNTAX",
+        "CAP-SSKR-MIXED-LAYOUT",
+        "CAP-SSKR-REPAIR-ONE-SHARE",
+        "CAP-SSKR-REPAIR-REPORT",
+        "CAP-SSKR-RESTORE-COMPLETE",
+        "CAP-SSKR-RESTORE-HANDOFF",
+        "CAP-SSKR-RESTORE-STEPS",
+        "CAP-SSKR-RESTORED-SET-FACTS",
+        "CAP-SSKR-SAVE-SHARE-FILE",
+        "CAP-SSKR-SAVE-SHARE-QR",
+        "CAP-SSKR-SET-CHECK",
+        "CAP-SSKR-SHARE-ANY-FORM",
+        "CAP-SSKR-SHARE-BYTES-METADATA",
+        "CAP-SSKR-SHARE-QR-MATCH",
+        "CAP-SSKR-SHARE-SOURCES",
+        "CAP-SSKR-SHARE-TROUBLE",
+        "CAP-SSKR-SPLIT-BACKUP",
+        "CAP-SSKR-SPLIT-COMMAND",
+        "CAP-SSKR-SPLIT-PHRASE",
+        "CAP-SSKR-TYPED-SHARES",
+        "CAP-SSKR-UNMASK-SHARES",
+        "CAP-SSKR-WALLET-CHECK-SETS",
+        "CAP-WALLET-BIP39-PASSPHRASE-INPUT",
+        "CAP-WALLET-BIP39-SEED",
+        "CAP-WALLET-EVIDENCE-CHECK",
+        "CAP-WALLET-EVIDENCE-OPTIONS",
+        "CAP-WALLET-EVIDENCE-WIF",
+        "CAP-WALLET-HOST-CHECK-CONTRACT",
+        "CAP-WALLET-MASTER-FINGERPRINT",
+        "CAP-WALLET-NODE-EVIDENCE-API"
+      ],
+      "current": "Own SecretValue, Redacted, wipedAfter (TS).",
+      "candidates": [
+        {
+          "crate": "zeroize",
+          "version": "1.9.1",
+          "notes": "tree 6 crates native, 6 wasm32; unsafe x17; Apache-2.0 OR MIT, released 2026-10-06. features zeroize_derive; mhfe/Cargo.toml:42 and sskr-wasm."
+        },
+        {
+          "crate": "secrecy",
+          "version": "0.10.3",
+          "notes": "tree 2 crates native, 2 wasm32; no unsafe, forbids or denies unsafe_code; Apache-2.0 OR MIT, released 2024-10-09. A wrapper mhfe does not use."
+        }
+      ],
+      "recommendation": "zeroize =1.9.1 (zeroize_derive); owner types as mhfe/src/memory.rs",
+      "reason": "Shared with mhfe and the engine; RUST-13."
+    },
+    {
+      "need": "Memory locking, MADV_DONTDUMP and MADV_WIPEONFORK, swap warning",
+      "capabilities": [
+        "CAP-CLI-SANDBOX-REPORT",
+        "CAP-CLI-SECRET-GATE",
+        "CAP-CLI-SWAP-WARNING",
+        "CAP-PHRASE-FORMATS-ENCODED-BACKUP",
+        "CAP-PHRASE-FORMATS-SECRET-OWNERS",
+        "CAP-SSKR-SHARE-ANY-FORM"
+      ],
+      "current": "Nothing in Node.js; the swap warning reads /proc/swaps and sysfs (src/cli/swap-check.ts).",
+      "candidates": [
+        {
+          "crate": "own code from mhfe",
+          "version": "-",
+          "notes": "mhfe/src/memory.rs:18-270 and src/engine/ffi.rs:282-335 over libc; mhfe locks only on unix, Windows needs VirtualLock (windows-sys Win32_System_Memory)."
+        },
+        {
+          "crate": "libc",
+          "version": "0.2.191",
+          "notes": "tree 1 crate native, 1 wasm32; unsafe x790; MIT OR Apache-2.0, released 2026-10-16. mhfe/Cargo.toml:59."
+        },
+        {
+          "crate": "windows-sys",
+          "version": "0.61.2",
+          "notes": "tree 2 crates native, 2 wasm32; unsafe x12530; MIT OR Apache-2.0, released 2025-10-06. mhfe/Cargo.toml:63."
+        },
+        {
+          "crate": "region",
+          "version": "4.0.1",
+          "notes": "tree 3 crates native, 3 wasm32; unsafe x93; MIT, released 2026-09-23."
+        },
+        {
+          "crate": "memsec",
+          "version": "0.7.0",
+          "notes": "tree 4 crates native, 3 wasm32; unsafe x23; MIT, released 2024-06-06. Last release 2024-06."
+        }
+      ],
+      "recommendation": "own code from mhfe over libc =0.2.191 and windows-sys =0.61.2; the swap check over std::fs",
+      "reason": "RUST-13 names mhfe as the model; libc and windows-sys are needed for the other protections anyway."
+    },
+    {
+      "need": "No core dumps and no debugger: Linux prctl/setrlimit, macOS setrlimit, ptrace PT_DENY_ATTACH, Seatbelt; Windows WER without heap, mitigation policies, job object with the memory cap",
+      "capabilities": [
+        "CAP-CLI-LINUX-NO-CORE-DUMPS",
+        "CAP-CLI-MACOS-DENY-DEBUGGER",
+        "CAP-CLI-MACOS-NO-CORE-DUMPS",
+        "CAP-CLI-MACOS-SEATBELT",
+        "CAP-CLI-SANDBOX-REPORT",
+        "CAP-CLI-SECRET-GATE",
+        "CAP-CLI-WINDOWS-JOB-NO-CHILDREN",
+        "CAP-CLI-WINDOWS-MITIGATIONS",
+        "CAP-CLI-WINDOWS-WER-NO-HEAP"
+      ],
+      "current": "node:ffi into libc.so.6, libSystem and kernel32 (src/cli/sandbox-linux.ts, sandbox-macos.ts:36-56, sandbox-windows.ts:63-79).",
+      "candidates": [
+        {
+          "crate": "libc",
+          "version": "0.2.191",
+          "notes": "tree 1 crate native, 1 wasm32; unsafe x790; MIT OR Apache-2.0, released 2026-10-16. PR_SET_DUMPABLE, RLIMIT_CORE; apple ptrace and PT_DENY_ATTACH (src/unix/bsd/apple/mod.rs:2377, 4930); no sandbox_init, so one extern declaration of our own."
+        },
+        {
+          "crate": "windows-sys",
+          "version": "0.61.2",
+          "notes": "tree 2 crates native, 2 wasm32; unsafe x12530; MIT OR Apache-2.0, released 2025-10-06. Features Win32_System_ErrorReporting (WerSetFlags, WerGetFlags), Win32_System_Threading (Set/GetProcessMitigationPolicy), Win32_System_JobObjects, Win32_Foundation: all present in 0.61.2."
+        },
+        {
+          "crate": "nix",
+          "version": "0.31.3",
+          "notes": "tree 4 crates native, 4 wasm32; unsafe x985; MIT, released 2026-05-11. Wrappers over the same calls."
+        },
+        {
+          "crate": "rustix",
+          "version": "1.1.5",
+          "notes": "tree 3 crates native, 4 wasm32; unsafe x1589; Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT, released 2026-09-16. Wrappers over the same calls."
+        }
+      ],
+      "recommendation": "own code over libc =0.2.191 and windows-sys =0.61.2 (Linux part from mhfe src/bin/mhfe/protect.rs:35-50)",
+      "reason": "Each protection is a few calls with a read-back (RUST-11); wrappers add crates, not safety."
+    },
+    {
+      "need": "seccomp: no new sockets, no io_uring",
+      "capabilities": [
+        "CAP-CLI-LINUX-SECCOMP",
+        "CAP-CLI-PERMISSION-MODEL",
+        "CAP-CLI-SANDBOX-REPORT"
+      ],
+      "current": "Own BPF through node:ffi (src/cli/sandbox-linux.ts).",
+      "candidates": [
+        {
+          "crate": "own code from mhfe",
+          "version": "-",
+          "notes": "mhfe/src/bin/mhfe/protect.rs:620-713 over libc."
+        },
+        {
+          "crate": "seccompiler",
+          "version": "0.5.0",
+          "notes": "tree 2 crates native, 2 wasm32; unsafe x4; Apache-2.0 OR BSD-3-Clause, released 2025-03-07. Firecracker."
+        },
+        {
+          "crate": "libseccomp",
+          "version": "0.4.0",
+          "notes": "tree 4 crates native, 4 wasm32; unsafe x48; MIT OR Apache-2.0, released 2025-04-05. Needs the C libseccomp."
+        },
+        {
+          "crate": "extrasafe",
+          "version": "0.5.1",
+          "notes": "tree 4 crates native, 4 wasm32; unsafe x19; MIT, released 2024-04-16. Last release 2024-04."
+        }
+      ],
+      "recommendation": "own code from mhfe over libc",
+      "reason": "A filter of a few rules, already reviewed in mhfe."
+    },
+    {
+      "need": "Landlock: no writes beyond the asked outputs",
+      "capabilities": [
+        "CAP-CLI-LINUX-LANDLOCK",
+        "CAP-CLI-PERMISSION-MODEL",
+        "CAP-CLI-SANDBOX-REPORT"
+      ],
+      "current": "Own syscalls through node:ffi.",
+      "candidates": [
+        {
+          "crate": "own code from mhfe",
+          "version": "-",
+          "notes": "mhfe/src/bin/mhfe/protect.rs:715-880 over libc syscall numbers (libc SYS_landlock_*, e.g. x86_64 not_x32.rs:363)."
+        },
+        {
+          "crate": "landlock",
+          "version": "0.4.7",
+          "notes": "tree 11 crates native, 11 wasm32; unsafe x36; MIT OR Apache-2.0, released 2026-07-27. enumflags2, thiserror."
+        }
+      ],
+      "recommendation": "own code from mhfe over libc",
+      "reason": "As seccomp: shared, small, read back."
+    },
+    {
+      "need": "Terminal: raw mode, hidden input, alternate screen, size, colours (ECMA-48)",
+      "capabilities": [
+        "CAP-CARDS-MENU-CARD-QUESTIONS",
+        "CAP-CARDS-TEMPLATE-CATALOG",
+        "CAP-CARDS-TERMINAL-COLOR-CARDS",
+        "CAP-CLI-COLOR-RULE",
+        "CAP-CLI-COMMAND-DISPATCH",
+        "CAP-CLI-FAILURE-AND-EXIT",
+        "CAP-CLI-LONG-SEARCH-CONTROL",
+        "CAP-CLI-MENU-COMMAND-PROCESS",
+        "CAP-CLI-MENU-DECODE",
+        "CAP-CLI-MENU-ENCODE",
+        "CAP-CLI-MENU-PREVIEW",
+        "CAP-CLI-MENU-RECOVER",
+        "CAP-CLI-MENU-REENCODE",
+        "CAP-CLI-MENU-RESTORE",
+        "CAP-CLI-MENU-SPLIT",
+        "CAP-CLI-MENU-TABLE",
+        "CAP-CLI-NOTICES-AND-LINKS",
+        "CAP-CLI-PRIVATE-SCREEN",
+        "CAP-CLI-QUESTIONS",
+        "CAP-CLI-RAW-LINE-EDITOR",
+        "CAP-CLI-RESULT-PAGING",
+        "CAP-CLI-SECRET-PROMPT",
+        "CAP-CLI-START-MENU",
+        "CAP-CLI-STEP-SCREENS",
+        "CAP-CLI-TERMINAL-LAYOUT",
+        "CAP-CLI-TYPED-AHEAD-DROP",
+        "CAP-CLI-WORD-HINTS-TYPING",
+        "CAP-PHRASE-FORMATS-DECODE-FROM-OPTIONS",
+        "CAP-PHRASE-FORMATS-DECODE-QUESTIONS",
+        "CAP-PHRASE-FORMATS-ENCODE",
+        "CAP-PHRASE-FORMATS-FORM-DETECTION",
+        "CAP-PHRASE-FORMATS-NUMBERED-DICTIONARIES",
+        "CAP-PHRASE-FORMATS-RE-ENCODE",
+        "CAP-PHRASE-FORMATS-RE-ENCODE-QUESTIONS",
+        "CAP-PHRASE-FORMATS-SECRET-SOURCES",
+        "CAP-PHRASE-FORMATS-SHOW-MASKED-WORDS",
+        "CAP-PHRASE-FORMATS-SHOW-ORIGINAL-WORDS",
+        "CAP-PHRASE-FORMATS-WORD-HINTS",
+        "CAP-PHRASE-FORMATS-WORD-TABLE-LOOKUP",
+        "CAP-RECOVERY-BACKUP-CHECK",
+        "CAP-RECOVERY-CANDIDATE-LIST-SAVE",
+        "CAP-RECOVERY-DATE-SEARCH",
+        "CAP-RECOVERY-MARKED-CODES-SEARCH",
+        "CAP-RECOVERY-WORD-SEARCH-RUN",
+        "CAP-SSKR-COMBINE-COMMAND",
+        "CAP-SSKR-EXPORT-COMMAND",
+        "CAP-SSKR-RESTORE-HANDOFF",
+        "CAP-SSKR-SET-CHOICE",
+        "CAP-SSKR-SHARE-SOURCES",
+        "CAP-SSKR-SPLIT-COMMAND",
+        "CAP-WALLET-EVIDENCE-OPTIONS"
+      ],
+      "current": "Node.js tty raw mode; /bin/stty for the menu (a model defect: echo stays on without it); own escape sequences.",
+      "candidates": [
+        {
+          "crate": "own code from mhfe",
+          "version": "-",
+          "notes": "termios, TIOCGWINSZ and console modes in mhfe/src/bin/mhfe/hidden_input.rs:678-925; alternate screen in terminal.rs:514-520."
+        },
+        {
+          "crate": "crossterm",
+          "version": "0.29.0",
+          "notes": "tree 27 crates native, 18 wasm32; unsafe x17; MIT, released 2025-04-05. mio, parking_lot, signal-hook, rustix."
+        },
+        {
+          "crate": "termion",
+          "version": "4.0.6",
+          "notes": "tree 3 crates native, 3 wasm32; unsafe x8; MIT, released 2025-11-21. Unix only."
+        }
+      ],
+      "recommendation": "own code from mhfe over libc and windows-sys (Win32_System_Console)",
+      "reason": "Shared with mhfe, Windows included, no stty child process."
+    },
+    {
+      "need": "Signals: SIGINT, SIGQUIT, SIGTSTP and SIGCONT, SIGWINCH; Windows console control",
+      "capabilities": [
+        "CAP-CLI-INTERRUPTION",
+        "CAP-CLI-LONG-SEARCH-CONTROL",
+        "CAP-CLI-RESULT-PAGING",
+        "CAP-RECOVERY-DATE-SEARCH"
+      ],
+      "current": "Node.js process signals.",
+      "candidates": [
+        {
+          "crate": "own code from mhfe",
+          "version": "-",
+          "notes": "sigaction over libc (mhfe/src/bin/mhfe/protect.rs:62-80) and SetConsoleCtrlHandler (windows-sys)."
+        },
+        {
+          "crate": "ctrlc",
+          "version": "3.5.2",
+          "notes": "tree 5 crates native, 1 wasm32; unsafe x15; MIT/Apache-2.0, released 2026-02-10. mhfe/Cargo.toml:52; only SIGINT, SIGTERM, SIGHUP; nix and dispatch2."
+        },
+        {
+          "crate": "signal-hook",
+          "version": "0.4.5",
+          "notes": "tree 4 crates native, 4 wasm32; unsafe x43; MIT OR Apache-2.0, released 2026-10-04."
+        }
+      ],
+      "recommendation": "own code over libc and windows-sys",
+      "reason": "The search control needs SIGTSTP and paging needs SIGWINCH, which ctrlc does not offer; one mechanism for all."
+    },
+    {
+      "need": "Argument parsing: 11 commands, 92 options, the secret-argv refusal, the program's own messages",
+      "capabilities": [
+        "CAP-CARDS-CLI-CARD-OPTIONS",
+        "CAP-CARDS-TEXT-RULES",
+        "CAP-CLI-COMMAND-DISPATCH",
+        "CAP-CLI-OPTION-PARSING",
+        "CAP-CLI-SECRET-ARGV-REFUSAL",
+        "CAP-CLI-SECRET-FILE-INPUT",
+        "CAP-CLI-SECRET-PROMPT",
+        "CAP-CLI-VERSION",
+        "CAP-PHRASE-FORMATS-SECRET-SOURCES",
+        "CAP-SSKR-SHARE-SOURCES"
+      ],
+      "current": "Own (src/cli/arguments.ts, command-line.ts, command-options.ts).",
+      "candidates": [
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "Port of the TS option table and tokenizer over std::env::args_os."
+        },
+        {
+          "crate": "lexopt",
+          "version": "0.3.2",
+          "notes": "tree 1 crate native, 1 wasm32; no unsafe, forbids or denies unsafe_code; MIT, released 2026-02-28. Tokenizer only."
+        },
+        {
+          "crate": "clap",
+          "version": "4.6.7",
+          "notes": "tree 17 crates native, 17 wasm32; no unsafe, forbids or denies unsafe_code; MIT OR Apache-2.0, released 2026-09-14. features derive; mhfe/Cargo.toml:48."
+        }
+      ],
+      "recommendation": "own code",
+      "reason": "Messages, their order and the help text are RUST-14 results; clap writes its own and lexopt saves only the tokenizer."
+    },
+    {
+      "need": "WASM bindings for the browser host (one WASM, at most a second for rendering)",
+      "capabilities": [
+        "CAP-CARDS-BACKUP-CONTENT",
+        "CAP-CARDS-BUSINESS-RENDER",
+        "CAP-CARDS-CLI-CARD-OPTIONS",
+        "CAP-CARDS-COLLECTION-SHEET-DRAW",
+        "CAP-CARDS-DECOYS-AND-PLAN",
+        "CAP-CARDS-HEIR-SHEET-PDF",
+        "CAP-CARDS-INVENTED-DETAILS",
+        "CAP-CARDS-PAGE-IMAGES",
+        "CAP-CARDS-PAGE-SETTINGS",
+        "CAP-CARDS-PDF-DOCUMENTS",
+        "CAP-CARDS-PDF-READER",
+        "CAP-CARDS-QR-VECTOR",
+        "CAP-CARDS-RENDER-PLATFORM",
+        "CAP-CARDS-RENDER-SHEETS-PDF",
+        "CAP-CARDS-SAMPLE-PREVIEW",
+        "CAP-CARDS-SHARE-CARD-SET",
+        "CAP-CARDS-SHARE-CARDS-EXPORT",
+        "CAP-CARDS-SHARE-KEEPING-NOTE",
+        "CAP-CARDS-TEMPLATE-CATALOG",
+        "CAP-CLI-HELP",
+        "CAP-CLI-PNG-ADMISSION",
+        "CAP-CLI-PORTABLE-PARTS",
+        "CAP-CLI-RESULT-PAGING",
+        "CAP-CLI-SELF-TEST-COMMAND",
+        "CAP-CLI-STEP-SCREENS",
+        "CAP-PHRASE-FORMATS-MASKING-RULES",
+        "CAP-PHRASE-FORMATS-REFUSAL-CODES",
+        "CAP-RECOVERY-CANDIDATE-ENCRYPT-KEY",
+        "CAP-SSKR-COMBINE-COMMAND",
+        "CAP-SSKR-EXPORT-COMMAND",
+        "CAP-SSKR-HOST-PLATFORM",
+        "CAP-SSKR-SPLIT-COMMAND",
+        "CAP-WALLET-BIP39-SEED"
+      ],
+      "current": "wasm-bindgen 0.2.129 glue of the SSKR engine; the rest is TS that multi-chain compiles.",
+      "candidates": [
+        {
+          "crate": "wasm-bindgen",
+          "version": "0.2.129",
+          "notes": "tree 11 crates native, 11 wasm32; unsafe x110; MIT OR Apache-2.0, released 2026-09-25. The workspace pin; wasm-bindgen-cli 0.2.129 must match."
+        },
+        {
+          "crate": "js-sys",
+          "version": "0.3.106",
+          "notes": "tree 17 crates native, 17 wasm32; unsafe x28; MIT OR Apache-2.0, released 2026-09-25. Not needed: mhfe uses it for JsString results and Function callbacks (mhfe/src/wasm_api.rs:187-195, wasm_api/core.rs:286-287); here the zeroing allocator wipes wasm-bindgen's String copies (ADR 0003), searches are steps the host calls with no callback (ADR 0005, 0006), and the host measures time (clock block). Without it the core WASM loses 6 crates (js-sys, futures-core, futures-task, futures-util, pin-project-lite, slab)."
+        },
+        {
+          "crate": "web-time",
+          "version": "1.1.0",
+          "notes": "tree 1 crate native, 18 wasm32; no unsafe; MIT OR Apache-2.0, released 2024-03-01. Not needed (clock block)."
+        }
+      ],
+      "recommendation": "wasm-bindgen =0.2.129",
+      "reason": "The version mhfe and multi-chain build with; no binding names a use for js-sys."
+    },
+    {
+      "need": "Clock for pace and progress; yielding and cancellation of searches",
+      "capabilities": [
+        "CAP-CLI-LONG-SEARCH-CONTROL",
+        "CAP-PHRASE-FORMATS-SELF-TEST-KNOWN-ANSWERS",
+        "CAP-RECOVERY-DATE-SEARCH",
+        "CAP-RECOVERY-SEARCH-PLAN",
+        "CAP-RECOVERY-SEARCH-TURNS",
+        "CAP-SSKR-JOINT-ASSESS",
+        "CAP-SSKR-JOINT-SEARCH",
+        "CAP-SSKR-REPAIR-REPORT",
+        "CAP-SSKR-RESTORE-STEPS",
+        "CAP-SSKR-SEARCH-CONSENT",
+        "CAP-SSKR-UNMASK-SHARES"
+      ],
+      "current": "performance.now and Date, setTimeout and setImmediate turns, AbortSignal.",
+      "candidates": [
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "None in the library (ADR 0005, 0006): the CLI times its search steps with std::time::Instant, the page with performance.now."
+        },
+        {
+          "crate": "web-time",
+          "version": "1.1.0",
+          "notes": "tree 1 crate native, 18 wasm32; no unsafe; MIT OR Apache-2.0, released 2024-03-01."
+        }
+      ],
+      "recommendation": "no crate: the host measures time; the library reads no clock",
+      "reason": "The library needs time only for estimates the host computes from the pace it measures (ADR 0006), and Instant::now traps on wasm32-unknown-unknown (Rust 1.99.1, work/instant-probe: \"trap: unreachable\")."
+    },
+    {
+      "need": "Files: new private files and folders, bounded reads, /proc and sysfs reads",
+      "capabilities": [
+        "CAP-CARDS-BUNDLED-ASSETS",
+        "CAP-CARDS-COLLECTION-QR",
+        "CAP-CARDS-HEIR-SHEET-PDF",
+        "CAP-CARDS-INDIVIDUAL-CARDS",
+        "CAP-CARDS-PAGE-IMAGES",
+        "CAP-CARDS-PALETTE-EXPORT",
+        "CAP-CARDS-QR-PNG-EXPORT",
+        "CAP-CARDS-RENDER-PLATFORM",
+        "CAP-CARDS-RENDER-SHEETS-PDF",
+        "CAP-CARDS-SAMPLE-PREVIEW",
+        "CAP-CARDS-SHARE-CARDS-EXPORT",
+        "CAP-CLI-CLOUD-FOLDER-WARNING",
+        "CAP-CLI-CORE-SELF-TEST-GATE",
+        "CAP-CLI-INTERRUPTION",
+        "CAP-CLI-MENU-FILE-QUESTIONS",
+        "CAP-CLI-NUMBERED-NAMES",
+        "CAP-CLI-OUTPUT-PREFLIGHT",
+        "CAP-CLI-PNG-ADMISSION",
+        "CAP-CLI-PRIVATE-FILE-PUBLICATION",
+        "CAP-CLI-QR-IMAGE-INPUT",
+        "CAP-CLI-SAVE-RETRY",
+        "CAP-CLI-SECRET-ANSWER-FILE-PATH",
+        "CAP-CLI-SECRET-FILE-INPUT",
+        "CAP-CLI-SELF-TEST-COMMAND",
+        "CAP-CLI-SWAP-WARNING",
+        "CAP-CLI-TEMPORARY-FOLDERS",
+        "CAP-PHRASE-FORMATS-DECODE-FROM-OPTIONS",
+        "CAP-PHRASE-FORMATS-ENCODE",
+        "CAP-PHRASE-FORMATS-ENCODE-QR",
+        "CAP-PHRASE-FORMATS-ENCODE-RECORD-FILE",
+        "CAP-PHRASE-FORMATS-NUMBERED-DICTIONARIES",
+        "CAP-PHRASE-FORMATS-RE-ENCODE",
+        "CAP-PHRASE-FORMATS-RECOVERY-GUIDE",
+        "CAP-PHRASE-FORMATS-RECOVERY-PACK",
+        "CAP-PHRASE-FORMATS-SECRET-SOURCES",
+        "CAP-RECOVERY-CANDIDATE-LIST-SAVE",
+        "CAP-SSKR-COMBINE-COMMAND",
+        "CAP-SSKR-ENGINE-LOAD-VERIFIED",
+        "CAP-SSKR-ENGINE-REPRODUCIBLE-BUILD",
+        "CAP-SSKR-EXPORT-COMMAND",
+        "CAP-SSKR-SAVE-SHARE-FILE",
+        "CAP-SSKR-SAVE-SHARE-QR",
+        "CAP-SSKR-SHARE-SOURCES",
+        "CAP-SSKR-SPLIT-COMMAND",
+        "CAP-WALLET-BIP39-PASSPHRASE-INPUT",
+        "CAP-WALLET-EVIDENCE-OPTIONS",
+        "CAP-WALLET-EVIDENCE-WIF"
+      ],
+      "current": "node:fs (mkdtemp, link, rename, chmod, lstat).",
+      "candidates": [
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "std::fs with OpenOptionsExt mode and create_new, hard_link and rename; random folder names from the randomness port; no tempfile crate."
+        }
+      ],
+      "recommendation": "std and libc",
+      "reason": "Every step is one std call."
+    },
+    {
+      "need": "Dates: Gregorian calendar and Seedshift shifts",
+      "capabilities": [
+        "CAP-PHRASE-FORMATS-DATE-PATTERNS",
+        "CAP-PHRASE-FORMATS-DATES",
+        "CAP-PHRASE-FORMATS-MODE-LEGACY",
+        "CAP-RECOVERY-DATE-CANDIDATES",
+        "CAP-RECOVERY-DATE-SEARCH",
+        "CAP-RECOVERY-LEGACY-LAST-WORDS",
+        "CAP-RECOVERY-MARKED-CODES-BY-WALLET"
+      ],
+      "current": "Own (src/core/dates.ts, seedshift.ts).",
+      "candidates": [
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "Port."
+        }
+      ],
+      "recommendation": "own code",
+      "reason": "Day arithmetic on whole dates; a date crate adds nothing."
+    },
+    {
+      "need": "Share repair algebra over GF(2^8) and GF(2)",
+      "capabilities": [
+        "CAP-SSKR-JOINT-ASSESS",
+        "CAP-SSKR-JOINT-SEARCH",
+        "CAP-SSKR-REPAIR-ONE-SHARE"
+      ],
+      "current": "Own (src/sskr/gf256.ts, gf2.ts, joint-solve.ts).",
+      "candidates": [
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "Port; HMAC-SHA256 from hmac and sha2."
+        }
+      ],
+      "recommendation": "own code",
+      "reason": "Search logic of MnemoCode, not a primitive; the engine keeps the Shamir arithmetic."
+    },
+    {
+      "need": "Small formats: library JSON output, Padme padding of candidate lists",
+      "capabilities": ["CAP-PHRASE-FORMATS-JSON-OUTPUT", "CAP-RECOVERY-CANDIDATE-LIST-FORMAT"],
+      "current": "JSON.stringify; own Padme (src/core/candidate-list.ts).",
+      "candidates": [
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "A writer of one fixed object of ASCII values; Padme in a few lines."
+        },
+        {
+          "crate": "serde_json",
+          "version": "1.0.154",
+          "notes": "tree 5 crates native, 5 wasm32; unsafe x13; MIT OR Apache-2.0, released 2026-10-11. With serde derive as in mhfe."
+        }
+      ],
+      "recommendation": "own code",
+      "reason": "One fixed shape of ASCII values needs no serializer."
+    },
+    {
+      "need": "Bundled assets and the world map: font, 7 PNGs, 5 JPEGs, Natural Earth land in Robinson projection",
+      "capabilities": ["CAP-CARDS-BUNDLED-ASSETS", "CAP-CARDS-COLLECTION-SHEET-DRAW"],
+      "current": "Files read from the package or the single executable; the map compiled into the code by scripts/build-world-map.mjs.",
+      "candidates": [
+        {
+          "crate": "own code",
+          "version": "-",
+          "notes": "include_bytes! with SHA-256 known answers (sha2); the map as generated constant data."
+        }
+      ],
+      "recommendation": "own code",
+      "reason": "The binary carries its assets; no file to load or verify at run time."
+    }
+  ]
+}

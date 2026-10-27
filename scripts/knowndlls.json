@@ -1,0 +1,4 @@
+{
+  "about": "The KnownDLLs the Windows executable relies on (W-DLL-SEARCH, docs/design/platform/protections.json): each import of the release executable is one of these or an API set (scripts/verify-windows-imports.mjs). ntdll.dll is mapped by the kernel into every process before any DLL search, so it is here too. CI confirms every name in the \\KnownDlls object directory of each Windows runner (scripts/read-knowndlls.ps1); a name a runner lacks fails the job, and the target comes back to the owner.",
+  "dlls": ["bcryptprimitives.dll", "kernel32.dll", "msvcrt.dll", "ntdll.dll", "ws2_32.dll"]
+}

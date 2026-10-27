@@ -1,0 +1,78 @@
+# CORE-15: at most 150 lines of code per function.
+too-many-lines-threshold = 150
+# Tests may unwrap, expect and panic (RUST-01, RUST-05); library and front-end code returns errors.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+
+# The libraries never touch the file system, the environment, processes, the network, threads or
+# the clock (CORE-09, CORE-49): the host gives them what they need. std's stdin() and stdout() keep
+# static buffers that are never freed, so never wiped (ARCHITECTURE.md §6); the CLI's `os` reads and
+# writes its descriptors instead. Only the CLI's I/O modules (module-map.json ioModules: os,
+# terminal, input, output, menu and commands/self_test.rs) expect these lints, at their top; never a
+# crate root, whose inner attribute would cover every module (the `code-rules` gate). main reads its
+# arguments and environment through os.
+disallowed-methods = [
+  { path = "std::io::stdin", reason = "a static buffer that is never wiped; read the descriptor through the CLI's os" },
+  { path = "std::io::stdout", reason = "a static buffer that is never wiped; write the descriptor through the CLI's os" },
+  { path = "std::io::stderr", reason = "write the descriptor through the CLI's os" },
+  { path = "std::time::Instant::now", reason = "the host owns the clock (ADR 0005); it traps on wasm32-unknown-unknown" },
+  { path = "std::time::SystemTime::now", reason = "the host owns the clock (ADR 0005)" },
+  { path = "std::thread::spawn", reason = "protections are set before the first thread (ADR 0008)" },
+  { path = "std::thread::Builder::spawn", reason = "protections are set before the first thread (ADR 0008)" },
+  { path = "std::thread::Builder::spawn_scoped", reason = "protections are set before the first thread (ADR 0008)" },
+  { path = "std::thread::scope", reason = "protections are set before the first thread (ADR 0008)" },
+  { path = "std::process::abort", reason = "main returns its exit code after the cleanup" },
+  { path = "std::env::current_exe", reason = "the CLI's os reads the environment" },
+  { path = "std::env::home_dir", reason = "the CLI's os reads the environment" },
+  { path = "std::env::set_current_dir", reason = "the CLI's os changes the environment" },
+  { path = "std::env::var", reason = "the CLI's os reads the environment" },
+  { path = "std::env::var_os", reason = "the CLI's os reads the environment" },
+  { path = "std::env::vars", reason = "the CLI's os reads the environment" },
+  { path = "std::env::vars_os", reason = "the CLI's os reads the environment" },
+  { path = "std::env::args", reason = "the CLI's main reads the arguments" },
+  { path = "std::env::args_os", reason = "the CLI's main reads the arguments" },
+  { path = "std::env::current_dir", reason = "the CLI's os reads the environment" },
+  { path = "std::env::temp_dir", reason = "the CLI's os reads the environment" },
+  { path = "std::fs::read", reason = "files belong to the CLI's input" },
+  { path = "std::fs::read_to_string", reason = "files belong to the CLI's input" },
+  { path = "std::fs::write", reason = "files belong to the CLI's output" },
+  { path = "std::fs::create_dir", reason = "files belong to the CLI's output" },
+  { path = "std::fs::create_dir_all", reason = "files belong to the CLI's output" },
+  { path = "std::fs::remove_file", reason = "files belong to the CLI's output" },
+  { path = "std::fs::remove_dir", reason = "files belong to the CLI's output" },
+  { path = "std::fs::remove_dir_all", reason = "files belong to the CLI's output" },
+  { path = "std::fs::rename", reason = "files belong to the CLI's output" },
+  { path = "std::fs::hard_link", reason = "files belong to the CLI's output" },
+  { path = "std::fs::copy", reason = "files belong to the CLI's output" },
+  { path = "std::fs::metadata", reason = "files belong to the CLI's input and output" },
+  { path = "std::fs::symlink_metadata", reason = "files belong to the CLI's input and output" },
+  { path = "std::fs::read_dir", reason = "files belong to the CLI's input and output" },
+  { path = "std::fs::canonicalize", reason = "files belong to the CLI's input and output" },
+  { path = "std::fs::exists", reason = "files belong to the CLI's input and output" },
+  { path = "std::fs::read_link", reason = "files belong to the CLI's input and output" },
+  { path = "std::fs::set_permissions", reason = "files belong to the CLI's output" },
+  { path = "std::fs::soft_link", reason = "files belong to the CLI's output" },
+  { path = "std::os::unix::fs::symlink", reason = "files belong to the CLI's output", allow-invalid = true },
+  { path = "std::net::ToSocketAddrs::to_socket_addrs", reason = "no network where secrets are (RUST-10)" },
+  # The SSKR engine's own randomness from the operating system: the libraries take the host's
+  # Random port instead (CORE-46). bc-rand enters the tree with the sskr unit (increment 7), so the
+  # paths do not resolve before it; allow-invalid goes when they do.
+  { path = "bc_rand::random_data", reason = "the library takes the host's Random port (CORE-46)", allow-invalid = true },
+  { path = "bc_rand::fill_random_data", reason = "the library takes the host's Random port (CORE-46)", allow-invalid = true },
+  { path = "bc_rand::thread_rng", reason = "the library takes the host's Random port (CORE-46)", allow-invalid = true },
+  { path = "std::process::exit", reason = "main returns its exit code after the cleanup" },
+]
+disallowed-types = [
+  { path = "std::fs::File", reason = "files belong to the CLI's input and output" },
+  { path = "std::fs::OpenOptions", reason = "files belong to the CLI's input and output" },
+  { path = "std::fs::DirBuilder", reason = "files belong to the CLI's output" },
+  { path = "std::os::unix::net::UnixStream", reason = "no network where secrets are (RUST-10)", allow-invalid = true },
+  { path = "std::os::unix::net::UnixListener", reason = "no network where secrets are (RUST-10)", allow-invalid = true },
+  { path = "std::os::unix::net::UnixDatagram", reason = "no network where secrets are (RUST-10)", allow-invalid = true },
+  { path = "bc_rand::SecureRandomNumberGenerator", reason = "the library takes the host's Random port (CORE-46)", allow-invalid = true },
+  { path = "std::process::Command", reason = "only the menu starts a command, through the CLI's os" },
+  { path = "std::net::TcpStream", reason = "no network where secrets are (RUST-10)" },
+  { path = "std::net::TcpListener", reason = "no network where secrets are (RUST-10)" },
+  { path = "std::net::UdpSocket", reason = "no network where secrets are (RUST-10)" },
+]

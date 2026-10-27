@@ -1,0 +1,22 @@
+[package]
+name = "mnemocode-cli"
+description = "The mnemocode command line and start menu."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "mnemocode"
+path = "src/main.rs"
+# A program, not a library: no API documentation (its name is also the library's).
+doc = false
+
+[dependencies]
+mnemocode.workspace = true
+mnemocode-cards.workspace = true
+
+[lints]
+workspace = true

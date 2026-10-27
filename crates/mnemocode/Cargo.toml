@@ -1,0 +1,19 @@
+[package]
+name = "mnemocode"
+description = "Every rule of MnemoCode: BIP39 phrases, encoded backups, shares, searches and wallet checks."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# Each unit (a coin, a share form, a search) gets its feature with the increment that builds it
+# (docs/design/architect/ARCHITECTURE.md §8, §9).
+[features]
+default = []
+
+[dependencies]
+
+[lints]
+workspace = true

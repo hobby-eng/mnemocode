@@ -1,0 +1,203 @@
+{
+  "about": "Module and dependency map of the Rust MnemoCode (docs/design/architect/ARCHITECTURE.md sections 2 and 3), read by the code-rules gate (scripts/verify-code-rules.mjs). layers: a library module may use the foundation and the modules listed for it ('*': every module); a module of mnemocode-cards or mnemocode-cli uses only the modules before it in 'order'; every listed edge of an existing library module is used. deps: each crate's direct dependencies per target, its devDependencies for its tests, and refusedInTree for every artifact. unsafe: 'forbid' in the crate root, or 'deny' with allow(unsafe_code) only in the files and folders of allowedIn (paths relative to the crate, a folder ending in /). ioModules: the only CLI files whose top may expect clippy's disallowed std methods and types.",
+  "crates": {
+    "mnemocode": {
+      "unsafe": {
+        "level": "deny",
+        "allowedIn": ["src/secret/pages.rs", "src/secret/allocator.rs"]
+      },
+      "dependencies": {
+        "all": [
+          "unicode-normalization",
+          "unicode-properties",
+          "unicode-script",
+          "sha2",
+          "hmac",
+          "bip39",
+          "ripemd",
+          "sha3",
+          "k256",
+          "bech32",
+          "bs58",
+          "chacha20poly1305",
+          "hkdf",
+          "x25519-dalek",
+          "scrypt",
+          "base64ct",
+          "sskr",
+          "bc-rand",
+          "rand_chacha",
+          "rand_core",
+          "qrcodegen",
+          "rqrr",
+          "png",
+          "zeroize"
+        ],
+        "cfg(unix)": ["libc"],
+        "cfg(windows)": ["windows-sys"]
+      },
+      "foundation": ["secret", "refusal", "checksum", "text", "random", "self_check", "search"],
+      "modules": {
+        "secret": [],
+        "refusal": [],
+        "checksum": [],
+        "text": ["refusal"],
+        "random": ["refusal"],
+        "self_check": ["refusal"],
+        "search": ["refusal"],
+        "bip39": [],
+        "dates": [],
+        "bip32": ["bip39"],
+        "pack": ["bip39"],
+        "qr": [],
+        "candidates": ["bip39"],
+        "forms": ["bip39"],
+        "modes": ["bip39", "dates", "bip32"],
+        "wallet": ["bip39", "bip32"],
+        "backup": ["bip39", "dates", "bip32", "forms", "modes", "wallet"],
+        "sskr": ["bip39", "dates", "bip32", "forms", "modes", "wallet", "backup"],
+        "recovery": [
+          "bip39",
+          "dates",
+          "bip32",
+          "forms",
+          "modes",
+          "wallet",
+          "backup",
+          "sskr",
+          "candidates"
+        ],
+        "checks": "*",
+        "lib": "*"
+      }
+    },
+    "mnemocode-cards": {
+      "unsafe": {
+        "level": "forbid"
+      },
+      "dependencies": {
+        "all": [
+          "mnemocode",
+          "pdf-writer",
+          "skrifa",
+          "subsetter",
+          "tiny-skia",
+          "png",
+          "miniz_oxide",
+          "jpeg-encoder",
+          "zune-jpeg",
+          "libm"
+        ]
+      },
+      "library": ["foundation", "bip39", "dates", "forms", "modes", "backup", "sskr", "qr"],
+      "order": [
+        "assets",
+        "settings",
+        "text_rules",
+        "palette",
+        "scene",
+        "pdf",
+        "raster",
+        "content",
+        "details",
+        "sheet",
+        "templates",
+        "plan",
+        "heir",
+        "export",
+        "preflight"
+      ]
+    },
+    "mnemocode-cli": {
+      "unsafe": {
+        "level": "deny",
+        "allowedIn": ["src/os.rs", "src/os/"]
+      },
+      "dependencies": {
+        "all": ["mnemocode", "mnemocode-cards", "getrandom"],
+        "cfg(unix)": ["libc"],
+        "cfg(windows)": ["windows-sys"]
+      },
+      "library": "*",
+      "order": ["os", "terminal", "args", "input", "output", "gate", "commands", "menu", "main"],
+      "ioModules": [
+        "src/os.rs",
+        "src/terminal.rs",
+        "src/input.rs",
+        "src/output.rs",
+        "src/menu.rs",
+        "src/commands/self_test.rs"
+      ]
+    },
+    "mnemocode-wasm": {
+      "unsafe": {
+        "level": "forbid"
+      },
+      "dependencies": {
+        "all": ["mnemocode", "mnemocode-cards"],
+        "cfg(target_arch = \"wasm32\")": ["wasm-bindgen", "getrandom"]
+      },
+      "dependencyNotes": "getrandom twice: =0.4.3 with wasm_js for the Random adapter, and =0.3.4 with wasm_js renamed getrandom03, only to give bc-rand's tree its browser backend; mnemocode-cards only with feature browser-cards; no js-sys.",
+      "library": "*",
+      "modules": {
+        "host": [],
+        "phrase": ["host"],
+        "wallet": ["host"],
+        "sskr": ["host"],
+        "recovery": ["host"],
+        "candidates": ["host"],
+        "qr": ["host"],
+        "cards": ["host"]
+      }
+    },
+    "sskr": {
+      "path": "vendor/sskr-0.12.0",
+      "vendored": "A workspace member as in TS (sskr-wasm/rust/Cargo.toml:47): fmt, clippy and test cover it with its own [lints] table, exempt from [lints] workspace = true; every file byte-equal to UPSTREAM.json downstreamSourceSha256.",
+      "unsafe": {
+        "level": "forbid"
+      },
+      "dependencies": {
+        "all": ["bc-rand", "bc-shamir", "thiserror", "zeroize"]
+      }
+    },
+    "bc-shamir": {
+      "path": "vendor/bc-shamir-0.13.0",
+      "vendored": "As sskr.",
+      "unsafe": {
+        "level": "forbid"
+      },
+      "dependencies": {
+        "all": ["bc-crypto", "bc-rand", "thiserror", "zeroize"]
+      }
+    },
+    "bc-crypto": {
+      "path": "shims/bc-crypto",
+      "unsafe": {
+        "level": "forbid"
+      },
+      "dependencies": {
+        "all": ["hmac", "sha2", "zeroize"]
+      },
+      "lockRule": "Cargo.lock lists bc-crypto without a registry source: an unmatched [patch.crates-io] only warns, and crates.io bc-crypto with its C libsecp256k1 would come back."
+    }
+  },
+  "refusedInTree": {
+    "about": "Refused anywhere in cargo metadata's resolve of the executable and of every WASM profile (T4, T10, T17).",
+    "crates": [
+      "hyper",
+      "reqwest",
+      "ureq",
+      "curl",
+      "isahc",
+      "tokio",
+      "mio",
+      "socket2",
+      "async-std",
+      "web-sys",
+      "js-sys",
+      "arboard",
+      "copypasta",
+      "clipboard"
+    ]
+  }
+}

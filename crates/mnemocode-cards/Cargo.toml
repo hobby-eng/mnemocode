@@ -1,0 +1,18 @@
+[package]
+name = "mnemocode-cards"
+description = "MnemoCode's cards, sheets and page images, drawn from the library's backups and shares."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+
+[dependencies]
+mnemocode.workspace = true
+
+[lints]
+workspace = true

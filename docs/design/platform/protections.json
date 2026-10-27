@@ -1,0 +1,1019 @@
+{
+  "legend": {
+    "platform": "linux | macos | windows | native (all three command-line systems) | browser",
+    "verdict": "required: answers a named requirement or a nameable cause at a reasonable cost; optional: may be added, nothing nameable breaks without it; rejected: not built, for the reason given",
+    "onRefusal": "what the program does when the system refuses or cannot read the measure back; 'refuse secrets' means every command that reads a secret stops before it asks (owner rule of 2026-10-13, CAP-CLI-SECRET-GATE)",
+    "evidence": "repository paths are relative to the workspace that holds the MnemoCode, mhfe and multi-chain-wallet-tools repositories; 'local:' is a reading on the owner's Ubuntu machine, kernel 7.0.0-38, on 2026-10-27"
+  },
+  "measures": [
+    {
+      "id": "L-CORE-LIMIT",
+      "platform": "linux",
+      "threat": "A crash (panic = abort raises SIGABRT; a fault in vendored C or a dependency) writes the process memory, secrets included, to a core file or to the store of the core_pattern handler (systemd-coredump, apport).",
+      "mechanism": "setrlimit(RLIMIT_CORE, {0, 0}) on the first line of main (RUST-09).",
+      "privileges": "none (lowering a limit)",
+      "readBack": "getrlimit(RLIMIT_CORE) gives {0, 0}; startup checks and self-test (as mhfe CoreDumpCheck).",
+      "onRefusal": "refuse secrets; the startup checks name the cause",
+      "verdict": "required",
+      "reason": "RUST-09. The kernel does not enforce RLIMIT_CORE for a pipe handler, but systemd-coredump and apport read the limit (%c) and store nothing at 0.",
+      "sources": [
+        "https://man7.org/linux/man-pages/man2/getrlimit.2.html",
+        "https://man7.org/linux/man-pages/man5/core.5.html",
+        "https://man7.org/linux/man-pages/man8/systemd-coredump.8.html",
+        "https://github.com/canonical/apport/blob/main/data/apport (write_user_coredump: limit == 0 writes nothing)",
+        "mhfe/src/bin/mhfe/protect.rs:34-49",
+        "mhfe/src/bin/mhfe/protect.rs:160-175"
+      ]
+    },
+    {
+      "id": "L-DUMPABLE",
+      "platform": "linux",
+      "threat": "Another process of the same user attaches with ptrace, reads /proc/PID/mem or calls process_vm_readv and copies the secrets; a crash dump of any kind, piped ones included (fs/coredump.c v5.15:610-611, v6.8:553-554, master :1196,1289; copies in design/skeptic/round3/).",
+      "mechanism": "prctl(PR_SET_DUMPABLE, 0) right after L-CORE-LIMIT (RUST-09).",
+      "privileges": "none",
+      "readBack": "prctl(PR_GET_DUMPABLE) gives 0, read back after the last step at start, with the other read-backs.",
+      "onRefusal": "refuse secrets (part of the core-dump protection)",
+      "verdict": "required",
+      "reason": "RUST-09. Step 4 of the ptrace access check denies a caller without CAP_SYS_PTRACE when the target is not dumpable, whatever Yama's scope; /proc/PID/mem and process_vm_readv use the attach check.",
+      "sources": [
+        "https://man7.org/linux/man-pages/man2/ptrace.2.html",
+        "https://man7.org/linux/man-pages/man2/PR_SET_DUMPABLE.2const.html",
+        "https://man7.org/linux/man-pages/man5/proc_pid_mem.5.html",
+        "https://man7.org/linux/man-pages/man2/process_vm_readv.2.html",
+        "mhfe/src/bin/mhfe/protect.rs:44-48",
+        "mhfe/src/bin/mhfe/protect.rs:182-193"
+      ]
+    },
+    {
+      "id": "L-CRASH-HANDLER",
+      "platform": "linux",
+      "threat": "With fs.suid_dumpable 2 and a pipe in core_pattern (Ubuntu with apport) the kernel still hands a non-dumpable process's memory to the handler as root; only the handler's reading of the zero limit keeps it off the disk, and a handler that ignores %c stores it.",
+      "mechanism": "Read /proc/sys/fs/suid_dumpable and /proc/sys/kernel/core_pattern at start.",
+      "privileges": "none (world-readable)",
+      "readBack": "The reading itself.",
+      "onRefusal": "not applied",
+      "verdict": "rejected",
+      "reason": "PR_GET_DUMPABLE read back as 0 makes the kernel drop every dump before core_pattern is read, piped ones included (fs/coredump.c v5.15:610-611, v6.8:553-554, master :1196,1289; copies in design/skeptic/round3/); suid_dumpable 2 acts only where a credential change resets dumpable: commit_creds does so only when ids or capabilities change (kernel/cred.c), which no step at start does (landlock_restrict_self commits credentials without changing them), and the read-back after the last step would refuse it.",
+      "sources": [
+        "https://docs.kernel.org/admin-guide/sysctl/fs.html (suid_dumpable)",
+        "https://man7.org/linux/man-pages/man5/core.5.html",
+        "local: /proc/sys/fs/suid_dumpable = 2, core_pattern = |/usr/share/apport/apport ... -c%c ...",
+        "mhfe/src/bin/mhfe/protect.rs:118-120"
+      ]
+    },
+    {
+      "id": "L-DONTDUMP-WORK",
+      "platform": "linux",
+      "threat": "A large work area in a core dump; none arises on Linux once dumpable reads 0 (L-DUMPABLE).",
+      "mechanism": "The rejected option: the zeroing global allocator page-aligns every block of 1 MiB or more and marks it MADV_DONTDUMP, reaching work areas a dependency allocates, scrypt's vec! among them.",
+      "privileges": "none",
+      "readBack": "madvise returns 0; a refusal is recorded for the memory row of the self-test.",
+      "onRefusal": "not applied",
+      "verdict": "rejected",
+      "reason": "The owner dropped this clause from RUST-13 on 2026-10-27: once dumpable reads 0 the kernel makes no dump of any kind (L-DUMPABLE); the zeroing allocator still wipes every freed block.",
+      "sources": [
+        "https://man7.org/linux/man-pages/man2/madvise.2.html",
+        "mhfe/src/engine/ffi.rs:224-237",
+        "mhfe/src/engine/ffi.rs:282-299",
+        "tmp/rust-arch/model/capabilities.json: CAP-RECOVERY-CANDIDATE-LIST-SAVE (scrypt, about 256 MiB)",
+        "tmp/rust-arch/design/architect/adr/0003-secret-memory.md"
+      ]
+    },
+    {
+      "id": "L-DONTDUMP-SECRETS",
+      "platform": "linux",
+      "threat": "A small secret reaches a dump through a core_pattern handler that ignores the zero limit (L-CRASH-HANDLER).",
+      "mechanism": "madvise(MADV_DONTDUMP) on the pages under each locked secret buffer (see L-MLOCK).",
+      "privileges": "none",
+      "readBack": "madvise returns 0.",
+      "onRefusal": "report",
+      "verdict": "rejected",
+      "reason": "No dump of any kind occurs once dumpable reads 0 (L-DUMPABLE), and a secret command runs only then.",
+      "sources": ["https://man7.org/linux/man-pages/man2/madvise.2.html"]
+    },
+    {
+      "id": "M-CORE-LIMIT",
+      "platform": "macos",
+      "threat": "A crash writes a core file with the memory, secrets included (/cores, when the limit allows).",
+      "mechanism": "setrlimit(RLIMIT_CORE, {0, 0}) on the first line of main.",
+      "privileges": "none",
+      "readBack": "getrlimit(RLIMIT_CORE) gives {0, 0}. The TypeScript program checks only setrlimit's return.",
+      "onRefusal": "refuse secrets",
+      "verdict": "required",
+      "reason": "RUST-09.",
+      "sources": [
+        "https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/getrlimit.2.html",
+        "mnemocode/src/cli/sandbox-macos.ts:99-102",
+        "mhfe/src/bin/mhfe/protect.rs:35-43"
+      ]
+    },
+    {
+      "id": "M-REPORTCRASH",
+      "platform": "macos",
+      "threat": "ReportCrash writes a crash report to ~/Library/Logs/DiagnosticReports.",
+      "mechanism": "Opting this process out of crash reports.",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "macOS offers a program no call to opt out; a report holds backtraces, thread registers and loaded images, not the heap. A register holding secret bytes at the crash is accepted.",
+      "sources": [
+        "https://developer.apple.com/documentation/xcode/examining-the-fields-in-a-crash-report"
+      ]
+    },
+    {
+      "id": "W-WER-NOHEAP",
+      "platform": "windows",
+      "threat": "Windows Error Reporting stores or sends a crash dump that holds the heap, where the secrets are; an administrator's LocalDumps setting writes full dumps.",
+      "mechanism": "WerSetFlags(WER_FAULT_REPORTING_FLAG_NOHEAP) at start; read HKLM\\SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\LocalDumps.",
+      "privileges": "none (the key is readable by users)",
+      "readBack": "WerGetFlags has the flag (as the TypeScript program); the LocalDumps key's presence and DumpType.",
+      "onRefusal": "report; secrets are not refused on Windows, which writes no dump file unless LocalDumps is set (TypeScript rule)",
+      "verdict": "required",
+      "reason": "RUST-09's 'equivalent on other systems'. One call and one registry read; whether NOHEAP also limits LocalDumps is not documented, so a set LocalDumps is reported, not assumed harmless.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/win32/api/werapi/nf-werapi-wersetflags",
+        "https://learn.microsoft.com/en-us/windows/win32/api/werapi/nf-werapi-wergetflags",
+        "https://learn.microsoft.com/en-us/windows/win32/wer/collecting-user-mode-dumps",
+        "mnemocode/src/cli/sandbox-windows.ts:95-106"
+      ]
+    },
+    {
+      "id": "L-TRACER",
+      "platform": "linux",
+      "threat": "A process started under a tracer (strace, gdb: a person debugging, or a wrapper script) keeps that tracer after PR_SET_DUMPABLE 0; strace prints every read(2), the typed phrase included.",
+      "mechanism": "Read TracerPid from /proc/self/status after L-DUMPABLE.",
+      "privileges": "none",
+      "readBack": "The reading itself.",
+      "onRefusal": "refuse secrets, naming the tracer's process id (owner, 2026-10-27)",
+      "verdict": "required",
+      "reason": "Dumpable 0 stops new attaches only. One file read. On macOS PT_DENY_ATTACH ends a traced process, so both systems would refuse a traced run.",
+      "sources": [
+        "https://man7.org/linux/man-pages/man5/proc_pid_status.5.html",
+        "https://man7.org/linux/man-pages/man2/ptrace.2.html",
+        "mnemocode-rust/crates/mnemocode-native/src/isolation/linux.rs:61-90"
+      ]
+    },
+    {
+      "id": "L-YAMA",
+      "platform": "linux",
+      "threat": "Same-user ptrace.",
+      "mechanism": "Reading or requiring kernel.yama.ptrace_scope.",
+      "privileges": "root to change",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "A system setting; L-DUMPABLE already denies a caller without CAP_SYS_PTRACE at every scope.",
+      "sources": ["https://man7.org/linux/man-pages/man2/ptrace.2.html"]
+    },
+    {
+      "id": "L-SECCOMP-EXTRA",
+      "platform": "linux",
+      "threat": "The program's own code calling ptrace, process_vm_readv or process_vm_writev, bpf, userfaultfd, pidfd_getfd, recvmsg or recvmmsg, a system call above number 471, or a terminal ioctl outside a list.",
+      "mechanism": "The extra denials and allow-lists of mnemocode-rust's filters.",
+      "privileges": "none",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "CORE-54: they guard against the program's own code. The number ceiling breaks on any new system call a new C library uses.",
+      "sources": [
+        "mnemocode-rust/crates/mnemocode-native/src/isolation/linux/seccomp.rs:11-25",
+        "mnemocode-rust/crates/mnemocode-native/src/syscall_filter.rs:18-21",
+        "mnemocode-rust/crates/mnemocode-native/src/syscall_filter/terminal_ioctls.rs:1-21"
+      ]
+    },
+    {
+      "id": "M-DENY-ATTACH",
+      "platform": "macos",
+      "threat": "A debugger of the same user attaches (lldb attaches through ptrace) and reads the memory.",
+      "mechanism": "ptrace(PT_DENY_ATTACH, 0, 0, 0) at start.",
+      "privileges": "none",
+      "readBack": "None exists; the call's return is reported as 'requested'. A process already traced exits at this call with ENOTSUP, so a traced run never reaches a secret.",
+      "onRefusal": "report",
+      "verdict": "required",
+      "reason": "The macOS counterpart of L-DUMPABLE; one call; existing in the TypeScript program.",
+      "sources": [
+        "https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/ptrace.2.html",
+        "mnemocode/src/cli/sandbox-macos.ts:103-106"
+      ]
+    },
+    {
+      "id": "M-HARDENED-RUNTIME",
+      "platform": "macos",
+      "threat": "A same-user program reads the memory through task_for_pid, which PT_DENY_ATTACH does not stop, or a launcher injects a library with DYLD_INSERT_LIBRARIES.",
+      "mechanism": "Sign the release with the hardened runtime (codesign --options runtime, ad hoc allowed) and without com.apple.security.get-task-allow.",
+      "privileges": "release build only",
+      "readBack": "Release verification: codesign --display --verbose shows flags with 'runtime'.",
+      "onRefusal": "the release gate fails",
+      "verdict": "optional",
+      "reason": "One signing flag, but both causes need code of the same user already running. The TypeScript build signs ad hoc without it.",
+      "sources": [
+        "https://developer.apple.com/documentation/security/hardened-runtime",
+        "https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.get-task-allow",
+        "mnemocode/scripts/build-executable.mjs:163"
+      ]
+    },
+    {
+      "id": "W-MEMORY-READERS",
+      "platform": "windows",
+      "threat": "A process of the same user opens this one with PROCESS_VM_READ (ReadProcessMemory, MiniDumpWriteDump).",
+      "mechanism": "A denying DACL on the own process object (SetSecurityInfo); a protected process (PPL).",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "The owner of the process object keeps WRITE_DAC and can restore the DACL, so a same-user reader is stopped only if it does not try; PPL needs a Microsoft-signed binary. The report states that Windows lets programs of this user read the memory.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights",
+        "https://learn.microsoft.com/en-us/windows/win32/api/minidumpapiset/nf-minidumpapiset-minidumpwritedump"
+      ]
+    },
+    {
+      "id": "W-DLL-SEARCH",
+      "platform": "windows",
+      "threat": "A DLL planted beside the executable (a browser's download folder, where a person runs it) loads into the process and reads the phrase: Microsoft's DLL planting. It needs no code execution, only an earlier download.",
+      "mechanism": "The GNU target, as mhfe (owner, 2026-10-27): SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32) first in main for later loads, and a release gate that every import of the executable is in the stored KnownDLL list or an API set. The list (scripts/knowndlls.json) names the KnownDLLs the executable relies on, each confirmed in the \\KnownDlls object directory of the CI's Windows runners, windows-2022 and windows-2025 (GitHub hosts no client Windows 10 or 11). mhfe's GNU build imports kernel32, ntdll, msvcrt, WS2_32, bcryptprimitives (std's ProcessPrng) and one API set; CI reads the list on every Windows runner (scripts/read-knowndlls.ps1) and checks the executable's imports against it (scripts/verify-windows-imports.mjs); an import outside the list brings the target back to the owner. /DEPENDENTLOADFLAG:0x800 (LOAD_LIBRARY_SEARCH_SYSTEM32 for static imports) is set by link.exe and lld-link, and rust-lld's MinGW driver accepts it as --dependent-load-flag, which acts only when the CRT provides _load_config_used. Increment 0's probe (2026-10-27): the MinGW-w64 libraries of the pinned Ubuntu noble toolchain (gcc-mingw-w64 13.2.0, mingw-w64 11) define no _load_config_used, so the flag would have no effect and the gate stands alone; an empty executable built so imports KERNEL32, msvcrt, ntdll and api-ms-win-core-synch-l1-2-0, each in the stored list or an API set.",
+      "privileges": "none",
+      "readBack": "Release gate: the import list against the stored KnownDLL list, and DependentLoadFlags where the flag is set; at start, SetDefaultDllDirectories returns nonzero.",
+      "onRefusal": "the release gate fails; a refused call is reported",
+      "verdict": "required",
+      "reason": "A release gate and one call against a documented attack that needs no code of the attacker to run first.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/cpp/build/reference/dependentloadflag",
+        "https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-security",
+        "https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-setdefaultdlldirectories",
+        "mhfe/scripts/package-release.sh:35",
+        "tmp/claude/aud023/probes/build-supply-chain/v060/win/mhfe.exe (objdump -p: DLL names)",
+        "local: rust-lld 22.1.8 `-flavor gnu -m i386pep --help` lists --dependent-load-flag"
+      ]
+    },
+    {
+      "id": "W-MITIGATIONS",
+      "platform": "windows",
+      "threat": "Code put into the process through legacy extension points (AppInit DLLs, global hooks) or images from network shares or of low integrity.",
+      "mechanism": "SetProcessMitigationPolicy: ExtensionPointDisable, ImageLoad NoRemoteImages and NoLowMandatoryLabelImages.",
+      "privileges": "none",
+      "readBack": "GetProcessMitigationPolicy (as the TypeScript program).",
+      "onRefusal": "report",
+      "verdict": "optional",
+      "reason": "AppInit DLLs need an administrator and are off under Secure Boot; global hooks reach only programs that load user32, which this one does not; network shares do not exist offline. Kept optional for CAP-CLI-WINDOWS-MITIGATIONS.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setprocessmitigationpolicy",
+        "mnemocode/src/cli/sandbox-windows.ts:107-118",
+        "mnemocode/src/cli/sandbox-windows.ts:143-156"
+      ]
+    },
+    {
+      "id": "L-MLOCK",
+      "platform": "linux",
+      "threat": "The kernel writes a secret's page to swap, where it outlasts the program by years.",
+      "mechanism": "A secret buffer reserved at its final size is locked with mlock before it is filled, with locks counted per page (mhfe memory.rs:231-349), so small secrets share pages within the budget, RLIMIT_MEMLOCK; on drop it is zeroized, then its pages' counts drop and a page is unlocked at 0. An owner over the budget is not locked (ADR 0003).",
+      "privileges": "none up to RLIMIT_MEMLOCK (8 MiB since Linux 5.16; 64 KiB before)",
+      "readBack": "mlock returns 0, which guarantees the pages resident; the startup check locks one typed-line buffer (as mhfe LockProbe) and its warning names the limit.",
+      "onRefusal": "warn once that secrets may reach swap, naming an owner over the budget, and go on",
+      "verdict": "required",
+      "reason": "RUST-13. Locks do not stack: one munlock unlocks a page for every buffer on it, hence the count. The kernel's own answer to mlock makes mnemocode-rust's /proc/self/smaps parsing unnecessary.",
+      "sources": [
+        "https://man7.org/linux/man-pages/man2/mlock.2.html (memory locks do not stack)",
+        "https://github.com/torvalds/linux/blob/master/include/uapi/linux/resource.h (MLOCK_LIMIT 8 MiB)",
+        "local: ulimit -l = 8192",
+        "mhfe/src/memory.rs:176-226",
+        "mhfe/src/memory.rs:231-349",
+        "tmp/rust-arch/design/architect/adr/0003-secret-memory.md",
+        "mnemocode-rust/crates/mnemocode-native/src/memory/linux/maps.rs"
+      ]
+    },
+    {
+      "id": "M-MLOCK",
+      "platform": "macos",
+      "threat": "A secret's page in swap.",
+      "mechanism": "mlock as in L-MLOCK (the same cfg(unix) code).",
+      "privileges": "none up to the limits",
+      "readBack": "mlock returns 0.",
+      "onRefusal": "warn once, go on",
+      "verdict": "optional",
+      "reason": "macOS always encrypts swap (M-SWAP), so nothing nameable leaks without it; kept because it is the Linux code.",
+      "sources": [
+        "https://support.apple.com/guide/mac-help/mh11852/mac",
+        "mhfe/src/engine/ffi.rs:321-327"
+      ]
+    },
+    {
+      "id": "W-VIRTUALLOCK",
+      "platform": "windows",
+      "threat": "A secret's page in the page file, which Windows encrypts only under BitLocker or EncryptPagingFile, neither readable without an administrator.",
+      "mechanism": "As L-MLOCK, with VirtualLock: a secret buffer reserved at its final size is locked before it is filled, with locks counted per page, so small secrets share pages within the budget; an owner over the budget is not locked (ADR 0003). At start the minimum and maximum working set are raised (SetProcessWorkingSetSize) by the lock budget, one named value (8 MiB, Linux's default limit), since a process can lock only its minimum working set (default 50 pages) less an overhead.",
+      "privileges": "SE_INC_WORKING_SET_NAME to raise the working set, which all users generally have",
+      "readBack": "VirtualLock returns nonzero (locked pages are guaranteed out of the page file); the startup check as on Linux.",
+      "onRefusal": "warn once, go on",
+      "verdict": "required",
+      "reason": "RUST-13. mhfe and the TypeScript program lock nothing on Windows.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtuallock",
+        "https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-setprocessworkingsetsizeex",
+        "mhfe/src/memory.rs:1-6",
+        "tmp/rust-arch/design/architect/adr/0003-secret-memory.md"
+      ]
+    },
+    {
+      "id": "L-MEMLOCK-SOFT",
+      "platform": "linux",
+      "threat": "A soft RLIMIT_MEMLOCK below the hard one refuses locks the hard limit would allow.",
+      "mechanism": "setrlimit(RLIMIT_MEMLOCK) with the soft limit raised to the hard limit at start.",
+      "privileges": "none (up to the hard limit)",
+      "readBack": "getrlimit.",
+      "onRefusal": "nothing; L-MLOCK warns",
+      "verdict": "optional",
+      "reason": "One call; helps only where a system sets the two apart (systemd sets both to 8 MiB).",
+      "sources": ["https://man7.org/linux/man-pages/man2/getrlimit.2.html"]
+    },
+    {
+      "id": "L-MLOCKALL",
+      "platform": "linux",
+      "threat": "Any page in swap.",
+      "mechanism": "mlockall(MCL_CURRENT | MCL_FUTURE).",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "It would lock the scrypt area and every buffer; past RLIMIT_MEMLOCK later allocations fail, so the program would stop where per-secret locks only warn.",
+      "sources": ["https://man7.org/linux/man-pages/man2/mlock.2.html"]
+    },
+    {
+      "id": "L-MEMFD-SECRET",
+      "platform": "linux",
+      "threat": "Secret pages readable through the kernel's direct map; a hibernation image of a run.",
+      "mechanism": "memfd_secret(2) for the secret pages instead of mlock.",
+      "privileges": "none; Linux 5.14+, off by default before 6.5; counts against RLIMIT_MEMLOCK",
+      "readBack": "the call returns a descriptor",
+      "onRefusal": "fall back to L-MLOCK",
+      "verdict": "optional",
+      "reason": "A kernel reader is outside a trusted computer; swap is answered by mlock and the hibernation image by L-SWAP-CHECK. It is the one Linux call that inhibits hibernation for a whole run, at the cost of a second allocation path.",
+      "sources": ["https://man7.org/linux/man-pages/man2/memfd_secret.2.html"]
+    },
+    {
+      "id": "L-WIPEONFORK",
+      "platform": "linux",
+      "threat": "A forked child keeps a copy of the secret pages.",
+      "mechanism": "madvise(MADV_WIPEONFORK).",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "The program forks no child that keeps running its memory; a started program executes another image, which replaces the memory.",
+      "sources": [
+        "mnemocode-rust/crates/mnemocode-native/src/memory/linux/sys.rs:122-123",
+        "https://man7.org/linux/man-pages/man2/madvise.2.html"
+      ]
+    },
+    {
+      "id": "N-GUARD-PAGES",
+      "platform": "native",
+      "threat": "An out-of-bounds access next to a secret.",
+      "mechanism": "PROT_NONE guard pages around each secret mapping.",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "CORE-54: it guards against the program's own code, which safe Rust bounds-checks.",
+      "sources": ["mnemocode-rust/crates/mnemocode-native/src/memory/linux/sys.rs:28"]
+    },
+    {
+      "id": "L-SWAP-CHECK",
+      "platform": "linux",
+      "threat": "Swap or a hibernation image on an unencrypted device keeps memory that could not be locked (the scrypt area, card rasters, refused locks) on the disk.",
+      "mechanism": "Read /proc/swaps and trace each area to its block device: encrypted when dm-crypt (dm/uuid starts with CRYPT-) directly or below LVM or RAID; zram counts as memory only when /sys/block/zramN/backing_dev is 'none'; zswap writes back to the swap device listed, which is checked as listed. The warning also names hibernation, whose image goes to a swap area. Shown before the first secret.",
+      "privileges": "none",
+      "readBack": "The reading; an unreadable or unexpected table gives 'cannot tell', never 'no swap' (AUD-014-SEC002).",
+      "onRefusal": "warn, go on",
+      "verdict": "required",
+      "reason": "RUST-13. mhfe and the TypeScript program take every zram device as safe, but zram with writeback moves pages to its backing device.",
+      "sources": [
+        "https://docs.kernel.org/admin-guide/blockdev/zram.html (writeback, backing_dev)",
+        "https://docs.kernel.org/admin-guide/mm/zswap.html",
+        "https://docs.kernel.org/power/swsusp.html",
+        "https://man7.org/linux/man-pages/man2/mlock.2.html (suspend saves RAM to disk)",
+        "mhfe/src/bin/mhfe/protect.rs:829-931",
+        "mhfe/src/bin/mhfe/settings.rs:137"
+      ]
+    },
+    {
+      "id": "M-SWAP",
+      "platform": "macos",
+      "threat": "Unencrypted swap.",
+      "mechanism": "A swap check.",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "macOS always encrypts what it pages out (secure virtual memory); the report says so without a check.",
+      "sources": ["https://support.apple.com/guide/mac-help/mh11852/mac"]
+    },
+    {
+      "id": "W-PAGEFILE",
+      "platform": "windows",
+      "threat": "An unencrypted page file or hibernation file.",
+      "mechanism": "Detecting BitLocker on the system volume or EncryptPagingFile.",
+      "privileges": "administrator",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "Both readings need an administrator; a partial answer would mislead. The report says Windows cannot tell and advises BitLocker.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/fsutil-behavior",
+        "https://learn.microsoft.com/en-us/windows/win32/secprov/win32-encryptablevolume"
+      ]
+    },
+    {
+      "id": "N-SLEEP-INHIBIT",
+      "platform": "native",
+      "threat": "The computer hibernates during a secret command and writes all memory, locked pages included, to disk.",
+      "mechanism": "SetThreadExecutionState (Windows), IOPMAssertionCreateWithName (macOS), a logind Inhibit lock (Linux).",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "They stop idle sleep only, not a closed lid or a power button; logind is reached over a D-Bus socket, which seccomp refuses. Linux's image device is covered by L-SWAP-CHECK; on Windows the hibernation file falls under W-PAGEFILE's report.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadexecutionstate",
+        "https://www.freedesktop.org/wiki/Software/systemd/inhibit/"
+      ]
+    },
+    {
+      "id": "N-MEMORY-PRECHECK",
+      "platform": "native",
+      "threat": "A large work area started without enough free memory makes the system swap, this process's unlocked pages among others.",
+      "mechanism": "Before a work area over a stated size (the scrypt area), compare it with available memory: Linux MemAvailable and the cgroup's limit, macOS host_statistics64 free and inactive pages, Windows GlobalMemoryStatusEx.",
+      "privileges": "none",
+      "readBack": "The reading.",
+      "onRefusal": "refuse the operation, naming both sizes; when the system does not say, go on and say so",
+      "verdict": "required",
+      "reason": "Answers owner requirement 2 (memory limits) for the one large area; the code exists in mhfe.",
+      "sources": [
+        "mhfe/src/engine/native.rs:45-48",
+        "mhfe/src/engine/ffi.rs:387-491",
+        "mhfe/src/engine/cgroup.rs:1-40"
+      ]
+    },
+    {
+      "id": "L-RLIMIT-DATA",
+      "platform": "linux",
+      "threat": "Runaway allocation (a decoder, a search or a dependency past its bounds) grows the process until the system swaps; the cap ends the process first, and the abort writes no core.",
+      "mechanism": "setrlimit(RLIMIT_DATA, {cap, cap}) at start; the cap is one named value: the measured peak of the heaviest operation (an age-encrypted candidate list at its largest: about 0.6 GiB from the list's owner, scrypt's 256 MiB area at log N 18 and the encrypted copy; the largest card export) plus a quarter, rounded up to a multiple of 64 MiB (about 0.7 GiB if the list is the heaviest); a test runs that operation under it (owner, 2026-10-27).",
+      "privileges": "none (lowering)",
+      "readBack": "getrlimit(RLIMIT_DATA).",
+      "onRefusal": "report; an existing lower hard limit is kept",
+      "verdict": "required",
+      "reason": "Owner requirement 2 names memory limits. Since Linux 4.7 the limit covers mmap, so it holds for every private writable mapping.",
+      "sources": ["https://man7.org/linux/man-pages/man2/getrlimit.2.html"]
+    },
+    {
+      "id": "L-RLIMIT-AS",
+      "platform": "linux",
+      "threat": "As L-RLIMIT-DATA.",
+      "mechanism": "setrlimit(RLIMIT_AS).",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "It counts reserved address space (thread stacks, allocator arenas), so a sound cap fails on reservations that use no memory.",
+      "sources": ["https://man7.org/linux/man-pages/man2/getrlimit.2.html"]
+    },
+    {
+      "id": "W-JOB-MEMORY",
+      "platform": "windows",
+      "threat": "As L-RLIMIT-DATA.",
+      "mechanism": "A job object with JOB_OBJECT_LIMIT_PROCESS_MEMORY (ProcessMemoryLimit = the cap), the process assigned to it; nested jobs work since Windows 8.",
+      "privileges": "none",
+      "readBack": "IsProcessInJob and QueryInformationJobObject (as the TypeScript program reads its job).",
+      "onRefusal": "report",
+      "verdict": "required",
+      "reason": "Owner requirement 2; the job object the TypeScript program already creates, with this limit instead of ActiveProcessLimit.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_extended_limit_information",
+        "https://learn.microsoft.com/en-us/windows/win32/procthread/nested-jobs",
+        "mnemocode/src/cli/sandbox-windows.ts:158-190"
+      ]
+    },
+    {
+      "id": "M-MEMORY-LIMIT",
+      "platform": "macos",
+      "threat": "As L-RLIMIT-DATA.",
+      "mechanism": "setrlimit(RLIMIT_DATA or RLIMIT_AS).",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "macOS does not reliably enforce these limits, and on arm64 refuses RLIMIT_DATA below about 389 GiB.",
+      "sources": ["https://developer.apple.com/forums/thread/702803"]
+    },
+    {
+      "id": "N-FRESH-PROCESS",
+      "platform": "native",
+      "threat": "Protections a command needs cannot be applied in a thread of the menu: Landlock before ABI 8 binds only the calling thread, and no_new_privs, the seccomp filter, the Landlock domain, the Seatbelt profile and the job bind the process for good, so a menu that ran a command in a thread would stay bound by it.",
+      "mechanism": "Every secret command runs in a fresh process of the same executable (the menu starts it, as the TypeScript program does) and applies its protections before its first thread; a test proves the order, as mhfe's G10.",
+      "privileges": "none",
+      "readBack": "The child's startup checks.",
+      "onRefusal": "the menu reports that the command could not start (CAP-CLI-MENU-COMMAND-PROCESS)",
+      "verdict": "required",
+      "reason": "One spawn; the menu handles no secret.",
+      "sources": [
+        "mhfe/src/bin/mhfe/main.rs:224-236",
+        "mhfe/src/bin/mhfe/protect.rs:1472-1515",
+        "tmp/rust-arch/model/capabilities.json: CAP-CLI-MENU-COMMAND-PROCESS"
+      ]
+    },
+    {
+      "id": "L-NO-NEW-PRIVS",
+      "platform": "linux",
+      "threat": "A started program gains privileges (set-user-ID); seccomp and Landlock need it for an unprivileged process.",
+      "mechanism": "prctl(PR_SET_NO_NEW_PRIVS, 1).",
+      "privileges": "none",
+      "readBack": "prctl(PR_GET_NO_NEW_PRIVS) gives 1.",
+      "onRefusal": "report; seccomp and Landlock are then not attempted",
+      "verdict": "required",
+      "reason": "Prerequisite of L-SECCOMP-SOCKETS and L-LANDLOCK-WRITES.",
+      "sources": [
+        "https://docs.kernel.org/userspace-api/no_new_privs.html",
+        "mhfe/src/bin/mhfe/protect.rs:583-588"
+      ]
+    },
+    {
+      "id": "L-SECCOMP-SOCKETS",
+      "platform": "linux",
+      "threat": "The program's or a dependency's code opens a socket and sends a secret (RUST-10); io_uring creates sockets without the socket call (IORING_OP_SOCKET, AUD-008-SEC001).",
+      "mechanism": "seccomp(SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_TSYNC, filter) refusing with EACCES: other architectures (AUDIT_ARCH of x86-64 or aarch64), x32 calls, socket, socketpair, io_uring_setup, io_uring_enter, io_uring_register.",
+      "privileges": "none with no_new_privs",
+      "readBack": "Probes in the calling thread: a UDP socket and an io_uring_setup both fail with EACCES; /proc/self/status shows Seccomp 2.",
+      "onRefusal": "report (missing sandbox parts never refuse: owner, 2026-10-13)",
+      "verdict": "required",
+      "reason": "RUST-10. TSYNC costs nothing and covers a thread a dependency started early, which a per-thread filter would miss.",
+      "sources": [
+        "https://man7.org/linux/man-pages/man2/seccomp.2.html",
+        "https://man7.org/linux/man-pages/man2/io_uring_enter.2.html",
+        "mhfe/src/bin/mhfe/protect.rs:620-713",
+        "mhfe/src/bin/mhfe/protect.rs:382-390",
+        "mnemocode/src/cli/sandbox-linux.ts:110-141"
+      ]
+    },
+    {
+      "id": "L-SECCOMP-EXEC",
+      "platform": "linux",
+      "threat": "A started program sends or writes what the process may not.",
+      "mechanism": "Refusing execve and execveat.",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "With no_new_privs the seccomp filter and the Landlock domain pass to the started program, which gains nothing the process lacks. Dropped from the port (owner, 2026-10-27; TS 0.1.0 has it).",
+      "sources": [
+        "https://man7.org/linux/man-pages/man2/seccomp.2.html",
+        "https://docs.kernel.org/userspace-api/landlock.html",
+        "mnemocode/src/cli/sandbox-linux.ts:116-121"
+      ]
+    },
+    {
+      "id": "L-LANDLOCK-WRITES",
+      "platform": "linux",
+      "threat": "A bug or a dependency writes a secret to a file other than the outputs asked for (RUST-10).",
+      "mechanism": "A ruleset that handles every file-changing right of the kernel's ABI (ABI 1: WRITE_FILE, REMOVE_DIR, REMOVE_FILE, MAKE_CHAR, MAKE_DIR, MAKE_REG, MAKE_SOCK, MAKE_FIFO, MAKE_BLOCK, MAKE_SYM; ABI 2: REFER; ABI 3: TRUNCATE). A command's outputs get a path-beneath rule on the parent folder of each output, the folder the preflight checks (links resolved), opened before the secret: for a file output its parent, which must exist; for a new folder output its parent, which the preflight makes, with any missing folders above it, before the secret (owner, 2026-10-27; TS makes them at publication), so that staging beside the destination and the final mkdir work as TS. The folders made stay after a cancel: a Landlocked process cannot remove the folder its rule sits on, since REMOVE_DIR covers a ruled folder's content only. The rule grants what the private-file publication needs (MAKE_REG, MAKE_DIR, WRITE_FILE, REMOVE_FILE, REMOVE_DIR, REFER, TRUNCATE). It applies on the private screen too: re-encode asks its new backup's outputs before the old phrase, and the save retry keeps to the ruled folders (owner, 2026-10-27). landlock_restrict_self before the first thread, with LANDLOCK_RESTRICT_SELF_TSYNC from ABI 8. On ABI 1, which always denies REFER, a command that saves gets no Landlock, since its staging folder is published across folders.",
+      "privileges": "none with no_new_privs; Linux 5.13+ with Landlock enabled",
+      "readBack": "Probe: opening /dev/null for writing fails with EACCES.",
+      "onRefusal": "report",
+      "verdict": "required",
+      "reason": "RUST-10. The TypeScript program passes the ABI 8 TSYNC flag on every kernel, which earlier ABIs refuse with EINVAL, so it applies no Landlock before ABI 8 (this machine reports ABI 8).",
+      "sources": [
+        "https://docs.kernel.org/userspace-api/landlock.html",
+        "https://man7.org/linux/man-pages/man2/landlock_restrict_self.2.html",
+        "local: landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION) = 8",
+        "mhfe/src/bin/mhfe/protect.rs:715-815",
+        "mnemocode/src/cli/sandbox-linux.ts:152",
+        "mnemocode/src/cli/sandbox-linux.ts:320-340",
+        "mnemocode-rust/crates/mnemocode-native/src/output_policy/linux/sys.rs:114-170",
+        "mnemocode/src/export/private-file.ts:271",
+        "mnemocode/src/cli/output-paths.ts:164-183",
+        "mnemocode/src/cli/output-paths.ts:200-217",
+        "mnemocode/src/cli/output-paths.ts:258-295"
+      ]
+    },
+    {
+      "id": "L-LANDLOCK-NET",
+      "platform": "linux",
+      "threat": "connect or bind on a socket inherited from the starting program, which seccomp does not cover (it refuses only new sockets).",
+      "mechanism": "handled_access_net with TCP bind and connect (ABI 4) and UDP bind and connect-send (ABI 10), no rule granting them.",
+      "privileges": "none",
+      "readBack": "None without a socket; reported with L-LANDLOCK-WRITES.",
+      "onRefusal": "report",
+      "verdict": "optional",
+      "reason": "One field, but an inherited socket comes from the program that started this one, which a trusted offline computer trusts.",
+      "sources": [
+        "https://docs.kernel.org/userspace-api/landlock.html",
+        "mhfe/src/bin/mhfe/protect.rs:746-787"
+      ]
+    },
+    {
+      "id": "L-LANDLOCK-SCOPES",
+      "platform": "linux",
+      "threat": "Connecting to an abstract Unix socket or signalling a process outside the domain.",
+      "mechanism": "LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET and LANDLOCK_SCOPE_SIGNAL (ABI 6).",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "An abstract socket needs a new socket, which seccomp refuses; signals to other processes do not expose this one's secrets.",
+      "sources": ["https://docs.kernel.org/userspace-api/landlock.html"]
+    },
+    {
+      "id": "L-NETNS",
+      "platform": "linux",
+      "threat": "Network access by a path the socket filter misses.",
+      "mechanism": "unshare(CLONE_NEWUSER | CLONE_NEWNET) in the fresh single-threaded process, for every secret command, writing ones included: files are created, linked and renamed with the person's own owner, since creation checks the caller's kernel user id, which the file system maps. Inside the namespace stat shows the overflow id 65534 for every owner, so no read-back compares owners (the publication compares device and inode only, as TS).",
+      "privileges": "unprivileged user namespaces. Ubuntu's AppArmor restriction lets an unconfined program create them and denies capabilities inside, which an empty network does not need; a system may switch them off (user.max_user_namespaces 0).",
+      "readBack": "/proc/self/net/dev lists only lo and /proc/self/net/route holds no route (mhfe).",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "Dropped, with its clause in RUST-10 (owner, 2026-10-27). Where the socket filter holds (x86-64 and aarch64, the release targets) it closes no further path, since sockets made earlier keep their namespace. mhfe leaves it out for commands that write, on the premise that an unmapped owner cannot create files (protect.rs:588-590), which the local probe refutes. mnemocode-rust's unshare(CLONE_NEWNET) alone needs CAP_SYS_ADMIN and never succeeds for a normal user.",
+      "sources": [
+        "https://man7.org/linux/man-pages/man2/unshare.2.html",
+        "https://man7.org/linux/man-pages/man7/user_namespaces.7.html",
+        "https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces",
+        "https://www.qualys.com/2025/three-bypasses-of-Ubuntu-unprivileged-user-namespace-restrictions.txt (unconfined: unshare -U -r -m fails only at the later uid_map write)",
+        "local: /etc/apparmor.d/unprivileged_userns (audit deny capability; allow file rwlkm /{,**})",
+        "local: /proc/sys/kernel/apparmor_restrict_unprivileged_userns = 1",
+        "tmp/rust-arch/design/platform/probe-netns/README.txt (create, mkdir, link, rename succeed; 1000:1000 on disk, 65534 inside; run under the claude-desktop profile, which grants userns)",
+        "tmp/rust-arch/design/skeptic/round2/probe-ga/README.txt",
+        "mnemocode/src/export/temporary-folders.ts:17-21",
+        "mhfe/src/bin/mhfe/protect.rs:588-591",
+        "mhfe/src/bin/mhfe/protect.rs:599-613",
+        "mhfe/src/bin/mhfe/protect.rs:402-424",
+        "mnemocode-rust/crates/mnemocode-native/src/isolation/linux.rs:19-52"
+      ]
+    },
+    {
+      "id": "L-INHERITED-FDS",
+      "platform": "linux",
+      "threat": "Sockets or devices inherited from the starting program.",
+      "mechanism": "Refusing to run with such descriptors open.",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "The descriptors come from the program that started this one; a trusted offline computer is the stated requirement.",
+      "sources": [
+        "mnemocode-rust/crates/mnemocode-native/src/isolation/linux.rs:143-162",
+        "mhfe/src/bin/mhfe/protect.rs:8-10"
+      ]
+    },
+    {
+      "id": "M-SEATBELT-NETWORK",
+      "platform": "macos",
+      "threat": "The program's or a dependency's code reaches the network with a secret (RUST-10).",
+      "mechanism": "sandbox_init(\"(version 1)(allow default)(deny network*)\", 0, &error) once the command's needs are known.",
+      "privileges": "none",
+      "readBack": "Probe: a UDP connect to 127.0.0.1:9 is refused with EPERM or EACCES (as the TypeScript program).",
+      "onRefusal": "report",
+      "verdict": "required",
+      "reason": "RUST-10; the only network block macOS gives an unprivileged program. sandbox_init is deprecated and Apple does not support custom profiles; the macOS 27 SDK manual says processes that use its named profiles are killed, so each new macOS is checked before a release.",
+      "sources": [
+        "https://leancrew.com/all-this/man/man3/sandbox_init.html",
+        "https://lists.mindrot.org/pipermail/openssh-unix-dev/2026-August/042690.html",
+        "mnemocode/src/cli/sandbox-macos.ts:73-80",
+        "mnemocode/src/cli/sandbox-macos.ts:109-166"
+      ]
+    },
+    {
+      "id": "M-SEATBELT-EXEC",
+      "platform": "macos",
+      "threat": "A started program reaches the network.",
+      "mechanism": "(deny process-exec*).",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "New processes inherit their parent's sandbox. Dropped from the port (owner, 2026-10-27; TS 0.1.0 has it).",
+      "sources": [
+        "https://leancrew.com/all-this/man/man7/sandbox.html",
+        "mnemocode/src/cli/sandbox-macos.ts:78"
+      ]
+    },
+    {
+      "id": "M-SEATBELT-WRITES",
+      "platform": "macos",
+      "threat": "A secret written to a file other than the outputs.",
+      "mechanism": "(deny file-write*) with allows for /dev (the terminal) and the output folders.",
+      "privileges": "none",
+      "readBack": "Probe: opening a file for writing outside the outputs is refused.",
+      "onRefusal": "report",
+      "verdict": "optional",
+      "reason": "RUST-10 asks write restriction on Linux only; the TypeScript program left it out because such a profile may refuse terminal output, which was never tested.",
+      "sources": ["mnemocode/src/cli/sandbox-macos.ts:8-11"]
+    },
+    {
+      "id": "W-NETWORK-SANDBOX",
+      "platform": "windows",
+      "threat": "The program's or a dependency's code reaches the network or writes files with a secret (RUST-10).",
+      "mechanism": "An AppContainer child without the internetClient capability; a restricted token; Windows Filtering Platform rules.",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "An AppContainer needs a broker process, a persistent profile (CreateAppContainerProfile) and brokered file access, since the container cannot open the person's files; a restricted token does not remove socket access; filtering rules need an administrator. The report says Windows gives no network or file-write restriction; RUST-10 names this exemption.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/win32/secauthz/appcontainer-isolation",
+        "https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer",
+        "mnemocode/src/cli/sandbox-windows.ts:12-15"
+      ]
+    },
+    {
+      "id": "W-JOB-NO-CHILDREN",
+      "platform": "windows",
+      "threat": "A started program reaches the network.",
+      "mechanism": "A job object with ActiveProcessLimit 1.",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "The process itself keeps the network and file access a child would have, so a child gains nothing. Dropped from the port (owner, 2026-10-27; TS 0.1.0 has it).",
+      "sources": ["mnemocode/src/cli/sandbox-windows.ts:158-190"]
+    },
+    {
+      "id": "N-NO-ECHO",
+      "platform": "native",
+      "threat": "A typed secret is echoed to the main screen and its scrollback, or the terminal's line mode acts on its keys.",
+      "mechanism": "Raw input: termios ECHO, ICANON and IEXTEN off (Unix); ENABLE_ECHO_INPUT and ENABLE_LINE_INPUT off (Windows); the program draws what is typed itself, on the private screen only.",
+      "privileges": "none",
+      "readBack": "tcgetattr or GetConsoleMode after the change (mhfe).",
+      "onRefusal": "refuse to ask that secret at the terminal; a file or standard input remain",
+      "verdict": "required",
+      "reason": "Existing behaviour (CAP-CLI-RAW-LINE-EDITOR, CAP-CLI-SECRET-PROMPT).",
+      "sources": [
+        "mhfe/src/bin/mhfe/hidden_input.rs:656-691",
+        "mhfe/src/bin/mhfe/hidden_input.rs:794-808",
+        "https://learn.microsoft.com/en-us/windows/console/high-level-console-modes"
+      ]
+    },
+    {
+      "id": "N-PRIVATE-SCREEN",
+      "platform": "native",
+      "threat": "Secrets left in the terminal's scrollback after the command.",
+      "mechanism": "The alternate screen (ESC[?1049h and clear; on leaving, clear then ESC[?1049l), only when standard input and standard error are terminals and TERM is not dumb, as TS terminalAvailable.",
+      "privileges": "none",
+      "readBack": "None reliable: DECRQM for mode 1049 is answered by some terminals only. Leaving clears first, so a terminal without an alternate screen keeps nothing visible.",
+      "onRefusal": "without such a terminal, a command whose result is secret refuses before any secret when standard output is a terminal (owner, 2026-10-27; mhfe AUD-007-SEC001), and writes the result as TS 0.1.0 when standard output is a file or a pipe; --ask-secrets is refused there (CAP-CLI-SECRET-PROMPT).",
+      "verdict": "required",
+      "reason": "Existing behaviour (CAP-CLI-PRIVATE-SCREEN).",
+      "sources": [
+        "mhfe/src/bin/mhfe/terminal.rs:514-606",
+        "mhfe/src/bin/mhfe/terminal.rs:608-624",
+        "mnemocode/src/cli/private-screen.ts:31-140",
+        "mnemocode/src/cli/private-screen.ts:116",
+        "mnemocode/src/cli/terminal-input.ts:101-110"
+      ]
+    },
+    {
+      "id": "N-SIGNALS",
+      "platform": "native",
+      "threat": "Ctrl+Z, Ctrl+\\, a closed terminal or a kill leaves a secret on the screen (AUD-015-SEC004), or a staging folder that may hold a secret export (CAP-CLI-TEMPORARY-FOLDERS).",
+      "mechanism": "Unix, own sigaction handlers over libc, installed without SA_RESTART; threads the program starts block these signals, so they reach the main thread. SIGINT, SIGTERM, SIGHUP and SIGQUIT only set a flag. The main thread, woken by EINTR from its terminal read (the reader checks the flag on EINTR instead of retrying, as std's read_exact would) or seeing the flag between search steps and after each library call, restores the terminal, leaves the private screen, removes the staging folders and the output folders being filled, names any it could not remove (CAP-CLI-TEMPORARY-FOLDERS), and exits with 128 + the signal's number: 130 and 'Cancelled.' for SIGINT, as TS; SIGQUIT is taken as SIGINT (mhfe). The handler does not restore the terminal itself: the main thread could then finish a secret line it was drawing, on the main screen; TS's SIGINT listener also runs only between turns of its event loop. SIGTSTP stops instead: its handler restores the terminal settings, clears and leaves the private screen, sets SIG_DFL, raises SIGTSTP and unblocks it, so the process stops with every thread; on continue it sets itself again, takes raw mode and the private screen again and sets a redraw flag, on which the current step or progress line draws itself again (a job continued with bg stops on SIGTTOU at the raw-mode step until fg, as TS). The handlers call only an atomic store, tcsetattr, write, sigaction, pthread_sigmask and raise, all async-signal-safe, and read terminal settings saved before they are installed. Ctrl+Z read as a key during a search sends SIGTSTP to the process group (CAP-CLI-LONG-SEARCH-CONTROL) and takes the same path. Windows: the console control handler, which runs in a thread of its own, sets the same flag; for CTRL_CLOSE_EVENT, after which the system ends the process when the handler returns or after 5 s, it waits within that time for the main thread's cleanup. Ctrl+Z is dropped, as TS (no job control).",
+      "privileges": "none",
+      "readBack": "sigaction reads every handler back (mhfe).",
+      "onRefusal": "report",
+      "verdict": "required",
+      "reason": "TS handles SIGINT (cleanup, 130), and suspends a search at Ctrl+Z with the private screen still shown; SIGTERM and SIGHUP end it without cleanup (CAP-CLI-INTERRUPTION notes: a port may add them), and its relaunch parent reports a child ended by a signal as 128 + its number. Removing folders walks directories and allocates, which a signal handler may not do (signal-safety(7)): one that interrupted malloc could deadlock and leave the folder. mhfe turns SIGTSTP into SIGINT, which would end the search that TS suspends (RUST-14); stopping after the restore keeps the suspend and closes AUD-015-SEC004.",
+      "sources": [
+        "mhfe/src/bin/mhfe/protect.rs:51-89",
+        "mnemocode/src/cli/interruption.ts:1-60",
+        "mnemocode/src/export/temporary-folders.ts:1-6",
+        "mnemocode/src/cli/terminal-input.ts:424-432",
+        "mnemocode/src/cli/terminal-input.ts:477-497",
+        "tmp/rust-arch/model/capabilities.json: CAP-CLI-INTERRUPTION, CAP-CLI-TEMPORARY-FOLDERS",
+        "https://man7.org/linux/man-pages/man7/signal-safety.7.html",
+        "https://man7.org/linux/man-pages/man2/sigaction.2.html",
+        "https://man7.org/linux/man-pages/man7/signal.7.html (system calls interrupted by handlers; SA_RESTART)",
+        "https://learn.microsoft.com/en-us/windows/console/handlerroutine (a thread of its own; termination when it returns; CTRL_CLOSE_EVENT 5000 ms)"
+      ]
+    },
+    {
+      "id": "N-NO-CLIPBOARD",
+      "platform": "native",
+      "threat": "Clipboard managers and cloud clipboards keep and synchronise what is put on the clipboard.",
+      "mechanism": "The program never writes to a clipboard: no clipboard dependency, no OSC 52 sequence. Clearing the clipboard is not done: the program cannot know what the person copied.",
+      "privileges": "none",
+      "readBack": "Review; the dependency list has no clipboard crate.",
+      "onRefusal": "-",
+      "verdict": "required",
+      "reason": "No code; it keeps the current behaviour from changing.",
+      "sources": ["tmp/rust-arch/model/capabilities.json: CAP-CLI-RESULT-PRESENTATION"]
+    },
+    {
+      "id": "N-NO-ARGV-ENV",
+      "platform": "native",
+      "threat": "A secret in an argument is visible to other users (/proc/PID/cmdline) and kept in shell history; one in the environment passes to every started program.",
+      "mechanism": "No option or environment variable carries a secret; the old secret options (--mnemonic, --input, --date and others) are refused before parsing, without reading their values.",
+      "privileges": "none",
+      "readBack": "A test per refused option.",
+      "onRefusal": "-",
+      "verdict": "required",
+      "reason": "Existing behaviour (CAP-PHRASE-FORMATS-SECRET-SOURCES, CAP-CLI-SECRET-ARGV-REFUSAL).",
+      "sources": [
+        "https://man7.org/linux/man-pages/man5/proc_pid_cmdline.5.html",
+        "mnemocode/src/cli/arguments.ts:37-63"
+      ]
+    },
+    {
+      "id": "N-PRIVATE-FILES",
+      "platform": "native",
+      "threat": "Another user reads a saved backup; a crash leaves a half-written file under the final name; a temporary copy is left elsewhere.",
+      "mechanism": "Outputs created new with mode 0600 or 0700 at creation (create-new, no chmod afterwards), filled in a 0700 staging folder beside the destination and published by link or rename; no temporary file anywhere else (CORE-24).",
+      "privileges": "none",
+      "readBack": "fstat of the new file gives the mode; on Windows the file takes its folder's permissions, which the summary says.",
+      "onRefusal": "the save fails with its code; leftovers are named (CAP-CLI-PRIVATE-FILE-PUBLICATION)",
+      "verdict": "required",
+      "reason": "Existing behaviour.",
+      "sources": ["mnemocode/src/export/private-file.ts:15-312"]
+    },
+    {
+      "id": "N-UMASK",
+      "platform": "native",
+      "threat": "Other users read a new file.",
+      "mechanism": "umask(077).",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "The modes set at creation are already 0600 and 0700; a umask can only remove bits.",
+      "sources": ["https://man7.org/linux/man-pages/man2/umask.2.html"]
+    },
+    {
+      "id": "N-CLOUD-FOLDERS",
+      "platform": "native",
+      "threat": "A sync client uploads a secret export from a synchronised folder.",
+      "mechanism": "Warn when an output lies in a folder that a cloud service synchronises (environment and folder names).",
+      "privileges": "none",
+      "readBack": "-",
+      "onRefusal": "warn, go on",
+      "verdict": "required",
+      "reason": "Existing behaviour (CAP-CLI-CLOUD-FOLDER-WARNING); a heuristic.",
+      "sources": ["mnemocode/src/cli/cloud-folders.ts:14-74"]
+    },
+    {
+      "id": "N-NO-SECRET-CHILD",
+      "platform": "native",
+      "threat": "A started program receives a secret: pdftocairo gets the card PDF, a backup, through a pipe; execve resets its dumpable attribute to 1, so programs of the same user can read it, and its memory is neither locked nor wiped.",
+      "mechanism": "No secret goes to another program; card images are rasterised in process.",
+      "privileges": "-",
+      "readBack": "Review: no secret reaches a started program.",
+      "onRefusal": "-",
+      "verdict": "required",
+      "reason": "Removes the child process, the PATH search and the pipe limits of CAP-CARDS-PAGE-IMAGES; the cards design decides how, and the owner whether images may differ from pdftocairo's (RUST-14).",
+      "sources": [
+        "https://man7.org/linux/man-pages/man2/PR_SET_DUMPABLE.2const.html",
+        "tmp/rust-arch/model/capabilities.json: CAP-CARDS-PAGE-IMAGES"
+      ]
+    },
+    {
+      "id": "N-REPORT",
+      "platform": "native",
+      "threat": "A person relies on a protection the system refused.",
+      "mechanism": "One report built only from the read-backs above: the startup checks before a secret, a Protection line on the private screen, and rows of the self-test, naming what holds and why the rest does not.",
+      "privileges": "none",
+      "readBack": "It is the read-back.",
+      "onRefusal": "secrets are refused only for L-CORE-LIMIT, L-DUMPABLE, M-CORE-LIMIT and L-TRACER; everything else is reported",
+      "verdict": "required",
+      "reason": "RUST-11; existing in both programs.",
+      "sources": [
+        "mhfe/src/bin/mhfe/startup.rs:34-39",
+        "mnemocode/src/cli/protection.ts:148-229",
+        "tmp/rust-arch/model/capabilities.json: CAP-CLI-SANDBOX-REPORT, CAP-CLI-SECRET-GATE"
+      ]
+    },
+    {
+      "id": "B-WIPE",
+      "platform": "browser",
+      "threat": "Secret bytes stay in WebAssembly linear memory after use (it never shrinks; freed blocks keep their bytes until reused), readable by later code or in a dump of the browser.",
+      "mechanism": "Every WASM file registers the zeroing allocator (ADR 0003), so wasm-bindgen's argument copies, &str and &[u8] alike, are wiped when the shim frees them; owners zeroize secrets on drop. A secret entry's other arguments are numbers, booleans or JsValue converted inside Rust: the glue copies a secret in its prelude with no finally, and a later argument's check that throws (_assertClass, _assertChar, _assertNonNull) would leave that copy never freed, so never wiped (as mhfe AUD-012-SEC001, where a refused option left copies). The page wipes its Uint8Arrays after the call. A result that must become text leaves as one JS string, on request (JS strings cannot be wiped).",
+      "privileges": "none",
+      "readBack": "A test scans memory.buffer for a public test secret after each operation.",
+      "onRefusal": "-",
+      "verdict": "required",
+      "reason": "CORE-24, RUST-13, WEB-04; ADR 0003.",
+      "sources": [
+        "tmp/rust-arch/design/architect/adr/0003-secret-memory.md",
+        "wasm-bindgen-cli-support-0.2.129/src/js/binding.rs:836-839 (_assertClass in the prelude)",
+        "wasm-bindgen-cli-support-0.2.129/src/js/binding.rs:959-975 (the string copy in the prelude)",
+        "mhfe/docs/audits/audit-12-2026-10-08.md:126-140 (AUD-012-SEC001)",
+        "https://webassembly.github.io/spec/core/exec/modules.html (memory grows only)"
+      ]
+    },
+    {
+      "id": "B-NO-MLOCK",
+      "platform": "browser",
+      "threat": "The browser's memory reaches swap, a crash report or a core dump.",
+      "mechanism": "Locking, swap checks or crash-report control from page code.",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "Page code has no such API; the self-check reports them as not available, and the page asks for a trusted offline computer.",
+      "sources": ["mhfe/src/memory.rs:205-209", "mhfe/src/memory.rs:351-359"]
+    },
+    {
+      "id": "B-CSP-OFFLINE",
+      "platform": "browser",
+      "threat": "Page or dependency code sends a secret by fetch, XHR, WebSocket, beacon or an image request.",
+      "mechanism": "Every page that runs a MnemoCode secret feature has the CSP default-src 'none'; connect-src 'none'; img-src 'none'; script-src with hashes and 'wasm-unsafe-eval'; worker-src blob: or 'none'; frame-src, object-src, base-uri and form-action 'none'; the WASM bytes are embedded.",
+      "privileges": "none",
+      "readBack": "The artifact gate compares the exact CSP of the built page.",
+      "onRefusal": "the build fails",
+      "verdict": "required",
+      "reason": "Existing in wallet-tools. A CSP does not cover navigation; only the page's own code can navigate (CORE-54) and WEB-01 keeps HTML parsing out.",
+      "sources": [
+        "multi-chain-wallet-tools/apps/key-derivation/src/index.html:8-9",
+        "multi-chain-wallet-tools/apps/key-derivation/scripts/verify-key-derivation-artifact.mjs:51-55",
+        "https://www.w3.org/TR/CSP3/"
+      ]
+    },
+    {
+      "id": "B-VAULT-FRAME",
+      "platform": "browser",
+      "threat": "On a page with network access (the Discovery Scanner) a secret meets code that can send it.",
+      "mechanism": "MnemoCode's secret WASM runs only inside the opaque-origin vault frame (sandbox=\"allow-scripts\", CSP connect-src and worker-src 'none'), which reaches the network only through the shell's validated MessagePort (network-boundary).",
+      "privileges": "none",
+      "readBack": "The discovery artifact gate.",
+      "onRefusal": "the build fails",
+      "verdict": "required",
+      "reason": "Existing in wallet-tools; MnemoCode adds nothing.",
+      "sources": [
+        "multi-chain-wallet-tools/apps/discovery-scanner/src/shell.html:59-65",
+        "multi-chain-wallet-tools/apps/discovery-scanner/src/index.html:8-9",
+        "multi-chain-wallet-tools/packages/network-boundary/src/iframe-bootstrap.ts:7-11",
+        "multi-chain-wallet-tools/packages/secret-vault/src/worker-bootstrap.ts"
+      ]
+    },
+    {
+      "id": "B-NO-STORAGE",
+      "platform": "browser",
+      "threat": "A secret kept in localStorage, sessionStorage, IndexedDB or the Cache API outlives the page on disk.",
+      "mechanism": "No storage of secrets (WEB-04); the Rust WASM is built without web-sys storage or network features.",
+      "privileges": "none",
+      "readBack": "The artifact gate refuses storage APIs in the built page.",
+      "onRefusal": "the build fails",
+      "verdict": "required",
+      "reason": "Existing in wallet-tools.",
+      "sources": [
+        "multi-chain-wallet-tools/apps/key-derivation/scripts/verify-key-derivation-artifact.mjs:397-399"
+      ]
+    },
+    {
+      "id": "B-EGRESS-TRIPWIRE",
+      "platform": "browser",
+      "threat": "A public result of a network page carries a secret after encoding.",
+      "mechanism": "SecretEgressGuard compares outgoing public data with the registered secrets in their usual encodings.",
+      "privileges": "none",
+      "readBack": "Its own tests.",
+      "onRefusal": "the export or request is blocked",
+      "verdict": "required",
+      "reason": "Existing in wallet-tools; a MnemoCode export that leaves a network page passes through it.",
+      "sources": ["multi-chain-wallet-tools/packages/secret-boundary/src/secret-guard.ts:74-139"]
+    },
+    {
+      "id": "B-COOP-COEP",
+      "platform": "browser",
+      "threat": "Cross-origin reads through shared processes (Spectre) or an opener reference.",
+      "mechanism": "Cross-Origin-Opener-Policy same-origin and Cross-Origin-Embedder-Policy require-corp.",
+      "privileges": "-",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "rejected",
+      "reason": "MnemoCode's WASM needs no SharedArrayBuffer; a page opened as a file cannot send headers and a meta element cannot set them; the key-derivation launcher already sends both for mhfe's threads.",
+      "sources": [
+        "https://html.spec.whatwg.org/multipage/browsers.html#cross-origin-opener-policies",
+        "multi-chain-wallet-tools/apps/key-derivation/launcher/src/server.rs:25-35"
+      ]
+    },
+    {
+      "id": "B-WORKER",
+      "platform": "browser",
+      "threat": "The linear memory of a finished operation stays reachable.",
+      "mechanism": "Each secret operation in a dedicated worker, terminated at its end.",
+      "privileges": "none",
+      "readBack": "-",
+      "onRefusal": "-",
+      "verdict": "optional",
+      "reason": "B-WIPE already wipes every secret; a worker for long searches is a matter of responsiveness, which the browser design decides.",
+      "sources": ["mhfe/web/core-worker.js"]
+    },
+    {
+      "id": "B-WASM-MAX-MEMORY",
+      "platform": "browser",
+      "threat": "Runaway growth of the WASM memory.",
+      "mechanism": "Link with a maximum memory (wasm-ld --max-memory) at the build's peak.",
+      "privileges": "none",
+      "readBack": "The module's memory limits.",
+      "onRefusal": "-",
+      "verdict": "optional",
+      "reason": "The browser's counterpart of owner requirement 2, but the browser already ends a tab that runs out; one link flag.",
+      "sources": ["https://lld.llvm.org/WebAssembly.html"]
+    }
+  ]
+}

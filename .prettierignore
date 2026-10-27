@@ -1,0 +1,7 @@
+vectors/
+target/
+output/
+dist/
+docs/audits/
+pnpm-lock.yaml
+vendor/
