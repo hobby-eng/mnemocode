@@ -13,6 +13,8 @@ pub mod phrase;
 pub mod probe;
 #[cfg(feature = "browser-qr")]
 pub mod qr;
+#[cfg(feature = "browser-sskr")]
+pub mod sskr;
 #[cfg(feature = "browser-wallet")]
 pub mod wallet;
 

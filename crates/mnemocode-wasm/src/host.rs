@@ -167,3 +167,32 @@ pub fn name(value: &JsValue) -> String {
 pub fn place(value: f64) -> usize {
     usize::try_from(whole(value)).unwrap_or(usize::MAX)
 }
+
+/// The dates typed in `text` for a phrase of `words` words, as the command line reads a typed line
+/// of dates: apart at white space, commas or semicolons, a refused one named by its place. Blank
+/// text is no date.
+pub fn dates_of(text: &str, words: usize) -> Result<Vec<mnemocode::dates::Date>, JsValue> {
+    if mnemocode::text::space::trim(text).is_empty() {
+        return Ok(Vec::new());
+    }
+    mnemocode::dates::answer::DatesAnswer::parse(text, Some(words), false)
+        .map(|answer| answer.known().iter().collect())
+        .map_err(|refusal| refused(&refusal))
+}
+
+/// The phrase `phrase` and the dates typed in `dates` for it, refused as the library refuses them.
+pub fn phrase_and_dates(
+    phrase: &str,
+    dates: &str,
+) -> Result<
+    (
+        mnemocode::bip39::phrase::Phrase,
+        Vec<mnemocode::dates::Date>,
+    ),
+    JsValue,
+> {
+    let phrase =
+        mnemocode::bip39::phrase::Phrase::parse(phrase).map_err(|refusal| refused(&refusal))?;
+    let dates = dates_of(dates, phrase.len())?;
+    Ok((phrase, dates))
+}

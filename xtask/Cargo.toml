@@ -18,7 +18,13 @@ doc = false
 proc-macro2 = { version = "=1.0.107", default-features = false, features = ["span-locations"] }
 serde_json.workspace = true
 sha2.workspace = true
-wasmi = { version = "=2.0.0", default-features = false, features = ["std", "validate"] }
+# The portable loop dispatch: the default's tail calls, which LLVM does not promise, grow the stack
+# of this debug-assertions build with every instruction run.
+wasmi = { version = "=2.0.0", default-features = false, features = [
+  "std",
+  "validate",
+  "portable-dispatch",
+] }
 syn = { version = "=3.0.9", default-features = false, features = ["full", "parsing", "visit"] }
 
 [target.'cfg(windows)'.dependencies]

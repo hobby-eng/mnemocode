@@ -399,9 +399,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "r-efi 5.3.0",
  "wasip2",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -599,6 +601,7 @@ name = "mnemocode"
 version = "0.2.0"
 dependencies = [
  "base64ct",
+ "bc-rand",
  "bech32",
  "bip39",
  "bs58",
@@ -610,12 +613,15 @@ dependencies = [
  "miniz_oxide 0.9.1",
  "png",
  "qrcodegen",
+ "rand_chacha",
+ "rand_core 0.9.5",
  "ripemd",
  "rqrr",
  "scrypt",
  "serde_json",
  "sha2",
  "sha3",
+ "sskr",
  "unicode-normalization",
  "windows-sys",
  "x25519-dalek",
@@ -645,6 +651,7 @@ dependencies = [
 name = "mnemocode-wasm"
 version = "0.2.0"
 dependencies = [
+ "getrandom 0.3.4",
  "getrandom 0.4.3",
  "mnemocode",
  "wasm-bindgen",

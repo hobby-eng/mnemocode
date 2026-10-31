@@ -8,14 +8,11 @@ use mnemocode::backup::{Backup, Encoding};
 use mnemocode::bip32::{ExtendedKey, fingerprint_hex};
 use mnemocode::bip39::phrase::Phrase;
 use mnemocode::checks::Part;
-use mnemocode::dates::Date;
-use mnemocode::dates::answer::DatesAnswer;
 use mnemocode::forms::Form;
 use mnemocode::modes::Mode;
-use mnemocode::text::space::trim;
 use wasm_bindgen::prelude::*;
 
-use crate::host::{after_secret, name, optional_text, refused, self_check, text};
+use crate::host::{after_secret, name, optional_text, phrase_and_dates, refused, self_check, text};
 
 /// A seed phrase encoded as a backup: its codes and its record, which hold the phrase masked or in
 /// another form, and both fingerprints. The page frees it once the codes are shown or saved.
@@ -23,18 +20,6 @@ use crate::host::{after_secret, name, optional_text, refused, self_check, text};
 pub struct EncodedBackup {
     encoding: Encoding,
     original: String,
-}
-
-/// The dates typed in `text` for a phrase of `words` words, as the command line reads a typed line
-/// of dates: apart at white space, commas or semicolons, a refused one named by its place. Blank
-/// text is no date.
-fn dates_of(text: &str, words: usize) -> Result<Vec<Date>, JsValue> {
-    if trim(text).is_empty() {
-        return Ok(Vec::new());
-    }
-    DatesAnswer::parse(text, Some(words), false)
-        .map(|answer| answer.known().iter().collect())
-        .map_err(|refusal| refused(&refusal))
 }
 
 impl EncodedBackup {
@@ -50,8 +35,7 @@ impl EncodedBackup {
         let mode = Mode::named(mode).map_err(|refusal| refused(&refusal))?;
         Backup::check_encodable(mode, valid_last_word, Some(form))
             .map_err(|refusal| refused(&refusal))?;
-        let phrase = Phrase::parse(phrase).map_err(|refusal| refused(&refusal))?;
-        let dates = dates_of(dates, phrase.len())?;
+        let (phrase, dates) = phrase_and_dates(phrase, dates)?;
         let encoding = Backup::encode(&phrase, &dates, form, mode, valid_last_word)
             .map_err(|refusal| refused(&refusal))?;
         let original = ExtendedKey::of_phrase(&phrase, "")

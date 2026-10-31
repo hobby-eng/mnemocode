@@ -27,27 +27,18 @@ use mnemocode::text::words::{
 };
 use serde_json::Value;
 
+mod common;
+
+use common::{text, texts};
+
 const RECORDED: &str = include_str!("../../../vectors/ts-0.1.0/foundation-v1.json");
 
 fn recorded() -> Value {
     serde_json::from_str(RECORDED).expect("the recorded file is JSON")
 }
 
-fn text(value: &Value) -> &str {
-    value.as_str().expect("a string")
-}
-
 fn number(value: &Value) -> u64 {
     value.as_u64().expect("a whole number")
-}
-
-fn texts(value: &Value) -> Vec<String> {
-    value
-        .as_array()
-        .expect("an array")
-        .iter()
-        .map(|item| text(item).to_owned())
-        .collect()
 }
 
 /// Asserts that `refusal` has the recorded code, message and kind of error.

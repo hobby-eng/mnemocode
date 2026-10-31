@@ -22,9 +22,10 @@ use crate::refusal::Refusal;
 
 /// The bytes of the stack that [`scrub_stack`] overwrites: more than the deepest stack measured
 /// over the entries that handle a secret. TS measured 2,936 bytes for its SSKR engine and kept
-/// 16 KiB (sskr-wasm/rust/src/lib.rs:22-25); the port measures every secret entry anew as it
-/// arrives (ARCHITECTURE.md §6) and raises this if one goes deeper.
-pub const STACK_SCRUB_BYTES: usize = 16 * 1024;
+/// 16 KiB (sskr-wasm/rust/src/lib.rs:22-25). The `wasm` gate measures every row of the self-check
+/// on each build and refuses one that reaches this size (ARCHITECTURE.md §6). The deepest, the QR
+/// reader, leaves data some 77 KiB down, so this keeps about two thirds more.
+pub const STACK_SCRUB_BYTES: usize = 128 * 1024;
 
 /// A secret did not fit the buffer reserved for it: the reserved size was computed too small.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

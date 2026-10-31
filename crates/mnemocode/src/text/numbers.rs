@@ -68,6 +68,11 @@ impl WholeRange {
         self.text("to")
     }
 
+    /// The range as a label writes it: "1-2048".
+    pub fn span(self) -> String {
+        format!("{}-{}", self.min, self.max)
+    }
+
     fn text(self, word: &str) -> String {
         format!("{} {word} {}", self.min, self.max)
     }

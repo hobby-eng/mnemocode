@@ -199,6 +199,14 @@ impl Phrase {
         .unwrap_or_else(|_| SecretText::copy_of("a phrase", ""))
     }
 
+    /// Its entropy, 16 to 32 bytes, in a locked buffer.
+    pub fn entropy(&self) -> Result<crate::secret::SecretBytes, PhraseError> {
+        let (mut bytes, length) = self.mnemonic()?.to_entropy_array();
+        let entropy = crate::secret::SecretBytes::copy_of("a phrase's entropy", &bytes[..length]);
+        bytes.zeroize();
+        Ok(entropy)
+    }
+
     /// The bip39 crate's mnemonic of the phrase, for its seed and entropy.
     pub(crate) fn mnemonic(&self) -> Result<Mnemonic, PhraseError> {
         Mnemonic::parse_in_normalized(Language::English, &self.text())

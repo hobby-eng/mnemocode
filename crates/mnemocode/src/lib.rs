@@ -28,5 +28,7 @@ pub mod refusal;
 pub mod search;
 pub mod secret;
 pub mod self_check;
+#[cfg(feature = "sskr")]
+pub mod sskr;
 pub mod text;
 pub mod wallet;

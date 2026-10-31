@@ -9,6 +9,8 @@ mod coins;
 pub mod public_vectors;
 mod qr;
 mod re_encoding;
+#[cfg(feature = "sskr")]
+mod sskr;
 mod wallet;
 
 use bip39::{Language, Mnemonic};
@@ -246,8 +248,25 @@ pub fn rows() -> impl Iterator<Item = &'static Row> {
     let coins = coins::ROWS;
     #[cfg(not(feature = "any-coin"))]
     let coins: &[Row] = &[];
-    ROWS.iter().chain([&wallet::ROW]).chain(coins)
+    #[cfg(feature = "sskr")]
+    let (integrity, shares): (&[Row], &[Row]) = (&SSKR_INTEGRITY, &SSKR_SHARES);
+    #[cfg(not(feature = "sskr"))]
+    let (integrity, shares): (&[Row], &[Row]) = (&[], &[]);
+    ROWS[..1]
+        .iter()
+        .chain(integrity)
+        .chain(&ROWS[1..])
+        .chain(shares)
+        .chain([&wallet::ROW])
+        .chain(coins)
 }
+
+/// The row of the share engine, after Core integrity, and those of the shares, after the
+/// library's, as TS orders them.
+#[cfg(feature = "sskr")]
+const SSKR_INTEGRITY: [Row; 1] = [sskr::INTEGRITY];
+#[cfg(feature = "sskr")]
+const SSKR_SHARES: [Row; 2] = [sskr::REPAIR, sskr::SPLIT];
 
 /// The parts that the binding's modules compute, each checked by its own rows in the module's
 /// `selfCheck` (ARCHITECTURE.md §6).
@@ -261,6 +280,9 @@ pub enum Part {
     Candidates,
     /// QR codes and the PNG files they are read from.
     Qr,
+    /// Shamir shares: their engine, forms, split, restore and repair.
+    #[cfg(feature = "sskr")]
+    Sskr,
 }
 
 /// The rows of the phrase part.
@@ -283,6 +305,11 @@ impl Part {
             Self::Wallet => row.name == "Wallet evidence" || row.name.ends_with(" addresses"),
             Self::Candidates => row.name == "Candidate lists",
             Self::Qr => matches!(row.name, "PNG admission" | "QR adapter"),
+            #[cfg(feature = "sskr")]
+            Self::Sskr => matches!(
+                row.name,
+                "SSKR integrity" | "Share repair" | "Share split and restore"
+            ),
         }
     }
 }

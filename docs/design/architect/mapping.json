@@ -1249,9 +1249,9 @@
     {
       "id": "CAP-SSKR-FORM-BYTEWORDS",
       "crate": "mnemocode",
-      "module": "sskr::forms::bytewords",
+      "module": "sskr::forms",
       "status": "port",
-      "reason": "Registry entry, feature share-form-words; the one Bytewords implementation."
+      "reason": "A variant of the closed enum ShareFormat (ADR 0002, amended with increment 7), with sskr; the one Bytewords implementation (sskr::bytewords)."
     },
     {
       "id": "CAP-SSKR-FORM-CHOICE",
@@ -1263,37 +1263,37 @@
     {
       "id": "CAP-SSKR-FORM-COLOR-UNICODE",
       "crate": "mnemocode",
-      "module": "sskr::forms::color_unicode",
+      "module": "sskr::forms",
       "status": "port",
-      "reason": "Registry entry, feature share-form-colors-unicode."
+      "reason": "A variant of the closed enum ShareFormat (ADR 0002, amended with increment 7), with sskr."
     },
     {
       "id": "CAP-SSKR-FORM-COLORS",
       "crate": "mnemocode",
-      "module": "sskr::forms::colors",
+      "module": "sskr::forms",
       "status": "port",
-      "reason": "Registry entry, feature share-form-colors."
+      "reason": "A variant of the closed enum ShareFormat (ADR 0002, amended with increment 7), with sskr."
     },
     {
       "id": "CAP-SSKR-FORM-UNICODE",
       "crate": "mnemocode",
-      "module": "sskr::forms::unicode",
+      "module": "sskr::forms",
       "status": "port",
-      "reason": "Registry entry, feature share-form-unicode."
+      "reason": "A variant of the closed enum ShareFormat (ADR 0002, amended with increment 7), with sskr."
     },
     {
       "id": "CAP-SSKR-FORM-UR",
       "crate": "mnemocode",
-      "module": "sskr::forms::ur",
+      "module": "sskr::forms",
       "status": "port",
-      "reason": "Registry entry, feature share-form-ur."
+      "reason": "A variant of the closed enum ShareFormat (ADR 0002, amended with increment 7), with sskr."
     },
     {
       "id": "CAP-SSKR-FORM-WORD-NUMBERS",
       "crate": "mnemocode",
-      "module": "sskr::forms::indexes",
+      "module": "sskr::forms",
       "status": "port",
-      "reason": "Registry entry, feature share-form-indexes."
+      "reason": "A variant of the closed enum ShareFormat (ADR 0002, amended with increment 7), with sskr."
     },
     {
       "id": "CAP-SSKR-HOST-PLATFORM",
@@ -1307,7 +1307,7 @@
       "crate": "mnemocode",
       "module": "sskr::joint",
       "status": "port",
-      "reason": "Same assessment; the impossible GF(256) guards go (CORE-54)."
+      "reason": "Same assessment, stepped by the host as a search is (ADR 0005); the impossible GF(256) guards go (CORE-54)."
     },
     {
       "id": "CAP-SSKR-JOINT-SEARCH",
@@ -1326,7 +1326,7 @@
     {
       "id": "CAP-SSKR-MIXED-LAYOUT",
       "crate": "mnemocode",
-      "module": "sskr::layout",
+      "module": "sskr::forms",
       "status": "port",
       "reason": "Same versioned layout; the bit packing of word indexes is bip39's (TS bits.ts)."
     },
@@ -1424,9 +1424,9 @@
     {
       "id": "CAP-SSKR-SHARE-QR-MATCH",
       "crate": "mnemocode",
-      "module": "sskr::share",
+      "module": "sskr::forms",
       "status": "port",
-      "reason": "Same comparison."
+      "reason": "Same comparison, of the shares the printed codes and the payload hold, each read in any form."
     },
     {
       "id": "CAP-SSKR-SHARE-SOURCES",
@@ -1480,9 +1480,9 @@
     {
       "id": "CAP-SSKR-WALLET-CHECK-SETS",
       "crate": "mnemocode",
-      "module": "sskr::restore",
+      "module": "recovery::shares",
       "status": "port",
-      "reason": "Filters restored phrases by the wallet evidence given as data."
+      "reason": "Filters restored phrases by the wallet evidence given as data, after the share restore steps unmask a Seedshift phrase."
     },
     {
       "id": "CAP-WALLET-ADDRESS-LOCATION",
@@ -2081,6 +2081,10 @@
     {
       "defect": "Over-built: build-executable.mjs backs up the previous release set and rolls back renames with PublicationRollbackError (scripts/build-executable.mjs:180-210) for an output that can simply be rebuilt into a fresh folder",
       "how": "Executables are built into a fresh folder; no backup or rollback."
+    },
+    {
+      "defect": "repair-report.ts lines(): marked shares refused before any combination is counted, as too uncertain, also said 'Open combinations: 0 (2^-Infinity)' (found by the recordings of increment 7)",
+      "how": "Fixed, TS first (CORE-44): a report of no combinations has no lines; the refusal says why."
     }
   ]
 }

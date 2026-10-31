@@ -44,7 +44,11 @@ pub fn asks_first(count: u64, seconds: f64, limit: Option<u64>) -> bool {
 
 /// A number as the messages write it, in en-US grouping: 65,536.
 pub fn counting(value: u64) -> String {
-    let digits = value.to_string();
+    grouped_digits(&value.to_string())
+}
+
+/// The decimal `digits` of a whole number in en-US grouping, a comma before each three.
+pub fn grouped_digits(digits: &str) -> String {
     let mut grouped = String::with_capacity(digits.len() + digits.len() / 3);
     for (at, digit) in digits.chars().enumerate() {
         if at > 0 && (digits.len() - at).is_multiple_of(3) {
@@ -62,15 +66,11 @@ pub fn duration(seconds: f64) -> String {
         return "under a second".to_owned();
     };
     let rounded = (seconds / *size as f64 + 0.5).floor();
-    // A search's time in a unit fits a u64 by far; a value past it is said as the largest.
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "a positive whole number of at most a search's time in its unit"
-    )]
-    let rounded = rounded.min(u64::MAX as f64) as u64;
-    let plural = if rounded == 1 { "" } else { "s" };
-    format!("about {} {name}{plural}", counting(rounded))
+    let plural = if rounded == 1.0 { "" } else { "s" };
+    format!(
+        "about {} {name}{plural}",
+        grouped_digits(&rounded.to_string())
+    )
 }
 
 /// `value` and `noun`, in the plural unless the value is 1: "1 share combination".

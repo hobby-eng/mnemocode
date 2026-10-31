@@ -11,6 +11,7 @@ use std::path::Path;
 use mnemocode::backup::{Backup, Encoding};
 use mnemocode::bip32::{ExtendedKey, fingerprint_hex};
 use mnemocode::bip39::phrase::Phrase;
+use mnemocode::bip39::sizes::WORD_NUMBER_RANGE;
 use mnemocode::forms::Form;
 use mnemocode::modes::phrase_words::{FINGERPRINT_ROLES, ORIGINAL_FINGERPRINT};
 use mnemocode::modes::{DateWords, Mode};
@@ -70,9 +71,10 @@ impl Refusal for MaskedWordsNeedSeedshift {
 
 /// What the codes of `form` in `mode` hold, as the result names them.
 pub(crate) fn encoded_output_label(form: Form, mode: Mode) -> String {
+    let indexes = format!("BIP39 word indexes ({})", WORD_NUMBER_RANGE.span());
     let form = match form {
         Form::English => "English BIP39 words",
-        Form::Indexes => "BIP39 word indexes (1-2048)",
+        Form::Indexes => indexes.as_str(),
         Form::Unicode => "Unicode code points",
         Form::Colors => "BIP39Colors RGB hexadecimal codes",
         Form::ColorsUnicode => "MnemoCode color Unicode code points",

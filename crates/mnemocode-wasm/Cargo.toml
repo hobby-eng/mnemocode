@@ -16,12 +16,21 @@ crate-type = ["cdylib", "rlib"]
 [features]
 default = []
 # The memory scan's own entries, built only into the test profile test/probe, never a page's file.
-browser-probe = []
+browser-probe = [
+  "browser-phrase",
+  "browser-wallet",
+  "browser-qr",
+  "browser-candidates",
+  "browser-sskr",
+  "coin-bitcoin",
+]
 # One module per library part (ARCHITECTURE.md §9); a page's profile names those it uses.
 browser-phrase = []
 browser-wallet = []
 browser-qr = []
 browser-candidates = []
+# Shamir shares: the library's sskr, and the browser backend of its engine's randomness crate.
+browser-sskr = ["mnemocode/sskr", "dep:getrandom03"]
 # The library's units, which a page's profile names: each coin of the wallet module.
 coin-bitcoin = ["mnemocode/coin-bitcoin"]
 coin-bitcoin-cash = ["mnemocode/coin-bitcoin-cash"]
@@ -47,6 +56,9 @@ workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { workspace = true, features = ["wasm_js"] }
+# bc-rand, under the vendored engine, takes getrandom 0.3, which has no browser backend unless asked
+# for one; nothing here calls it (the engine's generator is seeded from the Random port).
+getrandom03 = { package = "getrandom", version = "=0.3.4", features = ["wasm_js"], optional = true }
 
 [lints]
 workspace = true

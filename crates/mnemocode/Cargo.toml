@@ -12,6 +12,7 @@ publish.workspace = true
 # (docs/design/architect/ARCHITECTURE.md §8, §9).
 [features]
 default = [
+  "sskr",
   "coin-bitcoin",
   "coin-bitcoin-cash",
   "coin-cosmos",
@@ -27,6 +28,8 @@ default = [
 ]
 # Implied by every coin: the code all coins share. Not a coin, so not chosen on its own.
 any-coin = []
+# Shamir shares (SSKR): the vendored engine and its seeded generator.
+sskr = ["dep:sskr", "dep:bc-rand", "dep:rand_chacha", "dep:rand_core"]
 coin-bitcoin = ["any-coin"]
 coin-bitcoin-cash = ["any-coin"]
 coin-cosmos = ["any-coin"]
@@ -42,6 +45,7 @@ coin-zcash = ["any-coin"]
 
 [dependencies]
 base64ct.workspace = true
+bc-rand = { workspace = true, optional = true }
 bech32.workspace = true
 bip39.workspace = true
 bs58.workspace = true
@@ -52,11 +56,14 @@ k256.workspace = true
 miniz_oxide.workspace = true
 png.workspace = true
 qrcodegen.workspace = true
+rand_chacha = { workspace = true, optional = true }
+rand_core = { workspace = true, optional = true }
 ripemd.workspace = true
 rqrr.workspace = true
 scrypt.workspace = true
 sha2.workspace = true
 sha3.workspace = true
+sskr = { workspace = true, optional = true }
 unicode-normalization.workspace = true
 x25519-dalek.workspace = true
 zeroize.workspace = true

@@ -46,5 +46,7 @@ The library reads no clock.
 ## Consequences
 
 - Every search keeps its position as state; one CLI loop and one JS loop serve all of them.
+- The assessment of marked shares, which can take minutes for many marks, is stepped as a search
+  is; a stop plans nothing, as TS's signal stops it.
 - Progress lines, consent and stopping are front-end code over one interface; their texts stay
   RUST-14 results.

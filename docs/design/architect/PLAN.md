@@ -122,9 +122,9 @@ written in by hand, naming this decision.
 | 4  | `forms`, `modes`, `backup`; `encode` without cards and shares                                                                                                                                                                                                                                                                 | 24       | `mnemocode-v1.json`; representation matrix; MNC1 and JSON byte-equal; codes transcripts; rows Core integrity, Public vectors, Representation matrix, Re-encoding, Word hints                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | 5  | `wallet` with the 12 coins; binding `wallet`                                                                                                                                                                                                                                                                                  | 30       | each coin's known answers; evidence refusals; wallet-option transcripts; rows Wallet evidence, Coin addresses; the `dash-community` profile builds and holds no other coin's text                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | 6  | `qr`, `candidates`; bindings `qr`, `candidates`; the Scanner's profile                                                                                                                                                                                                                                                        | 13       | PNG admission fixtures; QR write and read back; C2SP CCTV age vectors; `candidates-v1.json`; the encryption gate; `--qr-file` and `--qr` transcripts; rows PNG admission, QR adapter, Candidate lists; the memory cap measured and tested under the largest encrypted candidate list                                                                                                                                                                                                                                                                                                                                             |
-| 7  | `sskr` with the engine bridge and the 6 share forms, `shims/bc-crypto` ((d), owner, 2026-10-27); `sskr-split`, `sskr-combine`, `sskr-export` without cards; binding `sskr`                                                                                                                                                    | 34       | `sskr-v1.json`, BCR vectors of SSKR, Bytewords and UR; share-form known answers; restore of every split; the engine leaves no copy (memory scan); rows SSKR integrity, Share split and restore, Share repair                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| 8  | `recovery` with the backup reading, the three searches and the share restore flows; `decode`, `re-encode`, `recover-date`, `recover-word`; binding `recovery`                                                                                                                                                                 | 20       | candidate order and counts of every search as TS; a stopped search returns a partial outcome; transcripts of searches with fixed pace; rows Backup reading, Marked codes search, Word search, Backup check, Share unmasking                                                                                                                                                                                                                                                                                                                                                                                                      |
-| 9  | `mnemocode-cards` with the 13 templates; card options, `preview`, images; binding `cards` in the Deriver's profile                                                                                                                                                                                                            | 50       | card outputs at the owner's parity level; page count and size rows; heir-sheet text byte-equal; template order; colour maths known answers; every command now complete; rows Heir sheet, Share cards, Card sets, Card export assets; the memory cap checked under the largest card export                                                                                                                                                                                                                                                                                                                                        |
+| 7  | `sskr` with the engine bridge and the 6 share forms, `shims/bc-crypto` ((d), owner, 2026-10-27); binding `sskr`                                                                                                                                                                                                               | 31       | `sskr-v1.json`, BCR vectors of SSKR, Bytewords and UR; share-form known answers; restore of every split; the engine leaves no copy (memory scan); rows SSKR integrity, Share split and restore, Share repair                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 8  | `recovery` with the backup reading, the three searches and the share restore flows; `decode`, `re-encode`, `recover-date`, `recover-word`; binding `recovery`                                                                                                                                                                 | 21       | candidate order and counts of every search as TS; a stopped search returns a partial outcome; transcripts of searches with fixed pace; rows Backup reading, Marked codes search, Word search, Backup check, Share unmasking                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 9  | `mnemocode-cards` with the 13 templates; card options, `preview`, images; binding `cards` in the Deriver's profile                                                                                                                                                                                                            | 52       | card outputs at the owner's parity level; page count and size rows; heir-sheet text byte-equal; template order; colour maths known answers; every command now complete; rows Heir sheet, Share cards, Card sets, Card export assets; the memory cap checked under the largest card export                                                                                                                                                                                                                                                                                                                                        |
 | 10 | the start menu                                                                                                                                                                                                                                                                                                                | 13       | every menu entry in the pty against TS sessions; shell quoting cases (POSIX, cmd and PowerShell); each command a fresh, protected process                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 11 | release tooling                                                                                                                                                                                                                                                                                                               | 6        | the reproducible rebuild (GATES `reproducible`); notices; executable verification on the three systems; the signing script's dry run; the release workflow; artifacts per page profile                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
@@ -181,10 +181,9 @@ RECOVERY-CANDIDATE-PROTECTION-CHOICE.
 SSKR-ENGINE-SPLIT, SSKR-EXPORT-SET, SSKR-FORM-BYTEWORDS, SSKR-FORM-CHOICE, SSKR-FORM-COLOR-UNICODE,
 SSKR-FORM-COLORS, SSKR-FORM-UNICODE, SSKR-FORM-UR, SSKR-FORM-WORD-NUMBERS, SSKR-HOST-PLATFORM,
 SSKR-JOINT-ASSESS, SSKR-JOINT-SEARCH, SSKR-MARK-SYNTAX, SSKR-MIXED-LAYOUT, SSKR-REPAIR-ONE-SHARE,
-SSKR-REPAIR-REPORT, SSKR-RESTORE-COMPLETE, SSKR-RESTORED-SET-FACTS, SSKR-SAVE-SHARE-QR,
-SSKR-SET-CHECK, SSKR-SET-CHOICE, SSKR-SHARE-ANY-FORM, SSKR-SHARE-BYTES-METADATA,
-SSKR-SHARE-QR-MATCH, SSKR-SHARE-SOURCES, SSKR-SHARE-TROUBLE, SSKR-SPLIT-BACKUP, SSKR-SPLIT-PHRASE,
-SSKR-TYPED-SHARES, SSKR-WALLET-CHECK-SETS.
+SSKR-REPAIR-REPORT, SSKR-RESTORE-COMPLETE, SSKR-RESTORED-SET-FACTS, SSKR-SET-CHECK,
+SSKR-SET-CHOICE, SSKR-SHARE-ANY-FORM, SSKR-SHARE-BYTES-METADATA, SSKR-SHARE-QR-MATCH,
+SSKR-SHARE-TROUBLE, SSKR-SPLIT-BACKUP, SSKR-SPLIT-PHRASE, SSKR-TYPED-SHARES.
 
 8: PHRASE-FORMATS-BACKUP-READING, PHRASE-FORMATS-DECODE-FROM-OPTIONS, RECOVERY-BACKUP-CHECK,
 RECOVERY-BACKUP-CHECK-CODES, RECOVERY-BACKUP-CHECK-SHARES, RECOVERY-DATE-CANDIDATES,
@@ -192,7 +191,7 @@ RECOVERY-DATE-SEARCH, RECOVERY-LEGACY-LAST-WORDS, RECOVERY-MARKED-CODES,
 RECOVERY-MARKED-CODES-BY-ENCODED-FINGERPRINT, RECOVERY-MARKED-CODES-BY-WALLET,
 RECOVERY-MARKED-CODES-LIST, RECOVERY-MARKED-CODES-SEARCH, RECOVERY-WORD-SEARCH-MISSING,
 RECOVERY-WORD-SEARCH-PLACES, RECOVERY-WORD-SEARCH-RUN, SSKR-EXPORT-REPAIR-FLOW,
-SSKR-RESTORE-STEPS, SSKR-SEARCH-CONSENT, SSKR-UNMASK-SHARES.
+SSKR-RESTORE-STEPS, SSKR-SEARCH-CONSENT, SSKR-UNMASK-SHARES, SSKR-WALLET-CHECK-SETS.
 
 9: CARDS-BACKUP-CONTENT, CARDS-BUNDLED-ASSETS, CARDS-BUSINESS-RENDER, CARDS-CARD-SESSION,
 CARDS-CLI-CARD-OPTIONS, CARDS-CODE-PALETTE, CARDS-COLLECTION-QR, CARDS-COLLECTION-SHEET-DRAW,
@@ -207,7 +206,7 @@ CLI-SELF-TEST-COMMAND, PHRASE-FORMATS-DECODE-QUESTIONS, PHRASE-FORMATS-ENCODE,
 PHRASE-FORMATS-ENCODE-RECORD-FILE, PHRASE-FORMATS-RE-ENCODE, PHRASE-FORMATS-RE-ENCODE-QUESTIONS,
 PHRASE-FORMATS-SHOW-MASKED-WORDS, PHRASE-FORMATS-SHOW-ORIGINAL-WORDS, RECOVERY-CANDIDATE-LIST-SAVE,
 SSKR-COMBINE-COMMAND, SSKR-EXPORT-COMMAND, SSKR-RESTORE-HANDOFF, SSKR-SAVE-SHARE-FILE,
-SSKR-SPLIT-COMMAND.
+SSKR-SAVE-SHARE-QR, SSKR-SHARE-SOURCES, SSKR-SPLIT-COMMAND.
 
 10: CARDS-MENU-CARD-QUESTIONS, CLI-MENU-COMMAND-PROCESS, CLI-MENU-DECODE, CLI-MENU-ENCODE,
 CLI-MENU-FILE-QUESTIONS, CLI-MENU-PREVIEW, CLI-MENU-RECOVER, CLI-MENU-REENCODE, CLI-MENU-RESTORE,
@@ -389,3 +388,51 @@ the TS capsule (`multi-chain-wallet-tools/packages/recovery-mnemocode`) to the W
   Medium: secret entries outside the scrub, and glue that could throw after copying a secret) was
   answered in the same commit, and its re-check's three Low notes too: the memory scan reads a
   page's string as a secret entry does (`probeText`), and ADR 0004 names the binding's codes.
+- Increment 7, 2026-10-27: the library's `sskr`, behind its feature: the engine (the vendored
+  SSKR linked in, its generator ChaCha20 seeded from the `Random` port, every share and secret in
+  a locked owner, the stack scrubbed after each call); a share's bytes and metadata; the six forms,
+  a closed enum `ShareFormat` (ADR 0002 amended: wallet-tools removes shares whole, never one
+  form), read in TS's order, a text refused by the reader of the form it is written in; the check
+  and facts of a set; the split of a phrase or a backup masked first, every new split restored
+  with each share checked; the restore of complete shares with every surplus member and group
+  checked against a digest-checked reference; the repair of one share marked with ? over GF(2),
+  colors and codes read in part included; the joint repair of the shares of a set, its assessment
+  and its search over bc-shamir's digest stepped by the host (the first `Search`, ADR 0005), with
+  the report of what is open and what was filled in; the shares as typed (places,
+  wrapped lines, a phrase typed for a share, copies, the share that does not fit); the export of a
+  set; the keeping note; and the QR check of a share. The library drops the engine-output and
+  unfilled-randomness checks (CORE-54) and keeps the restore of every split. Rows: SSKR
+  integrity, Share repair (startup and full), Share split and restore (full), their vectors
+  compiled in and held equal to `vectors/sskr-v1.json`. The TS repository's recorders
+  `shares.mjs` and `share-repair.mjs` record `vectors/ts-0.1.0/shares-v1.json` and
+  `share-repair-v1.json` from its commit `524d003`: about 1,000 marked texts repaired alone, 88
+  lists repaired together with their assessments, reports and sets, sets restored and refused,
+  shares as typed, exports, splits, notes and hints, public shares and a fixed sequence of changes
+  to them, which `tests/ts_shares.rs` replays byte for byte; its two longest replays are ignored
+  with their reasons and run at release (RUST-08). They found one defect of the TS report, fixed
+  there first (`mapping.json`). Not recorded, for the minutes they take: "Too many ways fit
+  these shares" and "The member numbers of these shares cannot be told". The binding's
+  `browser-sskr` (a backup split and written in one form with its keeping note, shares restored
+  together with their repair lines, a share's form and writing, the QR check) joins the
+  multi-chain Deriver's profile; its getrandom 0.3.4 line gives bc-rand's tree the browser
+  backend, without js-sys. The memory scan splits and restores a secret through the engine and
+  finds no copy (`probeShares`). The earlier increments' secret entries had never been scanned nor
+  their stack measured, so the gate now does both for all of them: the test profile takes every
+  module and coin, each row of the self-check runs there on a painted stack, and `probeEntries`
+  tells each secret it meets in one instance and in another calls every secret entry as a page
+  calls it, the stack searched after each return and the memory after the last, for any part of
+  every secret, seed, key and share, and the stack painted anew under each entry must show its
+  scrub ran. No entry left a copy; a seed and a share left on purpose were found, and an entry
+  without its scrub leaves the paint. The QR reader leaves data some
+  77 KiB down, past the 16 KiB kept from TS, so the scrub is
+  128 KiB, and the gate refuses a row that reaches it. wasmi takes its portable dispatch, whose
+  stack does not grow as it runs. The review found the assessment of marked shares unstoppable,
+  unlike TS's, so it is stepped as a search is. Open under RUST-13, for the owner to decide: the
+  algebra's vectors are redacted and wiped on free but not locked, and `Branch.particular`,
+  `visible` and `hidden`, `ReadingSpace.particular` and `basis` and `ReadingUnits.values` stay
+  for a whole search, one set of them for each branch and share. Moved: the share commands,
+  `--qr-dir` of shares and the sources of typed shares (CAP-SSKR-SAVE-SHARE-QR,
+  CAP-SSKR-SHARE-SOURCES) to increment 9 with the commands that use them; the wallet check of
+  restored sets (CAP-SSKR-WALLET-CHECK-SETS) to increment 8, where the share restore steps unmask
+  a Seedshift phrase before its check, and the binding's stepped assessment and repair search with
+  the recovery binding there.

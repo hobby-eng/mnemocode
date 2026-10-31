@@ -108,9 +108,7 @@
           "dates",
           "bip32",
           "forms",
-          "modes",
-          "wallet",
-          "backup"
+          "modes"
         ],
         "recovery": [
           "bip39",
@@ -233,7 +231,8 @@
           "getrandom"
         ],
         "cfg(target_arch = \"wasm32\")": [
-          "getrandom"
+          "getrandom",
+          "getrandom03"
         ]
       },
       "dependencyNotes": "wasm-bindgen and getrandom on every target, so that the native clippy and tests build the binding too and its entries that draw randomness run in the tests, from the system's source; getrandom =0.4.3 with wasm_js on wasm32 for the Random adapter, and from the sskr increment =0.3.4 with wasm_js renamed getrandom03, only to give bc-rand's tree its browser backend; mnemocode-cards only with feature browser-cards; no js-sys.",
@@ -262,7 +261,12 @@
           "host"
         ],
         "probe": [
-          "host"
+          "host",
+          "phrase",
+          "wallet",
+          "sskr",
+          "candidates",
+          "qr"
         ]
       }
     },

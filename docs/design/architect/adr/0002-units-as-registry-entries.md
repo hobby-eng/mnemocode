@@ -16,8 +16,8 @@ Every registry is a trait, one module per entry and one static list in the regis
 list line of an entry carries `#[cfg(feature = "<unit>")]` (checked to compile on stable Rust with
 a probe, rustc 1.98.1). An entry brings its own self-check rows through its trait, so the rows
 follow the feature. Registries: coins, encoded forms, modes, share forms, card templates, self-check
-rows. Features: `coin-*` (12), `sskr`, `share-form-*` (6), `search-date`, `search-word`,
-`search-marked-codes`, `template-*` (13); default all. Forms and modes are registries without
+rows. Features: `coin-*` (12), `sskr`, `share-form-*` (6, removed with increment 7),
+`search-date`, `search-word`, `search-marked-codes`, `template-*` (13); default all. Forms and modes are registries without
 features: every host takes them.
 
 ## Rejected alternatives
@@ -37,5 +37,9 @@ features: every host takes them.
   them; a unit never reaches another unit's module.
 - Amended with increments 3 and 4 (2026-10-27): forms and modes, which no build leaves out, are
   closed enums, not traits: a sixth form or a fifth mode is a variant whose every `match` the
-  compiler names, without a trait object or a list for what never varies by build. Coins, share
-  forms, templates and searches stay entries behind their features.
+  compiler names, without a trait object or a list for what never varies by build. Coins, templates
+  and searches stay entries behind their features.
+- Amended with increment 7 (2026-10-27): share forms are a closed enum too, `ShareFormat`, built
+  with `sskr`: wallet-tools removes the shares whole, never one form
+  (`multi-chain-wallet-tools/tooling/key-derivation-features.mjs`, the `sskr` feature), so no
+  `share-form-*` feature would serve a host.
