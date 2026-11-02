@@ -21,7 +21,16 @@ const RECORDED: &str = include_str!("../../../vectors/ts-0.1.0/transcripts-v1.js
 /// What TS's help says that differs here, each by a decision of PLAN.md's "Parity with TS 0.1.0":
 /// images need no other program, a missing folder is made, each text input has its own limit, and
 /// re-encode asks the new backup first.
-const WRITTEN_IN: [(&str, &str); 15] = [
+const WRITTEN_IN: [(&str, &str); 17] = [
+    // The owner's corrections of 2026-11-02 (PLAN.md, parity).
+    (
+        "Standard input must be the terminal; without one, or in a terminal\n          that says TERM=dumb, the command stops at once. Output sent to a file\n          goes there as before.",
+        "Standard input and standard error must be the terminal; without them,\n          or in a terminal that says TERM=dumb, the command stops at once.\n          Output sent to a file goes there as before.",
+    ),
+    (
+        "pixels on a side and 8 megapixels",
+        "pixels on a side and 2 megapixels",
+    ),
     (
         "Needs the Poppler program pdftocairo; PDF files do not. Pages are\n          drawn at 300 dpi. If pdftocairo is missing, MnemoCode says so before\n          it asks for a secret.",
         "Pages are drawn at 300 dpi.",

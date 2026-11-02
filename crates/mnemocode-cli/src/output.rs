@@ -70,6 +70,8 @@ pub(crate) enum OutputError {
     NotResolved,
     /// An input that cannot be read, by its option's label.
     UnreadableInput(&'static str),
+    /// A result that standard output did not take: the system's words.
+    ResultNotWritten(String),
     /// A file's folder is a file.
     FileFolderIsAFile,
 }
@@ -128,6 +130,10 @@ impl std::fmt::Display for OutputError {
                 f,
                 "The {label} could not be read. Check that the file exists and is readable."
             ),
+            Self::ResultNotWritten(words) => write!(
+                f,
+                "The result could not be written to standard output: {words}."
+            ),
             Self::FileFolderIsAFile => {
                 f.write_str("The folder containing the output file is not a directory.")
             }
@@ -165,6 +171,7 @@ impl Refusal for OutputError {
             Self::OutsideRuled(_) => "cli.output-paths.outside-ruled-folders",
             Self::NotResolved => "cli.output-paths.output-path-could-not-resolved-safely",
             Self::UnreadableInput(label) => FileError::Unreadable(label).code(),
+            Self::ResultNotWritten(_) => "cli.output-paths.result-not-written",
             Self::FileFolderIsAFile => "cli.output-paths.folder-file",
         }
     }

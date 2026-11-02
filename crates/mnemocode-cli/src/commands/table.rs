@@ -131,7 +131,7 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
                     result_line(&line);
                 }
             }
-            let _unwritten = os::write_output(text.as_bytes());
+            terminal::result_raw(&text);
             return Ok(());
         };
         let path = os::resolve(

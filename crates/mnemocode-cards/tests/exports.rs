@@ -11,7 +11,7 @@ mod common;
 
 use common::{
     Choices, LONG_PHRASE, PHRASE, assert_no_metadata, colors_of, first_choices, millimetres,
-    pages_of, phrase_cards, refused, template,
+    pages_of, phrase_cards, png_pixels, refused, template,
 };
 use mnemocode::backup::Backup;
 use mnemocode::dates::parse_date;
@@ -420,11 +420,7 @@ fn a_set_of_the_official_shares_is_planned_with_its_cards_and_its_qr_codes() {
 
 /// The side in pixels of the grey image `file`, and whether each pixel is dark, row by row.
 fn dark_pixels(file: &[u8]) -> (usize, Vec<bool>) {
-    let mut reader = png::Decoder::new(std::io::Cursor::new(file))
-        .read_info()
-        .expect("an image");
-    let mut pixels = vec![0; reader.output_buffer_size().expect("a size")];
-    let frame = reader.next_frame(&mut pixels).expect("its pixels");
+    let (frame, pixels) = png_pixels(file);
     assert_eq!(frame.width, frame.height);
     assert_eq!(frame.line_size, frame.width as usize, "one byte a pixel");
     let dark = pixels.iter().map(|level| *level < 128).collect();

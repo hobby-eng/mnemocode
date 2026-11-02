@@ -475,21 +475,31 @@ fn error_raw_unrecorded(text: &str) {
     let _ignored = os::write_error(text.as_bytes());
 }
 
-/// Writes `text` and a line break to standard output: a result, which a script reads.
-pub(crate) fn output_line(text: &str) -> std::io::Result<()> {
+/// The first failure to write standard output. The command ends with it (`output_failure`), so that
+/// a result that a full disk did not take is never taken for written (CORE-22; TS 0.1.0 dropped it).
+static OUTPUT_FAILURE: OnceLock<std::io::Error> = OnceLock::new();
+
+/// Writes `text` and a line break to standard output: a line of a result, which a script reads.
+pub(crate) fn result_line(text: &str) {
     let mut bytes = String::with_capacity(text.len() + 1);
     bytes.push_str(text);
     bytes.push('\n');
     if context().output {
         page::record_written(&bytes);
     }
-    os::write_output(bytes.as_bytes())
+    result_raw(&bytes);
 }
 
-/// Writes `text`, a line of a result, to standard output; as TS, what a closed or full standard
-/// output does not take is not reported.
-pub(crate) fn result_line(text: &str) {
-    let _unwritten = output_line(text);
+/// Writes `text` to standard output as it is, keeping the first failure.
+pub(crate) fn result_raw(text: &str) {
+    if let Err(error) = os::write_output(text.as_bytes()) {
+        let _first = OUTPUT_FAILURE.set(error);
+    }
+}
+
+/// The first failure to write standard output, if one happened.
+pub(crate) fn output_failure() -> Option<&'static std::io::Error> {
+    OUTPUT_FAILURE.get()
 }
 
 /// Advice that can be read and passed over: grey, wrapped.

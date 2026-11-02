@@ -1,6 +1,8 @@
-//! The QR code of a sheet as a host reads it back from the page image it saved, as TS's reader does
-//! (PLAN.md, the parity of page images). The designs differ in what lies around the code, and the
-//! codes in how many pixels their modules take; every kind of page is read.
+//! The QR code of a sheet as a host reads it back from the page image it saved (PLAN.md, the parity
+//! of page images). A QR image may have 2 megapixels (owner, 2026-11-02), less than a sheet of A6 or
+//! A5, so a sheet is read in overlapping parts, as a person crops the code. The designs differ in
+//! what lies around the code, and the codes in how many pixels their modules take; every kind of
+//! page is read.
 
 // Test code throughout, so that clippy's allow-*-in-tests keys cover the helpers too. The default
 // features hold the shares and every design, which the manifest asks of ts_cards one by one.
@@ -9,31 +11,50 @@
 
 mod common;
 
-use common::{LONG_PHRASE, PHRASE, direct_backup, first_choices, pages_of, template};
+use common::{LONG_PHRASE, PHRASE, direct_backup, first_choices, pages_of, png_pixels, template};
 use mnemocode::forms::Form;
 use mnemocode::qr::read_png;
 use mnemocode::self_check::vectors::{LONG_SHARES, OFFICIAL_SHARES};
 use mnemocode::sskr::forms::ShareFormat;
 use mnemocode_cards::content::{SskrLayout, backup_card_content};
 use mnemocode_cards::export::{CardJob, ShareCardOptions, ShareCardSet, render_cards};
-use mnemocode_cards::raster::{ImageFormat, page_image};
+use mnemocode_cards::raster::{ImageFormat, page_image, png_of};
 use mnemocode_cards::scene::Page;
 use mnemocode_cards::settings::{CardSettings, Orientation, PageSize};
 use mnemocode_cards::templates::{CARD_TEMPLATES, CardDrawing};
 
-/// The sheets that TS's reader reads: A4 is past the pixels that an image may have.
+/// The sheets that TS's reader read whole: A4 was past the pixels that an image could have.
 const SIZES: [PageSize; 2] = [PageSize::A6, PageSize::A5];
 const TURNS: [Orientation; 2] = [Orientation::Portrait, Orientation::Landscape];
 /// The forms of a backup that have cards: their codes differ in what a QR code holds.
 const FORMS: [Form; 2] = [Form::Unicode, Form::Colors];
 
-/// What the QR code of `page` reads as from its image; the refusal where it does not read.
+/// What the QR code of `page` reads as from the first part of its image that reads; the last
+/// refusal where none does. The parts take three fifths of each side, at either edge and in the
+/// middle, so that one holds a code in any corner or in the centre whole.
 fn read_image(drawing: &CardDrawing, page: &Page) -> String {
     let image = page_image(&drawing.font, page, ImageFormat::Png).expect("the image");
-    read_png(&image).map_or_else(
-        |refusal| refusal.to_string(),
-        |text| text.as_str().to_owned(),
-    )
+    let (frame, pixels) = png_pixels(&image);
+    let (width, height) = (frame.width as usize, frame.height as usize);
+    assert_eq!(frame.line_size, width * 4, "RGBA, its paper transparent");
+    let (wide, high) = (width * 3 / 5, height * 3 / 5);
+    let mut refusal = String::new();
+    for top in [0, (height - high) / 2, height - high] {
+        for left in [0, (width - wide) / 2, width - wide] {
+            let mut part = Vec::with_capacity(wide * high * 4);
+            for row in top..top + high {
+                part.extend_from_slice(
+                    &pixels[row * frame.line_size..][left * 4..(left + wide) * 4],
+                );
+            }
+            let file = png_of(wide as u32, high as u32, &part).expect("a part");
+            match read_png(&file) {
+                Ok(text) => return text.as_str().to_owned(),
+                Err(error) => refusal = error.to_string(),
+            }
+        }
+    }
+    refusal
 }
 
 /// A sheet of `size`, turned to `turn`, with a QR code.

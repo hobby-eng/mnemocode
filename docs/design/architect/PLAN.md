@@ -105,9 +105,11 @@ U+FFFF is refused as a character the card font lacks, where TS draws it blank, a
 wide, where TS draws a space of 651 units; two refusals of a partial restore name `ShareSet::combine`,
 this library's function, where TS names its own; where `--ask-secrets` cannot run, on a terminal that
 cannot clear its screen or with no terminal, that is said before the command's own options, since the
-gate that keeps a secret result off such a terminal runs first; an image of noise at 8 megapixels reads
-in about 90 seconds where TS takes 34, inside rqrr, whose finder search no bound of ours reaches, and
-Ctrl+C acts when the reading ends. Their expected transcripts are the TS recordings with each
+gate that keeps a secret result off such a terminal runs first; a QR image may have 2 megapixels, where TS took 8, and a page image is read cropped to its code: noise
+kept rqrr's search for up to 15 s, 56 s and minutes at 3, 5 and 8 megapixels, and still for up to 21 s
+at 2, since that search grows with what an image holds, so the limit shortens it without bounding it; the help of `--ask-secrets` names standard error beside standard input, as
+its refusal does; a result that standard output does not take ends the command with 1 and its reason, where
+TS dropped it, and a closed pipe ends it as done (CORE-22). Their expected transcripts are the TS recordings with each
 difference written in by hand, naming this decision.
 
 ## Definition of done of a capability
@@ -280,6 +282,14 @@ Decided on 2026-11-02:
 - The master extended public key is read in every build, whatever its coins: one key
   for every coin, in BIP32's and SLIP-132's forms. A build without Bitcoin names no Bitcoin network
   in its two refusals of a network, which take codes of the port's own (module-map.json).
+- A QR image has at most 2 megapixels: a screen of 1920 × 1080 fits, and a page image is cropped.
+- The help of `--ask-secrets` names standard error; a failed write of standard output is reported.
+- Kept as they are: encode refuses English words and word numbers without Seedshift; the working
+  vectors of a repair and the codes of cards are wiped on free but not locked (RUST-13); the
+  progress of a date search of shares counts over every set; the self-test's rows as they are; no
+  note of pdftocairo; recover-word keeps the right to write on its private screen; jpeg-encoder's
+  license text as its upstream writes it; the messages of missing codes and the white space of
+  tokens as TS 0.1.0 has them.
 
 Nothing is open.
 
@@ -449,10 +459,10 @@ the TS capsule (`multi-chain-wallet-tools/packages/recovery-mnemocode`) to the W
   77 KiB down, past the 16 KiB kept from TS, so the scrub is
   128 KiB, and the gate refuses a row that reaches it. wasmi takes its portable dispatch, whose
   stack does not grow as it runs. The review found the assessment of marked shares unstoppable,
-  unlike TS's, so it is stepped as a search is. Open under RUST-13, for the owner to decide: the
+  unlike TS's, so it is stepped as a search is. Under RUST-13, kept by the owner on 2026-11-02: the
   algebra's vectors are redacted and wiped on free but not locked, and `Branch.particular`,
   `visible` and `hidden`, `ReadingSpace.particular` and `basis` and `ReadingUnits.values` stay
-  for a whole search, one set of them for each branch and share. Open the same way: a card's
+  for a whole search, one set of them for each branch and share. Kept the same way: a card's
   `CardCodes` and each `Page` being drawn are wiped on free but not locked, since the same codes stand
   unlocked in the finished PDF and page images, so that locking one copy closes no path. Moved: the share commands,
   `--qr-dir` of shares and the sources of typed shares (CAP-SSKR-SAVE-SHARE-QR,

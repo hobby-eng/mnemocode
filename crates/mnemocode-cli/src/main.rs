@@ -206,7 +206,7 @@ fn main() -> ExitCode {
         (ended, None) => ended,
     };
     let left = os::remove_left();
-    let status = match ended {
+    let mut status = match ended {
         Ok(()) => 0,
         Err(Stop::Refused(refusal)) => {
             terminal::failure(&refusal.to_string());
@@ -223,6 +223,14 @@ fn main() -> ExitCode {
             signal.exit_status()
         }
     };
+    // A result that standard output did not take ends a command that would have succeeded. A
+    // closed pipe, such as `| head`, is the reader's choice: the command ends as done.
+    if let (0, Some(error)) = (status, terminal::output_failure())
+        && error.kind() != std::io::ErrorKind::BrokenPipe
+    {
+        terminal::failure(&output::OutputError::ResultNotWritten(error.to_string()).to_string());
+        status = 1;
+    }
     for folder in left {
         terminal::notice(
             &format!(

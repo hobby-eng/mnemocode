@@ -333,3 +333,13 @@ pub(crate) fn assert_no_metadata(file: &[u8]) {
         assert!(!found, "{key}");
     }
 }
+
+/// The pixels of the PNG `file`, as png decodes them, and what it says of their frame.
+pub(crate) fn png_pixels(file: &[u8]) -> (png::OutputInfo, Vec<u8>) {
+    let mut reader = png::Decoder::new(std::io::Cursor::new(file))
+        .read_info()
+        .expect("an image");
+    let mut pixels = vec![0; reader.output_buffer_size().expect("a size")];
+    let frame = reader.next_frame(&mut pixels).expect("its pixels");
+    (frame, pixels)
+}

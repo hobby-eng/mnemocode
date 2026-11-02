@@ -341,3 +341,23 @@ fn of_several_wrong_card_options_the_one_ts_names_first_is_named() {
         assert_refused(&folder, &args, refusal);
     }
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_result_that_standard_output_does_not_take_ends_the_command_with_its_reason() {
+    let folder = folder("output-failure");
+    let full = fs::File::create("/dev/full").expect("Linux has /dev/full");
+    let failed = Command::new(env!("CARGO_BIN_EXE_mnemocode"))
+        .args(["table", "--all"])
+        .current_dir(&folder)
+        .stdin(Stdio::null())
+        .stdout(full)
+        .output()
+        .expect("the program runs");
+    assert_eq!(failed.status.code(), Some(1));
+    let said = String::from_utf8_lossy(&failed.stderr);
+    assert!(
+        said.contains("The result could not be written to standard output"),
+        "{said}"
+    );
+}

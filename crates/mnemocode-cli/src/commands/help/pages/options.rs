@@ -9,7 +9,7 @@ pub(super) const ASK_SECRETS: HelpOption = HelpOption {
     details: &[
         "The secrets are typed on the terminal's alternate screen, a private screen that shows what you type and then the result. When you press Enter after the result, it is cleared and the terminal returns to where it was, so that no secret stays in the scrollback: only a summary stays, of what was saved and where and of the warnings. This works on Linux, macOS and Windows alike.",
         "Each answer is checked as soon as it is given: one that cannot be used is explained in one line and asked again, and the answers before it are kept. While a secret is typed, Escape cancels the action and returns to the menu when started there; at a visible value, such as a fingerprint, an address or a file name, it goes back to the question before and drops what was typed there; in a list of choices it does what the key hint says. Ctrl+C stops the command.",
-        "Standard input must be the terminal; without one, or in a terminal that says TERM=dumb, the command stops at once. Output sent to a file goes there as before.",
+        "Standard input and standard error must be the terminal; without them, or in a terminal that says TERM=dumb, the command stops at once. Output sent to a file goes there as before.",
         "Raw phrase, record, share, date and final-word arguments are refused, including public fixtures. Use the private screen or the corresponding file/stdin option.",
     ],
 };
@@ -370,7 +370,7 @@ pub(super) const QR_FILE: HelpOption = HelpOption {
     value: Some("PNG"),
     summary: "Read the encoded record from a QR code in a PNG image",
     details: &[
-        "The image is read on this computer. It may be up to 16 MiB, 4096 pixels on a side and 8 megapixels, with up to 8 bits per sample. A QR code holds no header, so give --mode for a masked record; without it, --ask-secrets asks how it was masked.",
+        "The image is read on this computer. It may be up to 16 MiB, 4096 pixels on a side and 2 megapixels, with up to 8 bits per sample. A QR code holds no header, so give --mode for a masked record; without it, --ask-secrets asks how it was masked.",
     ],
 };
 
@@ -598,7 +598,7 @@ pub(super) const ASK_SECRETS_2: HelpOption = HelpOption {
     details: &[
         "The secrets are typed on the terminal's alternate screen, a private screen that shows what you type and then the result. When you press Enter after the result, it is cleared and the terminal returns to where it was, so that no secret stays in the scrollback: only a summary stays, of what was saved and where and of the warnings. This works on Linux, macOS and Windows alike.",
         "Each answer is checked as soon as it is given: one that cannot be used is explained in one line and asked again, and the answers before it are kept. While a secret is typed, Escape cancels the action and returns to the menu when started there; at a visible value, such as a fingerprint, an address or a file name, it goes back to the question before and drops what was typed there; in a list of choices it does what the key hint says. Ctrl+C stops the command.",
-        "Standard input must be the terminal; without one, or in a terminal that says TERM=dumb, the command stops at once. Output sent to a file goes there as before.",
+        "Standard input and standard error must be the terminal; without them, or in a terminal that says TERM=dumb, the command stops at once. Output sent to a file goes there as before.",
         "Raw phrase, record, share, date and final-word arguments are refused, including public fixtures. Use the private screen or the corresponding file/stdin option.",
     ],
 };

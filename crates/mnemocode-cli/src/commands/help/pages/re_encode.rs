@@ -11,7 +11,7 @@ const OWN_0_2: HelpOption = HelpOption {
     value: Some("PNG"),
     summary: "Read the encoded record from a QR code in a PNG image",
     details: &[
-        "The image is read on this computer. It may be up to 16 MiB, 4096 pixels on a side and 8 megapixels, with up to 8 bits per sample. A QR code holds no header, so give --old-mode for a masked record; without it, --ask-secrets asks how it was masked.",
+        "The image is read on this computer. It may be up to 16 MiB, 4096 pixels on a side and 2 megapixels, with up to 8 bits per sample. A QR code holds no header, so give --old-mode for a masked record; without it, --ask-secrets asks how it was masked.",
     ],
 };
 const OWN_0_4: HelpOption = HelpOption {

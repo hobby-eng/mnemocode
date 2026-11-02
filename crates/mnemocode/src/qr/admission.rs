@@ -17,8 +17,11 @@ pub const MAX_PNG_BYTES: usize = 16 * MEBIBYTE;
 pub const MAX_PNG_DIMENSION: u32 = 4096;
 /// A megapixel as the limit names it: 2^20 pixels.
 pub const MEGAPIXEL: u64 = 1 << 20;
-/// The most pixels of a QR code image read: a whole 3840 x 2160 screen fits.
-pub const MAX_PNG_PIXELS: u64 = 8 * MEGAPIXEL;
+/// The most pixels of a QR code image read: a screen of 1920 x 1080 fits, and the QR images that
+/// MnemoCode saves are 720 px; a page image is read cropped to its code (owner, 2026-11-02; TS 0.1.0
+/// took 8). A smaller image shortens rqrr's search through noise, which grows faster than the
+/// pixels, but does not bound it: noise of 2 megapixels has kept it for 21 s.
+pub const MAX_PNG_PIXELS: u64 = 2 * MEGAPIXEL;
 /// The most bits of a sample read: a QR code has two levels.
 pub const MAX_PNG_SAMPLE_BITS: u8 = 8;
 
@@ -403,7 +406,7 @@ mod tests {
         let wide = image(&[&header(4097, 1, 8, 0, 0), &data]);
         assert_eq!(
             admit(&wide).unwrap_err().to_string(),
-            "QR PNG dimensions exceed the 4096 px / 8-megapixel safety limit."
+            "QR PNG dimensions exceed the 4096 px / 2-megapixel safety limit."
         );
         let too_many = image(&[&header(4096, 4096, 8, 0, 0), &data]);
         assert_eq!(admit(&too_many).unwrap_err(), PngError::DimensionsTooLarge);
@@ -411,6 +414,16 @@ mod tests {
         assert_eq!(admit(&sixteen).unwrap_err(), PngError::WideSamples);
         let large = vec![0; MAX_PNG_BYTES + 1];
         assert_eq!(admit(&large).unwrap_err().code(), "too-large");
+    }
+
+    #[test]
+    fn a_screen_fits_and_a_square_past_two_megapixels_does_not() {
+        assert_eq!(check_dimensions(1920, 1080), Ok(()));
+        assert_eq!(check_dimensions(1448, 1448), Ok(()));
+        assert_eq!(
+            check_dimensions(1449, 1449),
+            Err(PngError::DimensionsTooLarge)
+        );
     }
 
     #[test]
