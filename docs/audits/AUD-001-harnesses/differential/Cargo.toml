@@ -1,0 +1,17 @@
+[package]
+name = "aud001-differential"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lints]
+workspace = true
+
+# Not a member of the repository's workspace: an audit's own tool, built on its own.
+[workspace]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[dependencies]
+bip39 = "=3.0.0"

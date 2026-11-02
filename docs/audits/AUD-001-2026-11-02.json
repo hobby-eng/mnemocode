@@ -1,0 +1,1342 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-001",
+  "auditNumber": 1,
+  "date": "2026-11-02",
+  "title": "Full-scope audit of the Rust MnemoCode before 0.2.0",
+  "completedAtUtc": "2026-11-02T06:57:58Z",
+  "reviewer": {
+    "name": "Claude Code main session as coordinator, with one independent read-only reviewer for documents and claims",
+    "model": "claude-opus-5-5",
+    "reasoningEffort": null
+  },
+  "reviewerPhases": [
+    {
+      "phase": "Coordinator: gates, builds, harnesses, security trace, records",
+      "model": "claude-opus-5-5",
+      "reasoningEffort": null
+    },
+    {
+      "phase": "Reviewer: every claim of the documents against code and runs",
+      "model": "claude-opus-5-5",
+      "reasoningEffort": null
+    }
+  ],
+  "snapshot": {
+    "commit": "b677647b477db276fef9003516f07270024124c3",
+    "commitComplete": true,
+    "tree": "a5e4c2a7689a49c5858b0a5ce7f4ab36f6e4bd24",
+    "signed": true,
+    "workingTree": "clean apart from the untracked audit-owned docs/audits/AUD-001-harnesses/",
+    "sourceFingerprint": "a5e4c2a7689a49c5858b0a5ce7f4ab36f6e4bd24",
+    "referenceProgram": {
+      "repository": "mnemocode (TS 0.1.0 line)",
+      "commit": "6f423d93fb205b4be799b86c07c3982b51488ac0"
+    }
+  },
+  "scope": {
+    "summary": "A compact full-scope audit, not the expanded specialist workflow: the Rust workspace at the reviewed commit, that is the library `mnemocode`, the cards crate, the command line with its menu, the WebAssembly binding with its four page profiles, the release tooling, the workflows and every document. Environment: Linux 7.0 on x86-64, 16 threads, Rust 1.99.1, nightly for the fuzzer only, cargo-audit 0.22.2, wasm-bindgen 0.2.129, Docker 29.9.2, Node.js 26.12.1 for the reference program, Chrome 155.0.8059.79, Firefox 158.0. Methods: the repository's gates; a differential run against MnemoCode 0.1.0 with random damage; edge probes; bounded fuzzing; the page files in real browsers; the canonical container; every claim of the documents against code and runs, by a reviewer with its own computation of the manual recovery; a source trace of secrets, randomness and the network. Two review rounds and a follow-up came before this audit; their findings are in the commit record of b677647, and the audit took them as a regression list, not as its scope.",
+    "procedureHashes": {
+      "multi-chain-wallet-tools/docs/FULL_AUDIT_GUIDE.md": "e1b2fb641e4a25ebf292548fc1e2ef0c25dbd01faa5c2b580c6ba75df2afcab7",
+      "multi-chain-wallet-tools/docs/audits/AUDIT_STANDARD.md": "0c80621acaf5d210f85af76de28a994e545f89f3f660a129026ac0931bb38593",
+      "multi-chain-wallet-tools/docs/audits/AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
+      "multi-chain-wallet-tools/docs/audit-report.schema.json": "989bf3de974d581579c1d1c1e143d5ab9fa232dc70cc8c6f84ad00531ae698fb",
+      ".github/instructions/audits.instructions.md": "05f13b0c4875ffbd0f0af14d4c6660e0edea980c0d0193dd96d53c41be36117f"
+    },
+    "excluded": "The internals of upstream crates, the vendored SSKR crates included: their calls were reviewed, and their files compared with UPSTREAM.json. No browser interface, provider, transaction or discovery code exists in this repository. No cryptographic proof, and no certification, is implied.",
+    "coverage": [
+      {
+        "checkId": "CHECK-SEC-001",
+        "group": "SEC / Secret ownership",
+        "scope": "CLI, library, binding",
+        "method": "Source trace of each secret against ARCHITECTURE.md's table; the memory scan of the wasm gate",
+        "outcome": "failed",
+        "evidence": "AUD-001-SEC001, AUD-001-SEC002"
+      },
+      {
+        "checkId": "CHECK-SEC-002",
+        "group": "SEC / Vault and CSP",
+        "scope": "None",
+        "method": "Not applicable: no vault, iframe or CSP in this repository; the pages of the wallet tools hold them. The glue has no network loader (wasm gate)",
+        "outcome": "not-applicable",
+        "evidence": "check.log (local)"
+      },
+      {
+        "checkId": "CHECK-SEC-003",
+        "group": "SEC / Network egress",
+        "scope": "CLI, binding",
+        "method": "No network crate in Cargo.lock; strace of a command: one socket call, the seccomp probe's own, refused; `code-rules` refuses `std::net`",
+        "outcome": "passed",
+        "evidence": "strace-table.log, inventory-dependencies.log (local)"
+      },
+      {
+        "checkId": "CHECK-SEC-004",
+        "group": "SEC / Randomness and encryption",
+        "scope": "CLI, library, binding",
+        "method": "Every `Random` implementation traced; `below`'s rejection bound derived by hand; age vectors; fuzz of age files; two splits in real browsers",
+        "outcome": "passed",
+        "evidence": "check.log, fuzz.log, browser-chrome.log, browser-firefox.log (local)"
+      },
+      {
+        "checkId": "CHECK-SEC-005",
+        "group": "SEC / Secret lifecycle",
+        "scope": "CLI, binding",
+        "method": "Memory scan: 717 returns searched for 168 secrets; signal and staging cases in the pty tests; no forced failure after each allocation",
+        "outcome": "passed",
+        "evidence": "check.log (local)"
+      },
+      {
+        "checkId": "CHECK-SEC-006",
+        "group": "SEC / Injection and persistence",
+        "scope": "CLI",
+        "method": "No DOM or browser storage here. Control characters of a path and refusals that repeat nothing: probes",
+        "outcome": "passed",
+        "evidence": "probes.log (local)"
+      },
+      {
+        "checkId": "CHECK-SEC-007",
+        "group": "SEC / Availability bounds",
+        "scope": "CLI, library",
+        "method": "Limits at their edges, `/dev/zero`, 64 MiB on standard input, 3 fuzz targets, QR images of noise. No transaction or provider exists",
+        "outcome": "failed",
+        "evidence": "AUD-001-SEC004; probes.log, fuzz.log (local)"
+      },
+      {
+        "checkId": "CHECK-FUN-001",
+        "group": "FUN / BIP39",
+        "scope": "Library",
+        "method": "Published vectors, the bip39 crate, and 12 to 24 words in the differential run",
+        "outcome": "passed",
+        "evidence": "check.log, differential.log (local)"
+      },
+      {
+        "checkId": "CHECK-FUN-002",
+        "group": "FUN / HD derivation and coins",
+        "scope": "12 coins",
+        "method": "Known answers of each coin, recorded from the TS program; features gate, each coin alone. No third implementation",
+        "outcome": "passed",
+        "evidence": "features.log (local)"
+      },
+      {
+        "checkId": "CHECK-FUN-003",
+        "group": "FUN / BIP85, BIP38, messages",
+        "scope": "None",
+        "method": "Not applicable: none of these exists in MnemoCode",
+        "outcome": "not-applicable",
+        "evidence": "Source inventory"
+      },
+      {
+        "checkId": "CHECK-FUN-004",
+        "group": "FUN / Scripts and descriptors",
+        "scope": "None",
+        "method": "Not applicable: only address evidence exists",
+        "outcome": "not-applicable",
+        "evidence": "Source inventory"
+      },
+      {
+        "checkId": "CHECK-FUN-005",
+        "group": "FUN / Transactions and PSBT",
+        "scope": "None",
+        "method": "Not applicable: MnemoCode handles no transactions",
+        "outcome": "not-applicable",
+        "evidence": "Source inventory"
+      },
+      {
+        "checkId": "CHECK-FUN-006",
+        "group": "FUN / Recovery formats",
+        "scope": "MnemoCode, SSKR",
+        "method": "Differential run with random damage; the manual guide followed by own code; BCR vectors; every form both ways. SeedQR, SLIP-39, Codex32 and Envelope do not exist here",
+        "outcome": "passed",
+        "evidence": "differential.log (local); reviewer's report"
+      },
+      {
+        "checkId": "CHECK-FUN-007",
+        "group": "FUN / Discovery and providers",
+        "scope": "None",
+        "method": "Not applicable: no provider or scan; the candidate list's format falls under CHECK-API-003",
+        "outcome": "not-applicable",
+        "evidence": "Source inventory"
+      },
+      {
+        "checkId": "CHECK-API-001",
+        "group": "API / Call contracts",
+        "scope": "Binding, rqrr, age, SSKR",
+        "method": "The binding's unit tests and probes; the page files in real browsers; refusals carry their code",
+        "outcome": "passed",
+        "evidence": "check.log, browser-*.log (local)"
+      },
+      {
+        "checkId": "CHECK-API-002",
+        "group": "API / Async and cancellation",
+        "scope": "CLI, binding",
+        "method": "pty tests of signals; a stopped search gives its partial outcome; the stepped search of the binding. No async browser state here",
+        "outcome": "passed",
+        "evidence": "check.log (local)"
+      },
+      {
+        "checkId": "CHECK-API-003",
+        "group": "API / Export schema",
+        "scope": "MNC1, MNCL",
+        "method": "Formats read by the reviewer's own code; byte-equal records and lists against TS; CSV and XLSX do not exist here",
+        "outcome": "passed",
+        "evidence": "differential.log (local); reviewer's report"
+      },
+      {
+        "checkId": "CHECK-API-004",
+        "group": "API / Encoding interoperability",
+        "scope": "Shares, QR, age",
+        "method": "Shares and QR images read across the two programs in every form; the published Bytewords vector",
+        "outcome": "passed",
+        "evidence": "differential.log (local); reviewer's report"
+      },
+      {
+        "checkId": "CHECK-BLD-001",
+        "group": "BLD / Feature composition",
+        "scope": "All features and profiles",
+        "method": "`cargo xtask features`; the wasm gate on every profile: exports and no word of a left-out part",
+        "outcome": "passed",
+        "evidence": "features.log, check.log (local)"
+      },
+      {
+        "checkId": "CHECK-BLD-002",
+        "group": "BLD / Matrix depth",
+        "scope": "Units",
+        "method": "Each unit alone, none and all compiled with warnings refused; no exhaustive matrix of combinations",
+        "outcome": "passed",
+        "evidence": "features.log (local)"
+      },
+      {
+        "checkId": "CHECK-BLD-003",
+        "group": "BLD / Lockfiles and licenses",
+        "scope": "Workspace",
+        "method": "Exact pins, vendored files against UPSTREAM.json, vectors against PROVENANCE.json, notices gate, RustSec",
+        "outcome": "passed",
+        "evidence": "check.log, cargo-audit.log (local)"
+      },
+      {
+        "checkId": "CHECK-BLD-004",
+        "group": "BLD / Canonical bytes",
+        "scope": "Linux, Windows, WASM",
+        "method": "Canonical container with no cache on the reviewed commit and on the fix commit; a second build of the fix commit on the kept toolchain layers, every file compared. `cargo xtask reproducible` itself could not finish: see the limitations",
+        "outcome": "passed",
+        "evidence": "docker-canonical.log, remediation-docker-*.log (local)"
+      },
+      {
+        "checkId": "CHECK-BLD-005",
+        "group": "BLD / Artifacts and workflows",
+        "scope": "Workflows, release tooling",
+        "method": "Static reading of the three workflows; `verify-executable`; no workflow has ever run, as the repository has no remote",
+        "outcome": "failed",
+        "evidence": "AUD-001-BLD001; verify-executable.log (local)"
+      },
+      {
+        "checkId": "CHECK-UI-001",
+        "group": "UI / Files and viewports",
+        "scope": "None",
+        "method": "Not applicable: no browser interface here. The terminal's layouts are covered by the transcripts and the pty tests",
+        "outcome": "not-applicable",
+        "evidence": "check.log (local)"
+      },
+      {
+        "checkId": "CHECK-UI-002",
+        "group": "UI / Navigation and state",
+        "scope": "None",
+        "method": "Not applicable as a browser case. The menu is covered by the pty tests",
+        "outcome": "not-applicable",
+        "evidence": "check.log (local)"
+      },
+      {
+        "checkId": "CHECK-UI-003",
+        "group": "UI / Secret visibility",
+        "scope": "CLI",
+        "method": "Not applicable as a browser case. The private screen was run by the reviewer and in the pty tests",
+        "outcome": "not-applicable",
+        "evidence": "AUD-001-SEC002 from the same walk"
+      },
+      {
+        "checkId": "CHECK-ARC-001",
+        "group": "ARC / Ownership and imports",
+        "scope": "Workspace",
+        "method": "`code-rules` layers against module-map.json, in tokens and macros; its 45 self-test cases",
+        "outcome": "passed",
+        "evidence": "check.log, code-rules-selftest.log (local)"
+      },
+      {
+        "checkId": "CHECK-ARC-002",
+        "group": "ARC / Dead code and duplication",
+        "scope": "Workspace",
+        "method": "`copies` gate with its controls; clippy on every target",
+        "outcome": "passed",
+        "evidence": "check.log, copies-selftest.log (local)"
+      },
+      {
+        "checkId": "CHECK-ARC-003",
+        "group": "ARC / Comments and test fidelity",
+        "scope": "Workspace",
+        "method": "Test rules of `code-rules`; replays run the production paths through the recordings",
+        "outcome": "passed",
+        "evidence": "check.log (local)"
+      },
+      {
+        "checkId": "CHECK-DOC-001",
+        "group": "DOC / Capabilities and safety",
+        "scope": "All documents",
+        "method": "Every claim against code and runs, by one reviewer",
+        "outcome": "failed",
+        "evidence": "AUD-001-SEC002, SEC003, DOC001, DOC002, DOC003"
+      },
+      {
+        "checkId": "CHECK-DOC-002",
+        "group": "DOC / Commands and links",
+        "scope": "All documents",
+        "method": "Every example run as written; relative links and anchors; every option against the help",
+        "outcome": "failed",
+        "evidence": "AUD-001-DOC004 to DOC009"
+      },
+      {
+        "checkId": "CHECK-DOC-003",
+        "group": "DOC / Audit records",
+        "scope": "This report",
+        "method": "Schema, IDs, counts against logs, privacy",
+        "outcome": "passed",
+        "evidence": "report-validation.json (local)"
+      }
+    ]
+  },
+  "checks": [
+    {
+      "label": "check",
+      "command": [
+        "cargo",
+        "xtask",
+        "check"
+      ],
+      "outcome": "passed",
+      "counts": "rustfmt, clippy on three targets and the wasm profiles, doc, tests, code-rules, copies, dprint, notices, action pins, the wasm gate: 717 returns searched for 168 secrets, 4 page files; RustSec 1395 advisories, 180 crates",
+      "startedAtUtc": "2026-11-02T02:15:25Z",
+      "endedAtUtc": "2026-11-02T02:34:41Z",
+      "exitCode": 0,
+      "logSha256": "ea75ab7e0bf2900aa57fd82199ef31628a379c5cffdd69dc3601774fa8854d20",
+      "evidence": "check.log (local)"
+    },
+    {
+      "label": "features",
+      "command": [
+        "cargo",
+        "xtask",
+        "features"
+      ],
+      "outcome": "passed",
+      "counts": "548 tests with the ignored ones, 0 failed; clippy on each unit alone, none and all",
+      "startedAtUtc": "2026-11-02T02:34:41Z",
+      "endedAtUtc": "2026-11-02T02:46:33Z",
+      "exitCode": 0,
+      "logSha256": "d2e369658986c2096431c5a0d8820fec40889b41a21ac740e746fb8cefb68b77",
+      "evidence": "features.log (local)"
+    },
+    {
+      "label": "cargo-audit",
+      "command": [
+        "cargo",
+        "audit",
+        "--deny",
+        "warnings"
+      ],
+      "outcome": "passed",
+      "counts": "1395 advisories, 180 crates, none found",
+      "startedAtUtc": "2026-11-02T02:46:33Z",
+      "endedAtUtc": "2026-11-02T02:46:35Z",
+      "exitCode": 0,
+      "logSha256": "bb940f8b1ee416155e2534d406a9c95048a13775cb1a17a56e4476096397fc82",
+      "evidence": "cargo-audit.log (local)"
+    },
+    {
+      "label": "code-rules-selftest",
+      "command": [
+        "cargo",
+        "xtask",
+        "code-rules",
+        "--self-test"
+      ],
+      "outcome": "passed",
+      "counts": "45 cases caught",
+      "startedAtUtc": "2026-11-02T02:46:35Z",
+      "endedAtUtc": "2026-11-02T02:46:35Z",
+      "exitCode": 0,
+      "logSha256": "e76c02c81ef4c8f7caf92244b57c18ee834dab8266770b9083d12094dd99de17",
+      "evidence": "code-rules-selftest.log (local)"
+    },
+    {
+      "label": "copies-selftest",
+      "command": [
+        "cargo",
+        "xtask",
+        "copies",
+        "--self-test"
+      ],
+      "outcome": "passed",
+      "counts": "controls caught",
+      "startedAtUtc": "2026-11-02T02:46:35Z",
+      "endedAtUtc": "2026-11-02T02:46:35Z",
+      "exitCode": 0,
+      "logSha256": "4842e91148155eeb68c132e5ad460225bc6f1f48f4ca4eaead3836c29774fc9c",
+      "evidence": "copies-selftest.log (local)"
+    },
+    {
+      "label": "differential-control",
+      "command": [
+        "./target/release/aud001-differential",
+        "/home/user/Documents/bip_tools/tmp/aud001/mnemocode-try",
+        "control-final",
+        "1",
+        "7",
+        "/bin/echo"
+      ],
+      "outcome": "passed",
+      "counts": "control: a false reference must fail, and exit 1 is expected",
+      "startedAtUtc": "2026-11-02T03:07:53Z",
+      "endedAtUtc": "2026-11-02T03:07:53Z",
+      "exitCode": 1,
+      "logSha256": "b3afe2fac2afc795a426ba7081311f062320b3d17ff5a71782460c810358be90",
+      "evidence": "differential-control.log (local)"
+    },
+    {
+      "label": "differential",
+      "command": [
+        "./target/release/aud001-differential",
+        "/home/user/Documents/bip_tools/tmp/aud001/mnemocode-try",
+        "work-final",
+        "100",
+        "1001",
+        "node",
+        "/home/user/Documents/bip_tools/mnemocode/dist/mnemocode.js"
+      ],
+      "outcome": "passed",
+      "counts": "933 cases on 100 synthetic phrases, 0 differences; the control exits 1",
+      "startedAtUtc": "2026-11-02T03:07:53Z",
+      "endedAtUtc": "2026-11-02T03:48:24Z",
+      "exitCode": 0,
+      "logSha256": "f65837b10dbda5c8a5b169a25bc4425abe7bfce7fbf65154a354c55288149808",
+      "evidence": "differential.log (local)"
+    },
+    {
+      "label": "probes",
+      "command": [
+        "/home/user/Documents/bip_tools/tmp/aud001/target/release/probes",
+        "/home/user/Documents/bip_tools/tmp/aud001/mnemocode-try",
+        "/home/user/Documents/bip_tools/tmp/aud001/probe-final"
+      ],
+      "outcome": "passed",
+      "counts": "14 probes held",
+      "startedAtUtc": "2026-11-02T03:07:39Z",
+      "endedAtUtc": "2026-11-02T03:07:40Z",
+      "exitCode": 0,
+      "logSha256": "1c80c55555f7aa9a832c836b2871ecf71bb98598d79d514c5e974a95b33adfe9",
+      "evidence": "probes.log (local)"
+    },
+    {
+      "label": "fuzz",
+      "command": [
+        "/home/user/Documents/bip_tools/tmp/aud001/tools/run-fuzz.sh",
+        "300"
+      ],
+      "outcome": "passed",
+      "counts": "text 19,378 runs, qr_png 410,359, candidate_file 141,766, 300 s each; no crash, no timeout",
+      "startedAtUtc": "2026-11-02T02:46:56Z",
+      "endedAtUtc": "2026-11-02T03:03:33Z",
+      "exitCode": 0,
+      "logSha256": "c85ee722286ef1319b26b32e22150af10c34488a4fbe241aa612a688be3711fb",
+      "evidence": "fuzz.log (local)"
+    },
+    {
+      "label": "browser-chrome",
+      "command": [
+        "/home/user/Documents/bip_tools/mnemocode-rust/docs/audits/AUD-001-harnesses/browser/run.sh",
+        "/home/user/Documents/bip_tools/mnemocode-rust/dist/wasm/multi-chain",
+        "/home/user/Documents/bip_tools/tmp/aud001/target/release/serve",
+        "/home/user/Documents/bip_tools/workingspace/browsers/chromedriver-155.0.8059.79/chromedriver-linux64/chromedriver",
+        "/home/user/Documents/bip_tools/workingspace/browsers/chrome-155.0.8059.79/chrome-linux64/chrome",
+        "chrome",
+        "/home/user/Documents/bip_tools/tmp/aud001/bf"
+      ],
+      "outcome": "passed",
+      "counts": "Chrome 155.0.8059.79: 14 of 14 steps",
+      "startedAtUtc": "2026-11-02T03:07:40Z",
+      "endedAtUtc": "2026-11-02T03:07:46Z",
+      "exitCode": 0,
+      "logSha256": "9ed768da8942eac8217f24374a1038129176a094937f368697fff1338e64a0af",
+      "evidence": "browser-chrome.log (local)"
+    },
+    {
+      "label": "browser-firefox",
+      "command": [
+        "/home/user/Documents/bip_tools/mnemocode-rust/docs/audits/AUD-001-harnesses/browser/run.sh",
+        "/home/user/Documents/bip_tools/mnemocode-rust/dist/wasm/multi-chain",
+        "/home/user/Documents/bip_tools/tmp/aud001/target/release/serve",
+        "/home/user/Documents/bip_tools/workingspace/browsers/geckodriver-0.37.1/geckodriver",
+        "/home/user/Documents/bip_tools/workingspace/browsers/firefox-158.0/firefox/firefox",
+        "firefox",
+        "/home/user/Documents/bip_tools/tmp/aud001/bf"
+      ],
+      "outcome": "passed",
+      "counts": "Firefox 158.0: 14 of 14 steps",
+      "startedAtUtc": "2026-11-02T03:07:46Z",
+      "endedAtUtc": "2026-11-02T03:07:53Z",
+      "exitCode": 0,
+      "logSha256": "fa3e13e3d14b3adeda60b05afe1aec356aff91e42dcb47a19229142d5d188779",
+      "evidence": "browser-firefox.log (local)"
+    },
+    {
+      "label": "strace-table",
+      "command": [
+        "strace",
+        "-f",
+        "-qq",
+        "-e",
+        "trace=%network,execve,fork,vfork,clone,clone3,ptrace,mount,setuid",
+        "-o",
+        "/dev/stdout",
+        "./mnemocode-try",
+        "table",
+        "--word",
+        "abandon"
+      ],
+      "outcome": "passed",
+      "counts": "one execve; one socket call, refused: the seccomp probe",
+      "startedAtUtc": "2026-11-02T03:08:18Z",
+      "endedAtUtc": "2026-11-02T03:08:18Z",
+      "exitCode": 0,
+      "logSha256": "de63accbbe2138e2be4f3e0f50f8e9eb7777ba4312f3d9b780f74259520e30f3",
+      "evidence": "strace-table.log (local)"
+    },
+    {
+      "label": "tracer-refusal",
+      "command": [
+        "strace",
+        "-qq",
+        "-e",
+        "trace=execve",
+        "-o",
+        "/dev/null",
+        "./mnemocode-try",
+        "encode",
+        "--mnemonic-file",
+        "phrase-public.txt",
+        "--mode",
+        "direct",
+        "--format",
+        "3"
+      ],
+      "outcome": "passed",
+      "counts": "refused under a tracer, exit 1 as expected",
+      "startedAtUtc": "2026-11-02T03:08:18Z",
+      "endedAtUtc": "2026-11-02T03:08:18Z",
+      "exitCode": 1,
+      "logSha256": "334e51b9e2150756147e962757b4af5d2114d596f8fe3502f7fc8d42139387cf",
+      "evidence": "tracer-refusal.log (local)"
+    },
+    {
+      "label": "hardening",
+      "command": [
+        "bash",
+        "-c",
+        "readelf -h mnemocode-try | grep Type; readelf -lW mnemocode-try | grep -E 'GNU_STACK|GNU_RELRO'; readelf -dW mnemocode-try | grep -E 'BIND_NOW|FLAGS|NEEDED|RPATH|RUNPATH'"
+      ],
+      "outcome": "passed",
+      "counts": "PIE, full RELRO, BIND_NOW, non-executable stack",
+      "startedAtUtc": "2026-11-02T03:08:18Z",
+      "endedAtUtc": "2026-11-02T03:08:18Z",
+      "exitCode": 0,
+      "logSha256": "ad01068965f3067bc82ddcb54251221db147fa05e27a82e629d5cbc9ce18bdec",
+      "evidence": "hardening.log (local)"
+    },
+    {
+      "label": "docker-canonical",
+      "command": [
+        "docker",
+        "buildx",
+        "build",
+        "--no-cache",
+        "--platform",
+        "linux/amd64",
+        "--target",
+        "artifacts",
+        "--output",
+        "type=local,dest=dist/canonical",
+        "-f",
+        "packaging/Dockerfile.reproducible",
+        "."
+      ],
+      "outcome": "passed",
+      "counts": "Linux x64 and ARM64, Windows x64, 4 WASM files. Attempts 1 and 2 failed on snapshot.ubuntu.com answering 503; this one passed",
+      "startedAtUtc": "2026-11-02T03:23:45Z",
+      "endedAtUtc": "2026-11-02T03:48:42Z",
+      "exitCode": 0,
+      "logSha256": "ae685aab05a2654f157b10641b41722195cca4bf40881b832aded82f612f7b03",
+      "evidence": "docker-canonical.log (local)"
+    },
+    {
+      "label": "docker-reproducible",
+      "command": [
+        "cargo",
+        "xtask",
+        "reproducible"
+      ],
+      "outcome": "blocked",
+      "counts": "Blocked: the two attempts on this commit stopped at downloads from static.rust-lang.org inside the container; nothing was compared",
+      "startedAtUtc": "2026-11-02T03:56:43Z",
+      "endedAtUtc": "2026-11-02T04:09:50Z",
+      "exitCode": 1,
+      "logSha256": "3de54817980cea6f800c5ad8fc1ea27018e0a1529cb1c5efb2cd263fec413fa6",
+      "evidence": "docker-reproducible.log (local)"
+    },
+    {
+      "label": "verify-executable",
+      "command": [
+        "cargo",
+        "xtask",
+        "verify-executable",
+        "dist/release/mnemocode-0.2.0-linux-x64"
+      ],
+      "outcome": "passed",
+      "counts": "the canonical Linux x64 executable away from the checkout: all steps ok",
+      "startedAtUtc": "2026-11-02T03:56:07Z",
+      "endedAtUtc": "2026-11-02T03:56:10Z",
+      "exitCode": 0,
+      "logSha256": "5775fb381cfdb96be75c88f5e6d2056e640c80e0dc7a3f9d6a8364ed10036f91",
+      "evidence": "verify-executable.log (local)"
+    },
+    {
+      "label": "other-systems",
+      "command": [
+        "./run-other.sh",
+        "/home/user/Documents/bip_tools/tmp/aud001/baseline-src/dist/release"
+      ],
+      "outcome": "passed",
+      "counts": "Windows executable under Wine 9.0 and ARM64 under qemu-user 8.2.2: version, self-test, encode, decode, split, combine, card PDF, 14 of 14 steps",
+      "startedAtUtc": "2026-11-02T04:01:41Z",
+      "endedAtUtc": "2026-11-02T04:03:18Z",
+      "exitCode": 0,
+      "logSha256": "62485425d7b85f91501ca375afc2a1fb0854e52a571849ef37373fff02c669f6",
+      "evidence": "other-systems.log (local)"
+    },
+    {
+      "label": "glibc-floor",
+      "command": [
+        "/home/user/Documents/bip_tools/tmp/aud001/tools/glibc-floor.sh"
+      ],
+      "outcome": "passed",
+      "counts": "Debian 11 and Alpine cannot run it; Ubuntu 22.04 and Debian 12 run it with the loader warning of AUD-001-BLD002; Ubuntu 24.04 runs it clean",
+      "startedAtUtc": "2026-11-02T03:56:43Z",
+      "endedAtUtc": "2026-11-02T03:58:29Z",
+      "exitCode": 0,
+      "logSha256": "8cf953eeea3434ec6c5a17afb207a62ee80e1cbab105361f7396cbd3d1835f1a",
+      "evidence": "glibc-floor.log (local)"
+    },
+    {
+      "label": "remediation-check",
+      "command": [
+        "cargo",
+        "xtask",
+        "check"
+      ],
+      "outcome": "passed",
+      "counts": "545 tests; wasm gate 717 returns, 168 secrets; RustSec clean",
+      "startedAtUtc": "2026-11-02T04:35:28Z",
+      "endedAtUtc": "2026-11-02T04:50:26Z",
+      "exitCode": 0,
+      "logSha256": "afdd7741ff01aa0e81a8c3b57fe73f8f144266e2ec11ed1fb25d5cd7361e4769",
+      "evidence": "remediation-check.log (local)"
+    },
+    {
+      "label": "remediation-features",
+      "command": [
+        "cargo",
+        "xtask",
+        "features"
+      ],
+      "outcome": "passed",
+      "counts": "548 tests with the ignored ones, 0 failed",
+      "startedAtUtc": "2026-11-02T04:28:45Z",
+      "endedAtUtc": "2026-11-02T04:35:03Z",
+      "exitCode": 0,
+      "logSha256": "b41f13868e27860148774cdee54da0053808d7a84a7dba0256d6e1596d4873a8",
+      "evidence": "remediation-features.log (local)"
+    },
+    {
+      "label": "remediation-docker-canonical",
+      "command": [
+        "docker",
+        "buildx",
+        "build",
+        "--no-cache",
+        "--platform",
+        "linux/amd64",
+        "--target",
+        "artifacts",
+        "--output",
+        "type=local,dest=dist/canonical",
+        "-f",
+        "packaging/Dockerfile.reproducible",
+        "."
+      ],
+      "outcome": "passed",
+      "counts": "Linux x64 and ARM64, Windows x64, WASM archive, after 3 attempts stopped by the network. SHA-256: Linux x64 `a0f4c5325b601c66`, ARM64 `60ffea32bc650285`, Windows `7f1a38f7bf05fa2e`, WASM archive `b44efe57d0a40929`",
+      "startedAtUtc": "2026-11-02T05:22:50Z",
+      "endedAtUtc": "2026-11-02T05:42:39Z",
+      "exitCode": 0,
+      "logSha256": "3603581c97ea92387fd1cc8a9f86966595f2f11e4e0c7d71be3090f0b64d534b",
+      "evidence": "remediation-docker-canonical.log (local)"
+    },
+    {
+      "label": "remediation-rebuild-kept-toolchain",
+      "command": [
+        "/home/user/Documents/bip_tools/tmp/aud001/tools/rebuild-kept-toolchain.sh"
+      ],
+      "outcome": "passed",
+      "counts": "the build stage again on the kept toolchain layers: 7 files equal, byte for byte, the 3 executables and the WASM archive among them",
+      "startedAtUtc": "2026-11-02T06:30:22Z",
+      "endedAtUtc": "2026-11-02T06:53:30Z",
+      "exitCode": 0,
+      "logSha256": "0f63cab6e986c467bc5caef46e9341eae05c1354364c238d6ee08f399c87e25f",
+      "evidence": "remediation-rebuild-kept-toolchain.log (local)"
+    },
+    {
+      "label": "remediation-docker-reproducible",
+      "command": [
+        "cargo",
+        "xtask",
+        "reproducible"
+      ],
+      "outcome": "blocked",
+      "counts": "6 attempts, each stopped by a download from static.rust-lang.org failing inside the container; nothing compared",
+      "startedAtUtc": "2026-11-02T06:21:53Z",
+      "endedAtUtc": "2026-11-02T06:27:55Z",
+      "exitCode": 1,
+      "logSha256": "28d31699a6897de9138f70f63e754c2bb34ba0d67e0d733a7b64a6d6fc7838f8",
+      "evidence": "remediation-docker-reproducible.log (local)"
+    },
+    {
+      "label": "remediation-verify-executable",
+      "command": [
+        "cargo",
+        "xtask",
+        "verify-executable",
+        "dist/release/mnemocode-0.2.0-linux-x64"
+      ],
+      "outcome": "passed",
+      "counts": "all steps ok",
+      "startedAtUtc": "2026-11-02T05:42:40Z",
+      "endedAtUtc": "2026-11-02T05:43:12Z",
+      "exitCode": 0,
+      "logSha256": "5775fb381cfdb96be75c88f5e6d2056e640c80e0dc7a3f9d6a8364ed10036f91",
+      "evidence": "remediation-verify-executable.log (local)"
+    },
+    {
+      "label": "remediation-glibc-floor",
+      "command": [
+        "/home/user/Documents/bip_tools/tmp/aud001/tools/glibc-floor.sh",
+        "/home/user/Documents/bip_tools/tmp/aud001/final-src/dist/release"
+      ],
+      "outcome": "passed",
+      "counts": "no loader warning on Ubuntu 22.04, Debian 12 or Ubuntu 24.04, each self-test PASS; Debian 11 and Alpine cannot run it, as CLI.md now says",
+      "startedAtUtc": "2026-11-02T05:43:12Z",
+      "endedAtUtc": "2026-11-02T05:43:21Z",
+      "exitCode": 0,
+      "logSha256": "f55f1b2d45c4345dd8923020775b165922dd228ebc39a0d6dbc0ae5ef9f0f125",
+      "evidence": "remediation-glibc-floor.log (local)"
+    },
+    {
+      "label": "remediation-menu-child",
+      "command": [
+        "tools/run-menu-child.sh",
+        "/home/user/Documents/bip_tools/tmp/aud001/final-src/dist/release"
+      ],
+      "outcome": "passed",
+      "counts": "on Ubuntu 22.04 and 24.04 the menu starts its child, `table --word abandon`, in a pty",
+      "startedAtUtc": "2026-11-02T06:42:01Z",
+      "endedAtUtc": "2026-11-02T06:42:16Z",
+      "exitCode": 0,
+      "logSha256": "5ea96477cffd4a65b1260f9b0bea0bce40ac3a350f5881e1d35d5fc3e430fc6c",
+      "evidence": "remediation-menu-child.log (local)"
+    },
+    {
+      "label": "remediation-other-systems",
+      "command": [
+        "/home/user/Documents/bip_tools/tmp/aud001/tools/run-other.sh",
+        "/home/user/Documents/bip_tools/tmp/aud001/final-src/dist/release"
+      ],
+      "outcome": "passed",
+      "counts": "14 of 14 steps under Wine and qemu-user",
+      "startedAtUtc": "2026-11-02T05:43:21Z",
+      "endedAtUtc": "2026-11-02T05:44:34Z",
+      "exitCode": 0,
+      "logSha256": "f38d638be16cf83022073154e1019b4e5f62942dd2a0f5c372b26421142eb9ce",
+      "evidence": "remediation-other-systems.log (local)"
+    },
+    {
+      "label": "remediation-differential",
+      "command": [
+        "./target/release/aud001-differential",
+        "/home/user/Documents/bip_tools/tmp/aud001/final-src/dist/release/mnemocode-0.2.0-linux-x64",
+        "work-fix",
+        "40",
+        "2002",
+        "node",
+        "/home/user/Documents/bip_tools/mnemocode/dist/mnemocode.js"
+      ],
+      "outcome": "passed",
+      "counts": "373 cases on 40 synthetic phrases of another seed, 0 differences, on the canonical executable",
+      "startedAtUtc": "2026-11-02T06:41:13Z",
+      "endedAtUtc": "2026-11-02T06:54:41Z",
+      "exitCode": 0,
+      "logSha256": "f05574e025a2d1f6dfaa6b20faf516feb963bfcb2c4adb1bac33b384c94624db",
+      "evidence": "remediation-differential.log (local)"
+    },
+    {
+      "label": "remediation-probes",
+      "command": [
+        "/home/user/Documents/bip_tools/tmp/aud001/target/release/probes",
+        "/home/user/Documents/bip_tools/tmp/aud001/final-src/dist/release/mnemocode-0.2.0-linux-x64",
+        "/home/user/Documents/bip_tools/tmp/aud001/probe-fix"
+      ],
+      "outcome": "passed",
+      "counts": "14 probes held",
+      "startedAtUtc": "2026-11-02T06:40:32Z",
+      "endedAtUtc": "2026-11-02T06:40:33Z",
+      "exitCode": 0,
+      "logSha256": "1c80c55555f7aa9a832c836b2871ecf71bb98598d79d514c5e974a95b33adfe9",
+      "evidence": "remediation-probes.log (local)"
+    },
+    {
+      "label": "remediation-browser-chrome",
+      "command": [
+        "/home/user/Documents/bip_tools/mnemocode-rust/docs/audits/AUD-001-harnesses/browser/run.sh",
+        "/home/user/Documents/bip_tools/tmp/aud001/final-wasm/wasm/multi-chain",
+        "/home/user/Documents/bip_tools/tmp/aud001/target/release/serve",
+        "/home/user/Documents/bip_tools/workingspace/browsers/chromedriver-155.0.8059.79/chromedriver-linux64/chromedriver",
+        "/home/user/Documents/bip_tools/workingspace/browsers/chrome-155.0.8059.79/chrome-linux64/chrome",
+        "chrome",
+        "/home/user/Documents/bip_tools/tmp/aud001/bf3"
+      ],
+      "outcome": "passed",
+      "counts": "14 of 14 steps",
+      "startedAtUtc": "2026-11-02T06:40:33Z",
+      "endedAtUtc": "2026-11-02T06:40:40Z",
+      "exitCode": 0,
+      "logSha256": "854875645b06bd637f781fed5ee0770a956581fd9ca78418528bb52754609c74",
+      "evidence": "remediation-browser-chrome.log (local)"
+    },
+    {
+      "label": "remediation-browser-firefox",
+      "command": [
+        "/home/user/Documents/bip_tools/mnemocode-rust/docs/audits/AUD-001-harnesses/browser/run.sh",
+        "/home/user/Documents/bip_tools/tmp/aud001/final-wasm/wasm/multi-chain",
+        "/home/user/Documents/bip_tools/tmp/aud001/target/release/serve",
+        "/home/user/Documents/bip_tools/workingspace/browsers/geckodriver-0.37.1/geckodriver",
+        "/home/user/Documents/bip_tools/workingspace/browsers/firefox-158.0/firefox/firefox",
+        "firefox",
+        "/home/user/Documents/bip_tools/tmp/aud001/bf3"
+      ],
+      "outcome": "passed",
+      "counts": "14 of 14 steps",
+      "startedAtUtc": "2026-11-02T06:40:40Z",
+      "endedAtUtc": "2026-11-02T06:40:50Z",
+      "exitCode": 0,
+      "logSha256": "e7d10c64a63d61890521764650345477b2148181dc9706e2071c499f3bed6b4f",
+      "evidence": "remediation-browser-firefox.log (local)"
+    }
+  ],
+  "findings": [
+    {
+      "id": "AUD-001-SEC001",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "Codes and records live in plain strings, against the design's owner types",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "group": "Secret lifecycle",
+      "affectedFiles": [
+        "crates/mnemocode/src/forms.rs:211",
+        "crates/mnemocode/src/backup.rs:257-264",
+        "crates/mnemocode/src/backup/json.rs:20",
+        "crates/mnemocode-cli/src/commands/encode.rs:132,536,552",
+        "SECURITY.md:41,43",
+        "README.md:280",
+        "docs/design/architect/ARCHITECTURE.md:295-296"
+      ],
+      "reproduction": "Read `Backup::text`, `Backup::record` and `Form::codes` at the reviewed commit: each returns a `String`. `encode --mode direct` writes the phrase itself in another form through them. `Date` is `Copy` without `Drop`, and `derive_shifts` returns a `Vec<u16>`.",
+      "expected": "RUST-13 and ARCHITECTURE.md's table: codes, the MNC1 record and JSON live in `EncodedBackup` and `SecretText`, wiped and locked where their size allows. SECURITY.md names drawn pages as the only memory left unlocked.",
+      "observed": "The codes and the record of a backup stood in unlocked `String`s for the rest of a command, with no redaction. Their heap blocks were wiped on free by the zeroing allocator. Stack copies of a `Date` are not wiped, and shift schedules are not locked; both are short-lived working values.",
+      "impact": "Where swap is in use, these buffers were not kept out of it, while the documents said so. A debug print of the text would not have been redacted. No leak was demonstrated: the allocator wiped the blocks, and core dumps stay off.",
+      "recommendedFix": "Return `SecretText` from `Form::codes`, `Backup::text`, `Backup::record` and `json`, and keep the record line in one. Name a step's working copies as the exception in SECURITY.md, README.md and ARCHITECTURE.md.",
+      "requiredVerification": "A test that the codes and the record print as redacted; `cargo xtask check`, whose memory scan covers the entries that use them; a byte-equal differential run.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-SEC002",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "The menu's word lookup is called free of secrets, yet takes words of a phrase on the command line",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "group": "Secret lifecycle",
+      "affectedFiles": [
+        "crates/mnemocode-cli/src/menu/table.rs:41",
+        "crates/mnemocode-cli/src/os/child.rs:3",
+        "SECURITY.md:42",
+        "README.md:60"
+      ],
+      "reproduction": "On a pty: start the menu, choose 8, then 1, and type `abandon`. The alternate screen is not entered, the main screen keeps `Word: abandon` and `mnemocode table --word abandon`, and the child process has the word in its arguments.",
+      "expected": "SECURITY.md: the start menu holds no secret. README.md: enter recovery material on the private screen or through local files, never as command-line text.",
+      "observed": "The entry is labelled \"Look up a seed word, its number or its Unicode code\" and treats the word as public, as 0.1.0 does.",
+      "impact": "A person who looks up the words of a real phrase one by one leaves them in the scrollback, and in `ps` while each child runs. It needs a person's use of the lookup for a real phrase; a single word alone is not the phrase.",
+      "recommendedFix": "Say so in SECURITY.md and README.md, and point to a saved word list for a real phrase. The behaviour stays that of 0.1.0 (RUST-14).",
+      "requiredVerification": "The documents read back against the menu's behaviour.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-SEC003",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "Exported files are called private to the user where Windows keeps them open",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "group": "Local boundaries",
+      "affectedFiles": [
+        "SECURITY.md:47",
+        "crates/mnemocode-cli/src/os/files.rs:427-447"
+      ],
+      "reproduction": "Read `private_folder` and `private_file`: the modes 0700 and 0600 are set under `#[cfg(unix)]` only, and no code sets an ACL on Windows. Windows was not run.",
+      "expected": "SECURITY.md: exported files can be read only by your user account, where the system supports this.",
+      "observed": "NTFS supports per-user ACLs, and an exported file takes the ACL of its folder. On Linux the modes 600 and 700 were confirmed by the probes.",
+      "impact": "On a shared Windows computer, a file saved into a folder that others can read can be read by them. 0.1.0 behaves the same and says so in its release notes.",
+      "recommendedFix": "State the limit in SECURITY.md: Linux and macOS, on file systems that keep Unix permissions; Windows takes the folder's permissions.",
+      "requiredVerification": "The document read back against the code.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-SEC004",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "The read of a QR image has no bound on its time, and Ctrl+C waits for it",
+      "severity": "low",
+      "status": "deferred",
+      "releaseBlocking": false,
+      "group": "Availability bounds",
+      "affectedFiles": [
+        "crates/mnemocode/src/qr.rs:271-289",
+        "rqrr 0.11.0 src/prepare.rs:268-305"
+      ],
+      "reproduction": "`decode --qr-file noise.png` with a PNG of random pixels at 2896 x 2896 took 94 s in a release build. An image of the same size with its top 49.75% noise and the rest white was stopped after 240 s. Ctrl+C at 1.5 s gave no prompt after 20 s. Real page images read at once: 104 of 104 pages.",
+      "expected": "CORE-50: work that grows with input stops at a limit that the program states. The size limits of the image hold; time has none.",
+      "observed": "rqrr clones the whole image for each group of finder patterns it tests, and noise offers many. Its API gives no count of them and no way to stop. 0.1.0's reader takes 34 s on the same noise.",
+      "impact": "A hostile or damaged image can keep one command busy for minutes or more, ignoring Ctrl+C; closing the terminal or SIGKILL ends it. No secret is touched, since the read happens before any result.",
+      "recommendedFix": "None taken: a bound would need an own pre-scan of finder patterns in front of rqrr, which risks losing photographs that read today. Recorded in PLAN.md's parity list and CLI.md. The owner decides.",
+      "requiredVerification": "If it is fixed: the two images refused or read within seconds, and every page image still read.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-BLD001",
+      "category": "BLD",
+      "kind": "finding",
+      "title": "The release workflow runs Python, in a repository of Rust tooling alone",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "group": "Release workflow",
+      "affectedFiles": [
+        ".github/workflows/release.yml:33,161,163"
+      ],
+      "reproduction": "Read the step that verifies the tag: it pipes `cargo metadata` into `python3 -c`. The macOS job also writes `${{ matrix.target }}` straight into its shell lines, where its Linux job passes `FILE` through `env`.",
+      "expected": "TOOL-01: a Rust repository's tools are Rust; the shell is a thin wrapper. CI rules: values reach a shell through `env`.",
+      "observed": "One Python line, not seen by `code-rules`, which reads files and not their inline scripts. The matrix values are constants, so no injection exists.",
+      "impact": "A release depends on the runner's Python for one comparison.",
+      "recommendedFix": "Read the version from `Cargo.toml` with `sed`, and pass the target through `env`.",
+      "requiredVerification": "`cargo xtask check`; the workflow itself cannot run here (no remote).",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-BLD002",
+      "category": "BLD",
+      "kind": "finding",
+      "title": "On glibc 2.35 to 2.38 the loader writes a warning at every start of the Linux executable",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "group": "Release builds",
+      "affectedFiles": [
+        "packaging/Dockerfile.reproducible:7,48-50"
+      ],
+      "reproduction": "Run the canonical `mnemocode-0.2.0-linux-x64` in `ubuntu:22.04` or `debian:12`: `mnemocode --version`.",
+      "expected": "A command writes only its own lines: 0.1.0's single executable starts there without any.",
+      "observed": "Before the output, standard error gets \"/lib/x86_64-linux-gnu/libc.so.6: weak version `GLIBC_2.39' not found (required by ...)\". The command then works: the self-test passes. Rust's std takes `pidfd_spawnp` and `pidfd_getpid` as weak symbols, and the canonical image's glibc is 2.39.",
+      "impact": "Every start, the menu's included, shows a loader's message on two common systems, Ubuntu 22.04 and Debian 12, which reads as a fault in a program that handles a seed phrase. Scripts that read standard error get a line more. No result changes.",
+      "recommendedFix": "Define the two symbols as 0 at link time in the canonical build, so that the executable keeps no reference to that version and std starts a child as it does on an older system.",
+      "requiredVerification": "The rebuilt canonical executables on `ubuntu:22.04` and `debian:12`: no such line; a child started by the menu; the two builds byte-equal.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-DOC001",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "The library example promises a wipe of every freed block without the allocator that gives it",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "group": "Capabilities",
+      "affectedFiles": [
+        "docs/CLI.md:269-287",
+        "README.md:288",
+        "crates/mnemocode/src/secret/allocator.rs:17-18"
+      ],
+      "reproduction": "Read the example: it registers no global allocator, and only the executable and the binding do (`crates/mnemocode-cli/src/main.rs:26-27`, `crates/mnemocode-wasm/src/lib.rs:28`).",
+      "expected": "CLI.md: a secret stays in its owner type; every block the program frees is wiped too.",
+      "observed": "A library cannot register an allocator for its host, so a host that follows the example gets no wipe of the copies that dependencies make.",
+      "impact": "A host built from the example has weaker memory handling than the text says.",
+      "recommendedFix": "Add the `#[global_allocator]` lines to the example, and state what a host without them lacks. `Backup::read` in the example follows `text`'s new type.",
+      "requiredVerification": "The document read back against `mnemocode::secret::ZeroingAllocator` and the crate's API.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-DOC002",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "\"Needs nothing else installed\" leaves out the C library of Linux",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "group": "Capabilities",
+      "affectedFiles": [
+        "README.md:36",
+        "docs/CLI.md:7",
+        "CHANGELOG.md:5",
+        "xtask/src/release.rs:22"
+      ],
+      "reproduction": "`readelf -d` on the Linux executable shows NEEDED `libgcc_s.so.1`, `libm.so.6` and `libc.so.6`; the target is `x86_64-unknown-linux-gnu`.",
+      "expected": "README.md, CLI.md and CHANGELOG.md: the executable needs nothing else installed.",
+      "observed": "The canonical executables need glibc 2.35 (`hypotf`) and libgcc_s. They ran on Ubuntu 22.04 (2.35), Debian 12 (2.36) and Ubuntu 24.04 (2.39). Debian 11 (2.31) refuses them with `version GLIBC_2.35 not found`, and Alpine (musl) cannot start them.",
+      "impact": "The executable will not start on an older glibc or on musl, such as Alpine. That matters for heirs and for the live systems SECURITY.md recommends.",
+      "recommendedFix": "State the Linux requirement beside the claim.",
+      "requiredVerification": "The versions read from the canonical executable.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-DOC003",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "The limits on file writes read as general, and are Linux's alone",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "group": "Capabilities",
+      "affectedFiles": [
+        "SECURITY.md:42",
+        "README.md:182",
+        "CHANGELOG.md:8",
+        "crates/mnemocode-cli/src/os/macos.rs:28-31,104",
+        "crates/mnemocode-cli/src/os/windows.rs:153",
+        "crates/mnemocode-cli/src/os/protect.rs:103-106"
+      ],
+      "reproduction": "Read `rule_writes` on macOS and Windows: it does nothing, and `writes_ruled` exists on Linux only. macOS and Windows were not run.",
+      "expected": "SECURITY.md: where the system allows it, one that saves nothing cannot write files. README.md: a failed save may take another name only in those folders.",
+      "observed": "macOS could refuse writes and does not; only Linux rules them.",
+      "impact": "A reader on macOS or Windows takes a limit that does not hold there.",
+      "recommendedFix": "Say \"on Linux\" in the three places.",
+      "requiredVerification": "The documents read back against the code.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-DOC004",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "`--card-reference-label` is described as text of the sheet, which prints none",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "group": "Commands",
+      "affectedFiles": [
+        "docs/CLI.md:155",
+        "crates/mnemocode-cards/src/templates/business.rs:532"
+      ],
+      "reproduction": "`encode ... --card-reference-label Code --pdf ref.pdf`: the sheet prints `01 0317CC` with no label. With `--cards-dir` the card prints `Code 01 0317CC`.",
+      "expected": "CLI.md: the option replaces the text on the sheet.",
+      "observed": "The label stands on separate cards alone. Sheets print none, as in 0.1.0.",
+      "impact": "An option seems to do nothing on a sheet.",
+      "recommendedFix": "Say where the label stands.",
+      "requiredVerification": "The document read back against the run.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-DOC005",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "The startup check is described without the share engine it runs",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "group": "Commands",
+      "affectedFiles": [
+        "docs/CLI.md:240,257",
+        "README.md:258",
+        "crates/mnemocode/src/checks/sskr.rs:183"
+      ],
+      "reproduction": "`checks/sskr.rs` `integrity` ignores its tier, and `commands/self_test.rs:67-71` runs every row before each command.",
+      "expected": "CLI.md: quick checks without files, renderers or a share engine; the engine is checked before shares are split or combined.",
+      "observed": "The engine's cases run at every start, which is more than the documents say.",
+      "impact": "None on safety: the behaviour is stronger than documented.",
+      "recommendedFix": "Correct the three sentences.",
+      "requiredVerification": "The documents read back against the code.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-DOC006",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "The repair speed in SSKR.md is ten times too slow for a current computer",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "group": "Recovery",
+      "affectedFiles": [
+        "docs/SSKR.md:156"
+      ],
+      "reproduction": "Whole searches on an i7-1260P: 2^24 took 5.60 s and 2^28 took 92.08 s, 0.33 to 0.34 µs a try.",
+      "expected": "SSKR.md: about 2.5 to 4.5 µs a try, about 2^34 combinations in 12 hours, 2^40 in about a month.",
+      "observed": "At the measured rate 12 hours hold about 2^37 combinations, and 2^40 takes about 4.4 days. The program's own estimates were right.",
+      "impact": "The guide overstates a search's time; the program does not.",
+      "recommendedFix": "Give the range, and say that the limit follows the speed measured on the computer.",
+      "requiredVerification": "The document read back against the runs.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-DOC007",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "SSKR.md says that an unreadable share is rebuilt, which it is not",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "group": "Recovery",
+      "affectedFiles": [
+        "docs/SSKR.md:175,181"
+      ],
+      "reproduction": "`sskr-export` with share 1 as 21 `?` and shares 2 and 3 whole: all 21 elements are marked `(a guess)`, then \"Share 1 cannot be settled and is left out\".",
+      "expected": "SSKR.md:175: a share that cannot be read at all is rebuilt from the others, except for its member number.",
+      "observed": "The share is left out, as SSKR.md:181 says.",
+      "impact": "A reader expects a share back that the program will not give; the phrase is restored all the same.",
+      "recommendedFix": "Say what happens.",
+      "requiredVerification": "The document read back against the run.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-DOC008",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "The help of `--ask-secrets` leaves out standard error",
+      "severity": "low",
+      "status": "deferred",
+      "releaseBlocking": false,
+      "group": "Commands",
+      "affectedFiles": [
+        "crates/mnemocode-cli/src/commands/help/pages/options.rs:12,601",
+        "crates/mnemocode-cli/src/terminal.rs:196"
+      ],
+      "reproduction": "With standard input and output on a pty and standard error to a file: exit 1 and \"--ask-secrets needs a terminal on standard input and standard error\".",
+      "expected": "The help: standard input must be the terminal.",
+      "observed": "Standard error must be one too. The refusal says so, and the help keeps 0.1.0's words.",
+      "impact": "A person who redirects standard error gets a refusal that explains itself.",
+      "recommendedFix": "None taken: the help is byte-equal to the recorded 0.1.0 help on every page, and this sentence would change it in the TS program first. It goes with the next change of the help (a Low finding, audits.instructions.md).",
+      "requiredVerification": "If it is fixed: the transcripts recorded from the TS program.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    },
+    {
+      "id": "AUD-001-DOC009",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "\"8 megapixels\" means 8,388,608 pixels",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "group": "Commands",
+      "affectedFiles": [
+        "docs/CLI.md:136",
+        "crates/mnemocode/src/qr/admission.rs:18-21"
+      ],
+      "reproduction": "A 4000 x 2001 PNG, 8,004,000 pixels, passes the size check.",
+      "expected": "CLI.md: up to 8 megapixels.",
+      "observed": "`MEGAPIXEL` is 2^20. The bound is 8 x 2^20 pixels, as in 0.1.0.",
+      "impact": "An image slightly over a decimal 8 megapixels is admitted.",
+      "recommendedFix": "Give the number in CLI.md. The help keeps 0.1.0's words.",
+      "requiredVerification": "The document read back against the constant.",
+      "evidence": [
+        "probes.log, reviewer report and source lines as named above (local)"
+      ]
+    }
+  ],
+  "observations": [],
+  "remediation": [
+    {
+      "id": "AUD-001-SEC001",
+      "status": "verified",
+      "fixCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "verificationCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "evidence": "remediation-check.log, remediation-features.log (local)"
+    },
+    {
+      "id": "AUD-001-SEC002",
+      "status": "verified",
+      "fixCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "verificationCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "evidence": "remediation-check.log, remediation-features.log (local)"
+    },
+    {
+      "id": "AUD-001-SEC003",
+      "status": "verified",
+      "fixCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "verificationCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "evidence": "remediation-check.log, remediation-features.log (local)"
+    },
+    {
+      "id": "AUD-001-SEC004",
+      "status": "deferred",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "None taken: a bound would need an own pre-scan of finder patterns in front of rqrr, which risks losing photographs that read today. Recorded in PLAN.md's parity list and CLI.md. The owner decides."
+    },
+    {
+      "id": "AUD-001-BLD001",
+      "status": "verified",
+      "fixCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "verificationCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "evidence": "remediation-check.log, remediation-features.log (local)"
+    },
+    {
+      "id": "AUD-001-BLD002",
+      "status": "verified",
+      "fixCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "verificationCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "evidence": "remediation-check.log, remediation-features.log (local)"
+    },
+    {
+      "id": "AUD-001-DOC001",
+      "status": "verified",
+      "fixCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "verificationCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "evidence": "remediation-check.log, remediation-features.log (local)"
+    },
+    {
+      "id": "AUD-001-DOC002",
+      "status": "verified",
+      "fixCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "verificationCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "evidence": "remediation-check.log, remediation-features.log (local)"
+    },
+    {
+      "id": "AUD-001-DOC003",
+      "status": "verified",
+      "fixCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "verificationCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "evidence": "remediation-check.log, remediation-features.log (local)"
+    },
+    {
+      "id": "AUD-001-DOC004",
+      "status": "verified",
+      "fixCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "verificationCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "evidence": "remediation-check.log, remediation-features.log (local)"
+    },
+    {
+      "id": "AUD-001-DOC005",
+      "status": "verified",
+      "fixCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "verificationCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "evidence": "remediation-check.log, remediation-features.log (local)"
+    },
+    {
+      "id": "AUD-001-DOC006",
+      "status": "verified",
+      "fixCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "verificationCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "evidence": "remediation-check.log, remediation-features.log (local)"
+    },
+    {
+      "id": "AUD-001-DOC007",
+      "status": "verified",
+      "fixCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "verificationCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "evidence": "remediation-check.log, remediation-features.log (local)"
+    },
+    {
+      "id": "AUD-001-DOC008",
+      "status": "deferred",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": "None taken: the help is byte-equal to the recorded 0.1.0 help on every page, and this sentence would change it in the TS program first. It goes with the next change of the help (a Low finding, audits.instructions.md)."
+    },
+    {
+      "id": "AUD-001-DOC009",
+      "status": "verified",
+      "fixCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "verificationCommit": "17da8620e275198552d8b87e4a0de6e262cb5328",
+      "evidence": "remediation-check.log, remediation-features.log (local)"
+    }
+  ],
+  "informationalObservations": [
+    "`encode --cards-dir X --page-size a4` shows the result and only then refuses the size, with exit 1. 0.1.0 does the same, byte for byte, so it is parity; refusing before the secret would be better in both programs.",
+    "With `--ask-secrets` on a terminal that cannot run it, the terminal is named before the command's own options, where 0.1.0 names the option. Both refuse and show nothing secret. PLAN.md's parity list records it.",
+    "The Docker build depends on snapshot.ubuntu.com, which failed with 502 and 503 for part of this audit. A release would wait for it.",
+    "`fuzz/text` runs about 64 inputs a second under AddressSanitizer, since each input goes through every form and mode: its 19,378 runs are a light pass.",
+    "Open questions of the port remain the owner's, as PLAN.md and the commit records list them; none is a defect of this snapshot."
+  ],
+  "limitations": [
+    "Windows ran only under Wine 9.0, and ARM64 only under qemu-user 8.2.2; macOS did not run at all. Their console, ACL, sandbox and Landlock paths are read or compiled, not run on those systems. ConPTY never ran.",
+    "No workflow has ever run: the repository has no remote. The release workflow, the attestations, the signature steps and the two macOS builds are unproven.",
+    "`cargo xtask reproducible` did not finish: downloads from static.rust-lang.org failed inside the container on every attempt. The toolchain layers were not rebuilt for the comparison.",
+    "The reference program is one implementation of the same design, by the same project: agreement shows parity, not correctness against an independent oracle, beyond the published vectors.",
+    "Fuzzing was bounded to 300 seconds a target, `text` at 64 inputs a second. Upstream crates were not fuzzed on their own.",
+    "A real unencrypted swap area, a failed self-test in the menu, FAT and exFAT media and a real photograph of a QR code were not exercised.",
+    "SEC004 and DOC008 stay deferred. The owner's open questions of the port remain as the commit record and PLAN.md list them."
+  ],
+  "harnessFiles": [
+    "docs/audits/AUD-001-harnesses/README.md"
+  ],
+  "releaseVerdict": "No critical or high finding stands, and none of the 15 blocks a release. 13 are verified on the fix commit, and 2 Low findings are deferred with their reasons. Within what ran, the Rust program gave the reference's results in every case, read and wrote its formats, kept its secrets out of errors and output, and built to the same bytes twice. This is the owner's record for the release decision, not a certification. Release acceptance stays open until the release workflow has run on the three systems, which needs a remote, as GATES.md requires.",
+  "actionsNotPerformed": [
+    "no push, tag, release or remote change",
+    "no change to the owner's settings",
+    "no real secret used",
+    "no paid runner dispatched"
+  ]
+}

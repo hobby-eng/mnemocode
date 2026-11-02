@@ -1,0 +1,42 @@
+[package]
+name = "aud001-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[lints]
+workspace = true
+
+# Not a member of the repository's workspace: an audit's own tool, built on its own.
+[workspace]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[dependencies]
+libfuzzer-sys = "=0.4.12"
+mnemocode = { path = "../../../../crates/mnemocode" }
+
+[[bin]]
+name = "text"
+path = "fuzz_targets/text.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "qr_png"
+path = "fuzz_targets/qr_png.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "candidate_file"
+path = "fuzz_targets/candidate_file.rs"
+test = false
+doc = false
+bench = false

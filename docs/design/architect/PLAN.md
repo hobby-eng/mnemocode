@@ -491,3 +491,6 @@ the TS capsule (`multi-chain-wallet-tools/packages/recovery-mnemocode`) to the W
 - Increment 11, 2026-11-01: `release build`, `release pages`, `verify-executable`, `reproducible`,
   `features` and `sign` of `xtask`, `.github/workflows/release.yml`, the canonical container and
   docs/RELEASING.md. The word of a part that a page leaves out is refused in its file (`wasm`).
+- Audit AUD-001, 2026-11-02: every capability of the commit `b677647`, with a differential run against
+  0.1.0, fuzzing, real browsers and the canonical container: no critical or high finding; its fixes
+  are in `17da862`, and two Low stay deferred (docs/audits/AUD-001-2026-11-02.md).

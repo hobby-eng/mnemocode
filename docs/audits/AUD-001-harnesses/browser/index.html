@@ -1,0 +1,63 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>AUD-001 browser smoke</title>
+<pre id="result">running</pre>
+<script type="module">
+// AUD-001: the page files of a release in a real browser, on the public test phrase. Served from
+// the folder of a profile's pages (dist/wasm/multi-chain), it ends with a line DONE, and no line
+// starts with FAIL.
+const PHRASE = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+const lines = [];
+const check = (name, holds, detail = "") => lines.push(`${holds ? "ok" : "FAIL"}  ${name} ${detail}`);
+const attempt = async (name, work) => {
+  const start = performance.now();
+  try {
+    await work();
+    check(name, true, `${Math.round(performance.now() - start)} ms`);
+  } catch (error) {
+    check(name, false, `${error?.code ?? ""} ${error?.message ?? error}`);
+  }
+};
+try {
+  // The glue holds no loader: a page gives it the bytes, which it carries itself.
+  const load = async (folder) => {
+    const page = await import(`./${folder}/mnemocode.js`);
+    page.initSync({ module: await (await fetch(`./${folder}/mnemocode.wasm`)).arrayBuffer() });
+    return page;
+  };
+  const page = await load("key-derivation");
+  for (const name of ["Phrase", "Wallet", "Qr", "Candidates", "Sskr", "Recovery", "Cards"]) {
+    await attempt(`self-check ${name}, full`, () => page[`selfCheck${name}`](true));
+  }
+  check("master fingerprint", page.masterFingerprint(PHRASE, "") === "73c5da0a");
+  const backup = page.EncodedBackup.encode(PHRASE, "23-09-2026", "colors", "seedshift", false);
+  const record = backup.record();
+  check("record", record.startsWith("MNC1:seedshift:colors:"));
+  await attempt("QR written and read back", () => {
+    if (page.readQrPng(page.qrPng(record)) !== record) throw new Error("another text came back");
+  });
+  await attempt("two splits differ and restore", () => {
+    const first = page.SplitShares.split(PHRASE, undefined, "direct", 2, 3, "ur").shares();
+    const second = page.SplitShares.split(PHRASE, undefined, "direct", 2, 3, "ur").shares();
+    if (first[0] === second[0]) throw new Error("the browser's randomness gave one split twice");
+    if (page.RestoredShares.restore(first.slice(1)).phrase() !== PHRASE) throw new Error("another phrase");
+  });
+  await attempt("sample cards as PDF and PNG", () => {
+    const cards = new page.CardExport(undefined, undefined, undefined, false).preview(12, false);
+    const pdf = cards.pdf(0);
+    if (String.fromCharCode(...pdf.slice(0, 4)) !== "%PDF") throw new Error("no PDF");
+    if (cards.image(0, 0, "png")[1] !== 0x50) throw new Error("no PNG");
+  });
+  try {
+    page.EncodedBackup.encode("not a phrase", undefined, "colors", "direct", false);
+    check("a refusal throws", false);
+  } catch (error) {
+    check("a refusal throws with a code", typeof error.code === "string", error.code);
+  }
+  const scanner = await load("discovery-scanner");
+  await attempt("scanner session key", () => scanner.SessionIdentity.create().free());
+} catch (error) {
+  check("page", false, String(error));
+}
+document.getElementById("result").textContent = `${lines.join("\n")}\nDONE`;
+</script>
