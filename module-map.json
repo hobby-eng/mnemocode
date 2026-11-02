@@ -391,6 +391,8 @@
     "cli.file-system": "the file system's own words",
     "wasm.cards.no-such-part": "a part that a page names and the binding has not",
     "wasm.recovery.no-wallet": "a search by the wallet without one, which TS's types refuse",
+    "core.wallet-evidence.network": "a build without Bitcoin, which names no Bitcoin network where TS writes core.wallet-evidence.bitcoin-network (owner, 2026-11-02)",
+    "core.wallet-evidence.extended-key-prefix-does-not-match-selected-network": "a build without Bitcoin, as core.wallet-evidence.network",
     "core.bip32.invalid-master-key": "a seed that gives no key, one in 2^127: TS's library throws its own",
     "core.bip32.invalid-child-key": "a child key that does not exist, one in 2^127: TS's library throws its own",
     "core.candidate-list.no-candidate-at-place": "ADR 0004",

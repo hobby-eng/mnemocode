@@ -12,7 +12,7 @@ use mnemocode::refusal::Refusal;
 use mnemocode::secret::SecretText;
 use mnemocode::text::space::{trim, without_byte_order_mark};
 use mnemocode::wallet::coins::{AddressLocation, Coin};
-use mnemocode::wallet::evidence::{BitcoinNetwork, BitcoinProfile, Evidence, Place};
+use mnemocode::wallet::evidence::{BitcoinProfile, Evidence, KeyNetwork, Place};
 use mnemocode::wallet::scan::{ADDRESS_COUNT_RANGE, NORMAL_INDEX_RANGE, default_address_count};
 
 use super::given::PATH_LIMIT;
@@ -264,9 +264,9 @@ fn profiles_of(parsed: &Parsed) -> Result<Vec<BitcoinProfile>, Stop> {
 }
 
 /// The network of --network, mainnet by default.
-fn network_of(parsed: &Parsed) -> Result<BitcoinNetwork, WalletOptionError> {
-    value(parsed, "network").map_or(Ok(BitcoinNetwork::Mainnet), |name| {
-        BitcoinNetwork::named(name).map_err(|_| WalletOptionError::Network)
+fn network_of(parsed: &Parsed) -> Result<KeyNetwork, WalletOptionError> {
+    value(parsed, "network").map_or(Ok(KeyNetwork::Mainnet), |name| {
+        KeyNetwork::named(name).map_err(|_| WalletOptionError::Network)
     })
 }
 
@@ -299,7 +299,7 @@ fn scan_gap_of(parsed: &Parsed) -> Result<Option<u64>, Stop> {
 /// The first receiving address of the first account on mainnet, in each of the four profiles.
 fn first_receiving(addresses: Option<u64>) -> Place {
     Place {
-        network: BitcoinNetwork::Mainnet,
+        network: KeyNetwork::Mainnet,
         profiles: BitcoinProfile::ALL.to_vec(),
         location: AddressLocation {
             account: 0,

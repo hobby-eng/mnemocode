@@ -1,25 +1,28 @@
 //! What tells that a phrase opens the person's wallet (MnemoCode TS 0.1.0's
 //! `core/wallet-evidence.ts`, `wallet-check.ts` and `coin-address-evidence.ts`,
-//! CAP-WALLET-EVIDENCE-*, CAP-WALLET-FINGERPRINT-EVIDENCE): a master fingerprint or an address of
-//! a coin at its place in every build, with Bitcoin also the keys of `bitcoin`; each compared with
-//! the keys a master key derives, the private half of each wiped once it is compared.
+//! CAP-WALLET-EVIDENCE-*, CAP-WALLET-FINGERPRINT-EVIDENCE): a master fingerprint, the master
+//! extended public key of `master` or an address of a coin at its place in every build, with
+//! Bitcoin also the keys of `bitcoin`; each compared with the keys a master key derives, the
+//! private half of each wiped once it is compared.
 
 use std::fmt;
 
 use super::coins::{AddressLocation, Coin, CoinAddress, CoinError, KeyPath};
 use super::scan::{ScanError, address_count, scan_branch};
-use crate::bip32::{Bip32Error, ExtendedKey, fingerprint_hex};
+use crate::bip32::{Bip32Error, ExtendedKey, ExtendedPublicKey, fingerprint_hex};
 use crate::refusal::Refusal;
 use crate::text::space::trim;
 
 #[cfg(feature = "coin-bitcoin")]
 mod bitcoin;
+mod master;
 
 #[cfg(feature = "coin-bitcoin")]
 pub use bitcoin::{
-    BitcoinError, BitcoinNetwork, BitcoinProfile, COMPRESSED_KEY_BYTES, Place, bitcoin_address_on,
-    parse_compressed_public_key, parse_extended_public_key, wif_public_key,
+    BitcoinError, BitcoinProfile, COMPRESSED_KEY_BYTES, Place, bitcoin_address_on,
+    parse_compressed_public_key, wif_public_key,
 };
+pub use master::{KeyError, KeyNetwork, parse_extended_public_key};
 
 /// The path of the master key.
 pub const MASTER_KEY_PATH: &str = "m";
@@ -32,6 +35,8 @@ pub const FINGERPRINT_WARNING: &str =
 pub enum EvidenceError {
     /// A fingerprint that is not eight hexadecimal digits.
     Fingerprint,
+    /// The refusal of an extended key or its network.
+    Key(KeyError),
     /// The refusal of Bitcoin's evidence.
     #[cfg(feature = "coin-bitcoin")]
     Bitcoin(BitcoinError),
@@ -47,6 +52,7 @@ impl fmt::Display for EvidenceError {
             Self::Fingerprint => {
                 f.write_str("A master fingerprint must be eight hexadecimal characters.")
             }
+            Self::Key(error) => error.fmt(f),
             #[cfg(feature = "coin-bitcoin")]
             Self::Bitcoin(error) => error.fmt(f),
             Self::Coin(error) => error.fmt(f),
@@ -63,11 +69,18 @@ impl Refusal for EvidenceError {
             Self::Fingerprint => {
                 "core.wallet-check.master-fingerprint-eight-hexadecimal-characters"
             }
+            Self::Key(error) => error.code(),
             #[cfg(feature = "coin-bitcoin")]
             Self::Bitcoin(error) => error.code(),
             Self::Coin(error) => error.code(),
             Self::Scan(error) => error.code(),
         }
+    }
+}
+
+impl From<KeyError> for EvidenceError {
+    fn from(error: KeyError) -> Self {
+        Self::Key(error)
     }
 }
 
@@ -127,6 +140,7 @@ pub struct Evidence(Kind);
 #[derive(Clone, Debug)]
 enum Kind {
     Fingerprint(String),
+    MasterKey(ExtendedPublicKey, KeyNetwork),
     #[cfg(feature = "coin-bitcoin")]
     Bitcoin(bitcoin::Kind),
     Coin {
@@ -168,6 +182,15 @@ impl Evidence {
                     derived: Some(derived),
                     path: Some(MASTER_KEY_PATH.to_owned()),
                     warning: Some(FINGERPRINT_WARNING),
+                })
+            }
+            Kind::MasterKey(expected, network) => {
+                let derived = root.public()?;
+                Ok(WalletMatch {
+                    matched: derived == *expected,
+                    derived: Some(derived.encode(network.public_version())),
+                    path: Some(MASTER_KEY_PATH.to_owned()),
+                    warning: None,
                 })
             }
             #[cfg(feature = "coin-bitcoin")]

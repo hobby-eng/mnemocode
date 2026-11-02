@@ -1,17 +1,16 @@
 //! The evidence of a Bitcoin wallet (the part of MnemoCode TS 0.1.0's `core/wallet-evidence.ts`
-//! that a build without Bitcoin leaves out, CORE-31): a master or account extended public key, a
-//! Bitcoin address, a compressed public key or a WIF at its place under the selected address
-//! profiles.
+//! that a build without Bitcoin leaves out, CORE-31): an account extended public key, a Bitcoin
+//! address, a compressed public key or a WIF at its place under the selected address profiles.
 
 use std::fmt;
 
 use super::{
-    Evidence, EvidenceError, Kind as EvidenceKind, MASTER_KEY_PATH, WalletMatch, found_match,
+    Evidence, EvidenceError, KeyNetwork, Kind as EvidenceKind, WalletMatch, found_match,
+    parse_extended_public_key,
 };
 use crate::bip32::{ExtendedKey, ExtendedPublicKey};
 use crate::refusal::Refusal;
 use crate::text::space::trim;
-use crate::text::words::list_in_words;
 use crate::wallet::coins::{
     AddressLocation, AddressType, Coin, CoinAddress, CoinError, KeyPath, bitcoin, encodings,
 };
@@ -20,53 +19,13 @@ use crate::wallet::scan::{address_count, match_at_path, scan_branch};
 /// The bytes of a compressed public key.
 pub const COMPRESSED_KEY_BYTES: usize = 33;
 
-/// Bitcoin's networks.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BitcoinNetwork {
-    /// The main network.
-    Mainnet,
-    /// The test networks.
-    Testnet,
-}
-
-impl BitcoinNetwork {
-    /// Both, as options and messages name them.
-    pub const ALL: [Self; 2] = [Self::Mainnet, Self::Testnet];
-
-    /// Its name.
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Mainnet => "mainnet",
-            Self::Testnet => "testnet",
-        }
-    }
-
-    /// The network `name` names.
-    pub fn named(name: &str) -> Result<Self, EvidenceError> {
-        Self::ALL
-            .into_iter()
-            .find(|network| network.name() == name)
-            .ok_or(EvidenceError::Bitcoin(BitcoinError::Network))
-    }
-
-    /// Whether it is a testnet.
-    pub const fn testnet(self) -> bool {
-        matches!(self, Self::Testnet)
-    }
-
+impl KeyNetwork {
+    /// The network of a testnet or not.
     const fn of(testnet: bool) -> Self {
         if testnet {
             Self::Testnet
         } else {
             Self::Mainnet
-        }
-    }
-
-    /// The version of its xpub (BIP32).
-    const fn public_version(self) -> u32 {
-        match self {
-            Self::Mainnet => 0x0488_b21e,
-            Self::Testnet => 0x0435_87cf,
         }
     }
 
@@ -141,31 +100,15 @@ impl BitcoinProfile {
     }
 }
 
-/// The extended public keys a check reads: their four letters, the network and the version.
-const EXTENDED_KEY_VERSIONS: [(&str, BitcoinNetwork, u32); 10] = [
-    ("xpub", BitcoinNetwork::Mainnet, 0x0488_b21e),
-    ("ypub", BitcoinNetwork::Mainnet, 0x049d_7cb2),
-    ("zpub", BitcoinNetwork::Mainnet, 0x04b2_4746),
-    ("Ypub", BitcoinNetwork::Mainnet, 0x0295_b43f),
-    ("Zpub", BitcoinNetwork::Mainnet, 0x02aa_7ed3),
-    ("tpub", BitcoinNetwork::Testnet, 0x0435_87cf),
-    ("upub", BitcoinNetwork::Testnet, 0x044a_5262),
-    ("vpub", BitcoinNetwork::Testnet, 0x045f_1cf6),
-    ("Upub", BitcoinNetwork::Testnet, 0x0242_89ef),
-    ("Vpub", BitcoinNetwork::Testnet, 0x0257_5483),
-];
-
 /// The refusals of Bitcoin's evidence, word for word as TS 0.1.0 writes them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BitcoinError {
     /// An address that is no Bitcoin address of the network.
-    AddressNotValid(BitcoinNetwork),
+    AddressNotValid(KeyNetwork),
     /// An address of the other network: the one asked and the one it is.
-    AddressOtherNetwork(BitcoinNetwork, BitcoinNetwork),
+    AddressOtherNetwork(KeyNetwork, KeyNetwork),
     /// An address of a type no selected profile writes: the profile that writes it.
     OutsideProfiles(&'static str),
-    /// A network that is none.
-    Network,
     /// No profile.
     NoProfile,
     /// A profile that is none.
@@ -179,15 +122,9 @@ pub enum BitcoinError {
     /// A public key off the curve.
     PublicKeyNotPoint,
     /// A WIF that does not read on the network.
-    WifNotValid(BitcoinNetwork),
+    WifNotValid(KeyNetwork),
     /// A WIF whose key is no private key.
     WifNoKey,
-    /// An extended key of another prefix.
-    ExtendedKeyPrefix,
-    /// An extended key of the other network.
-    ExtendedKeyNetwork,
-    /// An extended key that does not read.
-    ExtendedKeyInvalid,
 }
 
 impl fmt::Display for BitcoinError {
@@ -208,17 +145,6 @@ impl fmt::Display for BitcoinError {
                 f,
                 "The address is a {writer} address, which none of the selected Bitcoin address profiles writes."
             ),
-            Self::Network => {
-                let names: Vec<&str> = BitcoinNetwork::ALL
-                    .iter()
-                    .map(|network| network.name())
-                    .collect();
-                write!(
-                    f,
-                    "Bitcoin network must be {}.",
-                    list_in_words(&names, "or")
-                )
-            }
             Self::NoProfile => {
                 f.write_str("At least one Bitcoin address profile must be selected.")
             }
@@ -241,21 +167,6 @@ impl fmt::Display for BitcoinError {
                 write!(f, "The WIF is not valid for Bitcoin {}.", network.name())
             }
             Self::WifNoKey => f.write_str("The WIF holds no valid secp256k1 private key."),
-            Self::ExtendedKeyPrefix => {
-                let prefixes: Vec<&str> = EXTENDED_KEY_VERSIONS
-                    .iter()
-                    .map(|(prefix, ..)| *prefix)
-                    .collect();
-                write!(
-                    f,
-                    "Unsupported extended-key prefix. Supported public forms include {}.",
-                    list_in_words(&prefixes, "and")
-                )
-            }
-            Self::ExtendedKeyNetwork => {
-                f.write_str("The extended-key prefix does not match the selected Bitcoin network.")
-            }
-            Self::ExtendedKeyInvalid => f.write_str("The extended public key is not valid."),
         }
     }
 }
@@ -270,7 +181,6 @@ impl Refusal for BitcoinError {
                 "core.wallet-evidence.address-not-valid-bitcoin-address"
             }
             Self::OutsideProfiles(_) => "core.wallet-evidence.address-outside-profiles",
-            Self::Network => "core.wallet-evidence.bitcoin-network",
             Self::NoProfile => "core.wallet-evidence.at-least-one-bitcoin-address-profile-selected",
             Self::UnknownProfile => "core.wallet-evidence.unknown-bitcoin-address-profile",
             Self::ProfileTwice => "core.wallet-evidence.bitcoin-address-profile-given-twice",
@@ -283,13 +193,6 @@ impl Refusal for BitcoinError {
             }
             Self::WifNotValid(_) => "core.wallet-evidence.wif-not-valid-bitcoin",
             Self::WifNoKey => "core.wallet-evidence.wif-holds-no-valid-secp256k1-private-key",
-            Self::ExtendedKeyPrefix => {
-                "core.wallet-evidence.unsupported-extended-key-prefix-supported-public-forms-include"
-            }
-            Self::ExtendedKeyNetwork => {
-                "core.wallet-evidence.extended-key-prefix-does-not-match-selected-bitcoin"
-            }
-            Self::ExtendedKeyInvalid => "core.wallet-evidence.extended-public-key-not-valid",
         }
     }
 }
@@ -319,7 +222,7 @@ pub fn parse_compressed_public_key(
 /// The compressed public key of the WIF `text` on `network`; the private key is wiped.
 pub fn wif_public_key(
     text: &str,
-    network: BitcoinNetwork,
+    network: KeyNetwork,
 ) -> Result<[u8; COMPRESSED_KEY_BYTES], EvidenceError> {
     let invalid = BitcoinError::WifNotValid(network);
     let mut data = encodings::checked_data(trim(text), encodings::Alphabet::Bitcoin)
@@ -345,33 +248,13 @@ pub fn wif_public_key(
         .map_err(|_| BitcoinError::WifNoKey.into())
 }
 
-/// The extended public key `text` of `network`, in any of its forms.
-pub fn parse_extended_public_key(
-    text: &str,
-    network: BitcoinNetwork,
-) -> Result<ExtendedPublicKey, EvidenceError> {
-    let text = trim(text);
-    let prefix = text.get(..4).unwrap_or_default();
-    let (_, on, version) = EXTENDED_KEY_VERSIONS
-        .iter()
-        .find(|(known, ..)| *known == prefix)
-        .ok_or(BitcoinError::ExtendedKeyPrefix)?;
-    if *on != network {
-        return Err(BitcoinError::ExtendedKeyNetwork.into());
-    }
-    ExtendedPublicKey::decode(text, *version).ok_or_else(|| BitcoinError::ExtendedKeyInvalid.into())
-}
-
 /// The Bitcoin address `text` on `network`.
-pub fn bitcoin_address_on(
-    text: &str,
-    network: BitcoinNetwork,
-) -> Result<CoinAddress, EvidenceError> {
+pub fn bitcoin_address_on(text: &str, network: KeyNetwork) -> Result<CoinAddress, EvidenceError> {
     let address = bitcoin::COIN.parse(text).map_err(|error| match error {
         CoinError::NotSingleKey(_) => EvidenceError::Coin(error),
         _ => BitcoinError::AddressNotValid(network).into(),
     })?;
-    let on = BitcoinNetwork::of(address.testnet);
+    let on = KeyNetwork::of(address.testnet);
     if on != network {
         return Err(BitcoinError::AddressOtherNetwork(network, on).into());
     }
@@ -389,10 +272,9 @@ pub(super) enum Expected {
 /// Evidence of Bitcoin's keys.
 #[derive(Clone, Debug)]
 pub(super) enum Kind {
-    MasterKey(ExtendedPublicKey, BitcoinNetwork),
     Located {
         expected: Expected,
-        network: BitcoinNetwork,
+        network: KeyNetwork,
         profiles: Vec<BitcoinProfile>,
         location: AddressLocation,
         count: u32,
@@ -403,15 +285,6 @@ impl Kind {
     /// Whether it is matched by the keys of `root`, the master key of the phrase.
     pub(super) fn compare(&self, root: &ExtendedKey) -> Result<WalletMatch, EvidenceError> {
         match self {
-            Self::MasterKey(expected, network) => {
-                let derived = root.public()?;
-                Ok(WalletMatch {
-                    matched: derived == *expected,
-                    derived: Some(derived.encode(network.public_version())),
-                    path: Some(MASTER_KEY_PATH.to_owned()),
-                    warning: None,
-                })
-            }
             Self::Located {
                 expected,
                 network,
@@ -454,7 +327,7 @@ impl Kind {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Place {
     /// The network.
-    pub network: BitcoinNetwork,
+    pub network: KeyNetwork,
     /// The profiles, at least one.
     pub profiles: Vec<BitcoinProfile>,
     /// The place of the first key.
@@ -464,14 +337,6 @@ pub struct Place {
 }
 
 impl Evidence {
-    /// A master extended public key of `network`.
-    pub fn master_key(text: &str, network: BitcoinNetwork) -> Result<Self, EvidenceError> {
-        Ok(Self(EvidenceKind::Bitcoin(Kind::MasterKey(
-            parse_extended_public_key(text, network)?,
-            network,
-        ))))
-    }
-
     /// A Bitcoin address at `place`: the place checked first, as TS's `LocatedEvidence` checks it,
     /// then the address, which one of the place's profiles must write.
     pub fn bitcoin_address(text: &str, place: Place) -> Result<Self, EvidenceError> {
@@ -513,7 +378,7 @@ impl Evidence {
     /// it, with no branch or index (TS a7aecf5), the place checked first.
     pub fn account_key(
         text: &str,
-        network: BitcoinNetwork,
+        network: KeyNetwork,
         profiles: Vec<BitcoinProfile>,
         account: u64,
     ) -> Result<Self, EvidenceError> {
@@ -559,14 +424,14 @@ impl Evidence {
 }
 
 /// Bitcoin's account paths of `profile` on `network`.
-fn account_paths(profile: BitcoinProfile, network: BitcoinNetwork, account: u32) -> Vec<KeyPath> {
+fn account_paths(profile: BitcoinProfile, network: KeyNetwork, account: u32) -> Vec<KeyPath> {
     bitcoin_paths(|coin| coin.account_paths(profile.kind(), network.testnet(), account))
 }
 
 /// Bitcoin's branch paths of `profile` on `network` at `location`.
 fn branch_paths(
     profile: BitcoinProfile,
-    network: BitcoinNetwork,
+    network: KeyNetwork,
     location: AddressLocation,
 ) -> Vec<KeyPath> {
     bitcoin_paths(|coin| coin.branch_paths(profile.kind(), network.testnet(), location))
@@ -582,7 +447,7 @@ fn bitcoin_paths(of: impl FnOnce(&Coin) -> Vec<KeyPath>) -> Vec<KeyPath> {
 fn derived_from(
     expected: &Expected,
     profile: BitcoinProfile,
-    network: BitcoinNetwork,
+    network: KeyNetwork,
     node: &ExtendedKey,
     key: &[u8; 33],
 ) -> Option<String> {
@@ -611,7 +476,7 @@ mod tests {
         let evidence = Evidence::bitcoin_address(
             "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g",
             Place {
-                network: BitcoinNetwork::Mainnet,
+                network: KeyNetwork::Mainnet,
                 profiles: profiles.clone(),
                 location,
                 addresses: Some(5),
@@ -624,7 +489,7 @@ mod tests {
             Evidence::bitcoin_address(
                 "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA",
                 Place {
-                    network: BitcoinNetwork::Mainnet,
+                    network: KeyNetwork::Mainnet,
                     profiles,
                     location,
                     addresses: None
@@ -641,7 +506,7 @@ mod tests {
         let refusal = Evidence::bitcoin_address(
             "garbage",
             Place {
-                network: BitcoinNetwork::Mainnet,
+                network: KeyNetwork::Mainnet,
                 profiles: BitcoinProfile::ALL.to_vec(),
                 location,
                 addresses: Some(0),
@@ -652,7 +517,7 @@ mod tests {
         let refusal = Evidence::bitcoin_address(
             "garbage",
             Place {
-                network: BitcoinNetwork::Mainnet,
+                network: KeyNetwork::Mainnet,
                 profiles: Vec::new(),
                 location,
                 addresses: None,
@@ -666,7 +531,7 @@ mod tests {
     fn an_account_key_is_found_at_its_account() {
         let zpub = "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs";
         let profiles = BitcoinProfile::checked(&["legacy", "native-segwit"]).unwrap();
-        let matched = Evidence::account_key(zpub, BitcoinNetwork::Mainnet, profiles, 0)
+        let matched = Evidence::account_key(zpub, KeyNetwork::Mainnet, profiles, 0)
             .unwrap()
             .compare(&root())
             .unwrap();

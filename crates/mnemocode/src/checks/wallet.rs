@@ -1,14 +1,16 @@
 //! The wallet evidence row (MnemoCode TS 0.1.0's `core/wallet-evidence-self-test.ts`,
-//! CAP-WALLET-EVIDENCE-CHECK): the public phrase's fingerprint in every build; with Bitcoin, its
-//! master keys in every form, its account keys, its addresses under every profile, its key and
-//! WIF, a scan, and the refusals.
+//! CAP-WALLET-EVIDENCE-CHECK): the public phrase's fingerprint and its master keys in every form in
+//! every build; with Bitcoin, its account keys, its addresses under every profile, its key and WIF,
+//! a scan, and the refusals.
 
 use super::{Row, ok};
 use crate::bip32::ExtendedKey;
 use crate::bip39::phrase::Phrase;
-use crate::self_check::vectors::{PUBLIC_FINGERPRINT, PUBLIC_MNEMONIC};
+use crate::self_check::vectors::{
+    PUBLIC_FINGERPRINT, PUBLIC_MASTER_TPUB, PUBLIC_MASTER_XPUB, PUBLIC_MNEMONIC,
+};
 use crate::self_check::{CheckFailure, Tier, expect_same};
-use crate::wallet::evidence::{Evidence, EvidenceError};
+use crate::wallet::evidence::{Evidence, EvidenceError, KeyNetwork};
 
 /// The row.
 #[cfg(feature = "coin-bitcoin")]
@@ -17,9 +19,9 @@ pub(super) const ROW: Row = Row::new(
     "fingerprint, xpubs, four profiles, key, WIF, address scan, refusals",
     run,
 );
-/// The row, of a build without Bitcoin: the master fingerprint.
+/// The row, of a build without Bitcoin: the master fingerprint and the master key.
 #[cfg(not(feature = "coin-bitcoin"))]
-pub(super) const ROW: Row = Row::new("Wallet evidence", "fingerprint", run);
+pub(super) const ROW: Row = Row::new("Wallet evidence", "fingerprint, master xpubs, refusal", run);
 
 type Build = fn() -> Result<Evidence, EvidenceError>;
 
@@ -38,6 +40,59 @@ const FINGERPRINTS: [(&str, Build, &str, &str); 2] = [
         "",
     ),
 ];
+
+/// The public phrase's master keys in SLIP-132's forms, published or computed independently (TS's
+/// KEYS).
+const ROOT_YPUB: &str = "ypub6QqdH2c5z79673aQjy9R4MUVPujYqGA1vY7YCAjmcFWdN9NLbDEiTeKLkP7ECKzds8NrfRnX8zGyZtXA9QFT7mTs8vi1PVeq8YQpcNKUMvQ";
+const ROOT_ZPUB: &str = "zpub6jftahH18ngZxLmXaKw3GSZzZsszmt9WqedkyZdezFtWRFBZqsQH5hyUmb4pCEeZGmVfQuP5bedXTB8is6fTv19U1GQRyQUKQGUTzyHACMF";
+
+/// Each case of the master key: its name, its evidence, what it gives, and the BIP39
+/// passphrase.
+const MASTER_MATCHES: [(&str, Build, &str, &str); 5] = [
+    (
+        "Master xpub",
+        || Evidence::master_key(PUBLIC_MASTER_XPUB, KeyNetwork::Mainnet),
+        "matched at m",
+        "",
+    ),
+    (
+        "Master ypub",
+        || Evidence::master_key(ROOT_YPUB, KeyNetwork::Mainnet),
+        "matched at m",
+        "",
+    ),
+    (
+        "Master zpub",
+        || Evidence::master_key(ROOT_ZPUB, KeyNetwork::Mainnet),
+        "matched at m",
+        "",
+    ),
+    (
+        "Master tpub",
+        || Evidence::master_key(PUBLIC_MASTER_TPUB, KeyNetwork::Testnet),
+        "matched at m",
+        "",
+    ),
+    (
+        "The master key of another passphrase",
+        || Evidence::master_key(PUBLIC_MASTER_XPUB, KeyNetwork::Mainnet),
+        "not matched",
+        "TREZOR",
+    ),
+];
+
+/// Each refused case of the master key: its name, its evidence and words of its refusal.
+const MASTER_REFUSED: [(&str, Build, &str); 1] = [(
+    "A testnet key on mainnet",
+    || Evidence::master_key(PUBLIC_MASTER_TPUB, KeyNetwork::Mainnet),
+    NETWORK_REFUSED,
+)];
+
+/// Words of the refusal of a key of the other network, which names Bitcoin where it is built.
+#[cfg(feature = "coin-bitcoin")]
+const NETWORK_REFUSED: &str = "does not match the selected Bitcoin network";
+#[cfg(not(feature = "coin-bitcoin"))]
+const NETWORK_REFUSED: &str = "does not match the selected network";
 
 /// What `build` gives against the public phrase with `passphrase`.
 fn match_of(build: Build, passphrase: &str) -> Result<String, CheckFailure> {
@@ -87,6 +142,7 @@ fn run(tier: Tier) -> Result<(), CheckFailure> {
         &[0]
     };
     run_cases(tier, &FINGERPRINTS, startup, &[])?;
+    run_cases(tier, &MASTER_MATCHES, &[], &MASTER_REFUSED)?;
     #[cfg(feature = "coin-bitcoin")]
     bitcoin::run(tier)?;
     Ok(())
@@ -98,16 +154,10 @@ mod bitcoin {
     use super::{Build, match_of, run_cases};
     use crate::self_check::{CheckFailure, Tier, expect_same};
     use crate::wallet::coins::AddressLocation;
-    use crate::wallet::evidence::{BitcoinNetwork, BitcoinProfile, Evidence, EvidenceError, Place};
-
-    /// The public phrase's master keys, published or computed independently (TS's KEYS).
-    const ROOT_XPUB: &str = "xpub661MyMwAqRbcFkPHucMnrGNzDwb6teAX1RbKQmqtEF8kK3Z7LZ59qafCjB9eCRLiTVG3uxBxgKvRgbubRhqSKXnGGb1aoaqLrpMBDrVxga8";
-    const ROOT_YPUB: &str = "ypub6QqdH2c5z79673aQjy9R4MUVPujYqGA1vY7YCAjmcFWdN9NLbDEiTeKLkP7ECKzds8NrfRnX8zGyZtXA9QFT7mTs8vi1PVeq8YQpcNKUMvQ";
-    const ROOT_ZPUB: &str = "zpub6jftahH18ngZxLmXaKw3GSZzZsszmt9WqedkyZdezFtWRFBZqsQH5hyUmb4pCEeZGmVfQuP5bedXTB8is6fTv19U1GQRyQUKQGUTzyHACMF";
-    const ROOT_TPUB: &str = "tpubD6NzVbkrYhZ4XYa9MoLt4BiMZ4gkt2faZ4BcmKu2a9te4LDpQmvEz2L2yDERivHxFPnxXXhqDRkUNnQCpZggCyEZLBktV7VaSmwayqMJy1s";
-    const ACCOUNT_84_ZPUB: &str = "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs";
+    use crate::wallet::evidence::{BitcoinProfile, Evidence, EvidenceError, KeyNetwork, Place};
 
     /// The public phrase's account keys and addresses, published or computed independently.
+    const ACCOUNT_84_ZPUB: &str = "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs";
     const ACCOUNT_86_XPUB: &str = "xpub6BgBgsespWvERF3LHQu6CnqdvfEvtMcQjYrcRzx53QJjSxarj2afYWcLteoGVky7D3UKDP9QyrLprQ3VCECoY49yfdDEHGCtMMj92pReUsQ";
     const ACCOUNT_49_TESTNET_UPUB: &str = "upub5EFU65HtV5TeiSHmZZm7FUffBGy8UKeqp7vw43jYbvZPpoVsgU93oac7Wk3u6moKegAEWtGNF8DehrnHtv21XXEMYRUocHqguyjknFHYfgY";
     const ADDRESS_44: &str = "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA";
@@ -145,7 +195,7 @@ mod bitcoin {
         kind(
             value,
             Place {
-                network: BitcoinNetwork::Mainnet,
+                network: KeyNetwork::Mainnet,
                 profiles: profiles.to_vec(),
                 location: first(),
                 addresses: None,
@@ -159,7 +209,7 @@ mod bitcoin {
         Evidence::bitcoin_address(
             SECOND_84,
             Place {
-                network: BitcoinNetwork::Mainnet,
+                network: KeyNetwork::Mainnet,
                 profiles: vec![BitcoinProfile::NativeSegwit],
                 location,
                 addresses,
@@ -173,7 +223,7 @@ mod bitcoin {
     const MATCHES: [(&str, Build, &str, &str); 15] = [
         (
             "Account zpub",
-            || Evidence::account_key(ACCOUNT_84_ZPUB, BitcoinNetwork::Mainnet, NATIVE.to_vec(), 0),
+            || Evidence::account_key(ACCOUNT_84_ZPUB, KeyNetwork::Mainnet, NATIVE.to_vec(), 0),
             "matched at m/84'/0'/0'",
             "",
         ),
@@ -182,7 +232,7 @@ mod bitcoin {
             || {
                 Evidence::account_key(
                     ACCOUNT_86_XPUB,
-                    BitcoinNetwork::Mainnet,
+                    KeyNetwork::Mainnet,
                     vec![BitcoinProfile::Taproot],
                     0,
                 )
@@ -195,7 +245,7 @@ mod bitcoin {
             || {
                 Evidence::account_key(
                     ACCOUNT_49_TESTNET_UPUB,
-                    BitcoinNetwork::Testnet,
+                    KeyNetwork::Testnet,
                     vec![BitcoinProfile::NestedSegwit],
                     0,
                 )
@@ -338,50 +388,7 @@ mod bitcoin {
         ),
     ];
 
-    /// Each case of the master key: its name, its evidence, what it gives, and the BIP39
-    /// passphrase.
-    const MASTER_MATCHES: [(&str, Build, &str, &str); 5] = [
-        (
-            "Master xpub",
-            || Evidence::master_key(ROOT_XPUB, BitcoinNetwork::Mainnet),
-            "matched at m",
-            "",
-        ),
-        (
-            "Master ypub",
-            || Evidence::master_key(ROOT_YPUB, BitcoinNetwork::Mainnet),
-            "matched at m",
-            "",
-        ),
-        (
-            "Master zpub",
-            || Evidence::master_key(ROOT_ZPUB, BitcoinNetwork::Mainnet),
-            "matched at m",
-            "",
-        ),
-        (
-            "Master tpub",
-            || Evidence::master_key(ROOT_TPUB, BitcoinNetwork::Testnet),
-            "matched at m",
-            "",
-        ),
-        (
-            "Another master key",
-            || Evidence::master_key(ACCOUNT_84_ZPUB, BitcoinNetwork::Mainnet),
-            "not matched",
-            "",
-        ),
-    ];
-
-    /// Each refused case of the master key: its name, its evidence and words of its refusal.
-    const MASTER_REFUSED: [(&str, Build, &str); 1] = [(
-        "A testnet key on mainnet",
-        || Evidence::master_key(ROOT_TPUB, BitcoinNetwork::Mainnet),
-        "does not match the selected Bitcoin network",
-    )];
-
     pub(super) fn run(tier: Tier) -> Result<(), CheckFailure> {
-        run_cases(tier, &MASTER_MATCHES, &[], &MASTER_REFUSED)?;
         run_cases(tier, &MATCHES, &[5, 12, 13], &[])?;
         let change = || located(Evidence::bitcoin_address, CHANGE_84, &NATIVE);
         expect_same(

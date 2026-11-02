@@ -22,7 +22,7 @@ use mnemocode::qr::admission::MAX_PNG_BYTES;
 use mnemocode::recovery::date_search::wallet_needed;
 use mnemocode::sskr::forms::ShareFormat;
 use mnemocode::wallet::coins::AddressLocation;
-use mnemocode::wallet::evidence::{BitcoinNetwork, BitcoinProfile, Place};
+use mnemocode::wallet::evidence::{BitcoinProfile, KeyNetwork, Place};
 use mnemocode_cards::export::SAMPLE_FILE_BASE;
 
 use crate::commands::asking::{WHAT_NOW, ask_list};
@@ -530,7 +530,7 @@ fn share_repair_action() -> Result<Action, Stop> {
 /// at once. Without it (`required` false) every candidate is listed: no options.
 fn ask_wallet(required: bool, explanation: &Explanation) -> Result<Option<Vec<String>>, Stop> {
     let place = Place {
-        network: BitcoinNetwork::Mainnet,
+        network: KeyNetwork::Mainnet,
         profiles: BitcoinProfile::ALL.to_vec(),
         location: AddressLocation {
             account: 0,

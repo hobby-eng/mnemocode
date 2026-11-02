@@ -100,9 +100,7 @@ each missing parent folder made, before a command's own options are read, since 
 need those folders before any secret and the options are read among the secrets, so of a wrong path
 and a wrong option the path is named first, and a folder made for a refused command stays; a line of a
 secret result that TS writes to standard error goes to standard output where standard error is a
-terminal with no private screen; the master key evidence needs Bitcoin in a build (as wallet-tools
-builds it: a build without Bitcoin recognises a wallet by its fingerprint or a coin's address); the help
-says that images need no other program, that a missing folder is made, and each text input's limit;
+terminal with no private screen; the help says that images need no other program, that a missing folder is made, and each text input's limit;
 U+FFFF is refused as a character the card font lacks, where TS draws it blank, and U+034F measures 0
 wide, where TS draws a space of 651 units; two refusals of a partial restore name `ShareSet::combine`,
 this library's function, where TS names its own; where `--ask-secrets` cannot run, on a terminal that
@@ -276,6 +274,12 @@ Decided on 2026-10-27:
   (ADR 0003). The help names each text input's limit. TS has one 1 MiB limit for answers, files
   and standard input (`src/cli/bounded-read.ts:15`, `src/cli/terminal-input.ts:62`), with a
   per-question `limit` option (`terminal-input.ts:560`).
+
+Decided on 2026-11-02:
+
+- The master extended public key is read in every build, whatever its coins: one key
+  for every coin, in BIP32's and SLIP-132's forms. A build without Bitcoin names no Bitcoin network
+  in its two refusals of a network, which take codes of the port's own (module-map.json).
 
 Nothing is open.
 

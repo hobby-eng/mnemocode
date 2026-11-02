@@ -11,8 +11,8 @@ use mnemocode::bip39::phrase::Phrase;
 use mnemocode::checks::Part;
 use mnemocode::wallet::coins::{AddressLocation, COINS, Coin};
 #[cfg(feature = "coin-bitcoin")]
-use mnemocode::wallet::evidence::{BitcoinNetwork, BitcoinProfile, Place};
-use mnemocode::wallet::evidence::{Evidence, WalletMatch};
+use mnemocode::wallet::evidence::{BitcoinProfile, Place};
+use mnemocode::wallet::evidence::{Evidence, KeyNetwork, WalletMatch};
 use wasm_bindgen::prelude::*;
 
 use crate::host::{after_secret, optional_text, refused, self_check, text, whole};
@@ -58,9 +58,8 @@ impl WalletPlace {
 }
 
 /// The network `name` names.
-#[cfg(feature = "coin-bitcoin")]
-fn network(name: &str) -> Result<BitcoinNetwork, JsValue> {
-    BitcoinNetwork::named(name).map_err(|refusal| refused(&refusal))
+fn network(name: &str) -> Result<KeyNetwork, JsValue> {
+    KeyNetwork::named(name).map_err(|refusal| refused(&refusal))
 }
 
 /// The place of `account`, `branch` and `index`, refused outside BIP32's normal indexes.
@@ -104,8 +103,7 @@ impl WalletEvidence {
             .map_err(|refusal| refused(&refusal))
     }
 
-    /// A master extended public key of `network`.
-    #[cfg(feature = "coin-bitcoin")]
+    /// A master extended public key of `network`, which every coin shares.
     #[wasm_bindgen(js_name = masterKey)]
     pub fn master_key(text: &str, network_name: &str) -> Result<WalletEvidence, JsValue> {
         Evidence::master_key(text, network(network_name)?)
@@ -264,22 +262,33 @@ pub fn self_check_wallet(full: bool) -> Result<(), JsValue> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mnemocode::self_check::vectors::{PUBLIC_FINGERPRINT, PUBLIC_MNEMONIC};
+    use mnemocode::self_check::vectors::{PUBLIC_FINGERPRINT, PUBLIC_MASTER_XPUB, PUBLIC_MNEMONIC};
 
     #[test]
-    fn evidence_is_compared_with_a_phrase() {
-        let evidence = WalletEvidence::master_fingerprint(PUBLIC_FINGERPRINT).unwrap();
-        let check = evidence.check_text(PUBLIC_MNEMONIC, "").unwrap();
-        assert!(check.matched());
-        assert_eq!(check.path().as_deref(), Some("m"));
-        assert!(check.warning().is_some());
+    fn the_binding_compares_a_fingerprint_and_a_master_key() {
+        for evidence in [
+            WalletEvidence::master_fingerprint(PUBLIC_FINGERPRINT).unwrap(),
+            WalletEvidence::master_key(PUBLIC_MASTER_XPUB, "mainnet").unwrap(),
+        ] {
+            let check = evidence.check_text(PUBLIC_MNEMONIC, "").unwrap();
+            assert!(check.matched());
+            assert_eq!(check.path().as_deref(), Some("m"));
+            assert!(
+                !evidence
+                    .check_text(PUBLIC_MNEMONIC, "TREZOR")
+                    .unwrap()
+                    .matched()
+            );
+        }
+        let fingerprint = WalletEvidence::master_fingerprint(PUBLIC_FINGERPRINT).unwrap();
         assert!(
-            !evidence
-                .check_text(PUBLIC_MNEMONIC, "TREZOR")
+            fingerprint
+                .check_text(PUBLIC_MNEMONIC, "")
                 .unwrap()
-                .matched()
+                .warning()
+                .is_some()
         );
-        // Every build checks a fingerprint, with or without Bitcoin.
+        // Every build checks both, with or without Bitcoin, in its self-check.
         assert!(self_check_wallet(true).is_ok());
     }
 

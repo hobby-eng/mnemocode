@@ -12,6 +12,10 @@ pub const PUBLIC_MNEMONIC: &str =
 pub const PUBLIC_MNEMONIC_24: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art";
 /// Its master fingerprint without a passphrase (direct-12, sourceFingerprint).
 pub const PUBLIC_FINGERPRINT: &str = "73c5da0a";
+/// Its master extended public key without a passphrase, as an xpub (BIP-0084's root) and a tpub.
+pub const PUBLIC_MASTER_XPUB: &str = "xpub661MyMwAqRbcFkPHucMnrGNzDwb6teAX1RbKQmqtEF8kK3Z7LZ59qafCjB9eCRLiTVG3uxBxgKvRgbubRhqSKXnGGb1aoaqLrpMBDrVxga8";
+/// The same key as a tpub.
+pub const PUBLIC_MASTER_TPUB: &str = "tpubD6NzVbkrYhZ4XYa9MoLt4BiMZ4gkt2faZ4BcmKu2a9te4LDpQmvEz2L2yDERivHxFPnxXXhqDRkUNnQCpZggCyEZLBktV7VaSmwayqMJy1s";
 /// The Unicode codes of its words, from the published BIP39 Chinese list: word 1, abandon, is
 /// U+7684, word 4, about, is U+5728.
 pub const PUBLIC_UNICODE_CODES: [&str; 12] = [
