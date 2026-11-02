@@ -121,14 +121,17 @@ pub(crate) fn read_input_text(
     text_of(bytes, name)
 }
 
-/// The text of a local file at `path`, at most `limit` bytes of strict UTF-8.
+/// The text of a local file at `path`, at most `limit` bytes of strict UTF-8. A name typed at a
+/// question is read `regular_only`: a pipe without a writer would hold the question and Ctrl+C
+/// (AUD-039-API002), where an option may name a pipe that a script writes.
 pub(crate) fn read_input_path(
     path: &Path,
     what: &'static str,
     limit: usize,
+    regular_only: bool,
 ) -> Result<SecretText, InputError> {
     let resolved = os::resolve(path, terminal::environment().current.as_deref());
-    text_of(os::read_secret_file(&resolved, limit, what, false)?, what)
+    text_of(os::read_secret_file(&resolved, limit, what, regular_only)?, what)
 }
 
 /// Refuses, without reading it, a file at `path` that the program cannot read, as the read would.
@@ -146,14 +149,15 @@ pub(crate) fn check_readable(path: &Path, what: &'static str) -> Result<(), Inpu
     }
 }
 
-/// The bytes of the PNG file of a QR code at `path`, for the library's strict reader.
-pub(crate) fn read_qr_bytes(path: &Path) -> Result<SecretBytes, InputError> {
+/// The bytes of the PNG file of a QR code at `path`, for the library's strict reader; a name
+/// typed at a question is read `regular_only`, as by [`read_input_path`].
+pub(crate) fn read_qr_bytes(path: &Path, regular_only: bool) -> Result<SecretBytes, InputError> {
     let resolved = os::resolve(path, terminal::environment().current.as_deref());
     Ok(os::read_secret_file(
         &resolved,
         MAX_PNG_BYTES,
         "The QR PNG input",
-        false,
+        regular_only,
     )?)
 }
 

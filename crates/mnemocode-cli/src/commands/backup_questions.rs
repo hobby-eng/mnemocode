@@ -298,9 +298,9 @@ impl BackupSource<'_> {
                 |answer: &str| {
                     let path = dropped_path(answer);
                     let text = if qr {
-                        read_qr_path(&path)
+                        read_qr_path(&path, true)
                     } else {
-                        read_input_path(&path, "The file", self.limit()).map_err(Stop::from)
+                        read_input_path(&path, "The file", self.limit(), true).map_err(Stop::from)
                     };
                     text.map_err(|stop| stop.message())
                 },

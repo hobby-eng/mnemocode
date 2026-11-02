@@ -13,6 +13,7 @@ MnemoCode is rewritten in Rust: one executable that needs nothing else installed
 - A missing parent folder of an output file is made before the secret is read.
 - A QR code image may have up to 2 megapixels, where 0.1.0 took 8: a screen of 1920 × 1080 fits, and a page image is cropped to its code.
 - A result that standard output does not take, as on a full disk, ends the command with exit code 1 and says so; a closed pipe ends it as done.
+- As in TS 0.1.1, after its audit AUD-039: shares under a threshold of 1, which keep no SSKR digest, are refused as a set where they disagree, since their agreement does not tell which one is wrong; a file name typed again after an unreadable file, and the name of the next share's QR image, are read only from regular files, so a named pipe is refused at once; and a word of a host's instructions for heirs wider than the page is refused.
 
 ## 0.1.0
 

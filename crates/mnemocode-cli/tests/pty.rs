@@ -88,6 +88,43 @@ fn a_result_sent_to_a_file_stays_off_the_screen() {
 }
 
 #[test]
+fn a_pipe_typed_as_a_file_name_is_refused_at_once() {
+    // A named pipe that no program writes to: opening it to read would wait for ever, and hold
+    // the question and Ctrl+C with it (AUD-039-API002).
+    let pipe = file("no-writer.pipe");
+    let _ = fs::remove_file(&pipe);
+    let made = std::process::Command::new("mkfifo").arg(&pipe).status();
+    assert!(made.is_ok_and(|status| status.success()), "mkfifo");
+    for (option, missing, prompt) in [
+        ("--input-file", "missing.txt", "Record file name:"),
+        ("--qr-file", "missing.png", "QR code file name:"),
+    ] {
+        let missing = file(missing);
+        let mut session = Session::start(
+            PROGRAM,
+            &[
+                "decode",
+                "--ask-secrets",
+                "--mode",
+                "direct",
+                "--format",
+                "unicode",
+                option,
+                missing.to_str().unwrap_or_default(),
+            ],
+        );
+        session.wait_for("Read another file");
+        session.press("1");
+        session.wait_for(prompt);
+        session.press(&format!("{}\r", pipe.display()));
+        session.wait_for("could not be read");
+        session.press("\x03");
+        let (status, written) = session.end();
+        assert_eq!(status, 130, "{written}");
+    }
+}
+
+#[test]
 fn ctrl_c_cancels_and_leaves_the_private_screen() {
     let mut session = at_the_first_question();
     session.press("\x03");

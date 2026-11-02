@@ -439,6 +439,26 @@ fn the_words_of_a_host_with_a_character_outside_the_font_are_refused() {
 }
 
 #[test]
+fn a_word_of_a_host_wider_than_the_page_is_refused() {
+    // A subtitle without a space, which no line break can split, would run off the page
+    // (AUD-039-UI001).
+    let wide = WalletTool {
+        subtitle: "W".repeat(100).leak(),
+        ..WalletTool::new()
+    };
+    let text = heir_sheet_text(&wide, &direct(shares(ShareFormat::Words, 2, 3))).expect("words");
+    for size in HeirSheetSize::ALL {
+        assert_eq!(
+            refused(render_heir_sheet(&UiFont::load(), &text, size)),
+            (
+                "export.heir-sheet.instructions-heirs-word-wider-than-page",
+                "The instructions for heirs contain a word wider than the page.".to_owned()
+            )
+        );
+    }
+}
+
+#[test]
 fn a_quorum_that_no_set_has_is_refused_and_each_that_a_restore_reads_is_kept() {
     let needs = |threshold, count| text_of(direct(shares(ShareFormat::Ur, threshold, count))).needs;
     assert!(needs(2, 3)[0].starts_with("Any 2 of the 3 Shamir shares"));

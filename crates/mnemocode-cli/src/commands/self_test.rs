@@ -126,7 +126,7 @@ fn qr_beside_sheets() -> Result<(), CheckFailure> {
             name,
         )?;
         expect_same(inside.as_str(), in_folder("4BBF-1-1-qr.png").as_str(), name)?;
-        let image = ok(read_qr_bytes(Path::new(&beside)))?;
+        let image = ok(read_qr_bytes(Path::new(&beside), false))?;
         expect_same(
             ok(mnemocode::qr::read_png(&image))?.as_str(),
             FIRST_SHARE_COLORS,

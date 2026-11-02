@@ -171,7 +171,7 @@ impl TypedShares {
             let text = if path == "-" {
                 read_input_text(path, "The text input", SHARE_SET_LIMIT)?
             } else {
-                read_input_path(Path::new(path), SHARE_FILE, SHARE_SET_LIMIT)?
+                read_input_path(Path::new(path), SHARE_FILE, SHARE_SET_LIMIT, false)?
             };
             let parts = shares.input.shares_of_text(&text, "The file holds")?;
             shares.input.add(&parts)?;
@@ -179,7 +179,7 @@ impl TypedShares {
         for path in values(parsed, "share-qr") {
             shares
                 .input
-                .add(&[read_qr_path(Path::new(path))?.as_str()])?;
+                .add(&[read_qr_path(Path::new(path), false)?.as_str()])?;
         }
         if shares.input.list().is_empty() {
             return Err(ShareSourceError::NoShare.into());
@@ -253,7 +253,7 @@ impl TypedShares {
                 None,
                 |answer: &str| -> Result<Vec<String>, String> {
                     let text =
-                        read_qr_path(&dropped_path(answer)).map_err(|stop| stop.message())?;
+                        read_qr_path(&dropped_path(answer), true).map_err(|stop| stop.message())?;
                     input
                         .shares_of_answer(text.as_str(), true)
                         .map_err(|error| error.to_string())

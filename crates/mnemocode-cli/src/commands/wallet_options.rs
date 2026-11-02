@@ -369,7 +369,7 @@ fn evidence_of(
     // A file may begin with a byte order mark besides.
     let wif_file = wif_path
         .filter(|_| files == SecretFiles::Read)
-        .map(|path| read_input_path(path, WIF_FILE, WIF_LIMIT))
+        .map(|path| read_input_path(path, WIF_FILE, WIF_LIMIT, false))
         .transpose()?;
     let text = wif_file
         .as_ref()
@@ -421,7 +421,7 @@ fn passphrase_of(parsed: &Parsed, files: SecretFiles) -> Result<SecretText, Stop
         check_readable(Path::new(path), PASSPHRASE_FILE)?;
         return Ok(SecretText::copy_of("no passphrase", ""));
     }
-    let file = read_input_path(Path::new(path), PASSPHRASE_FILE, PATH_LIMIT)?;
+    let file = read_input_path(Path::new(path), PASSPHRASE_FILE, PATH_LIMIT, false)?;
     let text = file.as_str();
     let line = text
         .strip_suffix('\n')

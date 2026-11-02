@@ -112,12 +112,12 @@ fn protection_of(parsed: &Parsed, gate: &mut Gate) -> Result<Option<Protection>,
     }
     if let Some(path) = key_file {
         gate.ready()?;
-        let text = read_input_path(Path::new(path), "The Scanner's key file", PATH_LIMIT)?;
+        let text = read_input_path(Path::new(path), "The Scanner's key file", PATH_LIMIT, false)?;
         return Ok(Some(Protection::key(&text)?));
     }
     if let Some(path) = passphrase_file {
         gate.ready()?;
-        let text = read_input_path(Path::new(path), "The passphrase file", PATH_LIMIT)?;
+        let text = read_input_path(Path::new(path), "The passphrase file", PATH_LIMIT, false)?;
         return Ok(Some(Protection::passphrase(&text)?));
     }
     if plaintext {

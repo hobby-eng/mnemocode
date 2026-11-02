@@ -241,7 +241,7 @@ pub(crate) fn encoded_input(parsed: &Parsed) -> Result<SecretText, Stop> {
     if value(parsed, "input").is_some() || value(parsed, "input-file").is_some() {
         return Err(GivenError::OneEncodedSource.into());
     }
-    read_qr_path(Path::new(path))
+    read_qr_path(Path::new(path), false)
 }
 
 /// The encoded seed phrase given with the options, read as the screen reads typed codes: a share,
@@ -330,9 +330,10 @@ pub(crate) fn assert_one_encoded_source(parsed: &Parsed) -> Result<(), Stop> {
     Ok(())
 }
 
-/// The text of the QR code in the PNG file at `path`, read by the library's strict reader.
-pub(crate) fn read_qr_path(path: &Path) -> Result<SecretText, Stop> {
-    Ok(mnemocode::qr::read_png(&read_qr_bytes(path)?)?)
+/// The text of the QR code in the PNG file at `path`, read by the library's strict reader;
+/// `regular_only` for a name typed at a question (read_qr_bytes).
+pub(crate) fn read_qr_path(path: &Path, regular_only: bool) -> Result<SecretText, Stop> {
+    Ok(mnemocode::qr::read_png(&read_qr_bytes(path, regular_only)?)?)
 }
 
 /// The dates or date patterns of --date or --dates-file, as one answer.

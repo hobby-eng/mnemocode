@@ -66,6 +66,8 @@ pub enum HeirError {
     Size,
     /// A character that the font lacks.
     UnknownCharacter,
+    /// A word wider than the page, which no line break can split.
+    WordWiderThanPage,
     /// A threshold above the shares of a set.
     Quorum,
     /// Codes of shares that do not fit a sheet.
@@ -97,6 +99,9 @@ impl fmt::Display for HeirError {
             Self::UnknownCharacter => f.write_str(
                 "The instructions for heirs contain a character not supported by the font.",
             ),
+            Self::WordWiderThanPage => {
+                f.write_str("The instructions for heirs contain a word wider than the page.")
+            }
             #[cfg(feature = "sskr")]
             Self::Quorum => write!(
                 f,
@@ -130,6 +135,7 @@ impl Refusal for HeirError {
             Self::UnknownCharacter => {
                 "export.heir-sheet.instructions-heirs-contain-character-not-supported-by-font"
             }
+            Self::WordWiderThanPage => "export.heir-sheet.instructions-heirs-word-wider-than-page",
             Self::Quorum => {
                 "export.heir-sheet-text.sheet-heirs-threshold-from-number-shares-at-most"
             }
@@ -363,6 +369,11 @@ impl<'a> Writer<'a> {
             return Err(HeirError::UnknownCharacter);
         }
         let width = self.format.width - 2.0 * self.format.margin - indent;
+        // A host's word, such as a long subtitle without a space, would run off the page
+        // (AUD-039-UI001).
+        if text.split(' ').any(|word| self.font.width(word, size) > width) {
+            return Err(HeirError::WordWiderThanPage);
+        }
         let x = self.format.margin;
         for (index, line) in wrap(text, self.font, size, width).iter().enumerate() {
             self.y -= size * LEADING;

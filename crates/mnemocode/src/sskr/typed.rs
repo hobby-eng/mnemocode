@@ -819,7 +819,11 @@ impl ShareInput {
                 continue;
             }
             match restore_complete(&remaining, None) {
-                Ok(_) => fits.push(typed.place),
+                // Only a phrase that a digest checked tells against the share left out: shares
+                // that keep none, under a threshold of 1, merely agree with each other
+                // (AUD-039-FUN001).
+                Ok(restored) if restored.digest_checked => fits.push(typed.place),
+                Ok(_) => {}
                 Err(other) if other.refuses_shares() => {}
                 Err(other) => return Err(other),
             }
@@ -1034,6 +1038,41 @@ mod tests {
         assert_eq!(set.phrase().text().as_str(), phrase);
         assert_eq!(places, vec![1, 3]);
         assert_eq!(input.places(), vec![1, 3]);
+    }
+
+    #[test]
+    fn a_share_left_out_is_named_only_where_a_digest_checked_the_others() {
+        use crate::sskr::engine::{Group, split_seeded};
+        use crate::sskr::text::compact_ur;
+        // Public secrets of zeros and of ones split with one seed, so that both sets carry the
+        // same identifier and a share of one stands among the other's (AUD-039-FUN001).
+        let urs = |secret: [u8; 16], threshold: usize| -> Vec<String> {
+            split_seeded(&secret, 1, &[Group { threshold, count: 3 }], &[7; 32])
+                .unwrap()
+                .iter()
+                .map(|payload| compact_ur(payload).as_str().to_owned())
+                .collect()
+        };
+        let trouble = |texts: [&String; 3]| {
+            let mut input = ShareInput::new(DECODE);
+            input.add(&texts).unwrap();
+            let CompleteOutcome::Trouble(trouble) = input.restore_complete().unwrap().0 else {
+                panic!("restored");
+            };
+            (trouble.kind, trouble.place)
+        };
+        // Each share of a threshold of 1 restores its own secret alone: two that agree prove
+        // nothing of the third.
+        let (zeros, ones) = (urs([0; 16], 1), urs([1; 16], 1));
+        let shares = [&zeros[0], &zeros[1], &ones[2]];
+        for order in [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]] {
+            assert_eq!(trouble(order.map(|at| shares[at])), (TroubleKind::Refused, None));
+        }
+        let (zeros, ones) = (urs([0; 16], 2), urs([1; 16], 2));
+        assert_eq!(
+            trouble([&zeros[0], &zeros[1], &ones[2]]),
+            (TroubleKind::Odd, Some(3))
+        );
     }
 
     #[test]

@@ -394,6 +394,7 @@
     "cli.output-paths.result-not-written": "a result that standard output did not take, which TS dropped (CORE-22; owner, 2026-11-02)",
     "core.wallet-evidence.network": "a build without Bitcoin, which names no Bitcoin network where TS writes core.wallet-evidence.bitcoin-network (owner, 2026-11-02)",
     "core.wallet-evidence.extended-key-prefix-does-not-match-selected-network": "a build without Bitcoin, as core.wallet-evidence.network",
+    "export.heir-sheet.instructions-heirs-word-wider-than-page": "a word of a host wider than the page, which TS 0.1.1 refuses with this code (AUD-039-UI001)",
     "core.bip32.invalid-master-key": "a seed that gives no key, one in 2^127: TS's library throws its own",
     "core.bip32.invalid-child-key": "a child key that does not exist, one in 2^127: TS's library throws its own",
     "core.candidate-list.no-candidate-at-place": "ADR 0004",
