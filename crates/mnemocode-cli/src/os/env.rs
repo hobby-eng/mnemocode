@@ -45,7 +45,7 @@ impl Environment {
             force_color: set("CLICOLOR_FORCE").is_some_and(|value| value != "0"),
             clicolor_off: std::env::var_os("CLICOLOR").is_some_and(|value| value == "0"),
             dumb_terminal: std::env::var_os("TERM").is_some_and(|value| value == "dumb"),
-            home: std::env::home_dir(),
+            home: home_folder(),
             onedrive: ["OneDrive", "OneDriveConsumer", "OneDriveCommercial"]
                 .into_iter()
                 .filter_map(set)
@@ -54,4 +54,20 @@ impl Environment {
             current: std::env::current_dir().ok(),
         }
     }
+}
+
+/// The home folder on Windows: the profile folder that USERPROFILE names, as Node.js takes it.
+/// std's home_dir would import userenv.dll, which is no KnownDLL, so that a file of that name
+/// beside the executable would load (W-DLL-SEARCH).
+#[cfg(windows)]
+fn home_folder() -> Option<PathBuf> {
+    std::env::var_os("USERPROFILE")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+/// The home folder: HOME, or the account's own entry.
+#[cfg(not(windows))]
+fn home_folder() -> Option<PathBuf> {
+    std::env::home_dir()
 }

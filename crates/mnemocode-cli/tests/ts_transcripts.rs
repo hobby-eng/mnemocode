@@ -93,6 +93,28 @@ const WRITTEN_IN: [(&str, &str); 17] = [
     ),
 ];
 
+/// The anchors of the warnings about the machine itself, which the one that recorded TS did not
+/// give: swap that is not encrypted, and memory that the system did not lock.
+const MACHINE_WARNINGS: [&str; 2] = ["#unencrypted-swap", "#memory-lock"];
+
+/// Standard error without the warnings about the machine that runs the test, each with its
+/// "More:" line, as a CI runner gives them; what the command itself writes stays.
+fn without_machine_warnings(text: &str) -> String {
+    let mut kept = Vec::new();
+    let mut lines = text.split_inclusive('\n').peekable();
+    while let Some(line) = lines.next() {
+        let next = lines.peek().map_or("", |next| next.trim_end());
+        if next.starts_with("More: ")
+            && MACHINE_WARNINGS.iter().any(|anchor| next.ends_with(anchor))
+        {
+            lines.next();
+            continue;
+        }
+        kept.push(line);
+    }
+    kept.concat()
+}
+
 /// What TS wrote for `args`, with this program's version in place of TS's own and the differences
 /// written in; recover-word's phrase may be a pattern, which has a limit of its own.
 fn expected(args: &[&str], text: &str) -> String {
@@ -143,7 +165,7 @@ fn every_command_writes_what_ts_writes() {
             "{name}"
         );
         assert_eq!(
-            String::from_utf8_lossy(&output.stderr),
+            without_machine_warnings(&String::from_utf8_lossy(&output.stderr)),
             entry["stderr"].as_str().expect("standard error"),
             "{name}"
         );
