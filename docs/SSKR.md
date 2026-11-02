@@ -4,20 +4,23 @@ MnemoCode splits a phrase into shares with Shamir secret sharing. You choose how
 
 With 2 of 3 you can lose one share and still restore the phrase. One share alone cannot restore it; keep every share private as wallet recovery material.
 
-The shares are written in SSKR (Sharded Secret Key Reconstruction), the open format from Blockchain Commons. Other programs that support this format can read them.
+The shares are written in SSKR (Sharded Secret Key Reconstruction), the open format from Blockchain Commons. Standard UR and Bytewords shares can be read by compatible SSKR programs. MnemoCode-specific forms are listed under [Share formats](#share-formats).
 
 A BIP39 passphrase is not part of the phrase and is **not stored** in the shares.
 
 ## Creating shares
 
 ```bash
-mnemocode encode --sskr --ask-secrets \
+mnemocode encode --sskr --mode direct --ask-secrets \
   --threshold 2 --shares 3 --output ./shares.txt
+
+# Restore privately: enter ./shares.txt at the share prompt.
+mnemocode sskr-combine --ask-secrets
 ```
 
 `--threshold` is N and `--shares` is M. Both need `--sskr`. The phrase is entered as in every `encode` command; see [Secret input styles](../README.md#secret-input-styles).
 
-The shares are always shown in the terminal. `--output NEW_FILE` also saves them, one share per line. The file holds **all shares**. An existing file is never replaced: when the name is taken, the shares are saved under a numbered name such as `shares-1.txt`, and MnemoCode says so. When a file cannot be saved on the private screen, for example because the disk is full, the shares are still shown, and MnemoCode offers to try again, to use another name, or to skip that file.
+The shares are shown on the result screen. `--output NEW_FILE` also saves them, one share per line. The file holds **all shares**. An existing file is never replaced: when the name is taken, the shares are saved under a numbered name such as `shares-1.txt`, and MnemoCode says so. When a file cannot be saved on the private screen, for example because the disk is full, the shares are still shown, and MnemoCode offers to try again, to use another name, or to skip that file.
 
 | Option                   | Selects                                                                                                        |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------- |
@@ -36,7 +39,11 @@ The menu offers the original words separately, off by default. Keep them apart f
 mnemocode encode --sskr --mode seedshift --ask-secrets \
   --share-format unicode --threshold 2 --shares 3 \
   --template business-it --card-layout qr \
-  --cards-dir ./property-shares --pdf ./property-shares.pdf
+  --cards-dir ./property-shares --pdf ./property-shares.pdf \
+  --output ./property-shares.txt
+
+# Enter ./property-shares.txt privately, then the same original dates.
+mnemocode sskr-combine --mode seedshift --ask-secrets
 ```
 
 With `--mode seedshift`, the phrase is first masked with the dates and then split. Give the same `--mode seedshift` and dates to `sskr-combine` to get the original phrase. The mode and the dates are not stored in the shares and are not printed on share cards: keep them yourself. The legacy Seedshift modes cannot be used with shares.
@@ -62,27 +69,17 @@ Color codes may be separated by spaces or joined, with or without `#`. **Their o
 
 Share cards print a share in colors as its colors, and a share in Unicode codes as its codes, one code to a card; the colors of the cards of Unicode codes only decorate them, one color for each code. Separate cards add one decoy per share; sheets add enough to fill their rows. A QR code on the sheet holds the share alone, without the decoys. Shares in word numbers, Bytewords or as a `ur:sskr` code have no cards.
 
-The forms in colors, word numbers and Unicode codes are only other ways to write a share, not encryption. For developers of compatible programs, a share is written in colors in five steps:
-
-1. Turn the Bytewords text of the single-part UR into bytes. The last four bytes are its CRC32 checksum; the bytes before them are the CBOR.
-2. Write the checksum first. After it come the version byte `A1`, one byte with the length of the CBOR, and the CBOR.
-3. Mix every byte after the checksum: XOR byte number `i` (counting from 0 at the version byte) with the low byte of the CRC32 of the four checksum bytes followed by `i` as two bytes, high byte first.
-4. Add zero bytes until the length can be divided by three.
-5. Write every three bytes as one `#RRGGBB` code, in order.
-
-The mixing removes the constant prefix of the unmodified representation. Checksums and first codes can still coincide; distinct starts are not guaranteed. This is only a change of appearance, not concealment from someone who knows the format: anyone can undo the mixing and check whether the text is a share. Reading takes the checksum from the front, undoes the mixing, checks the version, the length and the zero bytes, and builds the standard `ur` form again, whose CRC32 and CBOR structure are then checked.
-
-A share whose CBOR byte string has a longer head than it needs (`58` and a length below 24) is still read. It is written again with the shortest head and a new CRC32, as the SSKR library takes it, so that it restores like the share written the usual way and counts as a copy of it.
-
-Word numbers and Unicode codes are made the same way with the version byte `A2`, but the bytes are cut into pieces of 11 bits instead of 3 bytes, the last piece filled with zero bits, and each piece is written as the word number (1 to 2048) or the Unicode code of that BIP39 word, as `--format 2` and `--format 3` write a phrase. `colors-unicode` writes the colors of a share as `--format 4` writes the colors of a phrase. Because every form carries a version, a length and a checksum, a share is read in whatever form it is written.
-
 ## Share QR images
 
 `--qr-dir NEW_FOLDER` saves one complete share per PNG in every share format, without a card design or PDF. Encode with `--sskr`, Re-encode with shares, `sskr-split` and `sskr-export` accept it. Files are named `share-1-qr.png`, `share-2-qr.png` and so on. Each PNG is read back and compared with that share before publication; a failed check offers another try on the private screen. All shares are in one folder: separate them for storage. Restore reads each image with `--share-qr PATH`.
 
 ## Share cards
 
-Shares written in colors (`colors`, `colors-unicode`) can be printed as cards with every template, and shares in Unicode codes (`unicode`) with every template but the enclosure and tile materials, which have too few samples for the longest share; one code to a card. Shares in word numbers, Bytewords or as a `ur:sskr` code have no cards: write them on paper, keep the text file or save standalone QR images with `--qr-dir NEW_FOLDER`. `sskr-export` prints existing shares and never makes new ones; `--format` writes them in a form that has cards. Without `--format` each share is printed in the form it is written in, so the cards are checked in every form that has them before the shares are asked: the enclosure and tile materials then need `--format colors` or `colors-unicode`. Here the `ur` shares saved above are printed in colors:
+Color shares (`colors`, `colors-unicode`) support every card template. Unicode shares support every template except the enclosure and tile materials, which have too few samples for the longest share. Each card prints one code.
+
+Word-number, Bytewords and UR shares have no code cards. Keep their text, save standalone [QR images](#share-qr-images), or use `sskr-export --format` to rewrite existing shares in a printable form. Rewriting never creates a new share set.
+
+Without `--format`, each share keeps its own form. Before asking for input, MnemoCode therefore checks the design in every printable form; the enclosure and tile materials require an explicit `--format colors` or `colors-unicode`. For example, print the UR shares created above as colors:
 
 ```bash
 mnemocode sskr-export --share-file ./shares.txt --format colors \
@@ -129,23 +126,35 @@ On the private screen, enter the path to a saved text file in the share field, o
 
 With `--mode seedshift` and the dates, the restored masked backup is shown in the form of the first share: word numbers, Unicode codes or colors for shares written that way, words for shares in Bytewords or `ur`. The original seed phrase follows as English words. Without Seedshift, only the original English words are shown, without a second code block.
 
-MnemoCode refuses a damaged share, two different shares with the same member number, shares from different sets and too few shares. A share given twice is used once, with a note, so its copy does not count towards the threshold. From the command line such a problem ends the command. On the private screen it is named by the place of the share among those typed, and the other answers are kept: a share that cannot be read is typed again alone, a share beyond the threshold that disagrees with the others can be left out or typed again, and more shares can be added to too few. When nothing tells which share is wrong, such as two different shares with the same member number, or as many shares of one set as of another, they are named together, and you choose which to change or leave out. When the shares restore nothing, or no phrase matches the wallet, MnemoCode asks what to change: a share, the dates, the wallet, whether the phrase was masked with Seedshift, or Stop.
+MnemoCode refuses a damaged share, two different shares with the same member number, shares from different sets and too few shares. A share given twice is used once, with a note, so its copy does not count towards the threshold. From the command line such a problem ends the command. On the private screen it is named by the place of the share among those typed, and the other answers are kept: a share that cannot be read is typed again alone, a share beyond the threshold that disagrees with the others can be left out or typed again, and more shares can be added to too few.
+
+When nothing tells which share is wrong, such as two different shares with the same member number, or as many shares of one set as of another, they are named together, and you choose which to change or leave out.
+
+When the shares restore nothing, or no phrase matches the wallet, MnemoCode asks what to change: a share, the dates, the wallet, whether the phrase was masked with Seedshift, or Stop.
 
 The share library also checks the restored secret against a hash stored in the shares. The 16-bit number of a set only tells sets apart. It does not prove that a share is genuine. Shares whose groups each restore from one share, under a group threshold of 1, keep no such hash: MnemoCode never writes them, and for such shares made elsewhere it says that the phrase is not checked, because a changed share would restore another phrase.
 
-Every supplied member of a complete group is checked for consistency, including members and groups beyond the recovery threshold. Members of an incomplete group cannot be checked against its polynomial: the CLI names them as not checked. The written-backup check warns instead of reporting that the whole backup was checked.
+Every supplied member of a complete group is checked for consistency, including surplus members and groups. Members of an incomplete group cannot be checked against its polynomial; the CLI names them as unchecked. The written-backup check warns rather than claiming the entire backup was checked.
 
-For library callers, `ShareSet::combine_phrase` returns a phrase only when no supplied shares or repaired elements remain unchecked and the hash checked the secret. `ShareSet::combine` returns the phrase together with what stayed unchecked, unsettled repair elements and whether no hash checked the phrase; a caller of this partial recovery must report those limits, as a page does from `RestoredShares.checked`. Both, and `ShareSet::restore` for complete input, are in `mnemocode::sskr`. For complete shares they refuse a member given more than once, even as an exact copy; `sskr-combine` leaves such copies out before it calls them.
+The [library's restore contracts](LIBRARY.md#share-engine-contracts) distinguish strict restoration from results with unchecked shares or repair elements.
 
 ### Damaged shares
 
-The library lists the readings of one share with a budget of 4 free bits, at most 256 solutions per solved reading; a listing never comes silently truncated. Joint recovery has its own search limits described below.
-
-The engine is linked into the library: its refusal of an invalid quorum or digest is `sskr.engine.combine`. Other failures of the engine propagate as failures, not as an empty candidate list or an accusation that valid shares are wrong. A joint confirmation skips only a completed negative share-set result; an exhausted reference budget is not such a result.
-
 Replace each unreadable element of a share with `?`, keeping its place: a word number, a four-digit Unicode code, a color code, a color Unicode code or pair, a Bytewords word, or a two-letter pair inside `ur:sskr/...`. In Color Unicode codes run together, each `?` stands for one code or for a whole color, and both kinds may be mixed in one share; marks that fit more than 256 ways are refused, so read more of those codes. `sskr-combine`, `sskr-export` and the backup check fill them in. Spaces are needed around a missing word number; fixed-width codes, Bytewords, which all have four letters, and UR pairs may stay joined. Do not remove the element. Any of the shares may have marks, up to 64 on one share, and a share may be given twice when two damaged copies of it are kept.
 
-In colors, in the four-digit Unicode codes of words and in the four-digit codes of Color Unicode, written apart by spaces, commas, semicolons or `#` (in a list of shares, a semicolon separates the shares), a `?` inside a code stands for one digit, and the digits that can be read are used: `#B5?0??` misses three digits of a color, `4E?0` one digit of a word's code. A lone `?` stands for the whole color or code, and so does a code all of whose digits are `?`, such as `??????` or `????`; a `?` joined to a whole code, as in `?4E00` or `#?#1F9121`, is still one whole element. A code with a `?` keeps all its symbols, six for a color and four for a Unicode code, or the share is refused with the code's place. The digits of a color are bits of the share, so the digits read become equations of their own: two unreadable digits leave 8 bits open instead of 24. The digits of a Unicode code are not bits of its word number: such a code is unknown as a whole, and only a word whose code fits the digits read can fill it. One unreadable digit leaves about 2.5 of the 2,048 words on average, two digits about 19, three about 200. Where that shortens the search, the codes with the fewest fitting words are also tried word by word, those in the first codes of a share first, since they tell the member numbers: up to 64 combinations of words over all the shares, and a bounded amount of work, so that the assessment takes seconds at most. The digits of a Color Unicode code are not bits of its color either, which is a quotient and a remainder of 6,400: a color with a code read in part is unknown as a whole, and only a color whose two codes fit the digits read can fill it, at most 16 for one unreadable digit. Word numbers, Bytewords and `ur` take a `?` only for a whole element, and a share that marks one of their digits is refused with the code's place. In codes run together a `?` stands for a whole code, so a digit is marked only in codes written apart; the screen shows Unicode and Color Unicode codes apart beside the joined text, and a refusal of joined codes with a `?` among them says so.
+In colors, in the four-digit Unicode codes of words and in the four-digit codes of Color Unicode, written apart by spaces, commas, semicolons or `#` (in a list of shares, a semicolon separates the shares), a `?` inside a code stands for one digit, and the digits that can be read are used: `#B5?0??` misses three digits of a color, `4E?0` one digit of a word's code. A lone `?` stands for the whole color or code, and so does a code all of whose digits are `?`, such as `??????` or `????`; a `?` joined to a whole code, as in `?4E00` or `#?#1F9121`, is still one whole element. A code with a `?` keeps all its symbols, six for a color and four for a Unicode code, or the share is refused with the code's place.
+
+The digits of a color are bits of the share, so the digits read become equations of their own: two unreadable digits leave 8 bits open instead of 24.
+
+The digits of a Unicode code are not bits of its word number: such a code is unknown as a whole, and only a word whose code fits the digits read can fill it. One unreadable digit leaves about 2.5 of the 2,048 words on average, two digits about 19, three about 200. Where that shortens the search, the codes with the fewest fitting words are also tried word by word, those in the first codes of a share first, since they tell the member numbers: up to 64 combinations of words over all the shares, and a bounded amount of work, so that the assessment takes seconds at most.
+
+The digits of a Color Unicode code are not bits of its color either, which is a quotient and a remainder of 6,400: a color with a code read in part is unknown as a whole, and only a color whose two codes fit the digits read can fill it, at most 16 for one unreadable digit.
+
+Word numbers, Bytewords and `ur` take a `?` only for a whole element, and a share that marks one of their digits is refused with the code's place.
+
+In codes run together a `?` stands for a whole code, so a digit is marked only in codes written apart; the screen shows Unicode and Color Unicode codes apart beside the joined text, and a refusal of joined codes with a `?` among them says so.
+
+### How joint repair works
 
 All the shares are repaired together, as one system of linear equations over GF(2) in the bits of the marked elements (`crates/mnemocode/src/sskr/joint.rs`):
 
@@ -153,9 +162,13 @@ All the shares are repaired together, as one system of linear equations over GF(
 - all shares of a set carry the same identifier and thresholds, and each has its member number;
 - every share beyond the threshold lies on the polynomial of the others: each of its bytes is a fixed GF(256) combination of theirs, and multiplying by a fixed constant is linear over GF(2).
 
-Elimination solves this without trying any value. What it leaves open is decided by the 32-bit digest that the SSKR library keeps with the secret: each combination is checked with HMAC-SHA256 in Gray code order, about 0.3 to 4.5 µs a try depending on the computer, and every one that passes is read as ordinary shares and restored by the SSKR library itself, which checks everything once more. Before the search, MnemoCode shows how many combinations are open, how long they take, which marked elements would close the most if read again, and how many more shares would likely settle the rest. A search expected to take up to 12 hours by the speed measured on the computer starts at once, 2^33 to 2^37 combinations, with its progress shown and Ctrl+C to stop it; a longer one needs `--max-tries` or a yes on the private screen, up to 2^40 combinations in all, days to two months. Only sets of one group are repaired, which is all that MnemoCode writes.
+Elimination solves this without trying any value. What it leaves open is decided by the 32-bit digest that the SSKR library keeps with the secret: each combination is checked with HMAC-SHA256 in Gray code order, about 2.5 to 4.5 µs a try depending on the computer, and every one that passes is read as ordinary shares and restored by the SSKR library itself, which checks everything once more.
 
-These are the marks that each share of a 2-of-3 set may have, at random places in the secret part of each share, in at least 18 of 20 tries; marks in the identifier and the thresholds cost less, since the other shares carry the same. The search columns assume about 2.5 µs a try:
+Before the search, MnemoCode shows how many combinations are open, how long they take, which marked elements would close the most if read again, and how many more shares would likely settle the rest. A search expected to take up to 12 hours starts at once, about 2^34 combinations, with its progress shown and Ctrl+C to stop it; a longer one needs `--max-tries` or a yes on the private screen, up to 2^40 combinations in all, about a month. Only sets of one group are repaired, which is all that MnemoCode writes.
+
+### Search estimates
+
+The table retains TypeScript reference examples; it is not a Rust performance measurement. It records examples for a 2-of-3 set: each share had the stated number of marks at random positions in its secret portion, and the search met the column's bound in at least 18 of 20 trials. Marks in the identifier or thresholds cost less because other shares repeat that metadata. Search columns assume about 2.5 µs per attempt; they are not a timing guarantee for every computer.
 
 | Phrase   | Shares given | Form                           | Settled at once | Within a minute | Longer search |
 | -------- | ------------ | ------------------------------ | --------------- | --------------- | ------------- |
@@ -172,15 +185,37 @@ These are the marks that each share of a 2-of-3 set may have, at random places i
 
 Marks at the same places on every share are the worst case: three shares then settle about as many as two.
 
-With only as many shares as the threshold, each checksum settles 32 bits of its own share and the digest the rest. Each share beyond the threshold adds as many equations as the secret has bits, 128 for 12 words and 256 for 24. A share that cannot be read at all cannot be rebuilt, since its member number is unknown: its elements are reported as guesses, the phrase does not depend on them, and the share is left out.
+With only as many shares as the threshold, each checksum settles 32 bits of its own share and the digest the rest. Each share beyond the threshold adds as many equations as the secret has bits, 128 for 12 words and 256 for 24. A share that cannot be read at all is rebuilt from the others, except for its member number, which is then reported as a guess.
 
 Every phrase that passes is listed with its fingerprint, and none is chosen. Each combination tried passes by chance with a probability of 2^-32, so a search of 2^32 combinations is expected to let about one wrong phrase through; the assessment says so when the expected number is not small. A wallet check (`--master-fingerprint`, `--bitcoin-address` and the other recovery checks) keeps only the matching phrase. `--candidates-file` saves the phrases as an encrypted [candidate list](CANDIDATES.md) for the Discovery Scanner of the multi-chain wallet tools. A `?` at a wrong place, or a misread element without `?`, usually leaves no solution, and the shares are refused; unmarked errors are never corrected.
 
+### Checking and rewriting repaired shares
+
 After a repair, MnemoCode names each filled-in element, by share and place, so that the written copy can be corrected. A repair proves that the shares fit their checks and the secret digest; it does not prove that the wallet is the intended one, so check the wallet that comes back.
 
-To write repaired shares down again without seeing the seed phrase, use entry 6 of the menu, or `mnemocode sskr-export --ask-secrets`, and enter the shares with their marks; each comes back in its own form, unless `--format` names another. With the threshold of shares, they are repaired together, and when more than one set of shares fits, each is shown with the fingerprint of the phrase it holds and none is saved; a wallet check keeps the right one. With fewer shares, each is repaired from its own checks alone: up to two word numbers or Unicode codes, one color, or three Bytewords or UR pairs (often four) on a share are repaired outright, and when several shares fit, each is shown and none is saved. A share that nothing settles, such as one that could not be read at all, is left out instead of being written down as a guess.
+To write repaired shares down again without seeing the seed phrase, use entry 6 of the menu, or `mnemocode sskr-export --ask-secrets`, and enter the shares with their marks; each comes back in its own form, unless `--format` names another. With the threshold of shares, they are repaired together, and when more than one set of shares fits, each is shown with the fingerprint of the phrase it holds and none is saved; a wallet check keeps the right one.
+
+With fewer shares, each is repaired from its own checks alone: up to two word numbers or Unicode codes, one color, or three Bytewords or UR pairs (often four) on a share are repaired outright, and when several shares fit, each is shown and none is saved.
+
+A share that nothing settles, such as one that could not be read at all, is left out instead of being written down as a guess.
 
 On paper, one share may span several lines. A share file may keep those lines as they are: as with a paste, lines that read as a share only together are joined again. Word numbers need separators; four-digit Unicode codes, six-digit RGB codes and Bytewords, four letters each, can be joined without spaces.
+
+## Transport details for implementers
+
+This section describes the transport for compatible implementations. A share is written in colors in five steps:
+
+1. Turn the Bytewords text of the single-part UR into bytes. The last four bytes are its CRC32 checksum; the bytes before them are the CBOR.
+2. Write the checksum first. After it come the version byte `A1`, one byte with the length of the CBOR, and the CBOR.
+3. Mix every byte after the checksum: XOR byte number `i` (counting from 0 at the version byte) with the low byte of the CRC32 of the four checksum bytes followed by `i` as two bytes, high byte first.
+4. Add zero bytes until the length can be divided by three.
+5. Write every three bytes as one `#RRGGBB` code, in order.
+
+The mixing removes the constant prefix of the unmodified representation. Checksums and first codes can still coincide; distinct starts are not guaranteed. This is only a change of appearance, not concealment from someone who knows the format: anyone can undo the mixing and check whether the text is a share. Reading takes the checksum from the front, undoes the mixing, checks the version, the length and the zero bytes, and builds the standard `ur` form again, whose CRC32 and CBOR structure are then checked.
+
+A share whose CBOR byte string has a longer head than it needs (`58` and a length below 24) is still read. It is written again with the shortest head and a new CRC32, as the SSKR library takes it, so that it restores like the share written the usual way and counts as a copy of it.
+
+Word numbers and Unicode codes are made the same way with the version byte `A2`, but the bytes are cut into pieces of 11 bits instead of 3 bytes, the last piece filled with zero bits, and each piece is written as the word number (1 to 2048) or the Unicode code of that BIP39 word, as `--format 2` and `--format 3` write a phrase. `colors-unicode` writes the colors of a share as `--format 4` writes the colors of a phrase. Because every form carries a version, a length and a checksum, a share is read in whatever form it is written.
 
 ## Test data
 

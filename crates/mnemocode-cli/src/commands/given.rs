@@ -333,7 +333,10 @@ pub(crate) fn assert_one_encoded_source(parsed: &Parsed) -> Result<(), Stop> {
 /// The text of the QR code in the PNG file at `path`, read by the library's strict reader;
 /// `regular_only` for a name typed at a question (read_qr_bytes).
 pub(crate) fn read_qr_path(path: &Path, regular_only: bool) -> Result<SecretText, Stop> {
-    Ok(mnemocode::qr::read_png(&read_qr_bytes(path, regular_only)?)?)
+    Ok(mnemocode::qr::read_png(&read_qr_bytes(
+        path,
+        regular_only,
+    )?)?)
 }
 
 /// The dates or date patterns of --date or --dates-file, as one answer.

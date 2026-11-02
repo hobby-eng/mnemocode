@@ -1,235 +1,344 @@
 # MnemoCode
 
 [![CI](https://github.com/hobby-eng/mnemocode/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hobby-eng/mnemocode/actions/workflows/ci.yml)
-[![RustSec audit](https://github.com/hobby-eng/mnemocode/actions/workflows/audit.yml/badge.svg)](https://github.com/hobby-eng/mnemocode/actions/workflows/audit.yml)
 [![Release](https://github.com/hobby-eng/mnemocode/actions/workflows/release.yml/badge.svg)](https://github.com/hobby-eng/mnemocode/actions/workflows/release.yml)
+[![RustSec audit](https://github.com/hobby-eng/mnemocode/actions/workflows/audit.yml/badge.svg)](https://github.com/hobby-eng/mnemocode/actions/workflows/audit.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#provenance-and-license)
 [![Build provenance: GitHub attestations](https://img.shields.io/badge/build%20provenance-GitHub%20attestations-2ea44f)](https://github.com/hobby-eng/mnemocode/attestations)
 
-This README describes version 0.2.0, the Rust version of MnemoCode. Until the release of 0.2.0, use the released [MnemoCode 0.1.0](https://github.com/hobby-eng/mnemocode_typescript/releases), the TypeScript version, which reads and writes the same backups.
+This README describes MnemoCode 0.2.0, the Rust version. Until 0.2.0 is released, the published executables are in the [TypeScript repository](https://github.com/hobby-eng/mnemocode_typescript/releases). Existing MnemoCode records and shares remain readable.
 
-**Have you inherited a backup made with MnemoCode?** Start with [A guide for heirs](docs/HEIRS.md).
+MnemoCode writes a wallet seed phrase (a BIP39 mnemonic) as numbers, Unicode codes or colors. You can mask it with dates, divide it into Shamir shares, print it on cards, or search for missing recovery material. It works offline as a command-line program, Rust library or WebAssembly module.
 
-MnemoCode keeps a wallet seed phrase (a BIP39 mnemonic) on paper as numbers, Unicode codes or colors. It works offline, as the `mnemocode` command, a Rust library or the WebAssembly file of a web page.
+The [documentation index](https://github.com/hobby-eng/mnemocode/tree/main/docs) lists all guides and reference documents, with a short description of each.
 
-- **[Obfuscate](#commands):** change how the words are written and recover the exact original phrase.
-- **[Mask with dates](#transformation-modes):** turn the phrase into a different, valid seed phrase; the same dates restore yours.
-- **[Split into shares](#splitting-a-mnemonic-into-shares):** require a chosen number of shares, for example any 2 of 3, to restore the phrase.
-- **[Print](#cards-and-qr-codes):** put codes or shares on business cards or material samples, with optional QR codes.
-- **[Recover](#recovery):** search forgotten words, codes, date digits or share elements and compare candidates with a known wallet reference.
+**Inherited a MnemoCode backup?** Start with [A guide for heirs](docs/HEIRS.md).
 
-These steps can be combined. Obfuscation and date masking are **not encryption**; they can disguise the phrase but do not protect it against informed guessing. For encrypted long-term storage, [MHFE](https://github.com/hobby-eng/mhfe) encrypts a seed phrase into another valid BIP39 seed phrase. Read the [security limits](SECURITY.md#cryptographic-and-recovery-limits) before choosing a backup.
-
-[Start](#install-and-run) · [Formats](#commands) · [Shares](#splitting-a-mnemonic-into-shares) · [Recovery](#recovery) · [Safety](#compatibility-and-safety-notes) · [Library](#library-use)
+Changing the way a phrase is written and masking it with dates are **not encryption**. Read the [security limits](SECURITY.md#cryptographic-and-recovery-limits) before choosing a backup. For encrypted long-term storage, [MHFE](https://github.com/hobby-eng/mhfe) is a separate program that encrypts a seed phrase into another valid BIP39 phrase.
 
 ## Install and run
 
-### From source
+<a id="one-executable-file"></a>
 
-Use Rust 1.99.1, which `rust-toolchain.toml` names:
+### Download an executable
+
+[Releases](https://github.com/hobby-eng/mnemocode/releases) provide executables for Linux x64 and ARM64, Windows x64, and macOS ARM64 and x64. Linux needs glibc 2.35 or later, as in Ubuntu 22.04 or Debian 12; musl systems such as Alpine cannot run these binaries. Follow [download verification](docs/CLI.md#download-verification) before running one: the release signing key fingerprint is `28FC51B1DB80DF2101128CB30EDD4814591DD095`.
+
+On Linux x64, after verification:
 
 ```bash
+chmod +x mnemocode-0.2.0-linux-x64
+./mnemocode-0.2.0-linux-x64
+```
+
+The executable includes its artwork, fonts and SSKR engine. It draws PDFs, PNGs and JPEGs itself; Node.js and Poppler are not needed.
+
+<a id="from-source"></a>
+
+### Run from source
+
+Use Rust 1.99.1, as pinned in `rust-toolchain.toml`:
+
+```bash
+git clone https://github.com/hobby-eng/mnemocode.git
+cd mnemocode
 cargo build --locked --release -p mnemocode-cli
 target/release/mnemocode
 ```
 
-### One executable file
-
-The executable builds target Linux on x64 and ARM64, Windows on x64 and macOS on ARM64 and x64, and need nothing else installed but, on Linux, glibc 2.35 or later, which Ubuntu 22.04, Debian 12 and newer systems have; musl systems such as Alpine cannot run them. [Download verification and build instructions](docs/CLI.md#download-verification) cover signatures, checksums and GitHub attestations. The release signing key fingerprint is `28FC51B1DB80DF2101128CB30EDD4814591DD095`.
-
-The examples below use `mnemocode`. In a checkout, use `target/release/mnemocode` in its place. For options, run `mnemocode <command> --help`.
+The examples below use `mnemocode` for your executable's name or path. In a source checkout, replace it with `target/release/mnemocode`. Run `mnemocode <command> --help` for the full option list.
 
 ## Menu
 
-Run `mnemocode` without arguments in a terminal. The menu offers encoding, re-encoding, decoding, sharing, recovery, sample cards and word lookup. The lookup entry also exports numbered dictionaries and a [printable guide to recovery without MnemoCode](docs/MANUAL_RECOVERY.md).
+Run `mnemocode` without arguments in a terminal. The sections below follow the menu in the same order; each task's **More** link opens its own section.
 
-Word numbers and English words are always masked with Seedshift, because the BIP39 list makes them easy to read: the menu, the command line and the library refuse them without it. Unicode codes and colors can remain unmasked.
+| Menu | Task                                          | What it does                                                        |
+| ---- | --------------------------------------------- | ------------------------------------------------------------------- |
+| 1    | [Encode](#1-encode)                           | Make a backup in another form, with optional dates, shares or cards |
+| 2    | [Re-encode](#2-re-encode)                     | Restore an existing backup and make a replacement                   |
+| 3    | [Decode](#3-decode)                           | Read a backup and recover the original words                        |
+| 4    | [Split into shares](#4-split-into-shares)     | Make standard Shamir shares                                         |
+| 5    | [Restore from shares](#5-restore-from-shares) | Combine enough shares and undo date masking if used                 |
+| 6    | [Recovery](#6-recovery)                       | Find missing words, codes, date digits or share elements            |
+| 7    | [Preview cards](#7-preview-cards)             | Try designs with sample data                                        |
+| 8    | [Word lookup](#8-word-lookup)                 | Look up a word or export dictionaries and a recovery guide          |
+| 9    | [Self-test](#9-self-test)                     | Check the installation                                              |
+| 0    | [Help](#0-help)                               | Read commands and options                                           |
+| —    | [Quit](#quit)                                 | Leave the program                                                   |
 
-After Encode, the optional backup check asks for the written copy and dates again and checks that they restore the same seed phrase. The menu shows the equivalent command, with secrets omitted.
+<a id="secret-input-styles"></a>
 
-You can also show the phrase after Seedshift as words. With or without shares, you can separately show the original wallet phrase only as English words for visual checking. These choices affect the screen only; the original words are never added to the encoded exports.
+Use the menu or `--ask-secrets` for real recovery material. Enter it on the private screen or read it from protected local files; never put seed phrases, codes, shares or dates in command arguments. The program refuses those arguments, but cannot remove what you already typed from shell history or process listings.
 
-## Transformation modes
+The private screen clears its contents when you leave it. It needs an interactive terminal and refuses `TERM=dumb`; it cannot prevent screen capture, terminal logging or observation by a compromised computer. Escape at a secret-input prompt returns to the main menu when started there; a standalone cancelled command ends with exit code 130.
 
-| Mode               | Use it for                                    | Dates    |
-| ------------------ | --------------------------------------------- | -------- |
-| `direct`           | Another representation of the original phrase | None     |
-| `seedshift`        | Date masking with a valid BIP39 result        | Required |
-| `seedshift-legacy` | Compatibility with Original Seedshift         | Required |
+## 1. Encode
 
-Without `--mode`, supplying `--dates-file` selects `seedshift`; otherwise the mode is `direct`.
+Choose how to write the backup, whether to mask it with dates, and where to save it. The screen marks the part to keep with **SAVE THIS BACKUP**, or **SAVE THIS SHARE** for each share. Copy the entire marked block in the displayed order. If you use Seedshift, keep the original dates too.
 
-Enter recovery material on the private screen or through local files, never as command-line text. The word lookup of `table` and of the menu is the exception: what it is given stands on the command line and on the screen, so use it for public words, and a saved word list for a real phrase. Raw phrase, backup, share, date and final-word arguments are refused, even for public examples. Headless operations accept `--mnemonic-file`, `--input-file`, `--share-file`, `--dates-file`, `--old-dates-file` and `--last-word-file`; one source may use `-` for standard input. Refusal cannot remove text already entered from shell history or process arguments. See [input files and limits](docs/CLI.md#input-files-and-limits).
+### Backup formats
 
-**Wrong dates can produce a valid phrase for a different wallet.** A checksum does not confirm the dates. Keep an original fingerprint, address or public key for a [recovery check](#exact-local-recovery-checks).
+<a id="commands"></a>
 
-Original Seedshift usually produces an invalid BIP39 checksum. Its `--legacy-valid-last-word` option replaces the checksum but loses information from the last word. A record in this mode is called `seedshift-legacy-valid`; decoding gives 128, 64, 32, 16 or 8 possible last words for 12, 15, 18, 21 or 24 words. A wallet reference is needed to distinguish them.
+These are formats selected by `--format`, not separate commands:
 
-### How checksum-valid Seedshift works
-
-MnemoCode Seedshift shifts the entropy represented by each word and then calculates a new checksum. Decoding subtracts the shifts and restores the original phrase with the same dates. Different dates can produce the same shift. The [construction](docs/SEEDSHIFT_CONSTRUCTION.md) and [worked example](docs/MANUAL_RECOVERY.md#worked-12-word-example-public-test-data) describe the bit packing and its limits.
-
-## Secret input styles
-
-Use the menu or `--ask-secrets` for a real seed phrase. Putting secrets in command arguments exposes them to shell history and process listings.
-
-```bash
-mnemocode encode --mode seedshift --ask-secrets --format 3
-```
-
-The private screen shows the secret and result, then clears them when you leave it. It requires an interactive terminal, and refuses `TERM=dumb`. This does not protect against screen capture, terminal logging or a compromised computer.
-
-The result marks the data to keep with **SAVE THIS BACKUP**, or **SAVE THIS SHARE** for each Shamir share. Copy the complete block in the displayed order. Seedshift also needs the original dates; optional original words are for visual checking.
-
-For scripts, `--mnemonic-file PATH` and `--input-file PATH` read local files; `-` reads standard input. [Input limits and QR files](docs/CLI.md#input-files-and-limits) are documented separately.
-
-## Commands
-
-| Format                 | What is stored                                                             |
+| Format                 | What you save                                                              |
 | ---------------------- | -------------------------------------------------------------------------- |
-| `english` / `1`        | English BIP39 words                                                        |
-| `indexes` / `2`        | Word numbers from **1 to 2048**                                            |
+| `english` / `1`        | English BIP39 words of the masked phrase                                   |
+| `indexes` / `2`        | BIP39 word numbers from **1 to 2048**                                      |
 | `unicode` / `3`        | Four-digit codes of the corresponding Traditional Chinese BIP39 characters |
-| `colors-unicode` / `4` | Each color represented by two four-digit Unicode codes                     |
+| `colors-unicode` / `4` | Two four-digit Unicode codes for each color                                |
 | `colors` / `5`         | `#RRGGBB` codes: 8, 10, 12, 14 or 16 for 12, 15, 18, 21 or 24 words        |
 
-Colors can be reordered, but every real code is needed. The 12- and 24-word color forms are compatible with BIP39Colors. Color Unicode is MnemoCode's text format, not a Unicode standard; it is also read as the Private Use characters themselves. [Separators and public command examples](docs/CLI.md#representation-details) cover copying each form.
+English words and word numbers require Seedshift in the menu, command line and library. Unicode codes and colors can be used without dates. Colors may be reordered, but every real color code is needed; word codes must keep their order. The 12- and 24-word color forms are compatible with BIP39Colors. Color Unicode is MnemoCode's text format, also accepted as Private Use characters. [Representation details](docs/CLI.md#representation-details) explain separators and copying.
 
-Encode shows two fingerprints: **original** identifies the wallet with an empty BIP39 passphrase; **encoded** identifies the stored phrase. They do not reveal the phrase. The encoded fingerprint checks the written codes without dates; a wallet reference checks the result after undoing dates. An invalid legacy phrase has no encoded fingerprint.
+### Transformation modes
 
-## Complete encode and decode examples
+The mode decides whether the phrase itself changes; the format decides how the result is written.
 
-Save a record with its mode and format, then read it back:
+| Mode               | What happens                                           | Dates    |
+| ------------------ | ------------------------------------------------------ | -------- |
+| `direct`           | Writes the original phrase in another form             | None     |
+| `seedshift`        | Masks the phrase and calculates a valid BIP39 checksum | Required |
+| `seedshift-legacy` | Reproduces Original Seedshift                          | Required |
+
+Without `--mode`, a `--dates-file` selects `seedshift`; otherwise the mode is `direct`. Dates accept `DD-MM-YYYY` or `YYYY-MM-DD`, with years `0001`–`9999`. Their input order does not matter. You can use up to one date per three words: at most 4–8 dates for 12–24 words.
+
+**Wrong dates can produce a valid phrase for a different wallet.** A checksum cannot confirm the dates. Keep an original wallet fingerprint, address or public key for a [recovery check](#exact-local-recovery-checks).
+
+Original Seedshift usually produces an invalid BIP39 checksum. Its `--legacy-valid-last-word` option makes the checksum valid but loses information from the last word. Such a record is named `seedshift-legacy-valid`; decoding leaves 128, 64, 32, 16 or 8 possible last words for 12, 15, 18, 21 or 24 words. A wallet reference distinguishes them. MnemoCode also accepts 21-word legacy phrases, which Original Seedshift did not support.
+
+#### How checksum-valid Seedshift works
+
+MnemoCode Seedshift shifts the entropy represented by each word and calculates a new checksum. Decoding with the same dates subtracts those shifts and restores the original phrase. Different dates can produce the same shift. The [construction](docs/SEEDSHIFT_CONSTRUCTION.md) and [worked example](docs/MANUAL_RECOVERY.md#worked-12-word-example-public-test-data) explain the calculation.
+
+### Make a backup and read it back
+
+<a id="complete-encode-and-decode-examples"></a>
+
+Each pair below decodes the file made by the preceding command. `--ask-secrets` asks privately for the phrase and any dates needed. Run the pairs separately; keep the dates apart from the backup.
 
 ```bash
-mnemocode encode --mode seedshift --ask-secrets --format 5 --output shifted-colors.txt
+# Seedshift as colors: save a record, then restore it with the same dates.
+mnemocode encode --mode seedshift --ask-secrets --format colors \
+  --output shifted-colors.txt
 mnemocode decode --input-file shifted-colors.txt --ask-secrets
-```
 
-Without date masking:
-
-```bash
-mnemocode encode --mode direct --ask-secrets --format 3 --output direct-unicode.txt
+# Unicode without date masking: save and restore the original phrase.
+mnemocode encode --mode direct --ask-secrets --format unicode \
+  --output direct-unicode.txt
 mnemocode decode --input-file direct-unicode.txt --ask-secrets
+
+# Original Seedshift as English words: keep and reuse the original dates.
+mnemocode encode --mode seedshift-legacy --ask-secrets --format english \
+  --output legacy-words.txt
+mnemocode decode --input-file legacy-words.txt --ask-secrets
 ```
 
-## Cards and QR codes
+A record stores its mode and format, so Decode does not need them again. [File-based examples](docs/CLI.md#public-command-examples) use public test data for scripts; [input files and limits](docs/CLI.md#input-files-and-limits) list the available sources.
 
-Cards print the recoverable codes. Images, decorative colors and personal details do not carry the phrase. Thirteen designs are available; `mnemocode preview --list` lists them. Cards require format 3, 4 or 5.
+### Check what you saved
+
+Encode offers to check the backup by asking for the written copy and dates again. This checks your transcription. Every generated QR PNG is separately read back and compared with the expected content before saving; a mismatch offers another try.
+
+Encode shows an **original** fingerprint for the wallet with an empty BIP39 passphrase and an **encoded** fingerprint for the stored phrase. They do not reveal the phrase. The encoded fingerprint checks the codes before dates are removed; an original wallet reference checks the recovered phrase. An invalid legacy phrase has no encoded fingerprint.
+
+You can also show the masked phrase as English words with `--show-masked-words`, or the original words for visual checking with `--show-original words`. These screen-only choices never add the original phrase to encoded files or share exports. Keep the original words apart from the backup.
+
+### Cards and QR codes
+
+Recovery uses the **printed code values**: four-digit Unicode codes or `#RRGGBB` color codes. Copy the real codes exactly, following the card numbers and leaving out the decoys described below. For colors, keep the printed hexadecimal values rather than matching shades by eye. Pictures, names and contact details are decoration; on Unicode cards, the colors are decorative too.
+
+Cards need format 3, 4 or 5; `preview --list` lists the thirteen designs.
 
 ```bash
-mnemocode encode --mode seedshift --ask-secrets --format 5 \
-  --template business-it --pdf cards.pdf --card-qr
+# Seedshift colors on A4 sheets, with a QR code and its PNG copy.
+mnemocode encode --mode seedshift --ask-secrets --format colors \
+  --template business-it --page-size a4 --pdf color-cards.pdf --card-qr
+mnemocode decode --mode seedshift --format colors \
+  --qr-file color-cards-qr.png --ask-secrets
+
+# Direct Unicode as separate JPEG business cards, plus a record to decode.
+mnemocode encode --mode direct --ask-secrets --format unicode \
+  --template business-it --cards-dir unicode-cards --image-format jpg \
+  --output unicode-record.txt
+mnemocode decode --input-file unicode-record.txt --ask-secrets
+
+# A standalone QR backup in legacy Unicode, without printable cards.
+mnemocode encode --mode seedshift-legacy --ask-secrets --format unicode \
+  --qr legacy-unicode.png
+mnemocode decode --mode seedshift-legacy --format unicode \
+  --qr-file legacy-unicode.png --ask-secrets
 ```
 
-Printed sets include extra random codes to disguise their length. To decode manually copied cards, use `--words` for the original phrase length and leave out those extra codes. The sheet for heirs records that length.
+A QR code contains the real codes, **without a mode, format header or dates**. Keep that information yourself. `--card-qr` puts the QR on a collection sheet and saves a PNG copy beside the PDF or in the image folder; individual cards never have a QR. `--qr PATH` saves a standalone PNG. Decode reads the PNG, not a PDF or a photograph of the whole sheet.
 
-A QR code contains only the real codes: **no mode, format header or dates**. `--card-qr` adds one to the collection sheet and saves a PNG copy beside it; individual cards never have a QR code. `--qr PATH` saves a separate PNG of a backup; `--qr-dir NEW_FOLDER` saves one PNG per Shamir share in any share format, without cards. Every generated PNG is read back and compared with its exact content before saving; a mismatch offers another try. The separate backup check checks the copy you wrote down. Read a backup with `decode --qr-file PATH`, or a share with `sskr-combine --share-qr PATH`.
+Printed sets also contain extra random codes. When typing codes from cards, give `--words` for the original phrase length and omit those extra codes. The sheet for heirs records the length. Recheck a backup before relying on it.
 
-Files and folders are not overwritten; taken names receive a number. Folder exports are prepared privately, but interruption while publishing can leave partial output or a private temporary copy. See [export precautions](SECURITY.md#secret-lifecycle-and-local-boundaries).
+Files and folders are never overwritten: taken names receive a number, which MnemoCode reports. Use that reported name when decoding. Folder exports can be incomplete after interruption; [export precautions](SECURITY.md#secret-lifecycle-and-local-boundaries) explain what may remain.
 
-[Card designs](docs/card-designs.md), [identity defaults](docs/card-identities.md) and [card options](docs/CLI.md#card-options) describe customization. `preview` draws a random sample phrase, so you can try a design without entering a secret.
+#### Individual business cards
 
-### Individual business cards
+`--cards-dir NEW_FOLDER` saves one PDF, PNG or JPEG per card, for business card designs only. Each file holds one code; an extra card holds a decoy code. Names such as `01.pdf` do not include the codes.
 
-`--cards-dir NEW_FOLDER` saves one PDF, PNG or JPEG per card, for business card designs only. Each file contains one code; one extra card contains a decoy code. A file is named after the card's number alone, such as `01.pdf`, so that a folder listing shows no code.
+These cards are **not Shamir shares**. Every real card is needed and exposes part of the encoded phrase. To require only a subset, [split the phrase into shares](#4-split-into-shares).
 
-**This is not Shamir sharing.** Every real card is needed, and each exposes part of the encoded phrase. Use shares when you want a threshold.
+#### Page sizes
 
-## Page sizes
+A6, A5 and A4 produce collection sheets. `--page-size business` produces 90 × 50 mm cards, one per PDF page or image; `--cards-dir` puts each in a separate file. Samples on collection sheets are scaled to fit and are not cut-out cards. Print at **100% / actual size** to preserve QR dimensions.
 
-A6, A5 and A4 produce collection sheets. `--page-size business` produces 90 × 50 mm cards: one per PDF page or image. `--cards-dir` puts them in separate files. Sheet samples are scaled to fit and are not cut-out cards. Print at **100% / actual size** to preserve QR dimensions.
+`--image-format png|jpg` selects images. PNG preserves sharp codes and transparent card corners; JPEG has white corners. [Card options](docs/CLI.md#card-options) cover layout and orientation.
 
-`--image-format png|jpg` selects images. PNG preserves sharp codes and transparent card corners; JPEG has white corners. [Card options](docs/CLI.md#card-options) list output and orientation settings.
+#### Collection-sheet identity
 
-### Collection-sheet identity
+`--studio-name` names the design studio; `--card-company` names the employer on business cards. Material sheets use `--card-name` for the recipient. See [card designs](docs/card-designs.md), [identity defaults](docs/card-identities.md) and [custom text fields](docs/CLI.md#card-options).
 
-`--studio-name` names the design studio; `--card-company` names the employer on business cards. Material sheets use `--card-name` for the recipient. [Identity defaults](docs/card-identities.md) and [custom text fields](docs/CLI.md#card-options) explain the remaining details.
+### Instructions for heirs
 
-## Splitting a mnemonic into shares
+`--heir-sheet heirs.pdf` adds a double-sided A5 guide; `--heir-sheet-size a6` makes a smaller one. It records the backup type, phrase length, share threshold and number of dates, but no recovery material, fingerprints or storage locations.
+
+Keep it apart from the backup. A handwritten hint should help heirs remember dates without disclosing them. The sheet cannot restore the wallet on its own; [A guide for heirs](docs/HEIRS.md) explains what else they need.
+
+<a id="re-encoding-a-backup"></a>
+
+## 2. Re-encode
+
+Read an existing backup, restore the original phrase and make a replacement with another mode, dates, format, cards or shares. MnemoCode asks you to recognize the original words or check them against your wallet before proceeding. A valid checksum alone is not confirmation. The old backup remains usable.
 
 ```bash
-mnemocode encode --mode direct --ask-secrets --sskr --threshold 2 --shares 3
+# Replace the color record from Encode with a new date-masked Unicode record.
+mnemocode re-encode --input-file shifted-colors.txt --ask-secrets \
+  --mode seedshift --format unicode --output replacement-unicode.txt
+mnemocode decode --input-file replacement-unicode.txt --ask-secrets
+```
+
+On the private screen, you can also paste Shamir shares in any supported form, separated by `;` or line breaks, or enter a share file path. Mark unreadable codes with `?`. Re-encode uses the same repair as Restore, asks about Seedshift and its old dates, and then confirms the **original** phrase. At least the threshold number of shares is needed; an address or fingerprint cannot replace one.
+
+For scripts, `--old-mode`, `--old-format` and `--old-dates-file` describe the input; the ordinary encoding options describe the replacement. Supply a wallet reference or `--recognised`, and repair incomplete input before re-encoding. [Re-encode options](docs/CLI.md#input-files-and-limits) explain interactive share and date recovery.
+
+## 3. Decode
+
+Read a saved record, pasted codes, a text file or a QR PNG. With Seedshift, enter the original dates to recover the original words. For damaged codes or dates, use the corresponding [recovery option](#6-recovery).
+
+The [Encode examples](#make-a-backup-and-read-it-back) read records back directly; the [card and QR examples](#cards-and-qr-codes) give the mode and format needed for a headerless QR. To read Unicode codes copied into your own text file:
+
+```bash
+mnemocode decode --mode seedshift --format unicode \
+  --input-file copied-unicode.txt --ask-secrets
+```
+
+The private screen also accepts Shamir shares and opens share restoration, keeping all shares you supplied. If marked text could be either a backup or a share, choose which it is, or use `--input-kind codes|share`.
+
+### Versioned records and legacy compatibility
+
+A record from `encode --output` has the form `MNC1:<mode>:<format>:<data>`. It contains no dates. Explicit options that conflict with the header are refused; on the private screen you can choose to use the header's values.
+
+Typed codes and QR payloads lack the header. Keep the mode; when the format cannot be determined unambiguously, give `--format` too. With `--sskr`, an output file contains one share per line instead of an MNC1 record.
+
+For legacy-valid input, provide the original final word privately or with `--last-word-file`. If ordinary legacy decoding fails its checksum, the private screen can offer the replaced-final-word path when applicable. Choose it only if that word was replaced when making the backup. Wrong dates or mistyped codes can also fail a checksum; a word outside the BIP39 list is a separate input error.
+
+<a id="splitting-a-mnemonic-into-shares"></a>
+
+## 4. Split into shares
+
+Make standard Shamir shares of the seed phrase itself. Choose a threshold and a total count, for example any 2 of 3 shares. The threshold is at least 2 and no greater than the count; at most 16 shares can be made. Keep them in separate places.
+
+```bash
+# Standard SSKR shares, with no date masking; then restore from the saved file.
+mnemocode sskr-split --mode direct --ask-secrets --threshold 2 --shares 3 \
+  --format ur --output standard-shares.txt
+mnemocode sskr-combine --share-file standard-shares.txt
+```
+
+The file above holds **all shares**. It is convenient for checking the result, but keeping it together defeats separate storage. Standard UR and Bytewords forms can be read by other SSKR tools. A BIP39 passphrase is not included in shares.
+
+To combine date masking, custom formats and cards, use **Encode** with `--sskr`:
+
+```bash
+# Seedshift shares as Unicode, on A5 sheets with one QR per share.
+mnemocode encode --mode seedshift --ask-secrets --sskr \
+  --threshold 2 --shares 3 --share-format unicode \
+  --template business-it --page-size a5 --pdf unicode-shares.pdf --card-qr \
+  --output unicode-shares.txt
+mnemocode sskr-combine --mode seedshift --ask-secrets
+
+# Direct shares as color codes, with separate QR images and a text copy.
+mnemocode encode --mode direct --ask-secrets --sskr \
+  --threshold 2 --shares 3 --share-format colors \
+  --qr-dir color-share-qr --output color-shares.txt
+mnemocode sskr-combine --share-file color-shares.txt
+```
+
+For the Seedshift restore above, enter `unicode-shares.txt` at the private share prompt, then enter the same dates used for the split. Unicode, word-number and color shares need MnemoCode. Dates and mode are not stored in shares: a Seedshift set needs both to restore the original wallet. Legacy Seedshift modes cannot be combined with shares. A PDF or image folder can contain **every share**; separate them before storage.
+
+Use `sskr-export` to print or change the presentation of existing shares without making a new set:
+
+```bash
+mnemocode sskr-export --share-file unicode-shares.txt --format unicode \
+  --template business-it --page-size a4 --pdf reprinted-shares.pdf --card-qr
+```
+
+[SSKR](docs/SSKR.md) explains share formats, card layouts and interoperability.
+
+## 5. Restore from shares
+
+Supply at least the threshold number of distinct shares from the same set. Paste them one per line or separated by `;`, give a text file, or read the shares' QR PNGs. Duplicate copies of one share do not count as extra members.
+
+```bash
+# Enter standard shares privately, without Seedshift.
 mnemocode sskr-combine --ask-secrets
+
+# Enter shares that were masked before splitting, then the original dates.
+mnemocode sskr-combine --mode seedshift --ask-secrets
+
+# Read two share QR images saved by a 2-of-3 split, without date masking.
+mnemocode sskr-combine --share-qr first-share.png --share-qr second-share.png
 ```
 
-The required threshold can be at most the share count, up to 16. Standard Bytewords and `ur:sskr/…` shares work with other SSKR tools. Encode can also share word numbers, Unicode codes or colors; these forms require MnemoCode. Shares restore the phrase that was split: if it was masked, the dates are still needed.
+If Seedshift was used, select it and enter its dates. On the private screen, complete shares show the encoded fingerprint before asking for dates, so you can compare it with the one from the split. A forgotten digit can be marked with `?`; MnemoCode asks for a wallet reference to search the dates. Mark damaged share codes with `?` too; see [Damaged shares](#damaged-shares).
 
-`sskr-export` prints existing shares. Keep shares in separate places: one collection PDF or page-image folder can contain **all** of them. [SSKR commands and formats](docs/SSKR.md) explain the choices.
+<a id="recovery"></a>
 
-### Damaged shares
+## 6. Recovery
 
-Put `?` where a share element is unreadable. Separated color and Unicode codes also accept missing digits, such as `#B5?0??` or `4E?0`; retaining readable digits can reduce a search from months to seconds. Bytewords, word numbers and UR pairs accept whole-element marks only.
+Choose what is missing. These four options appear in the same order in the recovery menu:
 
-Repair uses checksums, matching set metadata and redundancy from extra shares. More than one damaged share, including two copies of one share, can be supplied. The program estimates the work before searching and asks before estimates above 12 hours; the maximum is about a trillion combinations. See [patterns and timing examples](docs/SSKR.md#damaged-shares).
+| Missing material              | What to use                                             |
+| ----------------------------- | ------------------------------------------------------- |
+| A word of the original phrase | [Forgotten word recovery](#forgotten-word-recovery)     |
+| A code of the encoded phrase  | [Codes that cannot be read](#codes-that-cannot-be-read) |
+| A digit of a masking date     | [Date recovery helper](#date-recovery-helper)           |
+| A code of a Shamir share      | [Damaged shares](#damaged-shares)                       |
 
-If several phrases survive, none is selected automatically. A [wallet check](#exact-local-recovery-checks) distinguishes them. `sskr-export` returns repaired shares without displaying the seed phrase, so you can correct the copies.
+<a id="word-and-code-patterns"></a>
 
-## Instructions for heirs
+### Forgotten word recovery
 
-`--heir-sheet heirs.pdf` makes a double-sided A5 guide; `--heir-sheet-size a6` makes a smaller one. It records the backup type, phrase length, share threshold and number of dates, but no codes, shares, dates, fingerprints or storage locations.
-
-Keep it apart from the backup. A handwritten hint should help your heirs remember dates without disclosing them. The sheet cannot restore the wallet on its own. [A guide for heirs](docs/HEIRS.md) explains recovery and wallet precautions.
-
-## Versioned records and legacy compatibility
-
-`encode --output` saves `MNC1:<mode>:<format>:<data>`. It records how to decode the backup, but never the dates. Conflicting explicit options are refused; the private screen offers to use the header's values instead.
-
-Typed codes and QR codes have no header: retain the original mode. MnemoCode can usually detect the format; ambiguous input needs `--format`. With `--sskr`, the output file instead contains one share per line.
-
-## Re-encoding a backup
-
-`re-encode` reads an existing backup, restores its phrase and makes another with new dates, mode, form, cards or shares. It requires recognition of the recovered phrase or a wallet check before creating the replacement. A valid checksum alone is not confirmation.
-
-On the private screen it asks for the new backup first: its form, its mode and where it is saved, so that the system can hold writes to those folders before the old phrase is read. On Linux with Landlock a failed save may then take another name only in those folders.
-
-On the private screen it also accepts Shamir shares in every supported form, separated by `;` or line breaks, or read from a text file. The input prompt reminds you about `;` and using `?` for each missing or unreadable code or digit. Use `?` for an unreadable share code or digit: it runs the same repair as Restore from Shamir shares, removes Seedshift with the old dates where used, and only then asks you to confirm the original phrase. A forgotten date digit can also be searched with the original wallet's fingerprint or address. At least the threshold number of shares is needed; a fingerprint or address cannot replace a missing share. If no repair fits, check the unmarked codes and the positions of `?`.
+Replace each unknown word with `?`, or keep a known prefix such as `aban*`. MnemoCode can also find where a missing word belongs. A valid checksum narrows the list; it does not identify the wallet.
 
 ```bash
-mnemocode re-encode --ask-secrets --input-file shifted-colors.txt --mode seedshift --format 5
+# Enter the pattern privately and compare candidates with an address you know.
+mnemocode recover-word --ask-secrets
+
+# Use a known original master fingerprint as a filter.
+mnemocode recover-word --ask-secrets --master-fingerprint 73c5da0a
 ```
 
-Use `--old-mode`, `--old-format` and `--old-dates-file` for the input; the ordinary encoding options describe the output. Legacy-valid input also needs the remembered original final word, entered privately or supplied with `--last-word-file`. For scripts, supply a wallet reference or `--recognised`, and recover missing codes or dates before calling Re-encode. Interactive Shamir repair and date search use the private screen described above. The old backup remains usable after re-encoding.
+On a terminal, when unfiltered candidates do not fit on the screen, MnemoCode offers to check them against a wallet reference or save an encrypted list. This also works with a pattern read using `--mnemonic-file`. All candidates remain available in redirected output. See [input handling](docs/CLI.md#input-files-and-limits) and `mnemocode recover-word --help` for options and limits.
 
-If ordinary Legacy decoding fails its checksum, the private screen also offers recovery with a replaced final word when the input permits it. Choose this only if that word was replaced to make the backup's checksum valid; the original final word is then required. Wrong dates or codes can also fail a checksum. Words outside the BIP39 list are a separate input error.
+### Codes that cannot be read
 
-## Recovery
+Decode accepts `?` for an unreadable code and known prefixes or suffixes where the format supports them. It can check the encoded fingerprint without dates, check the original wallet after undoing dates, or list a small set. Missing date digits can be searched at the same time. The result includes repaired codes and dates.
 
-| What is missing              | Operation                                       |
-| ---------------------------- | ----------------------------------------------- |
-| Words of the original phrase | [recover-word](#forgotten-word-recovery)        |
-| Codes of a stored phrase     | [Decode](#codes-that-cannot-be-read)            |
-| Masking dates                | [recover-date or Decode](#date-recovery-helper) |
-| Share elements               | [Restore or repair shares](#damaged-shares)     |
+```bash
+mnemocode decode --mode seedshift --format unicode --ask-secrets
+```
 
-### Word and code patterns
+Use the recovery menu's second option to choose this workflow explicitly. Retain every readable part; `mnemocode decode --help` describes the supported patterns and limits.
 
-| Pattern        | Meaning                                            |
-| -------------- | -------------------------------------------------- |
-| `?`            | One unreadable word, number, Unicode code or color |
-| `ab*`          | An English word beginning with `ab`                |
-| `rich\|rice`   | One of the listed English words                    |
-| `1?34`, `4E?0` | One unknown digit in a number or Unicode code      |
+### Date recovery helper
 
-Word and code searches allow up to **16,777,216 combinations**. A BIP39 checksum leaves roughly 128 candidates for one unknown word in 12 words, or 8 in 24 words; for two unknown words, roughly 262,144 or 16,384. Original Seedshift codes have no checksum filter. A checksum-valid candidate is not necessarily your wallet.
-
-## Forgotten-word recovery
-
-`recover-word` takes the original English phrase with the patterns above. If one word is missing at an unknown position, use `--missing-word` with the remaining words.
-
-A wallet check marks matching candidates. A file or a pipe gets every candidate, nonmatches too, up to 2,048; a terminal shows every candidate when they fit on the screen and otherwise only the matches ([details](docs/CLI.md#input-files-and-limits)). Checking hundreds of thousands can take minutes. With no wallet reference, use a [candidate list for discovery](#candidate-lists-for-discovery).
-
-For an invalid Original Seedshift last word, `--legacy-valid-last-word` lists valid replacement words for the **stored** phrase. The candidate marked `preserved` keeps the old data bits. Dates are still needed to recover the original phrase.
-
-## Codes that cannot be read
-
-Decode accepts the same patterns in stored codes. Select candidates by the encoded fingerprint, without dates; by a wallet reference after undoing dates; or by listing a small set. Missing date digits can be searched at the same time. The result includes the repaired codes and dates.
-
-Decode also accepts Shamir shares, pasted one per line or read from a text file or QR image, and keeps all of them when opening share restoration. When damaged text could be either codes or a share, choose the kind or pass `--input-kind codes|share`.
-
-## Date recovery helper
-
-`recover-date` accepts up to three incomplete dates. Use `?` for a digit, a day/month/year or a whole date; `|` lists alternatives:
+`recover-date` accepts up to three incomplete dates. Use `?` for a digit, a day/month/year or a whole date, and `|` for alternatives:
 
 | Pattern          | Meaning            |
 | ---------------- | ------------------ |
@@ -239,66 +348,142 @@ Decode also accepts Shamir shares, pasted one per line or read from a text file 
 | `?-?-2026`       | Any date in 2026   |
 | `?`              | Any supported date |
 
-MnemoCode Seedshift and legacy-valid searches require a wallet reference: every date can give a valid phrase. Original Seedshift can instead use the checksum as a weak filter. Searches above an estimated 12 hours need confirmation, and no date search exceeds 2,147,483,648 attempts. [Date search details](docs/CLI.md#date-search-details) explain equivalent dates, result limits and combined share/date repair.
+```bash
+# Read the color record made in Encode and ask privately for date patterns.
+mnemocode recover-date --input-file shifted-colors.txt --ask-secrets \
+  --master-fingerprint 73c5da0a
+```
 
-## Exact local recovery checks
+The example fingerprint belongs to a public test wallet; use your original wallet's reference for your own backup. MnemoCode Seedshift and legacy-valid searches need a wallet reference because every date can give a valid phrase. Original Seedshift can instead use its checksum as a weak filter. Searches estimated above 12 hours need confirmation, and no date search exceeds 2,147,483,648 attempts. See [date search details](docs/CLI.md#date-search-details).
 
-Candidates can be compared offline with an address, compressed public key, master/account extended public key, WIF from a file, or original master fingerprint. A fingerprint has only 32 bits: it is a filter, not proof. Prefer a known address or public key.
+### Damaged shares
 
-Bitcoin searches default to mainnet, account 0, receiving branch 0 and indexes 0–19, trying BIP44/49/84/86. `--account`, `--branch`, `--index`, `--scan-gap` (up to 1000), `--network` and `--bitcoin-profile` select the range. An exact location with `--scan-gap 1` is faster. Eleven other coins use their standard single-key paths and infer the network from the address.
+Put `?` where a share element cannot be read. Separated color and Unicode codes also accept missing digits, such as `#B5?0??` or `4E?0`. Bytewords, word numbers and UR pairs accept whole-element marks only.
 
-If the wallet uses a BIP39 passphrase, give it with `--bip39-passphrase-file`, also together with `--ask-secrets`; the private screen and the menu do not ask for it, and without the file wallet checks use an empty passphrase. It is separate from the masking dates. [Reference options, supported coins and examples](docs/CLI.md#wallet-check-examples-and-address-forms) cover the details. WIFs are private keys: keep them out of command arguments and reports.
+Restore uses checksums, set metadata and redundancy from extra shares to repair the shares together. Supply every share you have, including damaged copies. More than one surviving phrase is listed; none is selected automatically. A [wallet check](#exact-local-recovery-checks) helps distinguish them. `sskr-export` can return repaired shares without displaying the phrase.
 
-## Candidate lists for discovery
+Before searching, MnemoCode estimates the work and asks for confirmation above 12 hours. The maximum is about a trillion combinations. [Share repair patterns](docs/SSKR.md#damaged-shares) explain how keeping readable digits reduces the work.
 
-With no known reference, save candidates using `--candidates-file candidates.age` for the Discovery Scanner of the [multi-chain wallet tools](https://github.com/hobby-eng/multi-chain-wallet-tools). Candidate N on screen is record N in the file. On a terminal, `recover-word` also offers this after its search, when its candidates do not fit on the screen.
+### Exact local recovery checks
 
-**The file contains seed phrases.** It is encrypted to the Scanner's one-time key (`--candidates-key age1…`) or with a passphrase. MnemoCode stays offline; the Scanner checks for funds online. [Candidate lists](docs/CANDIDATES.md) describes the format, privacy and limits.
+Candidates can be compared offline with an address, compressed public key, master/account extended public key, WIF from a file, or original master fingerprint. A fingerprint is only 32 bits and is a filter, not proof; prefer a known address or public key.
 
-## Self-tests and public vectors
+Bitcoin searches default to mainnet, account 0, receiving branch 0 and indexes 0–19, trying BIP44/49/84/86. Narrow the location with `--account`, `--branch`, `--index`, `--scan-gap`, `--network` and `--bitcoin-profile`. Eleven other coins use their standard single-key paths and infer the network from the address. [Wallet check examples](docs/CLI.md#wallet-check-examples-and-address-forms) list references, supported coins and options.
 
-The startup self-test, quick known-answer and refusal checks, runs before secret operations; a failure stops the operation, and the menu then offers only the self-test, the help and Quit. It also checks the SSKR engine against published answers. These checks do not replace verifying a download or the stored backup.
+If the wallet uses a BIP39 passphrase, supply `--bip39-passphrase-file`, including with `--ask-secrets`. The menu and private screen do not ask for it; without the file, wallet checks use an empty passphrase. This passphrase is separate from masking dates. WIFs are private keys: keep them out of command arguments and reports.
 
-`mnemocode self-test` runs the full self-test, the startup self-test and more, including PDF and QR rendering, and can take longer. [Check coverage](docs/CLI.md#installation-checks) lists what it exercises; [public vectors](vectors/mnemocode-v1.json) are available for independent verification.
+### Candidate lists for discovery
+
+With no known wallet reference, save candidates for the Discovery Scanner of the [multi-chain wallet tools](https://github.com/hobby-eng/multi-chain-wallet-tools). For example:
+
+```bash
+mnemocode recover-word --ask-secrets --candidates-file candidates.age
+```
+
+**The file contains seed phrases.** Encrypt it to the Scanner's one-time key with `--candidates-key age1…`, or use a passphrase. Candidate N on screen is record N in the file. MnemoCode stays offline; the Scanner checks for funds online. [Candidate lists](docs/CANDIDATES.md) explains the format, privacy and limits.
+
+## 7. Preview cards
+
+Try a design with a random sample phrase before entering your own. Use `--list` to see design names, one `--template` to preview it, or `--all` to compare every design.
+
+```bash
+mnemocode preview --list
+mnemocode preview --all --words 24 --page-size a4 --pdf sample-designs.pdf
+mnemocode preview --template business-it --words 24 \
+  --cards-dir sample-cards --image-format jpg
+```
+
+These are samples, not wallet backups. The same [card options](docs/CLI.md#card-options) control actual exports from Encode.
+
+## 8. Word lookup
+
+Find the BIP39 row linking an English word, its 1-based number and its Unicode code. You can also export numbered dictionaries and a guide for recovery without MnemoCode.
+
+```bash
+mnemocode table --word abandon
+mnemocode table --index 1
+mnemocode table --unicode 5BF6
+
+# All four dictionaries and the recovery guide, in one new folder.
+mnemocode table --word-lists-dir recovery-pack
+```
+
+In the menu, Enter after a lookup asks for another value of the same kind; Escape returns to the main menu. **Export word lists and guide** lets you choose one table or the full set. [Dictionary export options](docs/CLI.md#word-lists-and-manual-recovery) describe individual files. The [manual recovery guide](docs/MANUAL_RECOVERY.md) includes a standalone Python helper; combining SSKR shares still requires a compatible implementation.
+
+<a id="self-tests-and-public-vectors"></a>
+
+## 9. Self-test
+
+Run the full installation self-test, including PDF and QR rendering:
+
+```bash
+mnemocode self-test
+```
+
+Secret operations also run a quicker startup self-test; share operations check the SSKR engine against published answers. If startup checks fail, the menu offers only Self-test, Help and Quit. These checks cannot replace verifying a download or checking the backup you stored. See [check coverage](docs/CLI.md#installation-checks) and the [public vectors](vectors/mnemocode-v1.json).
+
+## 0. Help
+
+Read the command list or the options for a particular task:
+
+```bash
+mnemocode --help
+mnemocode encode --help
+mnemocode sskr-combine --help
+```
+
+These are the actual commands, grouped in menu order:
+
+| Command        | Purpose                                                |
+| -------------- | ------------------------------------------------------ |
+| `encode`       | Write a backup, optionally with date masking or shares |
+| `re-encode`    | Restore a backup and create its replacement            |
+| `decode`       | Read a backup and recover the phrase                   |
+| `sskr-split`   | Make standard Shamir shares                            |
+| `sskr-combine` | Restore from shares                                    |
+| `sskr-export`  | Repair or print existing shares                        |
+| `recover-word` | Search missing words                                   |
+| `recover-date` | Search missing date digits                             |
+| `preview`      | Render sample card designs                             |
+| `table`        | Look up words or export dictionaries                   |
+| `self-test`    | Check the installation                                 |
+
+Damaged backup codes use `decode`; damaged share codes use `sskr-combine` or `sskr-export`. [The command-line reference](docs/CLI.md) covers file limits, detailed options and public examples.
+
+## Quit
+
+Choose Quit, press `q`, or press Escape at the main menu to leave MnemoCode. At a task question, Escape goes back or cancels that action. After a result, follow the prompt: it may offer Escape to quit, while a repeated word lookup returns to the menu. Ctrl+C cancels the current operation.
 
 ## Compatibility and safety notes
 
-- Dates accept `DD-MM-YYYY` or `YYYY-MM-DD`, with a four-digit year from `0001` to `9999`; their input order does not matter.
-- Use at most one date per three words: 4–8 dates for 12–24 words.
-- MnemoCode accepts 21-word legacy phrases, which Original Seedshift did not support.
-
-Read [SECURITY.md](SECURITY.md) for the remaining cryptographic, recovery and host risks.
+Use a trusted computer without a network connection. [SECURITY.md](SECURITY.md) describes the cryptographic, recovery and host risks and how to report a vulnerability.
 
 ### Protection while it runs
 
-The CLI restricts network access and file writes according to the command. Additional operating-system protections depend on what the system supports. The library inherits its host's permissions. [Runtime protection](SECURITY.md#secret-lifecycle-and-local-boundaries) describes the actual guarantees and exceptions.
+The CLI asks the operating system to restrict network access and file writes where supported. It reports the protections that actually applied; there is no restriction on starting child processes. The library inherits its host's permissions; [runtime protection](SECURITY.md#secret-lifecycle-and-local-boundaries) states the guarantees and exceptions.
 
 ### Unencrypted swap
 
-On Linux, MnemoCode warns when swap is unencrypted or cannot be assessed. Secret bytes may be written to disk through swap; use encrypted swap or none.
+On Linux, MnemoCode warns when swap is unencrypted or cannot be assessed. Secret bytes may reach disk through swap. Use encrypted swap or none. Secret owners request page locks, but locks have a budget and may be refused; large rendered pages and some working copies remain unlocked.
 
 ### Memory lock
 
-MnemoCode asks the system to keep the memory of each secret out of swap. A system may refuse beyond its limit, 8 MiB on a current Linux; MnemoCode then says so once. The drawn pages of cards are too large for the limit: they are wiped when freed but not locked. The codes on cards, the dates of a command and the working copies of a step are not locked either. Use encrypted swap or none for a real phrase.
+Small secret buffers request `mlock` on Linux and macOS, or `VirtualLock` on Windows, before being filled. A refused lock warns once. Secret owners wipe their memory when dropped; large buffers can be wiped without being locked. See [memory limits](SECURITY.md#input-screens-and-memory).
 
 ### Cloud folders
 
-A synchronized folder can upload records, cards and shares. MnemoCode warns for usual cloud-folder names, but cannot detect every configuration. Use a local folder or removable drive.
+A synchronized folder can upload records, cards or shares. MnemoCode warns for usual cloud-folder names, but cannot detect every configuration. Use a local folder or removable drive.
 
 ## Library use
 
-The crates `mnemocode` and `mnemocode-cards` provide the same transformations, recovery, sharing and drawing as the CLI, and `mnemocode-wasm` binds them for a web page. A host supplies its own randomness and files, and registers the library's zeroing allocator, which the example shows. The crates are distributed from this repository and are not published.
+The `mnemocode` crate provides transformations, recovery, shares and wallet checks; `mnemocode-cards` draws the printable output. Browser hosts use the feature-selected `mnemocode-wasm` binding. Hosts supply randomness and drive resumable searches; native file access and terminal questions stay in the CLI. The crates are built from this repository, not published to crates.io. [The library guide](docs/LIBRARY.md) covers examples, ownership and host contracts; [the module inventory](docs/ARCHITECTURE.md#modules-for-other-hosts) maps them to source.
 
-[The architecture](docs/design/architect/ARCHITECTURE.md) describes the crates and their ownership contracts; [library examples](docs/CLI.md#library-example) show encoding and decoding.
-
-## Continuous integration
-
-CI runs `cargo xtask check`, the fast gates of the repository; the release workflow also runs `cargo xtask features` and `cargo xtask reproducible`, and builds and checks the executables and the WebAssembly files. [Releasing](docs/RELEASING.md) describes the signing and acceptance requirements.
+<a id="continuous-integration"></a>
 
 ## Source layout and review
 
-See the [design](docs/design/README.md) and the [audit index](docs/audits/README.md).
+See the [architecture](docs/ARCHITECTURE.md), [audit index](docs/audits/README.md) and [release procedure](docs/RELEASING.md). CI checks source, tests and platform input handling; release workflows build and check the executables.
 
 ## Provenance and license
 
-MnemoCode is an independent implementation in Rust, not an official fork of Seedshift or BIP39Colors. Its source is licensed under either the [MIT license](LICENSE-MIT) or the [Apache License, Version 2.0](LICENSE-APACHE), at your option. [NOTICE](NOTICE) attributes the compatible formats to [Seedshift](https://github.com/mifunetoshiro/Seedshift) (MIT) and [BIP39Colors](https://github.com/EnteroPositivo/bip39colors) (CC BY 4.0). [Third-party notices](THIRD_PARTY_NOTICES.md) record dependencies, word-list origins and the origin of the card artwork.
+MnemoCode is an independent Rust implementation, not an official fork of Seedshift or BIP39Colors. Its source is available under either the [MIT license](LICENSE-MIT) or the [Apache License, Version 2.0](LICENSE-APACHE), at your option. [NOTICE](NOTICE) attributes the compatible formats to [Seedshift](https://github.com/mifunetoshiro/Seedshift) (MIT) and [BIP39Colors](https://github.com/EnteroPositivo/bip39colors) (CC BY 4.0). The [third-party notices](THIRD_PARTY_NOTICES.md) list dependencies, word-list origins and card artwork.

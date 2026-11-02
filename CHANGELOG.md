@@ -4,6 +4,7 @@
 
 MnemoCode is rewritten in Rust: one executable that needs nothing else installed but glibc 2.35 or later on Linux, for Linux, macOS and Windows, and a WebAssembly file for each page of the wallet tools. It reads every backup, record and share of 0.1.0 and writes the same ones, and its commands, questions and messages are those of 0.1.0, but for what follows.
 
+- The README follows the menu order, with paired command examples and a documentation index. Each menu task and recovery choice shows its own explanation and a link to that section.
 - Secrets live in types that wipe them, every freed block of memory is wiped, and the memory of a secret is kept out of swap where the system allows it.
 - Re-encode asks for the new backup before the old one, and on Linux with Landlock a failed save may take another name only in the folders of its outputs.
 - A command whose result is secret is refused on a terminal without a private screen.

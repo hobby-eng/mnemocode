@@ -26,7 +26,7 @@ use crate::os::{self, Environment, Stream};
 pub(crate) use answer::Hints;
 pub(crate) use choice::{
     Choice, Chosen, Digit, Explanation, LineQuestion, ListQuestion, answer_mark, ask_line, choose,
-    choose_from, erase_answers_since, list_rows, notes_room, rows_of, start_answer_record,
+    choose_from, list_rows, notes_room, redraw_answer_record, rows_of, start_answer_record,
     type_hint, wait_for_enter, wait_for_enter_or_escape, write_prompt,
 };
 pub(crate) use keys::{Interrupted, Keys, key};

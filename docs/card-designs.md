@@ -1,44 +1,43 @@
 # Card designs
 
-Thirteen templates are included; `mnemocode preview --list` prints their numbers and names. The [README](../README.md#cards-and-qr-codes) describes the options. This document says what every template prints.
+MnemoCode includes thirteen designs. Run `mnemocode preview --list` to see their names and numbers, or [preview them](../README.md#7-preview-cards) before entering your own phrase. This page describes the printed layout; the [CLI reference](CLI.md#card-options) lists customization options.
 
 ## Codes and colors
 
-- Every card prints one code: a color code in formats 4 and 5, a Unicode code in format 3.
-- In colors, a card shows its own color. In Unicode codes the colors only decorate the cards: one code always has one color, and different codes get colors that look as different as possible on every design.
-- Business cards take the hue, the brightness and some of the saturation of their color, so that pale, deep and dark colors look apart.
-- A sheet ends with random codes that belong to nothing, at least one, so that every row is full. Separate cards have exactly one extra code: a 24-word phrase in Unicode codes gives 25 cards. The QR code and the sheet for heirs know only the real codes.
-- The number on a card is its place in the set; no card says how many cards there are.
+Each card prints one code: an RGB color code for formats 4 and 5, or a four-digit Unicode code for format 3. In color formats, the printed color belongs to the backup. With Unicode codes, colors are decorative; recover from the printed codes, not from the artwork's color.
+
+Business-card artwork uses the selected color's hue, brightness and part of its saturation to distinguish pale, deep and dark samples.
+
+Collections include random decoy codes. A sheet has at least one and enough to fill every row; separate cards have exactly one. For example, a 24-word Unicode backup has 25 separate cards. The QR contains only real codes, and the sheet for heirs records the information needed to exclude decoys.
+
+A card's number gives its position in the set. No card states the total count.
 
 ## Collection sheets
 
-- A sheet shows the studio name and the line `DESIGN STUDY / FOR SELECTION` centred at the top, numbered samples with their references, and one line at the bottom with the slogan and the series reference.
-- Every row of samples is full. A sheet has at least three rows where they fit, rather than two long ones, with the largest samples the page allows, and of samples about as large the most of them, so that they fill the page in height and width. The rows share the height evenly, above, between and below them. Without `--orientation` the sheet is turned the way that gives such a sheet.
-- Business cards lie on a dark page with a world map. Material samples lie on a backdrop of their own setting, whose panels, tiles or planks are laid out around the samples: their joints run between them, and each sample sits in the middle of a panel or tile of its own.
-- The object of a material image, such as a tile or a switch plate, sits in the middle of its sample.
-- Each Shamir share has its own sheet and its own series reference.
-- Material sheets also show names of finishes, which are decoration. Two different codes never get the same sample on one sheet.
-- A name that does not fit beside its sample at the sheet's size takes two lines rather than smaller letters. The line with the number and the code is never split.
+The studio name and `DESIGN STUDY / FOR SELECTION` heading appear above numbered samples. A footer carries the slogan and series reference. Each Shamir share has a separate sheet and series reference.
+
+The layout fills every row and uses at least three rows where space allows. It chooses large, similarly sized samples and distributes vertical space above, between and below rows. Without `--orientation`, MnemoCode chooses the page direction that best fits that layout.
+
+Business cards sit on a dark page with a world map. Material designs use a matching backdrop: joints between panels, tiles or planks fall between samples, with each sample centered in its own panel or tile. The object in a material image, such as a switch plate, is centered within the sample.
+
+Finish names are decorative. On one sheet, different codes use different material samples. A long finish name can wrap to two lines; its letters are not reduced. The card number and code stay on one line.
 
 ## QR code
 
-- The QR code of a collection is in the upper-right corner, beside the heading and outside every sample.
-- Its dots are 0.30 mm wide, it is at least 12 mm wide, and it has a full empty border.
-- If it does not fit, the export stops and asks for a larger page.
+A collection QR sits in the upper-right corner beside the heading, outside the samples. Its modules are 0.30 mm wide, the symbol is at least 12 mm wide, and it has a full quiet border. If it cannot fit, the export asks for a larger page.
+
+Individual code cards never contain a collection QR. See [share layouts](SSKR.md#share-cards) for the separate QR-card option for Shamir shares.
 
 ## Artwork
 
-Images of cards and materials are stored in the program; the colour of a material sample is laid over its image. They were made for MnemoCode with OpenAI's image generation and are distributed under MnemoCode's license, MIT or Apache-2.0 at your option; [their notice](../crates/mnemocode-cards/assets/images/NOTICE) says how they were made and lists each image with its SHA-256. Page backdrops, text, reference codes and the QR code are drawn as shapes, not as pixels, so they stay sharp in print.
+Card and material images are bundled with the program. Material colors are laid over their images. The artwork was made for MnemoCode with OpenAI image generation and is distributed under MIT or Apache-2.0, at your option. Its [notice](../crates/mnemocode-cards/assets/images/NOTICE) records the provenance and each image's SHA-256.
+
+Page backdrops, text, reference codes and QR modules are drawn as vector shapes and remain sharp in print.
 
 ## Example titles
 
-`--title` takes one line of text that is not blank and has no control or format characters: at most 100 characters once spaces at either end are left out. For example:
+`--title` accepts a nonblank line of at most 100 characters after trimming, with no control or format characters. For example:
 
-- The Studio Edit
-- The Psychology of Color
-- Stunning Colors for Business Inspiration
-- Travel-Inspired Shades
-- Bold Tones for Bright Ideas
-- Modern Shades for Meaningful Work
-- Palette Notes for Creative Minds
-- Thoughtful Tones for Modern Living
+- Finish options
+- Material samples
+- Color study

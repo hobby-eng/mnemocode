@@ -12,7 +12,7 @@ The person and the company printed on business cards are invented. When you give
 | Phone     | `+44 20 7946 0281`, from the London numbers that the UK regulator reserves for fiction      |
 | Location  | `International`                                                                             |
 
-The email and the website are decoration. They end in `.example`, a domain reserved for examples, so they can never be the contacts of a real company.
+The email and website are decorative examples, using the reserved `.example` domain. They are not contact details to use.
 
 ## Studio on collection sheets
 

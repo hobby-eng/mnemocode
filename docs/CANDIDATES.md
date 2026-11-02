@@ -1,6 +1,8 @@
 # Candidate lists
 
-When MnemoCode cannot tell which seed phrase is the right one, for example after a forgotten word without a fingerprint to check against, it can save every candidate to one file. The Discovery Scanner of the [multi-chain wallet tools](https://github.com/hobby-eng/multi-chain-wallet-tools) imports that file and checks each candidate online; the Recovery tab of the Wallet Deriver writes the same file. This document fixes the format of the file, the order in which the candidates are numbered, and the encryption around it. `vectors/candidates-v1.json` holds test vectors for all three.
+When a search leaves several possible seed phrases, MnemoCode can save them as a candidate list. The Discovery Scanner of the [multi-chain wallet tools](https://github.com/hobby-eng/multi-chain-wallet-tools) imports the list and checks candidates online. The Wallet Deriver's Recovery tab writes the same format.
+
+This page specifies candidate ordering, MNCL bytes and encryption. `vectors/candidates-v1.json` contains test vectors for all three. For host APIs and cleanup contracts, use the [library guide](LIBRARY.md#candidate-list-encryption).
 
 Candidate N on MnemoCode's screen is record N of the file, counting from 1.
 
@@ -13,7 +15,7 @@ Candidate N on MnemoCode's screen is record N of the file, counting from 1.
 | Forgotten digits of the Seedshift dates                                          | `recover-date`                | as `recover-date` lists them |
 | Damaged Shamir shares, forgotten date digits of a phrase masked before splitting | `sskr-combine`                | as `sskr-combine` lists them |
 
-The searches are host-neutral parts of MnemoCode, which the Deriver compiles unchanged, so the same input gives the same list in both: `WordCandidateSearch` in `crates/mnemocode/src/recovery/word_search.rs` for words, `DateSearch` in `crates/mnemocode/src/recovery/date_search.rs` for dates, and `crates/mnemocode/src/sskr/joint.rs` for shares.
+The searches are host-neutral parts of MnemoCode, which are compiled into the native CLI and WebAssembly binding, so the same input gives the same list in both: `recovery::word_search::WordCandidateSearch` in `crates/mnemocode/src/recovery/word_search.rs` for words, `DateSearch` in `crates/mnemocode/src/recovery/date_search.rs` for dates, and `crates/mnemocode/src/sskr/joint.rs` for shares.
 
 A candidate is kept only when its BIP39 checksum is valid. A wallet check (a fingerprint, an address, a public key) works differently by search: `recover-word` lists and saves every candidate and marks those that match, while `recover-date` and `sskr-combine` list and save only the candidates that match. Either way the list holds exactly the candidates the screen numbers, in that order.
 
@@ -75,18 +77,18 @@ A reader computes L from the fields, then checks that the length of the list is 
 
 ## Encryption
 
-The operations run behind a gate of fast known answers (`candidates::gate`), one for each run of the command line and one for each instance of a page's WebAssembly. Encryption and decryption enforce it themselves: the first operation of each kind runs its known answers, a success is kept for the instance, and a failure starts no encryption of a person's list and is tried again by the next operation. The symmetric check needs no scrypt. The full self-test reruns the fast answers and the separate, slow scrypt answer at its unchanged work factor.
-
 A list leaves MnemoCode encrypted with [age](https://age-encryption.org/v1), in its binary form, never armored, by default. Exactly one of these two kinds is allowed, and a reader checks that the header has exactly one stanza in all, of that kind:
 
 - **To the Scanner's key.** The Scanner makes a one-time X25519 key for one session and shows its recipient, `age1…`, 62 characters, which can be typed, pasted or read from a file, a file's leading byte order mark left out; stanza type `X25519`. Upper and lower case are the same. A file with more than one recipient is refused, because it is only as strong as its weakest stanza.
 - **With a passphrase.** Stanza type `scrypt`, with the work factor log2 N = 18 exactly; any other is refused. It is a separate file and the only stanza in it, as age requires. The passphrase is the text as entered without white space at its ends (Unicode's White_Space, as every value that MnemoCode reads whole is trimmed; a byte order mark is no white space), and when read from a file also without a leading byte order mark; its UTF-8 bytes, with no Unicode normalization, are what age gets. MnemoCode refuses one shorter than 12 characters.
 
-X25519 is not post-quantum: a file kept today could be opened by a large quantum computer in the future. The owner chose it over the hybrid ML-KEM-768 key, whose recipient is 1,959 characters long. A passphrase file is symmetric and not exposed in this way, as long as the passphrase is strong.
+X25519 is not post-quantum: a file kept today could be opened by a large quantum computer in the future. A passphrase file is symmetric and not exposed in this way, as long as the passphrase is strong.
 
-With `--ask-secrets` and neither a key nor a passphrase file, MnemoCode asks for the passphrase twice on the private screen before the search, and asks for both again until they agree and are long enough. A list that `recover-word` offers on a terminal after a search whose candidates do not fit on the screen, also for words read with `--mnemonic-file`, has its passphrase asked in the same way when one is chosen for it, before the search runs again for the list. Both screens name the candidate list encryption passphrase and distinguish it from the BIP39 passphrase. Cancellation stops the operation. When the list cannot be saved, for example because the disk is full, it offers to try again, to use another file name, or to skip the list; the candidates stay on the screen.
+With `--ask-secrets` and no key or passphrase file, MnemoCode asks for the candidate-list encryption passphrase twice before searching. Both prompts distinguish it from the BIP39 passphrase. Short or mismatching answers are explained and asked again; cancellation stops the operation.
 
-Both sides use one module, `crates/mnemocode/src/candidates/age.rs`, which writes and reads the age format over audited primitives. The Scanner's one-time key lives in a session on the reader's side, which holds the private key as bytes, wiped when it ends, shows only its kind, and gives a writer its public `recipient`. A list is returned only while its session is live. A published test key is taken as text; text that is no X25519 age identity, a post-quantum one included, is refused without being repeated (`core.candidate-file-refusal.identity-invalid`).
+When `recover-word` offers a list after a long result, including a pattern read with `--mnemonic-file`, it asks for the chosen passphrase in the same way before rerunning the search for that list. If saving fails, you can retry, change the filename or skip saving; the candidates remain on screen.
+
+The [library guide](LIBRARY.md#candidate-list-encryption) describes encryption initialization, session identities and protection selection. A plaintext file is written only on explicit request (`--plaintext-candidates`), with a warning; a reader decides whether to permit plaintext import.
 
 ## Limits
 
@@ -96,12 +98,4 @@ Both sides use one module, `crates/mnemocode/src/candidates/age.rs`, which write
 
 ### File admission for hosts
 
-`candidates::admission` is the shared policy for readers and writers, with byte ceilings: `MAX_HEADER_BYTES` (65,536), a plaintext list's 155,189,248 bytes and an encrypted file's `MAX_ENCRYPTED_BYTES` (155,292,688). The plaintext ceiling follows from the maximum MNCL v1 fields, CRC and Padmé padding. The encrypted ceiling adds the bounded header, age's 16-byte nonce, and one 16-byte authentication tag per 65,536 plaintext bytes, including a tag for an empty payload. A byte ceiling permits a size; it does not prove that the contents form a valid list.
-
-These are format limits, not a bound on process memory. Decoded records and mnemonic strings take more memory than their file bytes. A page should release the file's bytes as soon as they are no longer needed, and free the opened list when finished.
-
-`OpenedCandidateList.free()` ends the list: it clears owned entropy and passphrase buffers and releases the records, and a later call on it is refused. Strings already returned to a page cannot be erased by freeing the list.
-
-Before reading an encrypted file in full, a page calls `checkCandidateFileSize(file.size)`, which refuses an oversized file without reading it, then `candidateFileLock(head)` on the first 65,536 bytes of the file or all of a shorter one. It validates the complete single-recipient header and returns `"X25519"` or `"scrypt"`, without X25519 or scrypt work, so that the page knows whether to ask for a key or a passphrase.
-
-Decrypting repeats these checks on the bytes actually given: an earlier check of a prefix does not authenticate the whole file. The plaintext decoder and all protections use the same plaintext ceiling. Each refusal has a `code` of its own, such as `core.candidate-file-refusal.encrypted-file-too-large`, so a page can choose its own words from it.
+Use `candidates::admission` before reading a file in full or asking for a key. The [host admission contract](LIBRARY.md#file-admission-for-hosts) specifies byte ceilings, prefix ownership, bounded reads, cleanup and refusal codes. Format byte limits do not bound process memory: decoded records and strings require more space.

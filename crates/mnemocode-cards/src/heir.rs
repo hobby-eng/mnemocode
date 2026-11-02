@@ -371,7 +371,10 @@ impl<'a> Writer<'a> {
         let width = self.format.width - 2.0 * self.format.margin - indent;
         // A host's word, such as a long subtitle without a space, would run off the page
         // (AUD-039-UI001).
-        if text.split(' ').any(|word| self.font.width(word, size) > width) {
+        if text
+            .split(' ')
+            .any(|word| self.font.width(word, size) > width)
+        {
             return Err(HeirError::WordWiderThanPage);
         }
         let x = self.format.margin;

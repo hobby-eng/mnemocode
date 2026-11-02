@@ -58,8 +58,12 @@ gives the decisions, the evidence and what is open.
    0.13. Checked (`work/bip39-crate`): the lists equal @scure/bip39 2.4.0 and the TS self-test
    hashes; the 985 recorded scure answers; the checksum paths and the seeds agree with the TS
    method and the published vector; `cargo audit` of the locks with bip39 is clean.
-3. **SSKR stays the vendored engine, unchanged** (CORE-47), linked into the WASM: no engine file,
-   no SHA-256 pins. bc-ur and bc-tags go: at run time the engine takes from them only the 256
+3. **SSKR keeps the TypeScript version's vendored variants** (CORE-47), linked into the WASM: no engine file,
+   no runtime engine-file SHA-256 pins. The word "unchanged" in the original comparison refers to
+   the TypeScript vendored variants, not pristine upstream releases. The current source identities
+   and downstream cleanup and validation changes are recorded in
+   `vendor/sskr-0.12.0/UPSTREAM.json` and `vendor/bc-shamir-0.13.0/UPSTREAM.json`.
+   bc-ur and bc-tags go: at run time the engine takes from them only the 256
    Bytewords and two tag numbers (`sskr-wasm/rust/src/share_text.rs:17,23,25`); CBOR heads,
    CRC-32 and Bytewords are already its own code. bc-shamir takes from bc-crypto only
    `hash::hmac_sha256`, `memzero` and `memzero_vec_vec_u8` (`vendor/bc-shamir-0.13.0/src/shamir.rs:1`,

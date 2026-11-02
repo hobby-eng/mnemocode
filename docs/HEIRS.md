@@ -6,9 +6,9 @@ Take your time. Nothing here is urgent, and anyone who tries to rush you is a wa
 
 ## What a wallet and a seed phrase are
 
-Bitcoin and other cryptocurrencies are not kept at a bank or in a file. They are recorded on a public ledger that thousands of computers share. What gives control over them is a secret: whoever knows it can spend them, and nobody can undo that.
+Cryptocurrency ownership is recorded on a shared public ledger. A wallet holds the secret keys that authorize spending. Someone who obtains those keys can take the funds; a transfer usually cannot be reversed.
 
-Most wallets keep that secret as a **seed phrase**: a list of 12, 15, 18, 21 or 24 English words, such as "letter advice cage absurd ...". The words come from a standard list of 2048 words (BIP39), so any wallet program that follows this standard can turn the same words back into the same wallet. The words are the wallet; the program is only a tool to use it.
+Many wallets derive their keys from a **seed phrase**: 12, 15, 18, 21 or 24 words from the standard BIP39 list of 2,048 English words. A compatible wallet can derive the keys again from those words. You may also need the owner's separate BIP39 passphrase and the right wallet settings, as explained under [Opening the wallet](#opening-the-wallet).
 
 ## What MnemoCode did to the seed phrase
 
@@ -28,13 +28,13 @@ Use a computer that you trust, for example your own. Do not do this on a compute
 
 ## Getting MnemoCode
 
-Download MnemoCode from its release page, `https://github.com/hobby-eng/mnemocode/releases`, and from nowhere else. Choose the file for your computer: the one ending in `win-x64.exe` for Windows, `macos-arm64` for a Mac with an Apple processor, `macos-x64` for a Mac with an Intel processor, `linux-x64` for Linux, or `linux-arm64` for Linux on an ARM processor.
+Download MnemoCode from its release page, `https://github.com/hobby-eng/mnemocode/releases`, and from nowhere else. Choose the file for your computer: the one ending in `win-x64.exe` for Windows, `macos-arm64` for a Mac with an Apple processor, `macos-x64` for an Intel Mac, or `linux-x64` / `linux-arm64` for Linux. Linux binaries require glibc 2.35 or later.
 
 The release page also has a file called `SHA256SUMS`, signed by the maintainer of MnemoCode. It lets you check that the file you downloaded is exactly the one that was published. The [download verification](CLI.md#download-verification) shows how to check the file and the signature. If this is too technical, ask someone you trust to check it with you; they do not need to see the backup for this.
 
 Then disconnect the computer from the internet: unplug the cable and turn off Wi-Fi.
 
-The first start may need one more step, because the file does not come from an app store:
+After verifying the download, the first start may need another step because the file is not from an app store:
 
 - **Windows** may show "Windows protected your PC". Choose "More info", then "Run anyway".
 - **macOS** may say that it cannot check the file. Open System Settings, then Privacy & Security, and choose "Open Anyway" next to MnemoCode.
@@ -42,7 +42,7 @@ The first start may need one more step, because the file does not come from an a
 
 ## Turning the backup back into the seed phrase
 
-Start MnemoCode by a double-click. It shows a menu: choose with the arrow keys and Enter, or press the number. Follow the steps on the sheet; it names the menu entries and the answers to choose.
+Start the verified executable in a terminal. If double-clicking opens a terminal with the menu, use that window; otherwise follow [Install and run](../README.md#install-and-run). Choose with the arrow keys and Enter, or press a menu number. The sheet names the entries and answers to use.
 
 - Printed cards end with a few codes that belong to nothing. The sheet says how many words the seed phrase has, or how many codes each share has: type only the codes from the first card on. When MnemoCode asks how many words the seed phrase has, give the number from the sheet.
 - Shares are typed one after another, separated by a semicolon (`;`).

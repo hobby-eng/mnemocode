@@ -1047,11 +1047,19 @@ mod tests {
         // Public secrets of zeros and of ones split with one seed, so that both sets carry the
         // same identifier and a share of one stands among the other's (AUD-039-FUN001).
         let urs = |secret: [u8; 16], threshold: usize| -> Vec<String> {
-            split_seeded(&secret, 1, &[Group { threshold, count: 3 }], &[7; 32])
-                .unwrap()
-                .iter()
-                .map(|payload| compact_ur(payload).as_str().to_owned())
-                .collect()
+            split_seeded(
+                &secret,
+                1,
+                &[Group {
+                    threshold,
+                    count: 3,
+                }],
+                &[7; 32],
+            )
+            .unwrap()
+            .iter()
+            .map(|payload| compact_ur(payload).as_str().to_owned())
+            .collect()
         };
         let trouble = |texts: [&String; 3]| {
             let mut input = ShareInput::new(DECODE);
@@ -1065,8 +1073,18 @@ mod tests {
         // nothing of the third.
         let (zeros, ones) = (urs([0; 16], 1), urs([1; 16], 1));
         let shares = [&zeros[0], &zeros[1], &ones[2]];
-        for order in [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]] {
-            assert_eq!(trouble(order.map(|at| shares[at])), (TroubleKind::Refused, None));
+        for order in [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ] {
+            assert_eq!(
+                trouble(order.map(|at| shares[at])),
+                (TroubleKind::Refused, None)
+            );
         }
         let (zeros, ones) = (urs([0; 16], 2), urs([1; 16], 2));
         assert_eq!(

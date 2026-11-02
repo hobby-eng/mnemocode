@@ -38,7 +38,7 @@ use crate::commands::encode_questions::{
     example, file_questions, sample_of, seedshift_explanation, variant_explanation,
 };
 use crate::commands::menu_entries::{
-    self, MenuEntry, PHRASE_WORDS_QUESTION, TYPED_SOURCE, phrase_words_answer,
+    self, Guide, MENU_GUIDE, MenuEntry, PHRASE_WORDS_QUESTION, TYPED_SOURCE, phrase_words_answer,
 };
 use crate::commands::output_questions::{ask_output_file, forget_claimed, input_file};
 use crate::commands::wallet_question::{Asker, WalletAnswer, ask_wallet_evidence_by};
@@ -47,9 +47,9 @@ use crate::gate::Stop;
 use crate::os::{self, Protection};
 use crate::terminal::{
     self, Channel, Choice, Chosen, Digit, Explanation, LEAVE_ALTERNATE_SCREEN, LineQuestion,
-    ListQuestion, NoticeKind, answer_mark, ask_line, choose, choose_from, erase_answers_since,
-    error_line, error_raw, heading_line, more_line, notes_room, notice, paint, printable,
-    readme_link, start_answer_record, style, terminal_available, wait_for_enter_or_escape,
+    ListQuestion, NoticeKind, answer_mark, ask_line, choose, choose_from, error_line, error_raw,
+    heading_line, more_line, notes_room, notice, paint, printable, readme_link,
+    redraw_answer_record, start_answer_record, style, terminal_available, wait_for_enter_or_escape,
 };
 use typed_line::command_display;
 
@@ -399,7 +399,17 @@ fn recover_action() -> Result<Action, Stop> {
             Forgotten::Share,
         ),
     ];
-    match ask_list("What is forgotten?", "Forgotten", &choices, None)? {
+    let forgotten = ask_list("What is forgotten?", "Forgotten", &choices, None)?;
+    if let Some(forgotten) = forgotten {
+        let guide = match forgotten {
+            Forgotten::Word => menu_entries::WORD_GUIDE,
+            Forgotten::Code => menu_entries::CODE_GUIDE,
+            Forgotten::Date => menu_entries::DATE_GUIDE,
+            Forgotten::Share => menu_entries::SHARE_GUIDE,
+        };
+        redraw_answer_record(&heading_lines(None, guide), answer_mark());
+    }
+    match forgotten {
         None => Ok(Action::Back),
         Some(Forgotten::Word) => word_recovery_action(),
         Some(Forgotten::Code) => marked_codes_action(),
@@ -676,24 +686,28 @@ fn closed_at_start(protection: &mut Protection) -> Option<Closure> {
 }
 
 /// The menu's heading; `closure` says which entries are no longer offered, and why.
-fn write_heading(closure: Option<&Closure>) {
-    error_line(&format!(
-        "\n{}\n",
-        heading_line(Channel::Error, "Offline seed phrase encoding")
-    ));
-    error_line("Encodes a BIP39 seed phrase as numbers, codes or colors, all offline.");
-    error_line(&more_line("menu"));
-    error_line(&paint(
-        Channel::Error,
-        style::MUTED,
-        "Work on a trusted computer without a network connection.",
-    ));
+fn heading_lines(closure: Option<&Closure>, guide: Guide) -> Vec<String> {
+    let mut lines = vec![
+        String::new(),
+        heading_line(Channel::Error, "Offline seed phrase encoding"),
+        String::new(),
+        guide.description.to_owned(),
+        more_line(guide.anchor),
+        paint(
+            Channel::Error,
+            style::MUTED,
+            "Work on a trusted computer without a network connection.",
+        ),
+    ];
     if let Some(closure) = closure {
-        terminal::failure(closure.reason());
-        notice(closure.left_out(), NoticeKind::Warning);
+        lines.push(terminal::failure_line(closure.reason()));
+        lines.extend(terminal::notice_lines(
+            closure.left_out(),
+            NoticeKind::Warning,
+        ));
     }
-    // The record of answers starts after a blank line; each question adds its own above it.
-    error_line("");
+    lines.push(String::new());
+    lines
 }
 
 /// Whether the command `name` runs on the private screen, which a terminal shows.
@@ -808,18 +822,29 @@ fn show_command(run: &[String]) {
 /// Runs the menu until the person quits, with Escape, q or the entry Quit.
 pub(crate) fn run(protection: &mut Protection) -> Result<(), Stop> {
     let mut closure = closed_at_start(protection);
-    write_heading(closure.as_ref());
+    let mut guide = MENU_GUIDE;
     start_answer_record();
+    redraw_answer_record(&heading_lines(closure.as_ref(), guide), 0);
     let mut selected = 0;
     let mut again = None;
     loop {
         let before = answer_mark();
         if again.is_none() {
+            if guide != MENU_GUIDE {
+                guide = MENU_GUIDE;
+                start_answer_record();
+                redraw_answer_record(&heading_lines(closure.as_ref(), guide), 0);
+            }
             match ask_entry(closure.as_ref(), selected)? {
                 Some(index) => selected = index,
                 None => return Ok(()),
             }
         }
+        if ENTRIES[selected].name == menu_entries::QUIT {
+            return Ok(());
+        }
+        guide = ENTRIES[selected].name.guide;
+        redraw_answer_record(&heading_lines(closure.as_ref(), guide), answer_mark());
         forget_claimed();
         let action = match again.take() {
             Some(lookup) => table::lookup_action(lookup)?,
@@ -829,7 +854,8 @@ pub(crate) fn run(protection: &mut Protection) -> Result<(), Stop> {
             Action::Quit => return Ok(()),
             Action::Back => {
                 // The task and the answers given for it leave the record before the list returns.
-                erase_answers_since(before, &|| write_heading(closure.as_ref()));
+                guide = MENU_GUIDE;
+                redraw_answer_record(&heading_lines(closure.as_ref(), guide), before);
                 continue;
             }
             Action::Help => {

@@ -16,9 +16,9 @@ use super::keys::{Interrupted, Key, Keys, read_key};
 use super::line::{LineOptions, LineOutcome, read_line};
 use super::page::{before_question, keep_readable};
 use super::{
-    ANSWER_LABEL_WIDTH, CLEAR_SCREEN, Channel, ERASE_BELOW, NoticeKind, TEXT_WIDTH, beside_mark,
-    columns, cursor_up, error_line, error_raw, fact_line, notice_lines, output_rows, paint,
-    question_ended, rows, shown_width, step_begin, style,
+    ANSWER_LABEL_WIDTH, Channel, ERASE_BELOW, NoticeKind, TEXT_WIDTH, beside_mark, columns,
+    cursor_up, error_line, error_raw, fact_line, notice_lines, output_rows, paint, question_ended,
+    rows, shown_width, step_begin, style,
 };
 
 /// Marker, number and the gaps before a label: "› 1  ".
@@ -295,11 +295,17 @@ fn answer_line(label: &str, answer: &str) -> String {
 struct AnswerRecord {
     lines: Vec<(String, String)>,
     reached: usize,
+    /// The menu heading directly above the record; zero after output from a command.
+    heading_rows: usize,
+    /// A width change makes the old heading's cursor position uncertain.
+    heading_columns: usize,
 }
 
 static RECORD: Mutex<AnswerRecord> = Mutex::new(AnswerRecord {
     lines: Vec::new(),
     reached: 1,
+    heading_rows: 0,
+    heading_columns: 0,
 });
 
 /// The record; a poisoned lock holds labels and answers, which stay usable.
@@ -320,9 +326,11 @@ pub(crate) fn start_answer_record() {
     let mut record = record();
     record.lines.clear();
     record.reached = 1;
+    record.heading_rows = 0;
+    record.heading_columns = 0;
 }
 
-/// A place in the record, for [`erase_answers_since`].
+/// A place in the record, for [`redraw_answer_record`].
 pub(crate) fn answer_mark() -> usize {
     record().lines.len()
 }
@@ -341,27 +349,35 @@ fn reach_answers(below: usize) {
     record.reached = record.reached.max(reached);
 }
 
-/// Erases the lines of the record written since `mark`; nothing but answers and questions may have
-/// been written since. Where the first of them went over the top of the terminal, the screen is
-/// cleared and drawn again: `heading`, then the lines that stay.
-pub(crate) fn erase_answers_since(mark: usize, heading: &dyn Fn()) {
-    let (kept, erased, reached) = {
+/// Replaces only the menu heading and keeps the first `keep` non-secret answers. If the old
+/// heading has scrolled away or the terminal width changed, appends a new block instead: clearing
+/// the whole main screen would erase the completed command's summary above the menu (CORE-39).
+pub(crate) fn redraw_answer_record(heading: &[String], keep: usize) {
+    let (old_rows, heading_rows, reached, heading_columns, kept) = {
         let mut record = record();
-        let erased = record.lines.split_off(mark);
-        (record.lines.clone(), erased, record.reached)
+        let old_rows = rows_of(&shown_answers(&record.lines));
+        record.lines.truncate(keep);
+        (
+            old_rows,
+            record.heading_rows,
+            record.reached,
+            record.heading_columns,
+            record.lines.clone(),
+        )
     };
-    let kept_rows = rows_of(&shown_answers(&kept));
-    if kept_rows + rows() >= reached {
-        redraw_from(rows_of(&shown_answers(&erased)));
-        return;
+    if heading_rows > 0 && heading_columns == columns() && heading_rows + reached <= rows() {
+        redraw_from(heading_rows + old_rows);
     }
-    error_raw(CLEAR_SCREEN);
-    heading();
+    for line in heading {
+        error_line(line);
+    }
     for line in shown_answers(&kept) {
         error_line(&line);
     }
-    // Counted from the record's own row again, as if it had started on the last row.
-    record().reached = kept_rows + 1;
+    let mut record = record();
+    record.reached = rows_of(&shown_answers(&kept)) + 1;
+    record.heading_rows = rows_of(heading);
+    record.heading_columns = columns();
 }
 
 /// Asks `asked` with `warning` above it, and lets the person choose an entry with the arrow keys

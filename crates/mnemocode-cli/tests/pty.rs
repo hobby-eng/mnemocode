@@ -281,11 +281,20 @@ fn the_menu_leaves_a_secret_to_the_private_screen_of_its_command() {
     session.wait_for("Press Enter to clear this screen.");
     session.press("\r");
     session.wait_for("What do you want to do?");
-    session.press("q");
+    session.press("7");
+    session.wait_for("Which card design?");
+    session.press("\x1b");
+    session.wait_for("What do you want to do?");
+    // From Preview: Word lookup, Self-test, Help, Quit, then select Quit with Enter.
+    session.press("\x1b[B\x1b[B\x1b[B\x1b[B\r");
     let (status, written) = session.end();
     assert_eq!(status, 0, "{written}");
     let outside = written.rsplit(LEAVE_PRIVATE_SCREEN).next().expect("a part");
     assert!(!outside.contains("abandon"), "{outside}");
+    assert!(
+        !outside.contains("\x1b[2J"),
+        "the main-screen summary was cleared: {outside}"
+    );
 }
 
 #[test]

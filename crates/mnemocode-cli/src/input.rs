@@ -131,7 +131,10 @@ pub(crate) fn read_input_path(
     regular_only: bool,
 ) -> Result<SecretText, InputError> {
     let resolved = os::resolve(path, terminal::environment().current.as_deref());
-    text_of(os::read_secret_file(&resolved, limit, what, regular_only)?, what)
+    text_of(
+        os::read_secret_file(&resolved, limit, what, regular_only)?,
+        what,
+    )
 }
 
 /// Refuses, without reading it, a file at `path` that the program cannot read, as the read would.
