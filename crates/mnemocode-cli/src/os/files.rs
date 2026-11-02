@@ -185,6 +185,57 @@ pub(crate) fn entry_at(path: &Path) -> io::Result<Entry> {
     }
 }
 
+/// `path` with its links resolved, which must exist.
+pub(crate) fn real_path(path: &Path) -> io::Result<PathBuf> {
+    fs::canonicalize(path)
+}
+
+/// What a look at a file to read says of it, a link followed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FileLook {
+    /// Nothing there: no such name, or a name under a file.
+    Nothing,
+    /// A folder.
+    Folder,
+    /// Something else that is no ordinary file.
+    NoFile,
+    /// An ordinary file: its size, and whether this program may read it.
+    File { bytes: u64, readable: bool },
+}
+
+/// What is at `path`, without reading it; any other failure leaves that unknown.
+pub(crate) fn look_at_file(path: &Path) -> io::Result<FileLook> {
+    let found = match fs::metadata(path) {
+        Ok(found) => found,
+        Err(error)
+            if matches!(
+                error.kind(),
+                io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
+            ) =>
+        {
+            return Ok(FileLook::Nothing);
+        }
+        Err(error) => return Err(error),
+    };
+    Ok(if found.is_dir() {
+        FileLook::Folder
+    } else if !found.is_file() {
+        FileLook::NoFile
+    } else {
+        FileLook::File {
+            bytes: found.len(),
+            readable: fs::File::open(path).is_ok(),
+        }
+    })
+}
+
+/// Whether this program may make a file in `folder`, its protections counted: tried with a private
+/// folder that is removed at once, as a look at the permissions would not see them.
+pub(crate) fn may_write(folder: &Path) -> bool {
+    make_staging(&folder.join(".mnemocode-check-"))
+        .is_ok_and(|staging| remove_staging(&staging, false).is_ok())
+}
+
 /// Makes `folder` with every missing folder above it, as the preflight does for each output's
 /// parent before any secret (ARCHITECTURE.md §5).
 pub(crate) fn make_folders(folder: &Path) -> io::Result<()> {
@@ -250,13 +301,8 @@ pub(crate) fn read_bounded(
         match reader.read(space) {
             Ok(0) => break,
             Ok(count) => length += count,
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => {
-                // A request to stop stops the process, and the read goes on once it continues; an
-                // ending signal is seen before the next read.
-                if super::signals::suspend_requested() {
-                    super::signals::suspend_now();
-                }
-            }
+            // An ending signal is seen before the next read.
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
             Err(_) => return Err(FileError::Unreadable(what)),
         }
         if length > limit {
@@ -363,8 +409,22 @@ fn remove_staging(folder: &Path, empty: bool) -> io::Result<()> {
     Ok(())
 }
 
+/// The system's temporary folder.
+pub(crate) fn temporary_folder() -> PathBuf {
+    std::env::temp_dir()
+}
+
+/// What `work` gives in a new private folder of the system's temporary folder, named from `prefix`
+/// and removed afterwards; one that cannot be removed stays recorded for [`remove_left`].
+pub(crate) fn in_temporary_folder<T>(prefix: &str, work: impl FnOnce(&Path) -> T) -> io::Result<T> {
+    let folder = make_staging(&temporary_folder().join(prefix))?;
+    let result = work(&folder);
+    let _recorded = remove_staging(&folder, false);
+    Ok(result)
+}
+
 /// A new folder that only its owner may open where the file system keeps Unix permissions.
-fn private_folder(path: &Path) -> io::Result<()> {
+pub(crate) fn private_folder(path: &Path) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
@@ -374,9 +434,8 @@ fn private_folder(path: &Path) -> io::Result<()> {
     fs::DirBuilder::new().create(path)
 }
 
-/// Writes `bytes` as a new file at `path` that only its owner may read; fails where something is
-/// there already.
-pub(crate) fn new_private_file(path: &Path, bytes: &[u8]) -> io::Result<()> {
+/// A new file at `path` that only its owner may read; fails where something is there already.
+fn private_file(path: &Path) -> io::Result<File> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
@@ -384,8 +443,13 @@ pub(crate) fn new_private_file(path: &Path, bytes: &[u8]) -> io::Result<()> {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    let mut file: File = options.open(path)?;
-    file.write_all(bytes)
+    options.open(path)
+}
+
+/// Writes `bytes` as a new file at `path` that only its owner may read; fails where something is
+/// there already.
+pub(crate) fn new_private_file(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    private_file(path)?.write_all(bytes)
 }
 
 /// Removes `staging` after a save failed with `failure`; where it stays, the failure says so.
@@ -413,11 +477,31 @@ fn no_hard_links(error: &io::Error) -> bool {
 
 /// Publishes `bytes` as a new private file at `path`, never replacing anything (the module's top).
 pub(crate) fn publish_new_file(path: &Path, bytes: &[u8]) -> Result<(), FileError> {
+    publish_written_file(path, |mut file| Ok(file.write_all(bytes)?))
+}
+
+/// Stops a save once an ending signal has come: the command ends with it (main), and nothing more
+/// is drawn or published.
+pub(crate) fn stop_if_signalled() -> Result<(), FileError> {
+    if super::signals::pending_signal().is_some() {
+        return Err(FileError::System(io::ErrorKind::Interrupted.into()));
+    }
+    Ok(())
+}
+
+/// Publishes the new private file at `path` that `write` fills, as a file too large for memory is
+/// written: it fills the staged copy, and nothing is at `path` unless it succeeds.
+pub(crate) fn publish_written_file(
+    path: &Path,
+    write: impl FnOnce(File) -> Result<(), FileError>,
+) -> Result<(), FileError> {
     let parent = path.parent().unwrap_or(Path::new("."));
     let staging = make_staging(&parent.join(".mnemocode-export-"))?;
     let temporary = staging.join("document");
-    let published = new_private_file(&temporary, bytes)
+    let published = private_file(&temporary)
         .map_err(FileError::from)
+        .and_then(write)
+        .and_then(|()| stop_if_signalled())
         .and_then(|()| match fs::hard_link(&temporary, path) {
             Ok(()) => Ok(()),
             Err(error) if no_hard_links(&error) => {
@@ -470,11 +554,6 @@ impl Folder {
         Ok(Self { target, taken })
     }
 
-    /// The folder's resolved path.
-    pub(crate) fn path(&self) -> &Path {
-        &self.target
-    }
-
     /// Has `write` fill a private staging folder named from `prefix`, then publishes it.
     pub(crate) fn publish<T>(
         &self,
@@ -500,6 +579,7 @@ pub(crate) fn publish_new_folder<T>(
     let staging = make_staging(&parent.join(prefix))?;
     let mut reservation = None;
     let result = write(&staging).and_then(|result| {
+        stop_if_signalled()?;
         match private_folder(target) {
             Ok(()) => {}
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {

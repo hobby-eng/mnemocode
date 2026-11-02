@@ -163,6 +163,13 @@ impl Phrase {
         phrase
     }
 
+    /// A copy of it, in a locked buffer of its own.
+    pub fn copy(&self) -> Self {
+        Self {
+            indexes: crate::secret::SecretBytes::copy_of("a phrase's indexes", &self.indexes),
+        }
+    }
+
     /// The number of words.
     pub fn len(&self) -> usize {
         self.indexes.len() / 2
@@ -311,10 +318,12 @@ pub fn valid_last_word_indexes(prefix: &[usize]) -> Result<Vec<usize>, PhraseErr
     Ok(found)
 }
 
-/// A replacement of the final word of an old exact-legacy phrase: its index, from 0, and whether it
-/// keeps the old final word's entropy bits.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A replacement of the final word of an old exact-legacy phrase: the phrase with it, its index,
+/// from 0, and whether it keeps the old final word's entropy bits.
+#[derive(Debug)]
 pub struct LastWordCandidate {
+    /// The phrase with this last word.
+    pub phrase: Phrase,
     /// The word's index, from 0.
     pub index: usize,
     /// Whether it keeps the entropy-bearing high bits of the old final word.
@@ -336,13 +345,18 @@ pub fn legacy_valid_last_words(text: &str) -> Result<Vec<LastWordCandidate>, Phr
     let (last, prefix) = indexes.split_last().ok_or(PhraseError::WordCount)?;
     let checksum = checksum_bits(words.len());
     let old_tail = last >> checksum;
-    Ok(valid_last_word_indexes(prefix)?
+    valid_last_word_indexes(prefix)?
         .into_iter()
-        .map(|index| LastWordCandidate {
-            index,
-            preserves_entropy: index >> checksum == old_tail,
+        .map(|index| {
+            let mut all = prefix.to_vec();
+            all.push(index);
+            Ok(LastWordCandidate {
+                phrase: Phrase::of_indexes(&all)?,
+                index,
+                preserves_entropy: index >> checksum == old_tail,
+            })
         })
-        .collect())
+        .collect()
 }
 
 #[cfg(test)]

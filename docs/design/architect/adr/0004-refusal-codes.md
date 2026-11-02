@@ -13,9 +13,8 @@ its messages are written. The TS has odd codes (`missing-checksum`,
 A `Refusal` trait (`code() -> &'static str`) over `std::error::Error`. One enum per module, one
 variant per condition; `code()` gives the TS string, `Display` the TS message byte for byte; a
 variant holds positions, counts and option names, never typed text.
-`vectors/ts-0.1.0/refusals-v1.json`, recorded from 7d0d4ee, lists every TS code with a sample
-message, or the reason it is gone; tests compare each variant with it and check that codes are
-unique across all enums. The CLI prints
+`vectors/ts-0.1.0/refusals-v1.json` lists every TS code; `cargo xtask code-rules` finds each code
+that the port writes there or in the port's own list, and refuses one code in two enums. The CLI prints
 `✗ Error: <Display>`; the binding returns `{ code, message }` from one function.
 
 ## Rejected alternatives
@@ -29,14 +28,15 @@ unique across all enums. The CLI prints
 - Codes that guarded JavaScript types or the program's own data are not written; the file records
   each of them. The binding, which takes its secrets as JavaScript values, keeps two of TS's for
   them: `core.secret-value.text` for a secret that is not text, and `core.secret-value.wiped` for
-  the session key used after its `wipe()`.
+  the session key used after its `wipe()`. It adds one of its own, `wasm.recovery.no-wallet`, for a
+  search by the wallet on a `Recovery` that holds none, where TS's signature needs a wallet.
 - Renaming a code, or fixing an odd message, is an owner decision applied in one place, the
   module's `code()` or `Display`. On 2026-10-27 the owner took such fixes, made in the TS first
   (`mapping.json`, defects "Decided"): `missing-checksum` gets its namespace (CORE-23), the two
   calendar codes say year and month, three messages are reworded, and the decided fixes add refusals (a new code where the fix names
-  one), each recorded in `refusals-v1.json` from the TS commit that adds it.
-- The port adds codes for conditions TS cannot meet, each in the library and in
-  `refusals-v1.json` as the port's own: `core.secret.capacity-exceeded` (a secret larger than the
+  one).
+- The port adds codes for conditions TS cannot meet, each in the library and in the port's own list
+  of `cargo xtask code-rules`: `core.secret.capacity-exceeded` (a secret larger than the
   buffer reserved for it), `core.random.unavailable` (the host's random source failed),
   `core.random.empty-range` (a uniform choice below 0) and `core.candidate-list.no-candidate-at-place`
   (a page asks a read list for a candidate past its last, where TS hands out an array).

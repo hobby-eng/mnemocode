@@ -10,7 +10,7 @@
 use std::fmt;
 
 use super::super::joint::{JointAssessment, Verdict};
-use super::super::restore::ShareSet;
+use super::super::restore::{MarkedElement, SetShare, ShareSet};
 use crate::refusal::Refusal;
 use crate::search::plan::{CORRECT_WRITTEN_COPY, asks_first, counted, duration, grouped_digits};
 use crate::text::words::place_of;
@@ -85,6 +85,25 @@ pub struct ShareRepairs {
     pub share: usize,
     /// Each element filled in, in order.
     pub elements: Vec<RepairedElement>,
+}
+
+impl ShareRepairs {
+    /// What was filled in of the share, as one line, each guess marked.
+    pub fn line(&self) -> String {
+        let elements: Vec<String> = self
+            .elements
+            .iter()
+            .map(|element| {
+                format!(
+                    "element {} is {}{}",
+                    element.position,
+                    element.value,
+                    if element.guess { " (a guess)" } else { "" }
+                )
+            })
+            .collect();
+        format!("Share {}: {}.", self.share, elements.join(", "))
+    }
 }
 
 /// A date search after the share search, for each phrase it finds: its size and pace.
@@ -231,7 +250,17 @@ impl RepairReport {
     /// What a repair filled in where ? marked an element, share by share; an element nothing
     /// settles is a guess. Each share is named by its place in `places`.
     pub fn repairs(set: &ShareSet, places: Option<&[usize]>) -> Vec<ShareRepairs> {
-        set.shares()
+        Self::repairs_of(set.shares(), set.unsettled(), places)
+    }
+
+    /// The repairs of `shares`, of which `unsettled` are guesses, as [`RepairReport::repairs`]
+    /// tells those of a set.
+    pub fn repairs_of(
+        shares: &[SetShare],
+        unsettled: &[MarkedElement],
+        places: Option<&[usize]>,
+    ) -> Vec<ShareRepairs> {
+        shares
             .iter()
             .enumerate()
             .filter(|(_, share)| share.repaired())
@@ -243,7 +272,7 @@ impl RepairReport {
                     .map(|element| RepairedElement {
                         position: element.position,
                         value: element.value.as_str().to_owned(),
-                        guess: set.unsettled().iter().any(|unsettled| {
+                        guess: unsettled.iter().any(|unsettled| {
                             unsettled.share == index + 1 && unsettled.position == element.position
                         }),
                     })
@@ -254,35 +283,30 @@ impl RepairReport {
 
     /// The repairs as lines, one warning for each share, then the notes.
     pub fn repair_lines(set: &ShareSet, places: Option<&[usize]>) -> Vec<ReportLine> {
-        let mut lines: Vec<ReportLine> = Self::repairs(set, places)
+        Self::repair_lines_of(set.shares(), set.unsettled(), places)
+    }
+
+    /// The repairs of `shares` as lines, as [`RepairReport::repair_lines`] tells those of a set.
+    pub fn repair_lines_of(
+        shares: &[SetShare],
+        unsettled: &[MarkedElement],
+        places: Option<&[usize]>,
+    ) -> Vec<ReportLine> {
+        let mut lines: Vec<ReportLine> = Self::repairs_of(shares, unsettled, places)
             .into_iter()
-            .map(|repairs| {
-                let elements: Vec<String> = repairs
-                    .elements
-                    .iter()
-                    .map(|element| {
-                        format!(
-                            "element {} is {}{}",
-                            element.position,
-                            element.value,
-                            if element.guess { " (a guess)" } else { "" }
-                        )
-                    })
-                    .collect();
-                ReportLine::Warning(format!("Share {}: {}.", repairs.share, elements.join(", ")))
-            })
+            .map(|repairs| ReportLine::Warning(repairs.line()))
             .collect();
-        lines.extend(Self::notes(set));
+        lines.extend(Self::notes_of(shares, unsettled));
         lines
     }
 
     /// The notes after what a repair filled in: guesses, and correcting the written copy.
-    pub fn notes(set: &ShareSet) -> Vec<ReportLine> {
+    pub fn notes_of(shares: &[SetShare], unsettled: &[MarkedElement]) -> Vec<ReportLine> {
         let mut lines = Vec::new();
-        if !set.unsettled().is_empty() {
+        if !unsettled.is_empty() {
             lines.push(ReportLine::Warning(GUESSES_NOTE.to_owned()));
         }
-        if set.shares().iter().any(|share| share.repaired()) {
+        if shares.iter().any(SetShare::repaired) {
             lines.push(ReportLine::Notice(CORRECT_WRITTEN_COPY.to_owned()));
         }
         lines

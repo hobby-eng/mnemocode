@@ -7,30 +7,24 @@
 //! secret refused before anything is parsed, then the command, whose outputs are checked and whose
 //! folders are made before its protections are restricted and its first secret is asked (gate).
 
-#![expect(
-    dead_code,
-    reason = "the parts of the terminal, the files and the protections that later commands use arrive with the command line (increment 2) before those commands; this goes once every command is in (increment 9)"
-)]
-
 mod args;
 mod commands;
 mod gate;
 mod input;
+mod menu;
 mod os;
 mod output;
 mod terminal;
 
 use std::process::ExitCode;
 
+use crate::commands::{Run, VERSION, help, self_test};
 use crate::gate::Stop;
-use crate::os::{Environment, Protection};
+use crate::os::{Environment, Needs, Protection};
 
 /// Every block the program frees is wiped first, the copies dependencies make of a secret included.
 #[global_allocator]
 static ALLOCATOR: mnemocode::secret::ZeroingAllocator = mnemocode::secret::ZeroingAllocator;
-
-/// The version, as `mnemocode --version` prints it.
-const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// The flags that ask for the version.
 const VERSION_FLAGS: [&str; 2] = ["-V", "--version"];
@@ -50,6 +44,45 @@ impl std::error::Error for NoSuchCommand {}
 impl mnemocode::refusal::Refusal for NoSuchCommand {
     fn code(&self) -> &'static str {
         "cli.command-line.there-no-command-run-mnemocode-help-see-commands"
+    }
+}
+
+/// Why a terminal that says TERM=dumb gets the help instead of the menu.
+const TOO_DUMB_FOR_THE_MENU: &str =
+    "The menu needs a terminal that can clear its screen; this one says TERM=dumb.";
+
+/// The flags that ask for help.
+const HELP_FLAGS: [&str; 2] = ["-h", "--help"];
+
+/// The refusals of `help`.
+#[derive(Debug)]
+enum HelpError {
+    OneName,
+    NoSuchName(String),
+}
+
+impl std::fmt::Display for HelpError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::OneName => f.write_str("The help command takes one command or topic name."),
+            Self::NoSuchName(names) => {
+                write!(
+                    f,
+                    "There is no such command or topic. Choose one of: {names}."
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for HelpError {}
+
+impl mnemocode::refusal::Refusal for HelpError {
+    fn code(&self) -> &'static str {
+        match self {
+            Self::OneName => "cli.command-line.help-command-takes-one-command-topic-name",
+            Self::NoSuchName(_) => "cli.command-line.there-no-command-topic-choose-one",
+        }
     }
 }
 
@@ -75,35 +108,83 @@ impl mnemocode::refusal::Refusal for VersionArguments {
 fn run_command_line(argv: &[String], protection: &mut Protection) -> Result<(), Stop> {
     args::assert_safe_material_argv(argv)?;
     let Some((command, rest)) = argv.split_first() else {
-        return Err(NoSuchCommand.into());
+        // Started at a terminal, as by a double-click, MnemoCode shows its menu; a script or a pipe
+        // gets the help. A terminal that says TERM=dumb cannot draw the menu.
+        if terminal::terminal_available() {
+            return menu::run(protection);
+        }
+        if terminal::terminals_attached() {
+            terminal::hint(TOO_DUMB_FOR_THE_MENU);
+        }
+        help::print_usage();
+        return Ok(());
     };
+    let is_help = |argument: &str| HELP_FLAGS.contains(&argument);
+    if is_help(command) {
+        help::print_usage();
+        return Ok(());
+    }
+    if command == "help" {
+        if rest.len() > 1 {
+            return Err(HelpError::OneName.into());
+        }
+        let Some(name) = rest.first() else {
+            help::print_usage();
+            return Ok(());
+        };
+        // `help --help` is the help of help.
+        let name = if is_help(name) { "help" } else { name.as_str() };
+        if !help::print_named_help(name) {
+            return Err(HelpError::NoSuchName(help::help_names()).into());
+        }
+        return Ok(());
+    }
     if VERSION_FLAGS.contains(&command.as_str()) || command == "version" {
+        // `version --help`, as `-V --help`: the help of version.
+        if let [only] = rest
+            && is_help(only)
+        {
+            help::print_named_help("version");
+            return Ok(());
+        }
         if !rest.is_empty() {
             return Err(VersionArguments.into());
         }
-        terminal::output_line(&format!("mnemocode {VERSION}")).map_err(|_| Stop::Cancelled)?;
+        terminal::result_line(&format!("mnemocode {VERSION}"));
+        return Ok(());
+    }
+    let page = help::page_of(command).ok_or(NoSuchCommand)?;
+    // Help still accepts half-typed non-secret options; forbidden material flags are refused first.
+    if rest.iter().any(|argument| is_help(argument)) {
+        let detailed = rest.iter().any(|argument| argument == "--help");
+        help::print_command_help(command, page, detailed);
         return Ok(());
     }
     let command = commands::named(command).ok_or(NoSuchCommand)?;
     let mut parsed = args::parse_arguments(rest)?;
     commands::check_options(command, &parsed)?;
-    // Before anything secret is read: the outputs checked, their folders made, the rest given up.
-    let (needs, mut renamed) = output::preflight(&mut parsed)?;
-    if command.secret {
-        let title = command.name;
-        return gate::run_secret(
-            protection,
-            &needs,
-            &parsed,
-            &mut renamed,
-            title,
-            true,
-            |_| (command.run)(&parsed),
-        );
+    if let Run::SelfTest(run) = command.run {
+        protection.restrict(&Needs {
+            folders: vec![os::temporary_folder()],
+            ..Needs::default()
+        });
+        return run(protection);
     }
+    // Before anything secret is read: the outputs checked, their folders made, the rest given up.
+    let mut needs = output::preflight(&mut parsed)?;
+    needs.answers_name_folders = command.asks_outputs.is_some_and(|asks| asks(&parsed));
     protection.restrict(&needs);
-    (command.run)(&parsed)?;
-    renamed.report();
+    self_test::assert_core()?;
+    let body = |protection: &mut Protection| match command.run {
+        Run::Options(run) => run(&parsed),
+        Run::Ruling(run) => run(&parsed, protection),
+        Run::SelfTest(run) => run(protection),
+    };
+    if command.secret {
+        return gate::run_secret(protection, &parsed, command.name, true, body);
+    }
+    body(protection)?;
+    output::report_renamed();
     Ok(())
 }
 
@@ -151,6 +232,7 @@ fn main() -> ExitCode {
             terminal::NoticeKind::Warning,
         );
     }
+    os::restore();
     os::cleanup_done();
     ExitCode::from(status)
 }

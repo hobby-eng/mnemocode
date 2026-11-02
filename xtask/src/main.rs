@@ -16,6 +16,11 @@
 //! - `knowndlls`: on Windows, the \\KnownDlls object directory against xtask/knowndlls.json.
 //! - `action-pins`: the workflows' actions against the workspace's pin table (CI-01 to CI-03).
 //! - `audit`: Cargo.lock against the RustSec advisories (cargo-audit).
+//! - `release build <target>`, `release pages`: the files of a release, in dist/release/.
+//! - `verify-executable <file>`: a built executable run on its own, on public test data.
+//! - `reproducible`: the canonical files rebuilt in the pinned container and compared.
+//! - `features`: each unit of the libraries built alone, and the slow tests.
+//! - `sign <tag> [--publish]`: a draft release checked and signed on the owner's computer.
 
 #![deny(unsafe_code)]
 #![expect(
@@ -31,6 +36,7 @@ mod copies;
 mod knowndlls;
 mod markdown;
 mod notices;
+mod release;
 mod repository;
 mod rust_source;
 mod wasm;
@@ -61,7 +67,7 @@ impl From<std::io::Error> for Failure {
 
 const USAGE: &str = "usage: cargo xtask <check | code-rules [--self-test] | copies [--tokens N | \
                      --self-test] | markdown | notices [--check] | wasm build [<edition>/<page>] \
-                     | wasm verify | windows-imports <file.exe> [--check] | action-pins | knowndlls | audit>";
+                     | wasm verify | windows-imports <file.exe> [--check] | action-pins | knowndlls | release build <target> | release pages | verify-executable <file> | reproducible | features | sign <tag> [--publish] | audit>";
 
 /// The repository's root: the folder above this crate's.
 pub(crate) fn root() -> PathBuf {
@@ -139,6 +145,13 @@ fn run(task: &str, arguments: &[String]) -> Result<(), Failure> {
         ("audit", []) => check::audit(&root, true),
         ("action-pins", []) => action_pins::run(&root),
         ("knowndlls", []) => knowndlls::run(&root),
+        ("release", ["build", target]) => release::build(&root, target),
+        ("release", ["pages"]) => release::pack_pages(&root),
+        ("verify-executable", [file]) => release::verify_executable(&root, Path::new(file)),
+        ("reproducible", []) => release::reproducible(&root),
+        ("features", []) => release::features(&root),
+        ("sign", [tag]) => release::sign(&root, tag, false),
+        ("sign", [tag, "--publish"]) => release::sign(&root, tag, true),
         _ => Err(Failure(USAGE.to_owned())),
     }
 }

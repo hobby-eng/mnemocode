@@ -153,6 +153,10 @@ pub mod phrase_words {
     pub const MASKED: &str = "the masked phrase (decoy)";
     /// The fingerprint of the original phrase.
     pub const ORIGINAL_FINGERPRINT: &str = "Original fingerprint";
+    /// Above repaired shares whose mode is known to mask.
+    pub const REPAIRED_MASKED: &str = "The repaired shares are the shares as written: they hold the masked phrase (decoy). The dates only checked them against the wallet; a restore with the same dates gives the original seed phrase.";
+    /// Above shares that a repair without the mode gives back.
+    pub const REPAIRED_UNKNOWN: &str = "The repaired shares are the shares as written: they hold the phrase they were split from, the masked phrase (decoy) if Seedshift was used.";
     /// The fingerprint of masked codes.
     pub const ENCODED_FINGERPRINT: &str = "Encoded fingerprint (of the masked phrase)";
     /// Under both fingerprints of a masked backup.

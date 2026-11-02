@@ -4,3 +4,4 @@
 /test-results/
 /dist/
 docs/audits/*-evidence/
+/release-signing-*/

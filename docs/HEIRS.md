@@ -1,0 +1,79 @@
+# A guide for heirs
+
+You are probably reading this because someone left you a wallet backup made with MnemoCode, together with a sheet called "How to restore this wallet backup". This guide explains in plain words what it all means and how to reach the wallet safely.
+
+Take your time. Nothing here is urgent, and anyone who tries to rush you is a warning sign.
+
+## What a wallet and a seed phrase are
+
+Bitcoin and other cryptocurrencies are not kept at a bank or in a file. They are recorded on a public ledger that thousands of computers share. What gives control over them is a secret: whoever knows it can spend them, and nobody can undo that.
+
+Most wallets keep that secret as a **seed phrase**: a list of 12, 15, 18, 21 or 24 English words, such as "letter advice cage absurd ...". The words come from a standard list of 2048 words (BIP39), so any wallet program that follows this standard can turn the same words back into the same wallet. The words are the wallet; the program is only a tool to use it.
+
+## What MnemoCode did to the seed phrase
+
+A seed phrase written on paper is easy to recognise, and whoever finds it can take everything. So the owner had MnemoCode change how it looks. The sheet says which of these the owner chose:
+
+- **Another form.** The words were written as numbers (each word's place in the list), as short codes of digits and letters, or as color codes such as `#1EAB91`, sometimes printed on cards that look like ordinary design samples.
+- **Secret dates (Seedshift).** The words were masked with one or more dates meaningful to the owner, such as a birthday. Their year, month and day shift the words along the BIP39 list: with 23-09-2026, "abandon" becomes "wool". Use the owner's dates to undo the shift. MnemoCode Seedshift gives a valid seed phrase even for wrong dates; the Original Seedshift may instead report a checksum error. A valid checksum does not confirm the owner's wallet. The dates have nothing to do with today, the backup date or the day you open the wallet. They are written nowhere; the owner may have left a hint on the sheet.
+- **Shamir shares.** The backup was split into several shares, kept in different places. A certain number of different shares, for example any 3 of 5, restore it. Fewer are not enough to restore the phrase, but still show details such as how many shares are needed and how long the phrase is. Keep every share private.
+
+MnemoCode undoes all of this on your computer, without the internet.
+
+## Before you start
+
+Gather the sheet, the backup or enough of the shares, and the secret dates if the sheet says that they are needed.
+
+Use a computer that you trust, for example your own. Do not do this on a computer at work, in a library, or one that someone else looks after. Do not photograph the backup, the shares or the seed phrase, and do not type them into a phone.
+
+## Getting MnemoCode
+
+Download MnemoCode from its release page, `https://github.com/hobby-eng/mnemocode/releases`, and from nowhere else. Choose the file for your computer: the one ending in `win-x64.exe` for Windows, `macos-arm64` for a Mac with an Apple processor, `macos-x64` for a Mac with an Intel processor, `linux-x64` for Linux, or `linux-arm64` for Linux on an ARM processor.
+
+The release page also has a file called `SHA256SUMS`, signed by the maintainer of MnemoCode. It lets you check that the file you downloaded is exactly the one that was published. The [download verification](CLI.md#download-verification) shows how to check the file and the signature. If this is too technical, ask someone you trust to check it with you; they do not need to see the backup for this.
+
+Then disconnect the computer from the internet: unplug the cable and turn off Wi-Fi.
+
+The first start may need one more step, because the file does not come from an app store:
+
+- **Windows** may show "Windows protected your PC". Choose "More info", then "Run anyway".
+- **macOS** may say that it cannot check the file. Open System Settings, then Privacy & Security, and choose "Open Anyway" next to MnemoCode.
+- **Linux** needs the file to be marked as a program first: in a terminal, `chmod +x` followed by the file name.
+
+## Turning the backup back into the seed phrase
+
+Start MnemoCode by a double-click. It shows a menu: choose with the arrow keys and Enter, or press the number. Follow the steps on the sheet; it names the menu entries and the answers to choose.
+
+- Printed cards end with a few codes that belong to nothing. The sheet says how many words the seed phrase has, or how many codes each share has: type only the codes from the first card on. When MnemoCode asks how many words the seed phrase has, give the number from the sheet.
+- Shares are typed one after another, separated by a semicolon (`;`).
+- When MnemoCode asks for "Dates", type the secret dates as day-month-year, such as `23-09-2026`, separated by spaces.
+- What you type is shown so that you can check it. When you press Enter at the end, the screen is cleared again.
+
+If something you typed cannot be right, MnemoCode says so in one line, names where, such as "Date 2" or "Share 3", and asks for it again; what you typed before is kept. A code or a word was probably mistyped: check each one against the paper.
+
+If you know a secret date but one of its digits is unclear, type `?` in place of that digit, such as `?3-09-2026`. MnemoCode then tries every possibility, both when it restores the backup and in the menu entry "Find a forgotten word, code, date digit or share code". To tell the right date, it usually asks for the wallet's fingerprint, eight characters such as `73c5da0a`, or one of its first receiving addresses.
+
+## Opening the wallet
+
+You now have the seed phrase: 12 to 24 English words. Write them down on paper, in order.
+
+Install a well-known wallet program, downloaded only from its own official website. If you know which program the owner used, take that one. In the program, choose "Restore", "Recover" or "Import wallet", not "Create a new wallet", and type the words. Once the program has caught up with the ledger, it shows what the wallet holds.
+
+If the wallet looks empty:
+
+- **A secret date may be wrong.** A wrong date can give another valid seed phrase; the Original Seedshift can also report a checksum error. Neither a valid phrase nor an empty-looking wallet proves that the dates are right. Check the secret dates, and that each is written day-month-year; compare a known address or fingerprint if one is available.
+- **The owner may have used a BIP39 passphrase**: an extra word or sentence, sometimes called the 25th word. It is not part of the backup, and MnemoCode does not keep it. The hint on the sheet may mention it.
+- **The owner may have used another program or another cryptocurrency.** Different programs can look at different parts of the same wallet. Try the program the owner used, if you know it.
+
+## After the wallet is open
+
+Move what the wallet holds to a new wallet of your own, with a new seed phrase that only you know. The old seed phrase has now been typed on a computer, and others may know that the backup exists.
+
+An inheritance can bring legal and tax duties. A lawyer or a tax adviser can tell you which ones apply to you.
+
+## Beware of scams
+
+- Nobody honest ever asks for a seed phrase: not a bank, a wallet maker or its support staff, a lawyer, the police, or a "recovery service". Whoever has the words can take everything, at once and for good.
+- Never type the seed phrase, the backup or the secret dates into a website, an email, a chat or a form.
+- Paid services that promise to recover a wallet are very often scams.
+- If you need help, ask someone you trust to sit beside you, and keep the words in your own hands.

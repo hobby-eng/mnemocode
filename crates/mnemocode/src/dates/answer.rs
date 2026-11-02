@@ -9,9 +9,9 @@ use std::fmt;
 use super::{DatePattern, DatesError, check_keys, combination_count, is_date_pattern};
 use super::{Dates, maximum_dates, parse_date, parse_date_pattern, too_many_dates_message};
 use crate::refusal::Refusal;
-use crate::search::plan::counting;
+use crate::search::plan::{counted, counting};
 use crate::text::space::is_ecmascript_space;
-use crate::text::words::after_place;
+use crate::text::words::{after_place, places_named};
 
 /// Dates with ? that one search takes.
 pub const MAX_INCOMPLETE_DATES: usize = 3;
@@ -37,6 +37,8 @@ pub enum AnswerError {
     AtPlace(usize, DatesError),
     /// A pattern with the key of an earlier one that allows other dates, at its place.
     KeyConflict(usize),
+    /// No date with ? where one must be searched.
+    NothingForgotten,
 }
 
 impl fmt::Display for AnswerError {
@@ -65,6 +67,9 @@ impl fmt::Display for AnswerError {
                 &DatesError::KeyConflict.to_string(),
                 ": ",
             )),
+            Self::NothingForgotten => {
+                f.write_str("At least one date must contain a forgotten digit represented by ?.")
+            }
         }
     }
 }
@@ -87,6 +92,9 @@ impl Refusal for AnswerError {
             }
             Self::AtPlace(..) => "core.date-search.at-place-refused",
             Self::KeyConflict(_) => "core.date-search.assert-keys-fit-refused",
+            Self::NothingForgotten => {
+                "core.date-search.at-least-one-date-contain-forgotten-digit-represented"
+            }
         }
     }
 }
@@ -127,6 +135,8 @@ impl DatesAnswer {
         word_count: Option<usize>,
         patterns: bool,
     ) -> Result<Self, AnswerError> {
+        // A build that cannot search dates refuses them, as TS does for a host that does not search.
+        let patterns = patterns && cfg!(feature = "search-date");
         let typed: Vec<&str> = line
             .split(|character: char| {
                 is_ecmascript_space(character) || matches!(character, ',' | ';')
@@ -179,6 +189,16 @@ impl DatesAnswer {
         })
     }
 
+    /// The complete dates `dates`, read before: nothing is forgotten.
+    pub fn of(dates: &[super::Date]) -> Self {
+        Self {
+            known: Dates::new(dates),
+            patterns: Vec::new(),
+            incomplete_places: Vec::new(),
+            combinations: 1,
+        }
+    }
+
     /// The complete dates, in the order typed.
     pub const fn known(&self) -> &Dates {
         &self.known
@@ -197,6 +217,56 @@ impl DatesAnswer {
     /// How many date combinations the patterns give: 1 without patterns.
     pub const fn combinations(&self) -> u64 {
         self.combinations
+    }
+
+    /// How many dates the answer holds, complete or not.
+    pub fn count(&self) -> usize {
+        self.known.len() + self.patterns.len()
+    }
+
+    /// Whether a date holds ? for a forgotten digit, so that the dates must be searched.
+    pub fn has_forgotten_digits(&self) -> bool {
+        !self.patterns.is_empty()
+    }
+
+    /// Refuses an answer without a date with ?: standalone date recovery needs one.
+    pub fn check_incomplete(&self) -> Result<(), AnswerError> {
+        if self.has_forgotten_digits() {
+            Ok(())
+        } else {
+            Err(AnswerError::NothingForgotten)
+        }
+    }
+
+    /// The line that a page shows while the dates are typed: which dates hold ? and the
+    /// combinations they stand for; none when every date is whole.
+    pub fn forgotten_digits_note(&self) -> Option<String> {
+        if self.incomplete_places.is_empty() {
+            return None;
+        }
+        let verb = if self.incomplete_places.len() == 1 {
+            "has"
+        } else {
+            "have"
+        };
+        Some(format!(
+            "{} {verb} forgotten digits: {}.",
+            places_named("Date", &self.incomplete_places),
+            counted(self.combinations, "combination")
+        ))
+    }
+
+    /// Whether a phrase of `word_count` words takes this many dates.
+    pub fn fits_phrase(&self, word_count: usize) -> bool {
+        self.count() <= maximum_dates(word_count)
+    }
+
+    /// Why a phrase of `word_count` words cannot take these dates; none when it can or when the
+    /// count is not known yet.
+    pub fn too_many_for(&self, word_count: Option<usize>) -> Option<String> {
+        word_count
+            .filter(|&words| !self.fits_phrase(words))
+            .map(too_many_dates_message)
     }
 }
 
@@ -217,6 +287,7 @@ mod tests {
         assert_eq!(answer.combinations(), 1);
     }
 
+    #[cfg(feature = "search-date")]
     #[test]
     fn refusals_name_the_place() {
         assert_eq!(
@@ -243,6 +314,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "search-date")]
     #[test]
     fn patterns_are_counted() {
         let answer = DatesAnswer::parse("23-09-2026 2?-09-2026", None, true).unwrap();

@@ -128,9 +128,21 @@ pub(super) fn restrict(protection: &mut Protection, needs: &Needs) {
         );
         Ok(())
     });
+    protection.group_since(from, "kernel");
+    if needs.answers_name_folders {
+        protection.lack(super::protect::WRITES_OPEN);
+    } else {
+        rule_writes(protection, &needs.folders);
+    }
+}
+
+/// Landlock: the process writes beneath `folders` alone, a second restriction after a first.
+pub(super) fn rule_writes(protection: &mut Protection, folders: &[std::path::PathBuf]) {
+    let from = protection.held_count();
     protection.attempt("Landlock", |protection| {
-        landlock::restrict_writes(&needs.folders)?;
-        let what = if needs.folders.is_empty() {
+        landlock::restrict_writes(folders)?;
+        Protection::writes_ruled(folders);
+        let what = if folders.is_empty() {
             "no file writes"
         } else {
             "file writes only to the chosen folders"

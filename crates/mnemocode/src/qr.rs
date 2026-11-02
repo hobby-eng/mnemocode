@@ -8,11 +8,10 @@
 //! copies are not reachable here.
 
 pub mod admission;
+mod segments;
 
 use std::fmt;
 use std::io::Cursor;
-
-use qrcodegen::{QrCode, QrCodeEcc, QrSegment, Version};
 
 use crate::refusal::Refusal;
 use crate::secret::{SecretBytes, SecretText};
@@ -25,6 +24,12 @@ pub const QR_QUIET_MODULES: usize = 4;
 pub const QR_IMAGE_PIXELS: usize = 720;
 /// The pixels of a module in the raster a matrix is checked on: crisp at any version.
 const CHECK_MODULE_PIXELS: usize = 4;
+/// The grey level between a dark module and a light one.
+const MIDDLE_GREY: u8 = 128;
+/// One pixel in this many that changes sides of the grey level is noise, no drawn page.
+const NOISE_SHARE: usize = 4;
+/// How many pixels each side of a pixel becomes for the second reading of an image.
+const ENLARGED: usize = 2;
 
 /// The refusals of QR codes, word for word as TS 0.1.0 writes them.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -39,6 +44,8 @@ pub enum QrError {
     NotText(NotUtf8),
     /// A matrix or an image made here did not read back as its payload.
     VerificationFailed,
+    /// An image of no text.
+    Empty,
 }
 
 impl fmt::Display for QrError {
@@ -48,6 +55,7 @@ impl fmt::Display for QrError {
             Self::InvalidPng => f.write_str("The QR input is not a valid PNG file."),
             Self::NoCode => f.write_str("No readable QR code was found in the PNG file."),
             Self::NotText(error) => error.fmt(f),
+            Self::Empty => f.write_str("QR payload must not be empty."),
             Self::VerificationFailed => f.write_str(
                 "QR verification failed: the image is unreadable or does not match the backup. It was not saved. Try creating it again.",
             ),
@@ -65,6 +73,7 @@ impl Refusal for QrError {
             Self::NoCode => "cli.qr-input.no-readable-qr-code-was-found-png-file",
             Self::NotText(error) => error.code(),
             Self::VerificationFailed => "export.qr-image.qr-verification-failed",
+            Self::Empty => "export.qr-image.qr-payload-not-empty",
         }
     }
 }
@@ -99,18 +108,7 @@ impl Matrix {
 pub fn matrix(payload: &str) -> Result<Matrix, QrError> {
     // Version 40 at level M holds 2331 bytes, far above any backup or share; a payload past it
     // gives no matrix to check, and fails as one that does not read back would.
-    // At level M exactly, as node-qrcode writes it: qrcodegen's encode_text would raise the level
-    // where the version leaves room.
-    let segments = QrSegment::make_segments(payload);
-    let code = QrCode::encode_segments_advanced(
-        &segments,
-        QrCodeEcc::Medium,
-        Version::MIN,
-        Version::MAX,
-        None,
-        false,
-    )
-    .map_err(|_| QrError::VerificationFailed)?;
+    let code = segments::code_of(payload).ok_or(QrError::VerificationFailed)?;
     let size = usize::try_from(code.size()).map_err(|_| QrError::VerificationFailed)?;
     let mut dark = Vec::with_capacity(size * size);
     for row in 0..code.size() {
@@ -158,6 +156,9 @@ fn check_reads_as(read: Result<SecretText, QrError>, payload: &str) -> Result<()
 /// The PNG image of `payload`, 720 pixels of 8-bit grey with the quiet zone, in a locked buffer:
 /// read back as `payload` before it is given out, so that a caller saves only an image that reads.
 pub fn png(payload: &str) -> Result<SecretBytes, QrError> {
+    if payload.is_empty() {
+        return Err(QrError::Empty);
+    }
     let matrix = matrix(payload)?;
     let symbol = matrix.size + 2 * QR_QUIET_MODULES;
     let scale = QR_IMAGE_PIXELS as f64 / symbol as f64;
@@ -236,28 +237,55 @@ fn grey_pixels(bytes: &[u8]) -> Result<(SecretBytes, usize, usize), QrError> {
     Ok((grey, width, height))
 }
 
-/// The text of the first QR code rqrr finds in `grey`, a `width` × `height` image of grey levels,
-/// tried again inverted as jsQR's attemptBoth does.
+/// The text of the first of `grids` that decodes; none where none does.
+fn first_text<G: rqrr::BitGrid>(grids: &[rqrr::Grid<G>]) -> Option<Result<SecretText, QrError>> {
+    grids.iter().find_map(|grid| {
+        let mut bytes = Vec::new();
+        let decoded = grid.decode_to(&mut bytes);
+        let text = decoded.ok().map(|_| {
+            strict_utf8(&bytes, "The QR code")
+                .map(|text| SecretText::copy_of("a QR code's text", text))
+                .map_err(QrError::NotText)
+        });
+        zeroize::Zeroize::zeroize(&mut bytes);
+        text
+    })
+}
+
+/// Whether more than one pixel in [`NOISE_SHARE`] of `grey` lies on the other side of
+/// [`MIDDLE_GREY`] than the pixel before it. Such noise holds no page of cards, and rqrr's search of
+/// finder patterns, which has no limit of its own, would take minutes over it (CORE-50).
+fn changes_at_most_pixels(grey: &[u8], width: usize) -> bool {
+    let changes = grey
+        .chunks_exact(width.max(1))
+        .flat_map(|row| row.windows(2))
+        .filter(|pair| (pair[0] < MIDDLE_GREY) != (pair[1] < MIDDLE_GREY))
+        .count();
+    changes > grey.len() / NOISE_SHARE
+}
+
+/// The text of the first QR code rqrr finds in `grey`, a `width` × `height` image of grey levels:
+/// tried again inverted as jsQR's attemptBoth does, then with each pixel as four, black below
+/// [`MIDDLE_GREY`]. On a page of cards the modules are 3.5 pixels wide, black on white, and rqrr's
+/// own threshold, whose window follows the width of the image, loses most of those pages.
 fn read_pixels(grey: &[u8], width: usize, height: usize) -> Result<SecretText, QrError> {
     for inverted in [false, true] {
         let mut image = rqrr::PreparedImage::prepare_from_greyscale(width, height, |x, y| {
             let level = grey[y * width + x];
             if inverted { 255 - level } else { level }
         });
-        for grid in image.detect_grids() {
-            let mut bytes = Vec::new();
-            let decoded = grid.decode_to(&mut bytes);
-            let text = decoded.ok().map(|_| {
-                strict_utf8(&bytes, "The QR code")
-                    .map(|text| SecretText::copy_of("a QR code's text", text))
-            });
-            zeroize::Zeroize::zeroize(&mut bytes);
-            if let Some(text) = text {
-                return text.map_err(QrError::NotText);
-            }
+        if let Some(text) = first_text(&image.detect_grids()) {
+            return text;
         }
     }
-    Err(QrError::NoCode)
+    if changes_at_most_pixels(grey, width) {
+        return Err(QrError::NoCode);
+    }
+    let (wide, high) = (width * ENLARGED, height * ENLARGED);
+    let mut image = rqrr::PreparedImage::prepare_from_bitmap(wide, high, |x, y| {
+        grey[y / ENLARGED * width + x / ENLARGED] < MIDDLE_GREY
+    });
+    first_text(&image.detect_grids()).unwrap_or(Err(QrError::NoCode))
 }
 
 #[cfg(test)]
@@ -274,6 +302,28 @@ mod tests {
         let image = png(PAYLOAD).unwrap();
         assert!(admission::has_signature(&image));
         assert_eq!(read_png(&image).unwrap().as_str(), PAYLOAD);
+    }
+
+    #[test]
+    fn noise_is_told_from_a_drawn_code_and_gets_no_long_search() {
+        let side = 1024;
+        let mut state = 0x2545_u32;
+        let noise: Vec<u8> = (0..side * side)
+            .map(|_| {
+                state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                (state >> 24) as u8
+            })
+            .collect();
+        assert!(changes_at_most_pixels(&noise, side));
+        assert!(matches!(
+            read_pixels(&noise, side, side),
+            Err(QrError::NoCode)
+        ));
+        let matrix = matrix(PAYLOAD).unwrap();
+        let drawn = (matrix.size() + 2 * QR_QUIET_MODULES) * CHECK_MODULE_PIXELS;
+        let mut pixels = vec![0; drawn * drawn];
+        draw(&matrix, &mut pixels, drawn, CHECK_MODULE_PIXELS as f64);
+        assert!(!changes_at_most_pixels(&pixels, drawn));
     }
 
     #[test]

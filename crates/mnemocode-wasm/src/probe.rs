@@ -13,6 +13,8 @@
 //! page gives, and the gate searches the stack after each entry and the memory after the last. It
 //! calls the Rust functions behind the generated wrappers, which pass on references alone.
 
+mod cards;
+
 use mnemocode::bip32::{ExtendedKey, HARDENED_OFFSET};
 use mnemocode::bip39::phrase::Phrase;
 use mnemocode::bip39::seed::seed;
@@ -36,8 +38,13 @@ use crate::candidates::{
 use crate::host::{after_secret, refused, text};
 use crate::phrase::{EncodedBackup, likely_form, master_fingerprint};
 use crate::qr::{QrMatrix, qr_png, read_qr_png};
+use crate::recovery::{
+    MarkedCodes, ReEncoding, ReadBackup, Recovery, RecoverySearch, SearchResult, check_backup,
+    check_share_backup, is_codes, share_kind,
+};
 use crate::sskr::{RestoredShares, SplitShares, check_qr, share_form, write_share};
 use crate::wallet::WalletEvidence;
+use crate::words::{legacy_last_words, word_hint, word_lookup};
 
 /// The first address of the wallet's native SegWit branch, which the wallet part derives.
 const FIRST_ADDRESS: [u32; 5] = [HARDENED_OFFSET + 84, HARDENED_OFFSET, HARDENED_OFFSET, 0, 0];
@@ -45,6 +52,12 @@ const FIRST_ADDRESS: [u32; 5] = [HARDENED_OFFSET + 84, HARDENED_OFFSET, HARDENED
 const FINGERPRINT: &str = "73c5da0a";
 /// The word of a share marked with ?.
 const MARKED_PLACE: usize = 8;
+/// What a page calls its reader of shares and of an encoded phrase.
+const SHARE_READER: &str = "the reader";
+/// The candidates a step of a search tries.
+const SEARCH_WORK: f64 = 64.0;
+/// A digit of the given dates, forgotten.
+const FORGOTTEN_DIGIT: (&str, &str) = ("-2026", "-202?");
 /// How shares are split: the threshold and the count.
 const LAYOUTS: [(u8, u8); 2] = [(2, 3), (3, 5)];
 
@@ -340,6 +353,8 @@ fn phrase_entries(given: Given<'_>, met: &mut Met) {
     met.ok("likely form", likely_form(js(given.phrase)));
     let fingerprint = master_fingerprint(js(given.phrase), js(given.passphrase));
     met.ok("master fingerprint", fingerprint);
+    word_entries(given.phrase, met);
+    re_encoding_entries(given, met);
     let refused = EncodedBackup::encode(
         js(given.phrase),
         js(given.dates),
@@ -348,6 +363,59 @@ fn phrase_entries(given: Given<'_>, met: &mut Met) {
         false,
     );
     met.refused("encode in no form", refused);
+}
+
+/// The entries of the word tables, on a phrase typed where they are asked.
+fn word_entries(phrase: &str, met: &mut Met) {
+    if let Some((first, _)) = phrase.split_once(' ') {
+        met.ok("word lookup", word_lookup(js("word"), js(first)));
+    }
+    met.ok("word hint", word_hint(js(phrase), false));
+    met.ok("hint of codes", word_hint(js(phrase), true));
+    if let Some(words) = met.ok("legacy last words", legacy_last_words(js(phrase)))
+        && let Some(Some(replaced)) = met.ok("legacy phrase", words.phrase(0.0))
+    {
+        met.text(&replaced);
+    }
+}
+
+/// A backup of the phrase read again, confirmed by the person and by a wallet.
+fn re_encoding_entries(given: Given<'_>, met: &mut Met) {
+    let encoded = EncodedBackup::encode(
+        js(given.phrase),
+        JsValue::UNDEFINED,
+        js("unicode"),
+        js("direct"),
+        false,
+    );
+    let Some(codes) = met
+        .ok("encode", encoded)
+        .and_then(|backup| met.ok("codes", backup.codes()))
+    else {
+        return;
+    };
+    let opened = ReEncoding::new(
+        js(&codes),
+        js("unicode"),
+        js("direct"),
+        js(""),
+        JsValue::UNDEFINED,
+    );
+    let Some(mut opened) = met.ok("re-encoding", opened) else {
+        return;
+    };
+    met.ok("phrase of a re-encoding", opened.phrase());
+    let evidence = WalletEvidence::master_fingerprint(FINGERPRINT);
+    if let Some(evidence) = met.ok("fingerprint evidence", evidence)
+        && let Some(recovery) = met.ok("recovery", evidence.recovery(js(given.passphrase)))
+    {
+        met.ok(
+            "wallet of a re-encoding",
+            opened.confirm_by_wallet(&recovery),
+        );
+    }
+    opened.confirm_by_person();
+    met.ok("confirmed phrase", opened.confirmed_phrase());
 }
 
 /// The wallet part's entries.
@@ -477,6 +545,7 @@ fn share_entries(given: Given<'_>, met: &mut Met) {
             met.returned("drop of a split");
             restored_entries(&shares, usize::from(threshold), met);
             if format == ShareFormat::Colors {
+                cards::share_card_entries(&shares, met);
                 let payload = write_share(js(&shares[0]), js("ur"));
                 if let Some(payload) = met.ok("write share", payload) {
                     let checked = check_qr(js(&shares[0]), js(&payload), JsValue::UNDEFINED);
@@ -494,11 +563,30 @@ fn share_entries(given: Given<'_>, met: &mut Met) {
         js("words"),
     );
     met.refused("split in no mode", split);
-    marked_entries(given.phrase, met);
+    if let Some(shares) = marked_entries(given.phrase, met)
+        && let Some(codes) = masked_codes(given, "english", met)
+        && let Some(numbers) = masked_codes(given, "indexes", met)
+    {
+        recovery_entries(given, (&codes, &numbers), &shares, met);
+    }
 }
 
-/// A share with an element marked, repaired with the others.
-fn marked_entries(phrase: &str, met: &mut Met) {
+/// The phrase masked with its dates, in `form`.
+fn masked_codes(given: Given<'_>, form: &str, met: &mut Met) -> Option<String> {
+    let encoded = EncodedBackup::encode(
+        js(given.phrase),
+        js(given.dates),
+        js(form),
+        js("seedshift"),
+        false,
+    );
+    let backup = met.ok("encode", encoded)?;
+    let codes = backup.codes();
+    met.ok("codes", codes)
+}
+
+/// A share with an element marked, repaired with the others; the shares, for the recovery part.
+fn marked_entries(phrase: &str, met: &mut Met) -> Option<Vec<String>> {
     let split = SplitShares::split(
         js(phrase),
         JsValue::UNDEFINED,
@@ -507,9 +595,7 @@ fn marked_entries(phrase: &str, met: &mut Met) {
         3.0,
         js("words"),
     );
-    let Some(split) = met.ok("split", split) else {
-        return;
-    };
+    let split = met.ok("split", split)?;
     let shares = met.gave("shares of a split", split.shares());
     met.shares(&shares);
     drop(split);
@@ -524,6 +610,191 @@ fn marked_entries(phrase: &str, met: &mut Met) {
         met.shares(&again);
         met.gave("repair lines", restored.repair_lines());
     }
+    Some(shares)
+}
+
+/// What `search` found, stepped to its end.
+fn ran(mut search: RecoverySearch, step: &str, met: &mut Met) -> Option<SearchResult> {
+    while met.ok(step, search.step(SEARCH_WORK))?.running() {}
+    met.ok(step, search.finish())
+}
+
+/// Runs each part of `search`'s pace sample, as a page does to time it; the seconds it says.
+fn timed(search: &RecoverySearch, step: &str, met: &mut Met) -> Option<Vec<f64>> {
+    let parts = search.pace_parts();
+    for part in 0..parts {
+        met.ok(step, search.pace_sample(f64::from(part)))?;
+    }
+    Some(vec![1e-3; usize::from(parts)])
+}
+
+/// The first phrase that `search` found, timed and planned as a page does, given out.
+fn found_phrase(search: Result<RecoverySearch, JsValue>, step: &str, met: &mut Met) {
+    if let Some(search) = met.ok(step, search)
+        && let Some(seconds) = timed(&search, step, met)
+        && met.ok(step, search.plan(seconds, f64::NAN)).is_some()
+        && let Some(found) = ran(search, step, met)
+    {
+        met.gave(step, found.phrase(0.0));
+        met.gave(step, found.codes(0.0));
+        met.gave(step, found.dates(0.0));
+        met.ok(step, found.candidate_list(JsValue::UNDEFINED));
+    }
+}
+
+/// What a restore `search` found, begun as a page begins it.
+fn begun(
+    search: Result<RecoverySearch, JsValue>,
+    step: &str,
+    met: &mut Met,
+) -> Option<SearchResult> {
+    let mut search = met.ok(step, search)?;
+    let seconds = timed(&search, step, met)?;
+    met.ok(step, search.begin(seconds))?;
+    ran(search, step, met)
+}
+
+/// The recovery part's entries: a backup read and decoded, checked as written, and every search,
+/// on `codes` and `numbers`, the phrase masked with its dates in words and in word numbers.
+fn recovery_entries(
+    given: Given<'_>,
+    (codes, numbers): (&str, &str),
+    shares: &[String],
+    met: &mut Met,
+) {
+    let reading = ReadBackup::read(js(codes), false, js(SHARE_READER), f64::NAN);
+    if let Some(reading) = met.ok("read backup", reading) {
+        let decoded = reading.decode(js("english"), js("seedshift"), js(given.dates));
+        if let Some(decoded) = met.ok("decode backup", decoded) {
+            met.gave("decoded phrase", decoded.phrase(0.0));
+            drop(decoded);
+            met.returned("drop of a decoding");
+        }
+        met.refused(
+            "decode in no form",
+            reading.decode(js("no form"), js("direct"), js(given.dates)),
+        );
+        met.ok("forms of a backup", reading.forms(JsValue::UNDEFINED));
+    }
+    met.ok("share kind", share_kind(js(codes)));
+    met.ok("is codes", is_codes(js(codes)));
+    let checked = check_backup(
+        js(given.phrase),
+        js("english"),
+        js("seedshift"),
+        js(given.dates),
+        js(codes),
+        js(given.dates),
+    );
+    met.ok("check backup", checked);
+    let written = format!("{}; {}", shares[0], shares[1]);
+    let checked = check_share_backup(
+        js(given.phrase),
+        js("direct"),
+        2.0,
+        JsValue::UNDEFINED,
+        js(SHARE_READER),
+        js(&written),
+        JsValue::UNDEFINED,
+    );
+    met.ok("check shares", checked);
+    let nobody = Recovery::without_wallet();
+    let pattern = given
+        .dates
+        .replacen(FORGOTTEN_DIGIT.0, FORGOTTEN_DIGIT.1, 1);
+    met.text(&pattern);
+    let dates = nobody.date_search(
+        js(codes),
+        js("english"),
+        js("seedshift"),
+        js(&pattern),
+        f64::NAN,
+        16.0,
+    );
+    found_phrase(dates, "date search", met);
+    let (start, last) = given.phrase.rsplit_once(' ').unwrap_or((given.phrase, ""));
+    let forgotten = format!("{start} ?");
+    met.line('t', if last.is_empty() { "" } else { &forgotten });
+    let words = nobody.word_search(js(&forgotten), false, f64::NAN, f64::NAN);
+    found_phrase(words, "word search", met);
+    // The last digit of the first code unread: ten numbers, few of which keep the checksum.
+    let marked = format!(
+        "{}?{}",
+        &numbers[..numbers.find(' ').unwrap_or(1) - 1],
+        &numbers[numbers.find(' ').unwrap_or(1)..]
+    );
+    met.text(&marked);
+    let reading = ReadBackup::read(js(&marked), false, js(SHARE_READER), f64::NAN);
+    if let Some(reading) = met.ok("read marked codes", reading) {
+        met.gave("marked codes", reading.marked());
+        met.ok("marked forms", reading.marked_forms(JsValue::UNDEFINED));
+        met.ok(
+            "marked candidates",
+            reading.marked_candidates(js("indexes"), js("seedshift")),
+        );
+    }
+    let read = MarkedCodes::read(js(&marked), js("indexes"), js("seedshift"));
+    if let Some(read) = met.ok("marked codes read", read) {
+        met.ok("unreadable codes", read.unreadable());
+        met.ok("many codes", read.many());
+        met.ok("ways of codes", read.ways());
+        met.ok("way of codes", read.way(0.0));
+    }
+    let listed = nobody.marked_search(
+        js(&marked),
+        js("indexes"),
+        js("seedshift"),
+        js(given.dates),
+        true,
+    );
+    found_phrase(listed, "marked codes listed", met);
+    let fingerprint =
+        nobody.marked_by_fingerprint(js(&marked), js("indexes"), js("seedshift"), js("00000000"));
+    found_phrase(fingerprint, "marked codes by a fingerprint", met);
+    let evidence = WalletEvidence::master_fingerprint(FINGERPRINT);
+    if let Some(evidence) = met.ok("fingerprint evidence", evidence)
+        && let Some(wallet) = met.ok("wallet", evidence.recovery(js(given.passphrase)))
+    {
+        let pair = vec![js(&shares[0]), js(&shares[1])];
+        let restore =
+            wallet.restore_shares(pair, js("direct"), JsValue::UNDEFINED, js(SHARE_READER));
+        if let Some(found) = begun(restore, "restore shares", met) {
+            met.gave("restored phrase", found.phrase(0.0));
+            met.gave("repairs of a phrase", found.repairs(0.0));
+            met.ok("restored list", found.candidate_list(js(given.passphrase)));
+        }
+        let pair = vec![js(&shares[0]), js(&shares[1])];
+        let repair = wallet.repair_shares(
+            pair,
+            js("direct"),
+            JsValue::UNDEFINED,
+            js(SHARE_READER),
+            JsValue::UNDEFINED,
+        );
+        if let Some(found) = begun(repair, "repair shares", met) {
+            met.gave("repaired share", found.share(0.0));
+            met.gave("repaired record", found.record(0.0));
+        }
+        let by_wallet = wallet.marked_search(
+            js(&marked),
+            js("indexes"),
+            js("seedshift"),
+            js(&pattern),
+            false,
+        );
+        found_phrase(by_wallet, "marked codes by the wallet", met);
+    }
+    met.refused(
+        "date search in no form",
+        nobody.date_search(
+            js(codes),
+            js("no form"),
+            js("seedshift"),
+            js(&pattern),
+            f64::NAN,
+            f64::NAN,
+        ),
+    );
 }
 
 /// One walk through the secret entries. `input` holds a line each: the two phrases, the BIP39
@@ -562,6 +833,9 @@ fn entries(telling: bool, input: &str) -> String {
         phrase_entries(given, &mut met);
         wallet_entries(given, &mut met);
         qr_entries(phrase, &mut met);
+        if place == 0 {
+            cards::card_entries(phrase, &mut met);
+        }
         candidate_entries(&list, &mut met);
         share_entries(given, &mut met);
         first_list = first_list.or(Some(list));

@@ -6,11 +6,16 @@
 //! the published phrase and a masked backup split and restored. No published vector gives the
 //! shares of a seeded split, so none is compared with them (CORE-27). Public data only.
 
-use super::{Row, ok};
+use super::{Row, hint_text, ok};
 use crate::bip39::phrase::Phrase;
 use crate::dates::parse_date;
+use crate::forms::hints::WordHints;
 use crate::modes::Mode;
 use crate::random::{Random, RandomError};
+use crate::self_check::vectors::{
+    FIRST_SHARE_COLORS as FIRST_COLORS, FIRST_SHARE_UNICODE as FIRST_UNICODE, LONG_SHARES,
+    OFFICIAL_SHARES,
+};
 use crate::self_check::vectors::{MASKED_DATE, MASKED_ENGLISH, PUBLIC_MNEMONIC};
 use crate::self_check::{CheckFailure, Tier, expect_refused, expect_same};
 use crate::sskr::engine::{Group, combine, split_seeded};
@@ -22,25 +27,15 @@ use crate::sskr::set::read_set;
 use crate::sskr::share::Share;
 use crate::sskr::split::{split, split_backup};
 use crate::sskr::text::standard_bytewords;
-use crate::sskr::typed::{CompleteOutcome, ShareInput, TroubleKind};
+use crate::sskr::typed::{CompleteOutcome, ShareInput, TroubleKind, share_word_hints};
 use crate::text::hex::{bytes_of_hex, hex_of_bytes};
 
-/// The official BCR-2020-011 grouped vector: its shares and the secret they restore.
-pub(crate) const OFFICIAL_SHARES: [&str; 5] = [
-    "ur:sskr/gogrrsbyadaefmnlbnctaaecvoqdfnjpbzecstfgaxtifpsskbfw",
-    "ur:sskr/gogrrsbyadaohtrygabavahphnlrlpmkghwyiojkjtkpmdkncfjp",
-    "ur:sskr/gogrrsbybgaefywsfefhiymofseyihfremkivwsogrespmclwepd",
-    "ur:sskr/gogrrsbybgaootkoehgoztzcreloknrfvawyinssrksnmedtfmks",
-    "ur:sskr/gogrrsbybgaaiaeenbuyksetonswsstduoprvwrphkbytlfzlyca",
-];
+/// The secret that the official shares restore.
 pub(crate) const OFFICIAL_ENTROPY: &str = "7daa851251002874e1a1995f0897e6b1";
 /// Its first share in colors, word numbers and Unicode codes, computed independently, and its
 /// published Bytewords.
-const FIRST_COLORS: &str =
-    "#41C47E #42D1F0 #0981D6 #EE44D3 #7C4D62 #E75FF8 #955228 #F02D9B #CADD22 #670000";
 const FIRST_NUMBERS: &str =
     "527 288 1158 1328 5 1544 734 1605 1692 1812 710 1654 2045 598 582 241 365 1779 1467 551 897";
-const FIRST_UNICODE: &str = "9805 968E 70AE 555F 4E0D 7642 6751 7686 7709 75C7 5354 77FD 97CB 964D 670D 5E7E 7FA4 5410 4EF2 6CB3 5BEC";
 const FIRST_BYTEWORDS: &str = "tuna next keep gyro gear runs body acid able film nail barn cost aqua epic veto quad fern jump buzz epic slot frog apex taxi grim fern twin leaf";
 /// A set of one group, two of three, from the entropy 000102…0f (vectors/sskr-v1.json,
 /// "bip39-128-2-of-3"), the colors of its first two shares and the phrase of its entropy.
@@ -49,22 +44,17 @@ pub(crate) const SET_SHARES: [&str; 3] = [
     "ur:sskr/goemjzaeadadflihpkmhspcheycndschfhcmkelyvaveiesolrls",
     "ur:sskr/goemjzaeadaockjsrlamsebalrbysbjngeeysnplutlywdfytpwe",
 ];
-const SET_COLORS: [&str; 2] = [
+pub(super) const SET_COLORS: [&str; 2] = [
     "#8B0C06 #B0D4F5 #0CF800 #FA41D6 #37B8CA #1F9121 #DB206C #4FD8A1 #1BF322 #750000",
     "#64C984 #835170 #897D85 #7FC452 #853144 #E8135A #C542B2 #158738 #F19A47 #D30000",
 ];
 pub(crate) const SET_ENTROPY: &str = "000102030405060708090a0b0c0d0e0f";
-const SET_PHRASE: &str =
+pub(super) const SET_PHRASE: &str =
     "abandon amount liar amount expire adjust cage candy arch gather drum buyer";
 /// The public test-only seed of the engine's regression vector, and another, never randomness.
 pub(crate) const TEST_SEED: &str =
     "fffefdfcfbfaf9f8f7f6f5f4f3f2f1f0efeeedecebeae9e8e7e6e5e4e3e2e1e0";
 const OTHER_TEST_SEED: &str = "1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100";
-/// The first two shares of the set of the longest secret, 32 bytes ("bip39-256-2-of-3").
-pub(crate) const LONG_SHARES: [&str; 2] = [
-    "ur:sskr/hddaemjzaeadaebdfpwmtntkwlptsskispvwbkbwjnamsttssnpmhpfghdaonbcnfmjkrnltdnlarkmsrefllt",
-    "ur:sskr/hddaemjzaeadadtkaekkfmspcheycndschfhcmkelyvavefzfewezsvemdptaemestiazccybzjsveasreislp",
-];
 pub(crate) const LONG_ENTROPY: &str =
     "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 
@@ -90,7 +80,7 @@ pub(super) const SPLIT: Row = Row::new(
 );
 
 /// A public test-only seed in place of randomness.
-struct FixedSeed(&'static str);
+pub(super) struct FixedSeed(pub(super) &'static str);
 
 impl Random for FixedSeed {
     fn fill(&mut self, bytes: &mut [u8]) -> Result<(), RandomError> {
@@ -133,8 +123,8 @@ fn pairs<T: Copy>(items: &[T]) -> Vec<[T; 2]> {
         .collect()
 }
 
-/// The transport and quorum refusals, before every command.
-fn transport_startup() -> Result<(), CheckFailure> {
+/// The forms of a share, a set and its refusals: no engine is used.
+fn transport() -> Result<(), CheckFailure> {
     let first = share(OFFICIAL_SHARES[0])?;
     expect_same(
         standard_bytewords(first.payload()).as_str(),
@@ -188,11 +178,10 @@ fn expect_engine_refuses(payloads: &[&[u8]], name: &'static str) -> Result<(), C
     expect_refused(combine(payloads), "sskr.engine.combine", name)
 }
 
-fn integrity(tier: Tier) -> Result<(), CheckFailure> {
-    transport_startup()?;
-    if tier == Tier::Startup {
-        return Ok(());
-    }
+/// Every case at both tiers, since no share command and no page asks the engine for known answers
+/// of its own, as TS does before a split or a restore (CORE-27).
+fn integrity(_: Tier) -> Result<(), CheckFailure> {
+    transport()?;
     let first = share(OFFICIAL_SHARES[0])?;
     expect_same(
         ShareFormat::Colors.write(&first).as_str(),
@@ -264,6 +253,29 @@ fn integrity(tier: Tier) -> Result<(), CheckFailure> {
         .collect();
     let grouped: Vec<&[u8]> = impossible.iter().map(Vec::as_slice).collect();
     expect_engine_refuses(&grouped, "SSKR engine impossible group index")
+}
+
+/// The Word hints row's cases of a share being typed, in Bytewords and in colors.
+pub(super) fn share_hints() -> Result<(), CheckFailure> {
+    let hints = share_word_hints();
+    for (line, expected, name) in [
+        (
+            "tuna acid; ta",
+            "words taco task taxi",
+            "Bytewords of a share",
+        ),
+        (
+            "q",
+            "count 2 Bytewords begin with this letter",
+            "Count of Bytewords",
+        ),
+        // Run together they are read four letters at a time, the last begun one being typed.
+        ("tuna acid tunaac", "words acid", "Bytewords run together"),
+        ("#1A2B3C AB", "nothing", "Share in colors"),
+    ] {
+        expect_same(hint_text(&hints.hint(line)).as_str(), expected, name)?;
+    }
+    Ok(())
 }
 
 /// `text` with the element written `element` marked as `mark`.

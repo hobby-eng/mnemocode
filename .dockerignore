@@ -1,0 +1,8 @@
+.git
+dist
+target
+release-signing-*
+export-*
+output
+test-results
+docs/audits/*-evidence

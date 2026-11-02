@@ -52,7 +52,9 @@ pub trait Random {
 
     /// A uniform choice of a whole number below `upper`: without bias, by drawing again a value that
     /// falls in the incomplete last range, as node:crypto's randomInt does, though not from the
-    /// same bytes (Node draws 48-bit values). A source that replays TS's choices overrides this.
+    /// same bytes (Node draws 48-bit values). A source that replays TS's choices overrides this,
+    /// and keeps its result below `upper`: every caller takes it as an index of what it chooses
+    /// from, unchecked (CORE-54), since the source of an executable or a page never overrides it.
     fn below(&mut self, upper: u32) -> Result<u32, RandomError> {
         if upper == 0 {
             return Err(RandomError::EmptyRange);

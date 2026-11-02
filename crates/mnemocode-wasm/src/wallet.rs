@@ -10,7 +10,9 @@ use mnemocode::bip32::ExtendedKey;
 use mnemocode::bip39::phrase::Phrase;
 use mnemocode::checks::Part;
 use mnemocode::wallet::coins::{AddressLocation, COINS, Coin};
-use mnemocode::wallet::evidence::{BitcoinNetwork, BitcoinProfile, Evidence, Place, WalletMatch};
+#[cfg(feature = "coin-bitcoin")]
+use mnemocode::wallet::evidence::{BitcoinNetwork, BitcoinProfile, Place};
+use mnemocode::wallet::evidence::{Evidence, WalletMatch};
 use wasm_bindgen::prelude::*;
 
 use crate::host::{after_secret, optional_text, refused, self_check, text, whole};
@@ -26,9 +28,11 @@ pub struct WalletCheck(WalletMatch);
 /// Where a Bitcoin key is looked for: the network, the profiles, the place of the first key and
 /// how many addresses from it are compared, checked when it is made. A WIF, which is secret, takes
 /// these as numbers and names instead: no class crosses beside a secret.
+#[cfg(feature = "coin-bitcoin")]
 #[wasm_bindgen]
 pub struct WalletPlace(Place);
 
+#[cfg(feature = "coin-bitcoin")]
 #[wasm_bindgen]
 impl WalletPlace {
     /// The place on `network`, under `profiles`, from `account`, `branch` and `index`, compared
@@ -54,6 +58,7 @@ impl WalletPlace {
 }
 
 /// The network `name` names.
+#[cfg(feature = "coin-bitcoin")]
 fn network(name: &str) -> Result<BitcoinNetwork, JsValue> {
     BitcoinNetwork::named(name).map_err(|refusal| refused(&refusal))
 }
@@ -70,6 +75,7 @@ fn addresses(count: f64) -> Option<u64> {
 }
 
 /// The place that `network`, `profiles` and the location give.
+#[cfg(feature = "coin-bitcoin")]
 fn place(
     network_name: &str,
     profiles: &str,
@@ -99,6 +105,7 @@ impl WalletEvidence {
     }
 
     /// A master extended public key of `network`.
+    #[cfg(feature = "coin-bitcoin")]
     #[wasm_bindgen(js_name = masterKey)]
     pub fn master_key(text: &str, network_name: &str) -> Result<WalletEvidence, JsValue> {
         Evidence::master_key(text, network(network_name)?)
@@ -181,6 +188,19 @@ impl WalletEvidence {
             .map_err(|refusal| refused(&refusal))
     }
 
+    /// The searches of recovery compared with this wallet and its BIP39 `passphrase` (undefined:
+    /// empty).
+    #[cfg(feature = "browser-recovery")]
+    pub fn recovery(&self, passphrase: JsValue) -> Result<crate::recovery::Recovery, JsValue> {
+        after_secret(|| {
+            let check = mnemocode::recovery::wallet_check::WalletCheck::new(
+                self.0.clone(),
+                &optional_text(&passphrase)?,
+            );
+            Ok(crate::recovery::Recovery::of(check))
+        })
+    }
+
     /// The evidence compared with the keys of `phrase` and its BIP39 `passphrase` (undefined:
     /// empty). Both are read inside the call, so that a freed evidence is refused before either
     /// is copied.
@@ -259,7 +279,7 @@ mod tests {
                 .unwrap()
                 .matched()
         );
-        // Every build checks master keys, with or without Bitcoin.
+        // Every build checks a fingerprint, with or without Bitcoin.
         assert!(self_check_wallet(true).is_ok());
     }
 

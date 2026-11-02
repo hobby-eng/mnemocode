@@ -105,6 +105,7 @@ windows-sys = "=0.61.2"
 wasm-bindgen = "=0.2.129"
 # Tests only: the recorded TS answers are JSON (vectors/ts-0.1.0/).
 serde_json = "=1.0.154"
+portable-pty = "=0.9.0"
 
 # RUST-12, as mhfe.
 [profile.release]

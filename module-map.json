@@ -1,5 +1,5 @@
 {
-  "about": "Module and dependency map of the Rust MnemoCode (docs/design/architect/ARCHITECTURE.md sections 2 and 3), read by the code-rules gate (cargo xtask code-rules). layers: a library module may use the foundation and the modules listed for it ('*': every module); a module of mnemocode-cards or mnemocode-cli uses only the modules before it in 'order'; every listed edge of an existing library module is used. deps: each crate's direct dependencies per target, its devDependencies for its tests, and refusedInTree for every artifact. unsafe: 'forbid' in the crate root, or 'deny' with allow(unsafe_code) only in the files and folders of allowedIn (paths relative to the crate, a folder ending in /). ioModules: the only CLI files and folders whose top may expect clippy's disallowed std methods and types, besides test modules and integration test files.",
+  "about": "Module and dependency map of the Rust MnemoCode (docs/design/architect/ARCHITECTURE.md sections 2 and 3), read by the code-rules gate (cargo xtask code-rules). layers: a library module may use the foundation and the modules listed for it ('*': every module); a module of mnemocode-cards or mnemocode-cli uses only the modules before it in 'order'; every listed edge of an existing library module is used. deps: each crate's direct dependencies per target, its devDependencies for its tests, and refusedInTree for every artifact. unsafe: 'forbid' in the crate root, or 'deny' with allow(unsafe_code) only in the files and folders of allowedIn (paths relative to the crate, a folder ending in /). ioModules: the only CLI files and folders whose top may expect clippy's disallowed std methods and types, besides test modules and integration test files. ownRefusalCodes: each code that the port writes and TS's catalogs do not hold, with why.",
   "crates": {
     "mnemocode": {
       "unsafe": {
@@ -143,9 +143,15 @@
           "miniz_oxide",
           "jpeg-encoder",
           "zune-jpeg",
-          "libm"
+          "libm",
+          "unicode-normalization",
+          "unicode-properties",
+          "unicode-script"
         ]
       },
+      "devDependencies": [
+        "serde_json"
+      ],
       "library": [
         "foundation",
         "bip39",
@@ -154,12 +160,13 @@
         "modes",
         "backup",
         "sskr",
-        "qr"
+        "qr",
+        "checks"
       ],
       "order": [
         "assets",
-        "settings",
         "text_rules",
+        "settings",
         "palette",
         "scene",
         "pdf",
@@ -171,7 +178,8 @@
         "plan",
         "heir",
         "export",
-        "preflight"
+        "preflight",
+        "checks"
       ]
     },
     "mnemocode-cli": {
@@ -208,6 +216,10 @@
         "menu",
         "main"
       ],
+      "devDependencies": [
+        "serde_json",
+        "portable-pty"
+      ],
       "ioModules": [
         "src/os.rs",
         "src/os/",
@@ -243,7 +255,8 @@
           "host"
         ],
         "wallet": [
-          "host"
+          "host",
+          "recovery"
         ],
         "sskr": [
           "host"
@@ -252,6 +265,9 @@
           "host"
         ],
         "candidates": [
+          "host"
+        ],
+        "words": [
           "host"
         ],
         "qr": [
@@ -266,7 +282,10 @@
           "wallet",
           "sskr",
           "candidates",
-          "qr"
+          "qr",
+          "recovery",
+          "cards",
+          "words"
         ]
       }
     },
@@ -353,5 +372,37 @@
       "copypasta",
       "clipboard"
     ]
+  },
+  "ownRefusalCodes": {
+    "export.pdf-documents.font-not-embedded": "the writer of a PDF: TS's pdf-lib has no such refusal",
+    "export.pdf-documents.not-written": "a sink of a PDF that refuses a write: TS keeps a PDF in memory",
+    "export.image-export.page-not-drawn": "the drawing of a page image: TS's Poppler has its own failures",
+    "cli.protection.private-screen-required": "the owner's refusal of a secret result without a private screen (PLAN.md)",
+    "cli.output-paths.outside-ruled-folders": "the owner's refusal of a retry outside the ruled folders (PLAN.md)",
+    "not-utf8": "TS writes it outside its catalogs",
+    "too-large": "TS writes it outside its catalogs",
+    "ambiguous-marks": "TS writes it outside its catalogs",
+    "share-variants": "TS writes it outside its catalogs",
+    "left-staging-copy": "TS writes it outside its catalogs",
+    "failed-save-left-staging-copy": "TS writes it outside its catalogs",
+    "failed-save-left-reservation": "TS writes it outside its catalogs",
+    "cli.signal": "a read that a signal stopped, which ends the command before anything shows it",
+    "cli.terminal": "a read of the terminal that failed, which ends the command as cancelled",
+    "cli.file-system": "the file system's own words",
+    "wasm.cards.no-such-part": "a part that a page names and the binding has not",
+    "wasm.recovery.no-wallet": "a search by the wallet without one, which TS's types refuse",
+    "core.bip32.invalid-master-key": "a seed that gives no key, one in 2^127: TS's library throws its own",
+    "core.bip32.invalid-child-key": "a child key that does not exist, one in 2^127: TS's library throws its own",
+    "core.candidate-list.no-candidate-at-place": "ADR 0004",
+    "core.masking.missing-checksum": "ADR 0004",
+    "core.random.unavailable": "ADR 0004",
+    "core.random.empty-range": "ADR 0004",
+    "core.secret.capacity-exceeded": "ADR 0004",
+    "sskr.engine.group": "the linked engine's refusal, which TS's WebAssembly reports by its message",
+    "sskr.engine.specification": "the linked engine's refusal",
+    "sskr.engine.secret": "the linked engine's refusal",
+    "sskr.engine.generate": "the linked engine's refusal",
+    "sskr.engine.combine": "the linked engine's refusal",
+    "sskr.engine.no-shares": "the linked engine's refusal"
   }
 }

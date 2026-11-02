@@ -6,6 +6,7 @@
 
 use std::fmt;
 
+use super::admission::FileRefusal;
 use crate::bip39::phrase::Phrase;
 use crate::checksum::crc32;
 use crate::refusal::{Refusal, RefusalKind};
@@ -14,6 +15,8 @@ use crate::secret::{SecretBytes, SecretText};
 
 /// The first bytes of every list.
 const MAGIC: [u8; 4] = *b"MNCL";
+/// The code of a list that cannot hold its candidates.
+pub const TOO_MANY_FOR_LIST: &str = "core.candidate-list.too-many-for-list";
 /// The format's version.
 const VERSION: u8 = 1;
 /// One passphrase for every candidate.
@@ -26,6 +29,12 @@ pub const MAX_CANDIDATE_RECORDS: usize = 1 << 19;
 pub const MAX_PASSPHRASE_BYTES: usize = 256;
 /// The candidates a search keeps: one more than a list holds, to tell that it overflowed.
 pub const LIST_KEEP: usize = MAX_CANDIDATE_RECORDS + 1;
+
+/// Whether one list holds `count` candidates.
+#[must_use]
+pub const fn candidate_list_holds(count: u64) -> bool {
+    count <= MAX_CANDIDATE_RECORDS as u64
+}
 /// The entropy lengths of BIP39, in bytes.
 const ENTROPY_LENGTHS: [usize; 5] = [16, 20, 24, 28, 32];
 /// The header: magic, version, flags, entropy length and a 32-bit count.
@@ -164,8 +173,8 @@ impl Refusal for ListError {
             Self::WrongRecordCount => "core.candidate-list.candidate-list-wrong-record-count",
             Self::Damaged => "core.candidate-list.candidate-list-damaged-crc-32-does-not-match",
             Self::WrongPadding => "core.candidate-list.candidate-list-wrong-padding",
-            Self::TooLarge => "core.candidate-file-refusal.plaintext-list-too-large",
-            Self::TooManyForList(_) => "core.candidate-list.too-many-for-list",
+            Self::TooLarge => FileRefusal::PlaintextTooLarge.code(),
+            Self::TooManyForList(_) => TOO_MANY_FOR_LIST,
             Self::NoCandidate => "core.candidate-list.no-candidate-at-place",
         }
     }
@@ -211,6 +220,11 @@ pub(super) fn checked_passphrase(
         }
         Some(text) => Ok(Some(SecretText::copy_of("a list's passphrase", text))),
     }
+}
+
+/// Refuses a BIP39 passphrase that a list could not hold.
+pub fn check_list_passphrase(passphrase: &str) -> Result<(), ListError> {
+    checked_passphrase(Some(passphrase), "BIP39 passphrase that the list stores").map(|_| ())
 }
 
 impl CandidateList {

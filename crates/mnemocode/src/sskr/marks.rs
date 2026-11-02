@@ -12,7 +12,7 @@ use super::repair::units::{
     MAX_REPAIR_UNITS, Structure, mixed_unit_counts, own_unit_count, structures_of,
 };
 use super::share::ur_prefix_end;
-use crate::bip39::table::unicode_code;
+use crate::bip39::table::unicode_codes_fitting;
 use crate::checksum::CRC32_BYTES;
 use crate::forms::colors::{
     COLOR_UNICODE_BASE, COLOR_UNICODE_POINTS_PER_COLOR, COLOR_UNICODE_WIDTH, RGB_HEX_DIGITS,
@@ -278,13 +278,6 @@ fn add_ur_model(models: &mut Vec<UnitModel>, text: &str) {
     }
 }
 
-/// The word indexes whose Unicode code fits `pattern`, a ? for each digit not read.
-fn unicode_codes_fitting(pattern: &str) -> Vec<u32> {
-    (0..2048_u32)
-        .filter(|&index| fits_pattern(pattern, &unicode_code(index as usize)))
-        .collect()
-}
-
 /// Unicode codes of words, apart or run together; a code read in part is unknown as a whole, and
 /// the words whose code fits it are its candidates.
 fn add_unicode_model(models: &mut Vec<UnitModel>, text: &str) {
@@ -296,7 +289,14 @@ fn add_unicode_model(models: &mut Vec<UnitModel>, text: &str) {
     };
     let candidates: Vec<Option<Vec<u32>>> = codes
         .iter()
-        .map(|code| read_in_part(code).then(|| unicode_codes_fitting(code)))
+        .map(|code| {
+            read_in_part(code).then(|| {
+                unicode_codes_fitting(code)
+                    .into_iter()
+                    .map(u32::from)
+                    .collect()
+            })
+        })
         .collect();
     if candidates.iter().flatten().any(Vec::is_empty) {
         return;

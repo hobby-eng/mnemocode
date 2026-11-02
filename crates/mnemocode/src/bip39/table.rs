@@ -9,6 +9,7 @@ use bip39::Language;
 
 use super::sizes::{DICTIONARY_SIZE, WORD_NUMBER_RANGE};
 use crate::refusal::Refusal;
+use crate::text::codes::fits_pattern;
 use crate::text::numbers::whole_number_of;
 use crate::text::space::trim;
 
@@ -179,6 +180,13 @@ pub fn chinese() -> &'static [&'static str; DICTIONARY_SIZE] {
 /// The Unicode code of a character: four or more upper-case hexadecimal digits.
 pub fn hex_code_point(character: char) -> String {
     format!("{:04X}", u32::from(character))
+}
+
+/// The word indexes whose Unicode code fits `pattern`, a ? for each digit not read.
+pub fn unicode_codes_fitting(pattern: &str) -> Vec<u16> {
+    (0..DICTIONARY_SIZE as u16)
+        .filter(|&index| fits_pattern(pattern, &unicode_code(usize::from(index))))
+        .collect()
 }
 
 /// The Unicode code of the word at `index`, from 0.

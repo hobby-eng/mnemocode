@@ -18,7 +18,7 @@
 mod probe;
 
 use std::fmt::Write as _;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use serde_json::Value;
@@ -130,7 +130,7 @@ pub(crate) fn binding_modules(root: &Path) -> Result<Vec<String>, Failure> {
 }
 
 /// The remapping flags for the builder's directories, refused where RUSTFLAGS would replace them.
-fn remapped_rustflags(root: &Path) -> Result<Vec<(String, String)>, Failure> {
+pub(crate) fn remapped_rustflags(root: &Path) -> Result<Vec<(String, String)>, Failure> {
     if std::env::var_os("RUSTFLAGS").is_some()
         || std::env::var_os("CARGO_ENCODED_RUSTFLAGS").is_some()
     {
@@ -180,6 +180,22 @@ fn remapped_rustflags(root: &Path) -> Result<Vec<(String, String)>, Failure> {
         .collect())
 }
 
+/// What cargo says of the workspace.
+pub(crate) fn metadata(root: &Path) -> Result<Value, Failure> {
+    serde_json::from_str(&output_of(
+        root,
+        "cargo",
+        &["metadata", "--locked", "--no-deps", "--format-version", "1"],
+    )?)
+    .map_err(|error| Failure(format!("cargo metadata: {error}")))
+}
+
+/// The folder that cargo builds into.
+pub(crate) fn target_folder(root: &Path) -> Result<PathBuf, Failure> {
+    let metadata = metadata(root)?;
+    Ok(Path::new(metadata["target_directory"].as_str().unwrap_or("target")).to_path_buf())
+}
+
 /// Builds the file of the profile `name`.
 pub(crate) fn build(root: &Path, name: &str) -> Result<(), Failure> {
     let profile = profiles(root)?
@@ -220,13 +236,7 @@ pub(crate) fn build(root: &Path, name: &str) -> Result<(), Failure> {
             "the WebAssembly of {name} did not build ({status})"
         )));
     }
-    let metadata: Value = serde_json::from_str(&output_of(
-        root,
-        "cargo",
-        &["metadata", "--locked", "--no-deps", "--format-version", "1"],
-    )?)
-    .map_err(|error| Failure(format!("cargo metadata: {error}")))?;
-    let target = Path::new(metadata["target_directory"].as_str().unwrap_or("target")).to_path_buf();
+    let target = target_folder(root)?;
     let out = root.join("dist/wasm").join(name);
     if out.exists() {
         std::fs::remove_dir_all(&out)?;
@@ -256,6 +266,68 @@ pub(crate) fn build(root: &Path, name: &str) -> Result<(), Failure> {
     write_manifest(root, &out, name, &profile)?;
     println!("Built dist/wasm/{name}");
     Ok(())
+}
+
+/// The word that the bytes of a file show of a part they must leave out (CORE-31): a module by a
+/// text only it holds, a design by its id, a coin by the name its texts give it; a coin's id, such
+/// as `tron` in the word `strong`, tells nothing.
+fn word_of_part(part: &str) -> Option<&str> {
+    match part {
+        "cards" => Some("VECTOR STUDIO"),
+        "sskr" => Some("ur:sskr/"),
+        "coin-bitcoin" => Some("Bitcoin"),
+        "coin-bitcoin-cash" => Some("Bitcoin Cash"),
+        "coin-cosmos" => Some("Cosmos"),
+        "coin-dash" => Some("Dash"),
+        "coin-dogecoin" => Some("Dogecoin"),
+        "coin-ethereum" => Some("Ethereum"),
+        "coin-ethereum-classic" => Some("Ethereum Classic"),
+        "coin-injective" => Some("Injective"),
+        "coin-litecoin" => Some("Litecoin"),
+        "coin-tron" => Some("Tron"),
+        "coin-xrp" => Some("XRP"),
+        "coin-zcash" => Some("Zcash"),
+        _ => part.strip_prefix("template-"),
+    }
+}
+
+/// Whether `bytes` hold `word`, apart from BIP32's key of every master key, which names Bitcoin in
+/// every build.
+fn holds_word(bytes: &[u8], word: &str) -> bool {
+    bytes
+        .windows(word.len())
+        .enumerate()
+        .any(|(at, window)| window == word.as_bytes() && !bytes[at..].starts_with(b"Bitcoin seed"))
+}
+
+/// The problems of the file `bytes` of the profile `name`: a word of a part that another profile
+/// holds and it leaves out.
+fn left_out_problems(
+    name: &str,
+    bytes: &[u8],
+    profile: &Profile,
+    all: &[(String, Profile)],
+) -> Vec<String> {
+    let parts = all
+        .iter()
+        .flat_map(|(_, other)| other.modules.iter().chain(&other.units));
+    let mut seen: Vec<&String> = Vec::new();
+    let mut problems = Vec::new();
+    for part in parts {
+        let held = profile.modules.contains(part) || profile.units.contains(part);
+        if held || seen.contains(&part) {
+            continue;
+        }
+        seen.push(part);
+        if let Some(word) = word_of_part(part)
+            && holds_word(bytes, word)
+        {
+            problems.push(format!(
+                "{name}: holds {word} of {part}, which it leaves out"
+            ));
+        }
+    }
+    problems
 }
 
 /// Builds every profile's file.
@@ -616,7 +688,8 @@ fn verify_profile(
     let mut expected: Vec<String> = profile
         .modules
         .iter()
-        .flat_map(|module| strings(&exports[module.as_str()]).unwrap_or_default())
+        .chain(&profile.units)
+        .flat_map(|part| strings(&exports[part.as_str()]).unwrap_or_default())
         .chain(["initSync".to_owned()])
         .collect();
     expected.sort();
@@ -658,6 +731,8 @@ pub(crate) fn verify(root: &Path) -> Result<(), Failure> {
     }
     for (name, profile) in &all {
         verify_profile(root, name, profile, &exports, &mut problems)?;
+        let wasm = std::fs::read(root.join("dist/wasm").join(name).join("mnemocode.wasm"))?;
+        problems.extend(left_out_problems(name, &wasm, profile, &all));
     }
     report(
         &problems,
@@ -697,6 +772,15 @@ mod tests {
             functions_in("async function __wbg_load(m) {}\nfunction initSync(module) {"),
             ["__wbg_load", "initSync"]
         );
+    }
+
+    #[test]
+    fn a_left_out_coin_shows_by_its_name_but_not_by_the_key_of_bip32() {
+        assert!(holds_word(b"not valid for Bitcoin mainnet", "Bitcoin"));
+        assert!(!holds_word(b"key: Bitcoin seed.", "Bitcoin"));
+        assert!(holds_word(b"Bitcoin seed and Bitcoin network", "Bitcoin"));
+        assert_eq!(word_of_part("coin-tron"), Some("Tron"));
+        assert!(!holds_word(b"the word strong", "Tron"));
     }
 
     #[test]

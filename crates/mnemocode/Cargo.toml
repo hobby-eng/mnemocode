@@ -13,6 +13,9 @@ publish.workspace = true
 [features]
 default = [
   "sskr",
+  "search-date",
+  "search-word",
+  "search-marked-codes",
   "coin-bitcoin",
   "coin-bitcoin-cash",
   "coin-cosmos",
@@ -30,6 +33,10 @@ default = [
 any-coin = []
 # Shamir shares (SSKR): the vendored engine and its seeded generator.
 sskr = ["dep:sskr", "dep:bc-rand", "dep:rand_chacha", "dep:rand_core"]
+# The searches of recovery; the readers they share are always built.
+search-date = []
+search-word = []
+search-marked-codes = ["search-date"]
 coin-bitcoin = ["any-coin"]
 coin-bitcoin-cash = ["any-coin"]
 coin-cosmos = ["any-coin"]
@@ -82,3 +89,20 @@ serde_json.workspace = true
 
 [lints]
 workspace = true
+
+# The helpers that the replays share read share reports.
+[[test]]
+name = "ts_foundation"
+required-features = ["sskr"]
+
+[[test]]
+name = "ts_recovery"
+required-features = ["sskr"]
+
+[[test]]
+name = "ts_recovery_shares"
+required-features = ["sskr"]
+
+[[test]]
+name = "ts_shares"
+required-features = ["sskr"]

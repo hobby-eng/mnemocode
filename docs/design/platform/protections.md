@@ -38,7 +38,7 @@ refusal and primary sources, is in `protections.json` (66 measures: 32 required,
    preflight makes a missing parent, with any missing folders above it, before the secret (owner, 2026-10-27;
    TS makes them at publication, `private-file.ts:271`), and those stay after a cancel, since a
    Landlocked process cannot remove the folder its rule sits on. It applies on the private screen too: re-encode asks its outputs before
-   the old phrase, and the save retry keeps to the ruled folders. No network namespace: on the release targets it closes no path the socket
+   the old phrase, a second Landlock restriction rules them before that phrase is read, and the save retry keeps to the ruled folders. No network namespace: on the release targets it closes no path the socket
    filter leaves open (owner, 2026-10-27; RUST-10 amended). No `execve` denial on Linux or in Seatbelt, and no
    limit on child processes in the Windows job: filters, Landlock domains, the Seatbelt profile and the job
    pass to a started program, which gains nothing the process lacks (owner, 2026-10-27; TS 0.1.0 has all three).
@@ -62,8 +62,8 @@ refusal and primary sources, is in `protections.json` (66 measures: 32 required,
    removes the staging folders and exits with 128 + the signal (130 and "Cancelled." for SIGINT,
    as TS, and for SIGQUIT, as mhfe): removing folders is not async-signal-safe, and a handler that
    redrew the screen could let the main thread finish a secret line on the main screen. SIGTSTP
-   restores the terminal, clears and leaves the private screen, then stops; on continue the
-   program takes raw mode and the private screen again and redraws. mhfe's SIGTSTP-to-SIGINT would
+   gives the terminal back from raw mode, then stops the process group; on continue raw mode comes
+   back, and the private screen, which stayed up, needs no drawing. mhfe's SIGTSTP-to-SIGINT would
    end the search that TS suspends (`CAP-CLI-LONG-SEARCH-CONTROL`, RUST-14). Windows: the console
    handler sets the same flag and, for a closed console, waits for the cleanup within the system's
    5 s. Without a private screen a secret result is refused when standard output is a terminal and

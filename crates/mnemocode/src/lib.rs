@@ -24,6 +24,7 @@ pub mod modes;
 pub mod pack;
 pub mod qr;
 pub mod random;
+pub mod recovery;
 pub mod refusal;
 pub mod search;
 pub mod secret;

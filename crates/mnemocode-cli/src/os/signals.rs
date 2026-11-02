@@ -2,9 +2,10 @@
 //! only set a flag, without SA_RESTART, so that the main thread's terminal read returns with EINTR
 //! and the main thread itself restores the terminal, leaves the private screen and removes the
 //! staging folders, which is not async-signal-safe, then exits with 128 + the signal (130 and
-//! "Cancelled." for SIGINT and SIGQUIT). SIGTSTP from outside sets its own flag; the main thread
-//! then restores the terminal and stops ([`suspend_now`]). On Windows the console handler sets the
-//! same flag and, for a closed console, waits up to the system's 5 s for the cleanup.
+//! "Cancelled." for SIGINT and SIGQUIT). SIGTSTP has its default, which stops the process at once,
+//! unless raw mode is on: there it sets its own flag, and the main thread restores the terminal and
+//! stops ([`suspend_now`]). On Windows the console handler sets the same flag and, for a closed
+//! console, waits up to the system's 5 s for the cleanup.
 
 #![allow(
     unsafe_code,
@@ -81,6 +82,19 @@ pub(crate) fn pending_signal() -> Option<Signal> {
     Signal::of_index(PENDING.load(Ordering::SeqCst))
 }
 
+/// Records a Ctrl+C read among keys that nothing else will read.
+pub(crate) fn cancel() {
+    record(Signal::Interrupt);
+}
+
+/// Forgets a Ctrl+C that was meant for a command, which has ended: it cancels nothing here. An
+/// ending signal stays.
+pub(crate) fn forget_cancel() {
+    if pending_signal().is_some_and(Signal::is_cancel) {
+        PENDING.store(0, Ordering::SeqCst);
+    }
+}
+
 /// Says that the cleanup after a signal is done, so that a waiting console handler lets Windows
 /// close the console.
 pub(crate) fn cleanup_done() {
@@ -121,27 +135,32 @@ mod system {
         on_signal as extern "C" fn(libc::c_int) as libc::sighandler_t
     }
 
-    /// The handlers of SIGINT, SIGQUIT, SIGTERM, SIGHUP and SIGTSTP; whether all read back.
+    /// The handlers of SIGINT, SIGQUIT, SIGTERM and SIGHUP; whether all read back.
     pub(super) fn handle_signals() -> bool {
-        [
-            libc::SIGINT,
-            libc::SIGQUIT,
-            libc::SIGTERM,
-            libc::SIGHUP,
-            libc::SIGTSTP,
-        ]
-        .into_iter()
-        // Every handler is installed, whether or not an earlier one was refused.
-        .filter(|&signal| !install(signal, handler()))
-        .count()
+        [libc::SIGINT, libc::SIGQUIT, libc::SIGTERM, libc::SIGHUP]
+            .into_iter()
+            // Every handler is installed, whether or not an earlier one was refused.
+            .filter(|&signal| !install(signal, handler()))
+            .count()
             == 0
     }
 
-    /// Stops the process as SIGTSTP's default would, and takes the handler again once continued.
+    /// Gives SIGTSTP its default, or the handler that raw mode needs: nothing but raw mode has a
+    /// terminal to restore before the process stops.
+    pub(super) fn suspend_by_default(default: bool) {
+        install(
+            libc::SIGTSTP,
+            if default { libc::SIG_DFL } else { handler() },
+        );
+    }
+
+    /// Stops the process group as SIGTSTP's default would, so that a shell sees its job stopped
+    /// whatever the pipe it stands in, and takes the handler again once continued.
     pub(super) fn stop() {
         install(libc::SIGTSTP, libc::SIG_DFL);
-        // SAFETY: raise takes a signal number; the process stops until SIGCONT.
-        unsafe { libc::raise(libc::SIGTSTP) };
+        // SAFETY: kill takes a process group, 0 for this one, and a signal number; the process
+        // stops until SIGCONT.
+        unsafe { libc::kill(0, libc::SIGTSTP) };
         install(libc::SIGTSTP, handler());
     }
 }
@@ -192,6 +211,9 @@ mod system {
 
     /// Windows has no stop signal.
     pub(super) fn stop() {}
+
+    /// Windows has no stop signal.
+    pub(super) fn suspend_by_default(_default: bool) {}
 }
 
 /// Installs the handlers; whether every one reads back as set.
@@ -199,8 +221,13 @@ pub(crate) fn handle_signals() -> bool {
     system::handle_signals()
 }
 
+/// Gives SIGTSTP its default, or, while raw mode is on, the handler.
+pub(super) fn suspend_by_default(default: bool) {
+    system::suspend_by_default(default);
+}
+
 /// Whether SIGTSTP asked the command to stop; the caller restores the terminal first, then calls
-/// [`suspend_now`], and takes the terminal and redraws once it returns.
+/// [`suspend_now`], and takes the terminal again once it returns.
 pub(crate) fn suspend_requested() -> bool {
     SUSPEND.load(Ordering::SeqCst)
 }

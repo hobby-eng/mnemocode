@@ -4,8 +4,9 @@
 //! used, each refusal one warning line that never repeats what was typed. Only the person leaves: Ctrl+C, Escape in
 //! a secret question, or the end of the input.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use mnemocode::qr::admission::MAX_PNG_BYTES;
 use mnemocode::refusal::Refusal;
 use mnemocode::secret::{SecretBytes, SecretText};
 use mnemocode::text::space::trim;
@@ -14,8 +15,8 @@ use mnemocode::text::widths::text_width;
 
 use crate::os::{self, FileError};
 use crate::terminal::{
-    self, Channel, Keys, LineOptions, LineOutcome, NoticeKind, error_raw, notice, notice_lines,
-    on_private_screen, read_line, remember_warning, step_begin, terminal_available,
+    self, Keys, LineOptions, LineOutcome, NoticeKind, error_raw, notice_lines, on_private_screen,
+    read_line, remember_warning, step_begin, terminal_available, type_hint, write_prompt,
 };
 
 /// Where a secret can come from without a terminal, as the refusals of a question say it.
@@ -38,7 +39,7 @@ pub(crate) enum InputError {
     /// The text is not UTF-8.
     NotUtf8(String),
     /// A signal ended the command.
-    Signal(os::Signal),
+    Signal,
     /// The terminal failed.
     Terminal(String),
 }
@@ -59,7 +60,7 @@ impl std::fmt::Display for InputError {
                 f.write_str("Use a local text file path or type the text itself.")
             }
             Self::NotUtf8(message) | Self::Terminal(message) => f.write_str(message),
-            Self::Signal(_) => f.write_str("Cancelled."),
+            Self::Signal => f.write_str("Cancelled."),
         }
     }
 }
@@ -74,7 +75,7 @@ impl Refusal for InputError {
             Self::File(error) => error.code(),
             Self::LocalFileRequired => "cli.text-file.local-file-required",
             Self::NotUtf8(_) => "not-utf8",
-            Self::Signal(_) => "cli.signal",
+            Self::Signal => "cli.signal",
             Self::Terminal(_) => "cli.terminal",
         }
     }
@@ -89,11 +90,14 @@ impl From<FileError> for InputError {
 impl From<terminal::Interrupted> for InputError {
     fn from(interrupted: terminal::Interrupted) -> Self {
         match interrupted {
-            terminal::Interrupted::Signal(signal) => Self::Signal(signal),
+            terminal::Interrupted::Signal(_) => Self::Signal,
             terminal::Interrupted::Failed(error) => Self::Terminal(error.to_string()),
         }
     }
 }
+
+/// The scheme of a link to a file.
+const FILE_SCHEME: &str = "file:";
 
 /// The text of a file option: the file at `path`, or standard input for "-", at most `limit`
 /// bytes of strict UTF-8, into a locked buffer; `what` names it in a refusal. A byte order mark and
@@ -106,10 +110,7 @@ pub(crate) fn read_input_text(
     let bytes = if path == "-" {
         read_standard_input(limit)?
     } else {
-        let resolved = os::resolve(
-            &dropped_path(path),
-            terminal::environment().current.as_deref(),
-        );
+        let resolved = os::resolve(Path::new(path), terminal::environment().current.as_deref());
         os::read_secret_file(&resolved, limit, what, false)?
     };
     let name = if path == "-" {
@@ -118,6 +119,42 @@ pub(crate) fn read_input_text(
         what
     };
     text_of(bytes, name)
+}
+
+/// The text of a local file at `path`, at most `limit` bytes of strict UTF-8.
+pub(crate) fn read_input_path(
+    path: &Path,
+    what: &'static str,
+    limit: usize,
+) -> Result<SecretText, InputError> {
+    let resolved = os::resolve(path, terminal::environment().current.as_deref());
+    text_of(os::read_secret_file(&resolved, limit, what, false)?, what)
+}
+
+/// Refuses, without reading it, a file at `path` that the program cannot read, as the read would.
+pub(crate) fn check_readable(path: &Path, what: &'static str) -> Result<(), InputError> {
+    let resolved = os::resolve(path, terminal::environment().current.as_deref());
+    match os::look_at_file(&resolved) {
+        Ok(
+            os::FileLook::Nothing
+            | os::FileLook::File {
+                readable: false, ..
+            },
+        )
+        | Err(_) => Err(os::FileError::Unreadable(what).into()),
+        Ok(_) => Ok(()),
+    }
+}
+
+/// The bytes of the PNG file of a QR code at `path`, for the library's strict reader.
+pub(crate) fn read_qr_bytes(path: &Path) -> Result<SecretBytes, InputError> {
+    let resolved = os::resolve(path, terminal::environment().current.as_deref());
+    Ok(os::read_secret_file(
+        &resolved,
+        MAX_PNG_BYTES,
+        "The QR PNG input",
+        false,
+    )?)
 }
 
 /// Standard input, read to its end within `limit`.
@@ -146,6 +183,116 @@ fn text_of(bytes: SecretBytes, what: &str) -> Result<SecretText, InputError> {
     }
     SecretText::from_bytes(bytes)
         .map_err(|_| InputError::NotUtf8(mnemocode::text::utf8::not_utf8_text(what)))
+}
+
+/// What follows the scheme of a file: link, in any case.
+fn file_link(text: &str) -> Option<&str> {
+    let scheme = text.get(..FILE_SCHEME.len())?;
+    scheme
+        .eq_ignore_ascii_case(FILE_SCHEME)
+        .then(|| text.get(FILE_SCHEME.len()..))
+        .flatten()
+}
+
+/// The path of a file: link, as a URL reads it: without a host, or with this computer's name.
+fn local_file_of(link: &str) -> Result<PathBuf, InputError> {
+    let path = match link.strip_prefix("//") {
+        Some(rest) => {
+            let (host, path) = rest.split_at(rest.find('/').unwrap_or(rest.len()));
+            if !host.is_empty() && !host.eq_ignore_ascii_case("localhost") {
+                return Err(InputError::LocalFileRequired);
+            }
+            path.to_owned()
+        }
+        None if link.starts_with('/') => link.to_owned(),
+        None => format!("/{link}"),
+    };
+    let decoded = percent_decoded(&path);
+    // A drive's path follows the slash of the URL: file:///C:/backup.txt.
+    let drive = cfg!(windows) && decoded.as_bytes().get(2) == Some(&b':');
+    Ok(PathBuf::from(if drive {
+        decoded.trim_start_matches('/').to_owned()
+    } else {
+        decoded
+    }))
+}
+
+/// The path an answer names: one with a separator, an extension or enclosing quotes; ./ names a
+/// bare filename. A URI other than a local file's is text, ur:sskr/ among them.
+fn path_of_answer(answer: &str) -> Result<Option<PathBuf>, InputError> {
+    if answer.contains(['\r', '\n']) {
+        return Ok(None);
+    }
+    let path = dropped_path(answer);
+    let text = path.to_string_lossy();
+    if let Some(link) = file_link(&text) {
+        return local_file_of(link).map(Some);
+    }
+    let scheme = text.split_once(':').is_some_and(|(scheme, _)| {
+        let mut letters = scheme.chars();
+        letters
+            .next()
+            .is_some_and(|first| first.is_ascii_alphabetic())
+            && letters.all(|letter| letter.is_ascii_alphanumeric() || "+.-".contains(letter))
+    });
+    let drive = text.as_bytes().get(1) == Some(&b':')
+        && matches!(text.as_bytes().get(2), Some(b'/' | b'\\'));
+    if scheme && !drive {
+        return Ok(None);
+    }
+    if text.starts_with("//") || text.starts_with("\\\\") {
+        return Err(InputError::LocalFileRequired);
+    }
+    let extension = text
+        .rsplit_once('.')
+        .is_some_and(|(_, end)| !end.is_empty() && !end.contains(char::is_whitespace));
+    let quoted = {
+        let trimmed = trim(answer);
+        trimmed.len() >= 2
+            && ["'", "\""]
+                .iter()
+                .any(|quote| trimmed.starts_with(quote) && trimmed.ends_with(quote))
+    };
+    let named = text.contains(['/', '\\']) || extension || quoted;
+    Ok(named.then_some(path))
+}
+
+/// `text` with its %XX escapes undone.
+fn percent_decoded(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut at = 0;
+    while at < bytes.len() {
+        let escape = (bytes[at] == b'%')
+            .then(|| text.get(at + 1..at + 3))
+            .flatten()
+            .and_then(|digits| u8::from_str_radix(digits, 16).ok());
+        match escape {
+            Some(byte) => {
+                out.push(byte);
+                at += 3;
+            }
+            None => {
+                out.push(bytes[at]);
+                at += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// The text of one private answer: inline text, or one local regular UTF-8 file within `limit`.
+/// File contents are never read as another path, and never printed here; a refusal holds no input.
+pub(crate) fn answered_text(
+    answer: &str,
+    what: &'static str,
+    limit: usize,
+) -> Result<SecretText, InputError> {
+    let Some(path) = path_of_answer(answer)? else {
+        return Ok(SecretText::copy_of("an answer", answer));
+    };
+    let resolved = os::resolve(&path, terminal::environment().current.as_deref());
+    text_of(os::read_secret_file(&resolved, limit, what, true)?, what)
 }
 
 /// A file dragged into a terminal as its path: the quotes or backslashes a terminal adds removed,
@@ -227,13 +374,17 @@ pub(crate) struct Ask<'h> {
     pub(crate) hints: Option<&'h dyn terminal::Hints>,
     /// Whether the answer shows as it is typed: on the private screen only, for a secret.
     pub(crate) echo: bool,
+    /// Accept a local text file path too; this name, never the path, appears in file refusals.
+    pub(crate) text_file: Option<&'static str>,
+    /// The answer that Enter alone gives, which the prompt names.
+    pub(crate) fallback: Option<String>,
 }
 
 /// Asks once and reads the answer, trimmed.
 fn read_answer(ask: &Ask<'_>) -> Result<Reading, InputError> {
     let mut keys = Keys::open();
     let shown = format!("{} ", ask.prompt);
-    error_raw(&shown);
+    write_prompt(&shown);
     let outcome = read_line(
         &mut keys,
         &LineOptions {
@@ -261,7 +412,7 @@ fn read_answer(ask: &Ask<'_>) -> Result<Reading, InputError> {
         LineOutcome::Ended => Reading::Ended,
         LineOutcome::Back { .. } => Reading::Back,
         LineOutcome::Cancelled => Reading::Cancelled,
-        LineOutcome::Refused(reason) => Reading::Unusable(reason.message()),
+        LineOutcome::Refused { reason, .. } => Reading::Unusable(reason.message()),
     })
 }
 
@@ -272,12 +423,6 @@ pub(crate) enum Left {
     Back,
     /// Ctrl+C, Escape at a secret, or the end of the input.
     Cancelled,
-}
-
-/// The line after an empty answer.
-fn type_hint(what: Option<&str>, leave: &str) -> String {
-    let what = what.unwrap_or("an answer");
-    format!("Type {what}, or press Ctrl+C to {leave}.")
 }
 
 /// Asks `ask` until `parse` accepts the answer, each refusal shown as one warning before the
@@ -308,14 +453,28 @@ pub(crate) fn ask_until<T, E: std::fmt::Display>(
             Reading::Back if secret => return Ok(Err(Left::Cancelled)),
             Reading::Back => return Ok(Err(Left::Back)),
             Reading::Unusable(reason) => warning = Some(reason),
-            Reading::Empty => warning = Some(type_hint(ask.what.as_deref(), leave)),
-            Reading::Answer(text) => match parse(&text) {
-                Ok(accepted) => {
+            Reading::Empty => match ask.fallback.as_deref().map(&mut parse) {
+                Some(Ok(accepted)) => {
                     terminal::answer_accepted();
                     return Ok(Ok(accepted));
                 }
-                Err(error) => warning = Some(error.to_string()),
+                Some(Err(error)) => warning = Some(error.to_string()),
+                None => warning = Some(type_hint(ask.what.as_deref(), leave)),
             },
+            Reading::Answer(text) => {
+                let read = match ask.text_file {
+                    Some(name) => answered_text(&text, name, ask.limit),
+                    None => Ok(text),
+                };
+                match read.map(|text| parse(&text).map_err(|error| error.to_string())) {
+                    Ok(Ok(accepted)) => {
+                        terminal::answer_accepted();
+                        return Ok(Ok(accepted));
+                    }
+                    Ok(Err(reason)) => warning = Some(reason),
+                    Err(error) => warning = Some(error.to_string()),
+                }
+            }
         }
     }
 }
@@ -330,16 +489,24 @@ pub(crate) fn secret_ask<'h>(prompt: &str, what: &str, limit: usize) -> Ask<'h> 
         pasted_line_break: Some(b' '),
         hints: None,
         echo: on_private_screen(),
+        text_file: None,
+        fallback: None,
     }
 }
 
-/// A warning line now, outside the step screens.
-pub(crate) fn warn(message: &str) {
-    notice(message, NoticeKind::Warning);
+/// A question for a visible value that is no secret.
+pub(crate) fn value_ask<'h>(prompt: &str, what: &str, limit: usize) -> Ask<'h> {
+    Ask {
+        prompt: prompt.to_owned(),
+        what: Some(what.to_owned()),
+        limit,
+        pasted_line_break: None,
+        hints: None,
+        echo: true,
+        text_file: None,
+        fallback: None,
+    }
 }
-
-/// The channel questions are drawn on.
-pub(crate) const QUESTIONS: Channel = Channel::Error;
 
 #[cfg(test)]
 mod tests {
@@ -355,6 +522,28 @@ mod tests {
         if cfg!(not(windows)) {
             assert_eq!(dropped_path("/x/a\\ b"), PathBuf::from("/x/a b"));
             assert_eq!(dropped_path("'it'\\''s'"), PathBuf::from("it's"));
+        }
+    }
+
+    #[test]
+    fn a_file_link_is_read_as_a_url_reads_it() {
+        let path = |answer: &str| path_of_answer(answer).ok().flatten();
+        assert_eq!(path("file:/x/a.txt"), Some(PathBuf::from("/x/a.txt")));
+        assert_eq!(
+            path("FILE:///x/a%20b.txt"),
+            Some(PathBuf::from("/x/a b.txt"))
+        );
+        assert_eq!(
+            path("file://localhost/x.txt"),
+            Some(PathBuf::from("/x.txt"))
+        );
+        assert!(path_of_answer("file://example.invalid/x.txt").is_err());
+    }
+
+    #[test]
+    fn an_answer_of_other_scripts_is_cut_nowhere() {
+        for answer in ["файл", "файл.txt", "的的的 的", "fil\u{e9}", "file:\u{e9}"] {
+            let _read = path_of_answer(answer);
         }
     }
 

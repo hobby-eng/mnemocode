@@ -67,7 +67,7 @@ pub fn capitalized(text: &str) -> String {
 }
 
 /// Whether the first word of `text` keeps its case: an abbreviation such as SSKR or PDF (two
-/// capitals at the start), or a name with a capital inside it, such as MnemoCode.
+/// capitals at the start), a name with a capital inside it, such as MnemoCode, or the name Unicode.
 fn keeps_case(text: &str) -> bool {
     let bytes = text.as_bytes();
     let capital = |at: usize| bytes.get(at).is_some_and(u8::is_ascii_uppercase);
@@ -79,11 +79,16 @@ fn keeps_case(text: &str) -> bool {
         .skip(1)
         .take_while(|byte| byte.is_ascii_lowercase())
         .count();
-    capital(0) && small > 0 && capital(1 + small)
+    if capital(0) && small > 0 && capital(1 + small) {
+        return true;
+    }
+    text.strip_prefix("Unicode").is_some_and(|rest| {
+        !rest.starts_with(|next: char| next.is_ascii_alphanumeric() || next == '_')
+    })
 }
 
 /// `text` with its first letter made small, to follow other words, unless its first word keeps its
-/// case, an abbreviation such as SSKR or a name such as MnemoCode.
+/// case, an abbreviation such as SSKR or a name such as MnemoCode or Unicode.
 pub fn lower_first(text: &str) -> String {
     if keeps_case(text) {
         return text.to_owned();
@@ -138,5 +143,15 @@ mod tests {
             after_place("Share", 2, "Unknown word.", ": "),
             "Share 2: unknown word."
         );
+    }
+
+    #[test]
+    fn the_name_unicode_keeps_its_capital_as_a_word_of_its_own() {
+        for text in ["Unicode codes have four digits.", "Unicode", "Unicode-wide"] {
+            assert_eq!(lower_first(text), text);
+        }
+        assert_eq!(lower_first("Unicodes"), "unicodes");
+        assert_eq!(lower_first("Unicode_x"), "unicode_x");
+        assert_eq!(lower_first("Unicode7"), "unicode7");
     }
 }

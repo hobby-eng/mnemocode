@@ -4,7 +4,7 @@
 
 #![expect(
     clippy::disallowed_methods,
-    reason = "the line is rewritten at most once per interval, measured on the system's clock"
+    reason = "the line is rewritten at most once per interval, and a search's pace measured, on the system's clock; the library reads none"
 )]
 
 use std::time::{Duration, Instant};
@@ -16,6 +16,13 @@ use super::{Channel, can_redraw, columns, error_raw, hint, paint, style};
 pub(crate) const SEARCH_PROGRESS_SECONDS: u64 = 10;
 /// Returns to the start of the line and erases it.
 const REWRITE_LINE: &str = "\r\x1b[2K";
+
+/// The seconds `work` takes on the system's clock.
+pub(crate) fn seconds_of<E>(work: impl FnOnce() -> Result<(), E>) -> Result<f64, E> {
+    let started = Instant::now();
+    work()?;
+    Ok(started.elapsed().as_secs_f64())
+}
 
 /// The progress line of one search.
 #[derive(Debug)]

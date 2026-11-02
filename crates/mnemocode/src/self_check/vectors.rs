@@ -44,6 +44,27 @@ pub const THREE_PHRASES_ENTROPY: [&str; 3] = [
 /// and the plaintext of the published age files.
 pub const THREE_PHRASES_LIST: &str = "4d4e434c01001000000003000000000000000000000000000000007f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7fffffffffffffffffffffffffffffffff98854aa000";
 
+/// The official BCR-2020-011 grouped vector's shares.
+pub const OFFICIAL_SHARES: [&str; 5] = [
+    "ur:sskr/gogrrsbyadaefmnlbnctaaecvoqdfnjpbzecstfgaxtifpsskbfw",
+    "ur:sskr/gogrrsbyadaohtrygabavahphnlrlpmkghwyiojkjtkpmdkncfjp",
+    "ur:sskr/gogrrsbybgaefywsfefhiymofseyihfremkivwsogrespmclwepd",
+    "ur:sskr/gogrrsbybgaootkoehgoztzcreloknrfvawyinssrksnmedtfmks",
+    "ur:sskr/gogrrsbybgaaiaeenbuyksetonswsstduoprvwrphkbytlfzlyca",
+];
+
+/// The first official share in colors, computed independently.
+pub const FIRST_SHARE_COLORS: &str =
+    "#41C47E #42D1F0 #0981D6 #EE44D3 #7C4D62 #E75FF8 #955228 #F02D9B #CADD22 #670000";
+/// The same share in Unicode codes.
+pub const FIRST_SHARE_UNICODE: &str = "9805 968E 70AE 555F 4E0D 7642 6751 7686 7709 75C7 5354 77FD 97CB 964D 670D 5E7E 7FA4 5410 4EF2 6CB3 5BEC";
+
+/// The first two shares of the set of the longest secret, 32 bytes ("bip39-256-2-of-3").
+pub const LONG_SHARES: [&str; 2] = [
+    "ur:sskr/hddaemjzaeadaebdfpwmtntkwlptsskispvwbkbwjnamsttssnpmhpfghdaonbcnfmjkrnltdnlarkmsrefllt",
+    "ur:sskr/hddaemjzaeadadtkaekkfmspcheycndschfhcmkelyvavefzfewezsvemdptaemestiazccybzjsveasreislp",
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;

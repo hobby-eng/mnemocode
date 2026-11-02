@@ -475,13 +475,11 @@ pub(crate) fn share_word_index(token: &str) -> Option<u32> {
 /// more than one word's Unicode code at more than half as many places as it has codes, every place
 /// looked at, so that codes run together that lost or gained a digit still count.
 fn written_in_word_codes(text: &str) -> bool {
-    let digits = compact_code(text);
-    let words = (0..digits.len().saturating_sub(UNICODE_CODE_DIGITS - 1))
-        .filter(|&at| {
-            digits
-                .get(at..at + UNICODE_CODE_DIGITS)
-                .is_some_and(|code| index_of_unicode(code).is_some())
-        })
+    // TS counts UTF-16 units, which decide this for a text with digits of another width.
+    let digits: Vec<u16> = compact_code(text).encode_utf16().collect();
+    let words = digits
+        .windows(UNICODE_CODE_DIGITS)
+        .filter(|code| String::from_utf16(code).is_ok_and(|code| index_of_unicode(&code).is_some()))
         .count();
     words > 1 && words * UNICODE_CODE_DIGITS * 2 > digits.len()
 }
@@ -624,6 +622,50 @@ mod tests {
             assert_eq!(read_share(text).unwrap_err().code(), code);
         }
     }
+
+    /// `text` with the digit `0` to `9` written from the digits that begin at `zero`.
+    fn with_digits_from(text: &str, zero: char, places: impl Fn(usize) -> bool) -> String {
+        let written = |(place, code): (usize, &str)| -> String {
+            code.chars()
+                .map(|character| match character.to_digit(10) {
+                    Some(digit) if places(place) => {
+                        char::from_u32(zero as u32 + digit).unwrap_or(character)
+                    }
+                    _ => character,
+                })
+                .collect()
+        };
+        let codes: Vec<String> = text.split(' ').enumerate().map(written).collect();
+        codes.join(" ")
+    }
+
+    #[test]
+    fn a_share_in_unicode_codes_is_told_by_the_units_ts_counts() {
+        const FULLWIDTH_ZERO: char = '\u{ff10}';
+        const MATHEMATICAL_ZERO: char = '\u{1d7ce}';
+        const CODES: &str =
+            "Unicode codes have four hexadecimal digits each, separated by spaces or joined.";
+        const NOT_BYTEWORDS: &str = "Unknown SSKR Byteword.";
+        let first_code = |place| place == 0;
+        let even_codes = |place| place % 2 == 0;
+        let odd_codes = |place| place % 2 == 1;
+        let text = crate::self_check::vectors::FIRST_SHARE_UNICODE;
+        // What TS 0.1.0 answers, by how many of the 84 digits are left in whole codes. A fullwidth
+        // digit is one UTF-16 unit and three bytes, a mathematical one two units and four bytes.
+        for (given, refusal) in [
+            (text.replacen("7642", "764", 1), CODES),
+            (with_digits_from(text, FULLWIDTH_ZERO, first_code), CODES),
+            (with_digits_from(text, MATHEMATICAL_ZERO, first_code), CODES),
+            (with_digits_from(text, FULLWIDTH_ZERO, odd_codes), CODES),
+            (
+                with_digits_from(text, FULLWIDTH_ZERO, even_codes),
+                NOT_BYTEWORDS,
+            ),
+        ] {
+            assert_eq!(read_share(&given).unwrap_err().to_string(), refusal);
+        }
+    }
+
     use serde_json::Value;
 
     const VECTORS: &str = include_str!("../../../../vectors/sskr-v1.json");

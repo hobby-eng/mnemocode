@@ -32,6 +32,8 @@ use crate::text::words::{after_place, places_in_words};
 const MAX_WRAPPED_LINES: usize = 8;
 /// What a person types between the shares of one answer.
 pub const SHARE_SEPARATOR: &str = ";";
+/// The same as a byte, for a paste of several lines.
+pub const SHARE_SEPARATOR_BYTE: u8 = b';';
 
 /// Whether `character` separates the shares of one answer: [`SHARE_SEPARATOR`] or a line break.
 fn separates_shares(character: char) -> bool {

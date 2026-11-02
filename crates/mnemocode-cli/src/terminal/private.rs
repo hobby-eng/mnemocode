@@ -7,9 +7,11 @@
 
 use std::sync::Mutex;
 
-use super::keys::{Interrupted, Keys, read_key};
+use super::choice::wait_for_enter;
+use super::keys::Interrupted;
+use super::page::{close_page, open_page};
 use super::{
-    CLEAR_SCREEN, Channel, ENTER_ALTERNATE_SCREEN, Key, LEAVE_ALTERNATE_SCREEN, NoticeKind,
+    CLEAR_SCREEN, Channel, Chosen, ENTER_ALTERNATE_SCREEN, LEAVE_ALTERNATE_SCREEN, NoticeKind,
     error_line, error_raw, fact_line, heading_line, hint, more_line, notice_lines,
     terminal_available,
 };
@@ -41,6 +43,8 @@ struct Steps {
     warnings: Vec<String>,
     warnings_drawn: bool,
     showing_result: bool,
+    /// Whether the questions under the result keep its first rows above them, not its last.
+    from_start: bool,
     drawing_context: bool,
     summary: Vec<SummaryLine>,
 }
@@ -168,6 +172,50 @@ pub(crate) fn answer_accepted() {
     });
 }
 
+/// The warnings of the last step end: no later step screen shows them.
+pub(crate) fn end_warnings() {
+    with_steps(|steps| {
+        if let Some(steps) = steps {
+            steps.warnings.clear();
+            steps.warnings_drawn = false;
+        }
+    });
+}
+
+/// Whether a result shows, which the questions after it are drawn under.
+pub(crate) fn showing_result() -> bool {
+    with_steps(|steps| steps.as_ref().is_some_and(|steps| steps.showing_result))
+}
+
+/// An answer under a result led to another step, which starts a new page: the result, its warnings
+/// and the contexts of the page end. Without a result shown nothing changes.
+pub(crate) fn leave_result() {
+    with_steps(|steps| {
+        if let Some(steps) = steps
+            && steps.showing_result
+        {
+            steps.showing_result = false;
+            steps.from_start = false;
+            steps.warnings.clear();
+            steps.warnings_drawn = false;
+            steps
+                .context
+                .retain(|(_, lifetime)| *lifetime == Lifetime::Command);
+        }
+    });
+}
+
+/// A question ended, answered or left with Escape: the context kept for it ends.
+pub(crate) fn question_ended() {
+    with_steps(|steps| {
+        if let Some(steps) = steps {
+            steps
+                .context
+                .retain(|(_, lifetime)| *lifetime != Lifetime::Question);
+        }
+    });
+}
+
 /// A result shows, which the questions after it are drawn under.
 pub(crate) fn show_result() {
     with_steps(|steps| {
@@ -178,6 +226,21 @@ pub(crate) fn show_result() {
     });
 }
 
+/// The result shown stays from its start above the questions after it, as an encoded backup does:
+/// what it is comes first.
+pub(crate) fn keep_result_from_start() {
+    with_steps(|steps| {
+        if let Some(steps) = steps {
+            steps.from_start = true;
+        }
+    });
+}
+
+/// Whether the result shown stays from its start.
+pub(super) fn result_stays_from_start() -> bool {
+    with_steps(|steps| steps.as_ref().is_some_and(|steps| steps.from_start))
+}
+
 /// Clears the private screen before a result, so that it stands alone (CORE-39); whether it was.
 pub(crate) fn clear_private_screen() -> bool {
     let cleared = with_steps(|steps| {
@@ -186,6 +249,7 @@ pub(crate) fn clear_private_screen() -> bool {
         };
         steps.begun = true;
         steps.showing_result = false;
+        steps.from_start = false;
         steps.warnings.clear();
         steps.warnings_drawn = false;
         steps
@@ -208,13 +272,15 @@ pub(crate) fn show_protection(summary: &str) {
         "{}\n",
         fact_line(Channel::Error, "Protection", summary, ANSWER_LABEL_WIDTH)
     );
-    keep_context(vec![line], Lifetime::Command);
+    keep_context(vec![line], Lifetime::Question);
 }
 
 /// The label column of the answers and facts of the questions (terminal-choice.ts).
-pub(crate) const ANSWER_LABEL_WIDTH: usize = 12;
+pub(crate) const ANSWER_LABEL_WIDTH: usize = 11;
 /// What the private screen asks before it is cleared, after a blank line.
 const CLEAR_PROMPT: &str = "Press Enter to clear this screen.";
+/// The rows of that prompt and of the blank line above it.
+pub(crate) const CLOSING_ROWS: usize = 2;
 /// The last line of the summary of a command whose result was read and cleared.
 const CLEARED: &str = "The screen with the result was cleared.";
 
@@ -235,6 +301,7 @@ impl PrivateScreen {
             };
         }
         error_raw(ENTER_ALTERNATE_SCREEN);
+        open_page();
         with_steps(|steps| {
             *steps = Some(Steps {
                 title: title.to_owned(),
@@ -259,22 +326,11 @@ impl PrivateScreen {
             return Ok(true);
         }
         error_raw("\n");
-        error_line(&super::paint(
-            Channel::Error,
-            super::style::MUTED,
-            CLEAR_PROMPT,
-        ));
-        let mut keys = Keys::open();
-        loop {
-            match read_key(&mut keys)? {
-                Key::Enter => {
-                    self.cleared = true;
-                    return Ok(true);
-                }
-                Key::Cancel => return Ok(false),
-                _ => {}
-            }
+        if matches!(wait_for_enter(CLEAR_PROMPT)?, Chosen::Cancelled) {
+            return Ok(false);
         }
+        self.cleared = true;
+        Ok(true)
     }
 
     /// Leaves the private screen, printing the summary on the main screen; done once.
@@ -283,6 +339,7 @@ impl PrivateScreen {
             return;
         }
         self.active = false;
+        close_page();
         let steps = with_steps(Option::take);
         error_raw(LEAVE_ALTERNATE_SCREEN);
         let Some(steps) = steps else {

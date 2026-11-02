@@ -9,10 +9,84 @@ repository.workspace = true
 publish.workspace = true
 
 [features]
-default = []
+default = [
+  "sskr",
+  "template-business-architect",
+  "template-business-it",
+  "template-business-estate",
+  "template-business-diagonal",
+  "template-business-contact",
+  "template-business-curves",
+  "template-business-facets",
+  "template-business-mixed",
+  "template-material-vehicle",
+  "template-material-enclosure",
+  "template-material-tile",
+  "template-material-switch",
+  "template-material-kitchen",
+]
+# The share-card content type, share card sets, separate share cards, the heir sheet's share lines.
+sskr = ["mnemocode/sskr"]
+# One design of the registry each, with its artwork.
+template-business-architect = []
+template-business-it = []
+template-business-estate = []
+template-business-diagonal = []
+template-business-contact = []
+template-business-curves = []
+template-business-facets = []
+template-material-vehicle = []
+template-material-enclosure = []
+template-material-tile = []
+template-material-switch = []
+template-material-kitchen = []
+# Draws the seven others in turn.
+template-business-mixed = [
+  "template-business-architect",
+  "template-business-it",
+  "template-business-estate",
+  "template-business-diagonal",
+  "template-business-contact",
+  "template-business-curves",
+  "template-business-facets",
+]
 
 [dependencies]
 mnemocode.workspace = true
+jpeg-encoder.workspace = true
+libm.workspace = true
+miniz_oxide.workspace = true
+pdf-writer.workspace = true
+png.workspace = true
+skrifa.workspace = true
+subsetter.workspace = true
+tiny-skia.workspace = true
+unicode-normalization.workspace = true
+unicode-properties.workspace = true
+unicode-script.workspace = true
+zune-jpeg.workspace = true
+
+[[test]]
+name = "ts_cards"
+required-features = [
+  "sskr",
+  "template-business-architect",
+  "template-business-it",
+  "template-business-estate",
+  "template-business-diagonal",
+  "template-business-contact",
+  "template-business-curves",
+  "template-business-facets",
+  "template-business-mixed",
+  "template-material-vehicle",
+  "template-material-enclosure",
+  "template-material-tile",
+  "template-material-switch",
+  "template-material-kitchen",
+]
+
+[dev-dependencies]
+serde_json.workspace = true
 
 [lints]
 workspace = true

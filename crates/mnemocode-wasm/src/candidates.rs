@@ -9,6 +9,7 @@
 
 use std::cell::RefCell;
 
+use mnemocode::candidates::admission;
 use mnemocode::candidates::age::{Identity, Opener};
 use mnemocode::candidates::format::{CandidateList, ListPassphrases};
 use mnemocode::candidates::gate::Gate;
@@ -23,6 +24,22 @@ use crate::host::{
 thread_local! {
     /// The gate of this instance: its known answers pass once, before its first operation.
     static GATE: RefCell<Gate> = const { RefCell::new(Gate::new()) };
+}
+
+/// The lock of the candidate file that begins with `head`, its first 64 KiB or more: "X25519" for
+/// a Scanner's key, "scrypt" for a passphrase; refused where it is no list. A page asks it before
+/// it asks for a key or a passphrase.
+#[wasm_bindgen(js_name = candidateFileLock)]
+pub fn candidate_file_lock(head: &[u8]) -> Result<String, JsValue> {
+    admission::lock(head)
+        .map(|lock| lock.stanza().to_owned())
+        .map_err(|refusal| refused(&refusal))
+}
+
+/// Refuses a candidate file of `size` bytes larger than any list's, before it is read.
+#[wasm_bindgen(js_name = checkCandidateFileSize)]
+pub fn check_candidate_file_size(size: f64) -> Result<(), JsValue> {
+    admission::check_encrypted_size(place(size)).map_err(|refusal| refused(&refusal))
 }
 
 /// The Discovery Scanner's one-time key for a session; only its recipient leaves the WebAssembly,

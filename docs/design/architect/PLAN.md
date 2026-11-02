@@ -55,9 +55,11 @@ file at once:
 
 - library results for public inputs, with a fixed random source passed through the TS host
   parameters (share seeds, card choices, sample phrases);
-- `refusals-v1.json`: every TS code with a sample message, or why the Rust port has no such code;
-- CLI transcripts: argv, standard input, environment, standard output and error, exit code, and
-  the SHA-256 of each file written; terminal sessions recorded through a pty;
+- `refusals-v1.json`: every TS code, which `cargo xtask code-rules` checks each code of the port
+  against, beside the port's own;
+- CLI transcripts: argv, standard output and error and exit code (a PDF's bytes differ by design, so
+  files are tested by what they hold, not by a hash); the terminal is tested by the pty gate, not by
+  recorded sessions;
 - card outputs with fixed details and choices (the TS's local `goldens/` folder is untracked and
   not used).
 
@@ -89,9 +91,26 @@ screen; a tracer on Linux refuses secrets; a card text whose width lies within t
 saving (ff, ffi and ffl are 31 units narrower than their letters in DejaVuSans-UI) may now be
 refused as too long; an answer, file or standard input longer than its question's limit, which
 TS reads up to 1 MiB, is refused with that limit, a BIP39 passphrase over 4 KiB included, and the
-help names each limit; the Protection line and the self-test name no "no other programs"
-measure, since no program start is denied. Their expected transcripts are the TS recordings with each difference
-written in by hand, naming this decision.
+help names each limit; a missing parent folder of an output file is made before the secret, where
+TS refuses it (ARCHITECTURE.md §5); the Protection line and the self-test name no "no other programs"
+measure, since no program start is denied; the code `export.platform.checked-choice-refused` is not
+ported: only a fake `Random` can give a choice past its bound, `SystemRandom` and `BrowserRandom` keep
+`below`'s contract, and CORE-54 leaves no check of it; the output paths are numbered and checked, and
+each missing parent folder made, before a command's own options are read, since the rules on writes
+need those folders before any secret and the options are read among the secrets, so of a wrong path
+and a wrong option the path is named first, and a folder made for a refused command stays; a line of a
+secret result that TS writes to standard error goes to standard output where standard error is a
+terminal with no private screen; the master key evidence needs Bitcoin in a build (as wallet-tools
+builds it: a build without Bitcoin recognises a wallet by its fingerprint or a coin's address); the help
+says that images need no other program, that a missing folder is made, and each text input's limit;
+U+FFFF is refused as a character the card font lacks, where TS draws it blank, and U+034F measures 0
+wide, where TS draws a space of 651 units; two refusals of a partial restore name `ShareSet::combine`,
+this library's function, where TS names its own; where `--ask-secrets` cannot run, on a terminal that
+cannot clear its screen or with no terminal, that is said before the command's own options, since the
+gate that keeps a secret result off such a terminal runs first; an image of noise at 8 megapixels reads
+in about 90 seconds where TS takes 34, inside rqrr, whose finder search no bound of ours reaches, and
+Ctrl+C acts when the reading ends. Their expected transcripts are the TS recordings with each
+difference written in by hand, naming this decision.
 
 ## Definition of done of a capability
 
@@ -123,7 +142,7 @@ written in by hand, naming this decision.
 | 5  | `wallet` with the 12 coins; binding `wallet`                                                                                                                                                                                                                                                                                  | 30       | each coin's known answers; evidence refusals; wallet-option transcripts; rows Wallet evidence, Coin addresses; the `dash-community` profile builds and holds no other coin's text                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | 6  | `qr`, `candidates`; bindings `qr`, `candidates`; the Scanner's profile                                                                                                                                                                                                                                                        | 13       | PNG admission fixtures; QR write and read back; C2SP CCTV age vectors; `candidates-v1.json`; the encryption gate; `--qr-file` and `--qr` transcripts; rows PNG admission, QR adapter, Candidate lists; the memory cap measured and tested under the largest encrypted candidate list                                                                                                                                                                                                                                                                                                                                             |
 | 7  | `sskr` with the engine bridge and the 6 share forms, `shims/bc-crypto` ((d), owner, 2026-10-27); binding `sskr`                                                                                                                                                                                                               | 31       | `sskr-v1.json`, BCR vectors of SSKR, Bytewords and UR; share-form known answers; restore of every split; the engine leaves no copy (memory scan); rows SSKR integrity, Share split and restore, Share repair                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| 8  | `recovery` with the backup reading, the three searches and the share restore flows; `decode`, `re-encode`, `recover-date`, `recover-word`; binding `recovery`                                                                                                                                                                 | 21       | candidate order and counts of every search as TS; a stopped search returns a partial outcome; transcripts of searches with fixed pace; rows Backup reading, Marked codes search, Word search, Backup check, Share unmasking                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 8  | `recovery` with the backup reading, the three searches and the share restore flows; `decode`, `recover-date`, `recover-word` from their options; binding `recovery`                                                                                                                                                           | 21       | candidate order and counts of every search as TS; a stopped search returns a partial outcome; transcripts of searches with fixed pace; rows Backup reading, Marked codes search, Word search, Backup check, Share unmasking                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 9  | `mnemocode-cards` with the 13 templates; card options, `preview`, images; binding `cards` in the Deriver's profile                                                                                                                                                                                                            | 52       | card outputs at the owner's parity level; page count and size rows; heir-sheet text byte-equal; template order; colour maths known answers; every command now complete; rows Heir sheet, Share cards, Card sets, Card export assets; the memory cap checked under the largest card export                                                                                                                                                                                                                                                                                                                                        |
 | 10 | the start menu                                                                                                                                                                                                                                                                                                                | 13       | every menu entry in the pty against TS sessions; shell quoting cases (POSIX, cmd and PowerShell); each command a fresh, protected process                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 11 | release tooling                                                                                                                                                                                                                                                                                                               | 6        | the reproducible rebuild (GATES `reproducible`); notices; executable verification on the three systems; the signing script's dry run; the release workflow; artifacts per page profile                                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -313,8 +332,7 @@ the TS capsule (`multi-chain-wallet-tools/packages/recovery-mnemocode`) to the W
   and the executable's getrandom adapter to increment 2 (the command line's), the cell widths to
   increment 2, NFKD and NFC to increment 3 (their first user, `bip39`), the time estimate of each
   search from its timed pace sample to increment 8 (with the searches, whose samples differ),
-  and `refusals-v1.json` to every increment for its modules' codes, complete and checked for unique
-  codes by increment 11. The independent review of increment 1 (two reviewers, 21 findings, one
+  and `refusals-v1.json` to the review of increment 11, checked by `code-rules`. The independent review of increment 1 (two reviewers, 21 findings, one
   High: `after_secret` left an inlined closure's stack unscrubbed) was answered in the same commit.
 - Increments 2 to 4, 2026-10-27: the command line (`os` with the protections of each system,
   `terminal` with the line editor, the private screen, word hints under a typed word and the
@@ -430,9 +448,46 @@ the TS capsule (`multi-chain-wallet-tools/packages/recovery-mnemocode`) to the W
   unlike TS's, so it is stepped as a search is. Open under RUST-13, for the owner to decide: the
   algebra's vectors are redacted and wiped on free but not locked, and `Branch.particular`,
   `visible` and `hidden`, `ReadingSpace.particular` and `basis` and `ReadingUnits.values` stay
-  for a whole search, one set of them for each branch and share. Moved: the share commands,
+  for a whole search, one set of them for each branch and share. Open the same way: a card's
+  `CardCodes` and each `Page` being drawn are wiped on free but not locked, since the same codes stand
+  unlocked in the finished PDF and page images, so that locking one copy closes no path. Moved: the share commands,
   `--qr-dir` of shares and the sources of typed shares (CAP-SSKR-SAVE-SHARE-QR,
   CAP-SSKR-SHARE-SOURCES) to increment 9 with the commands that use them; the wallet check of
   restored sets (CAP-SSKR-WALLET-CHECK-SETS) to increment 8, where the share restore steps unmask
   a Seedshift phrase before its check, and the binding's stepped assessment and repair search with
   the recovery binding there.
+- Increment 8, 2026-10-31: the library's `recovery`: how a backup as given is read, the places of a
+  phrase and codes marked with ?, the date, word and marked-code searches, each a unit behind its
+  feature and stepped by the host (ADR 0005), the check of a written backup, and the restore of
+  shares in the steps every host takes, with their repair and their unmasking. Without `search-date`
+  a dates answer refuses patterns. Rows: Dates, Backup reading, Marked codes search, Word search,
+  Backup check, Share unmasking. `decode`, `recover-date` and `recover-word` run from their options,
+  with `--qr-file` and the wallet options, over one driver of a search that reads Ctrl+C as a key
+  between steps. The TS recorders `recovery.mjs` and `transcripts.mjs`, of its commit `fc77a16`,
+  record `recovery-v1.json` and the first command transcripts, of those commands and `encode`, as a
+  script runs them, which `tests/ts_recovery.rs`, `ts_recovery_shares.rs` and the command line's
+  `ts_transcripts.rs` replay byte for byte; the first also records marked shares restored together
+  and the phrase alone with its refusals. `browser-recovery`, in the multi-chain Deriver's profile:
+  a backup read and decoded, a written backup checked, and every search as one class that the page
+  steps, started from a `Recovery`, the receiver that holds the wallet, as no class crosses beside
+  a secret; the assessment of marked shares is stepped there. Moved to increment 9, with the
+  capabilities that list them there: `--ask-secrets` of these commands and the questions they need,
+  `--candidates-file`, `re-encode`; so a text that fits several forms is refused here, and a
+  long search needs `--max-candidates`.
+- Increments 8 and 9, the rest, and 10, 2026-11-01: `--ask-secrets` of every command, `sskr-split`,
+  `sskr-combine`, `sskr-export`, `re-encode`, `--candidates-file`, the self-test command, the help
+  pages; `mnemocode-cards` with the 13 designs, each behind its feature, drawn as one scene for
+  PDF (pdf-writer) and images (tiny-skia) with no program started (ADR 0009), the heir sheet, card
+  options, `preview` and the rows Heir sheet, Share cards, Card sets, QR beside sheets and Card export
+  assets; the start menu, its record of answers and each command in a process of its own; binding
+  `cards`, in the Deriver's profile. The TS recorders `cards.mjs` and `transcripts.mjs`, of its
+  commit `cda5e91`, record every text and image that each design draws with a fixed sequence in
+  place of randomness (`cards-v1.json`), and what the commands write (162 commands); the replays
+  hold them to a millionth of a point and byte for byte. Page images against TS's: the 13 designs at
+  300 dpi differ by 0.7 to 1.6 of 255 on average, at most 0.05 % of the pixels by more than 64, the
+  edges of letters and shapes: tiny-skia's antialiasing against cairo's, which is the tolerance that
+  this part of the plan left open. A PDF of a set of shares takes more than the lock budget, so a
+  drawn page is `SecretBytes::large`, wiped on free and never locked (ARCHITECTURE.md §6).
+- Increment 11, 2026-11-01: `release build`, `release pages`, `verify-executable`, `reproducible`,
+  `features` and `sign` of `xtask`, `.github/workflows/release.yml`, the canonical container and
+  docs/RELEASING.md. The word of a part that a page leaves out is refused in its file (`wasm`).

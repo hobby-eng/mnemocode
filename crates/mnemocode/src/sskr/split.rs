@@ -17,6 +17,7 @@ use crate::modes::{Mode, ModeError};
 use crate::random::Random;
 use crate::refusal::Refusal;
 use crate::secret::equal_bytes;
+use crate::text::numbers::{TypedNumberRefused, WholeRange, typed_whole_number};
 
 /// A split makes one group, of at most as many members as SSKR numbers.
 pub const MAX_SHARES: usize = MAX_GROUP_MEMBERS;
@@ -115,6 +116,90 @@ pub struct BackupSplit {
     pub shares: Vec<Share>,
     /// The phrase the shares hold: the seed phrase itself, or its Seedshift mask.
     pub held: Phrase,
+}
+
+/// How many Shamir shares to make, and how many of them restore the seed phrase: a set that SSKR
+/// would refuse cannot exist. A host offers the usual sets and builds one of the person's own from
+/// two typed numbers, each refused with a line that says what fits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ShareSetChoice {
+    threshold: usize,
+    count: usize,
+}
+
+impl ShareSetChoice {
+    /// The usual sets, offered first; Other takes any that SSKR allows.
+    pub const PRESETS: [Self; 6] = [
+        Self {
+            threshold: 2,
+            count: 3,
+        },
+        Self {
+            threshold: 2,
+            count: 4,
+        },
+        Self {
+            threshold: 3,
+            count: 4,
+        },
+        Self {
+            threshold: 3,
+            count: 5,
+        },
+        Self {
+            threshold: 4,
+            count: 6,
+        },
+        Self {
+            threshold: 5,
+            count: 7,
+        },
+    ];
+
+    /// `count` shares of which `threshold` restore the phrase; refused as a split refuses them.
+    pub fn of(threshold: usize, count: usize) -> Result<Self, SplitError> {
+        check_threshold(threshold, count)?;
+        Ok(Self { threshold, count })
+    }
+
+    /// The number of shares in all, as typed; refused unless it is a number SSKR allows.
+    pub fn typed_count(answer: &str) -> Result<usize, TypedNumberRefused> {
+        let range = WholeRange::new(MIN_THRESHOLD as u64, MAX_SHARES as u64);
+        let refusal = format!("Choose {MIN_THRESHOLD} to {MAX_SHARES} shares.");
+        Ok(typed_whole_number(answer, range, Some(&refusal))? as usize)
+    }
+
+    /// How many of `count` shares restore the phrase, as typed; refused unless it fits `count`.
+    pub fn typed_threshold(answer: &str, count: usize) -> Result<usize, TypedNumberRefused> {
+        let range = WholeRange::new(MIN_THRESHOLD as u64, count as u64);
+        let refusal =
+            format!("Type a number from {MIN_THRESHOLD} to {count}, the number of shares.");
+        Ok(typed_whole_number(answer, range, Some(&refusal))? as usize)
+    }
+
+    /// The fewest distinct shares that restore the phrase.
+    #[must_use]
+    pub const fn threshold(self) -> usize {
+        self.threshold
+    }
+
+    /// The shares made.
+    #[must_use]
+    pub const fn count(self) -> usize {
+        self.count
+    }
+
+    /// The set in a few words, such as "2 of 3".
+    #[must_use]
+    pub fn label(self) -> String {
+        format!("{} of {}", self.threshold, self.count)
+    }
+
+    /// What the set means, such as "3 shares, any 2 restore it".
+    #[must_use]
+    pub fn note(self) -> String {
+        format!("{} shares, any {} restore it", self.count, self.threshold)
+    }
 }
 
 /// The shares of a backup: the phrase `phrase` makes in `mode` with `dates`, split as [`split`]

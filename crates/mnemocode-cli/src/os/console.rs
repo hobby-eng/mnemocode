@@ -14,6 +14,8 @@
 
 use std::io;
 
+use super::signals::suspend_by_default;
+
 /// One of the three standard streams.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Stream {
@@ -141,14 +143,17 @@ mod system {
     /// The terminal's modes before raw mode, restored on drop.
     pub(crate) struct Saved(libc::termios);
 
-    /// Raw mode on standard input, dropping what was typed ahead; `None` when it is no terminal.
-    pub(crate) fn enter_raw() -> Option<Saved> {
+    /// The modes of the terminal on standard input; `None` when it is no terminal.
+    fn modes_now() -> Option<libc::termios> {
         // SAFETY: a zeroed termios is a valid value that tcgetattr overwrites.
         let mut modes: libc::termios = unsafe { std::mem::zeroed() };
         // SAFETY: tcgetattr writes the struct, which lives for the call.
-        if unsafe { libc::tcgetattr(0, &raw mut modes) } != 0 {
-            return None;
-        }
+        (unsafe { libc::tcgetattr(0, &raw mut modes) } == 0).then_some(modes)
+    }
+
+    /// Raw mode on standard input, dropping what was typed ahead; `None` when it is no terminal.
+    pub(crate) fn enter_raw() -> Option<Saved> {
+        let mut modes = modes_now()?;
         let saved = Saved(modes);
         modes.c_iflag &= !(libc::BRKINT | libc::ICRNL | libc::INPCK | libc::ISTRIP | libc::IXON);
         modes.c_oflag |= libc::ONLCR;
@@ -166,8 +171,27 @@ mod system {
         unsafe { libc::tcsetattr(0, libc::TCSANOW, &raw const saved.0) };
     }
 
+    /// Echo off on standard input, the rest as it was; the modes before, `None` when it is no
+    /// terminal.
+    pub(crate) fn enter_no_echo() -> Option<Saved> {
+        let mut modes = modes_now()?;
+        let saved = Saved(modes);
+        modes.c_lflag &= !libc::ECHO;
+        // SAFETY: tcsetattr reads the struct, which lives for the call.
+        (unsafe { libc::tcsetattr(0, libc::TCSANOW, &raw const modes) } == 0).then_some(saved)
+    }
+
+    /// Drops what was typed and not read.
+    pub(crate) fn drop_typed_ahead() {
+        // SAFETY: tcflush takes a descriptor and a queue selector.
+        unsafe { libc::tcflush(0, libc::TCIFLUSH) };
+    }
+
     /// Nothing to prepare on Unix: terminals read UTF-8 and escape sequences.
     pub(crate) fn prepare() {}
+
+    /// Nothing to give back on Unix.
+    pub(crate) fn restore() {}
 }
 
 #[cfg(windows)]
@@ -176,13 +200,15 @@ mod system {
     use std::io::IsTerminal;
     use std::os::windows::io::BorrowedHandle;
     use std::ptr;
-    use windows_sys::Win32::Foundation::HANDLE;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use windows_sys::Win32::Foundation::{ERROR_BROKEN_PIPE, HANDLE};
     use windows_sys::Win32::Storage::FileSystem::{ReadFile, WriteFile};
     use windows_sys::Win32::System::Console::{
         CONSOLE_MODE, CONSOLE_SCREEN_BUFFER_INFO, ENABLE_VIRTUAL_TERMINAL_INPUT,
-        ENABLE_VIRTUAL_TERMINAL_PROCESSING, FlushConsoleInputBuffer, GetConsoleMode,
-        GetConsoleScreenBufferInfo, GetStdHandle, ReadConsoleW, STD_ERROR_HANDLE, STD_HANDLE,
-        STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, SetConsoleCP, SetConsoleMode, SetConsoleOutputCP,
+        ENABLE_VIRTUAL_TERMINAL_PROCESSING, FlushConsoleInputBuffer, GetConsoleCP, GetConsoleMode,
+        GetConsoleOutputCP, GetConsoleScreenBufferInfo, GetStdHandle, ReadConsoleW,
+        STD_ERROR_HANDLE, STD_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, SetConsoleCP,
+        SetConsoleMode, SetConsoleOutputCP,
     };
 
     /// UTF-8's code page.
@@ -244,13 +270,18 @@ mod system {
                 )
             } == 0
             {
-                return Err(io::Error::last_os_error());
+                let error = io::Error::last_os_error();
+                // The writer of a pipe closed it: the end of the input.
+                if error.raw_os_error() == i32::try_from(ERROR_BROKEN_PIPE).ok() {
+                    return Ok(0);
+                }
+                return Err(error);
             }
             return Ok(usize::try_from(read).unwrap_or(0));
         }
         // Each UTF-16 unit takes at most three bytes; one more unit completes a pair.
         let mut units = [0_u16; 64];
-        let wanted = (buffer.len() / 3).clamp(2, units.len());
+        let wanted = (buffer.len() / 3).clamp(2, units.len() - 1);
         let mut read = 0;
         // SAFETY: ReadConsoleW writes at most `wanted` units into the array, which lives for the
         // call.
@@ -399,10 +430,40 @@ mod system {
         unsafe { SetConsoleMode(handle(Stream::Input), saved.0) };
     }
 
+    /// A Windows console shows no key before a program reads it: the mode is only kept, for a
+    /// command that a signal stopped in raw mode.
+    pub(crate) fn enter_no_echo() -> Option<Saved> {
+        let mut mode = 0;
+        // SAFETY: the call writes the mode, which lives for it.
+        (unsafe { GetConsoleMode(handle(Stream::Input), &mut mode) } != 0).then_some(Saved(mode))
+    }
+
+    /// Drops what was typed and not read.
+    pub(crate) fn drop_typed_ahead() {
+        // SAFETY: the call takes the handle of the console's input.
+        unsafe { FlushConsoleInputBuffer(handle(Stream::Input)) };
+    }
+
+    /// The console's code pages before this program, which belong to the console.
+    static CODE_PAGES: [AtomicU32; 2] = [AtomicU32::new(0), AtomicU32::new(0)];
+
+    /// Gives the console its code pages back.
+    pub(crate) fn restore() {
+        let [input, output] = &CODE_PAGES;
+        // SAFETY: the calls take code pages only; 0, none read, is refused and changes nothing.
+        unsafe {
+            SetConsoleCP(input.load(Ordering::SeqCst));
+            SetConsoleOutputCP(output.load(Ordering::SeqCst));
+        }
+    }
+
     /// UTF-8 in and out of the console, and escape sequences on its output.
     pub(crate) fn prepare() {
+        let [input, output] = &CODE_PAGES;
         // SAFETY: the calls take code pages, handles and modes only.
         unsafe {
+            input.store(GetConsoleCP(), Ordering::SeqCst);
+            output.store(GetConsoleOutputCP(), Ordering::SeqCst);
             SetConsoleCP(UTF8);
             SetConsoleOutputCP(UTF8);
             for stream in [Stream::Output, Stream::Error] {
@@ -422,6 +483,28 @@ pub(crate) fn prepare() {
     system::prepare();
 }
 
+/// Gives the console what [`prepare`] changed back.
+pub(crate) fn restore() {
+    system::restore();
+}
+
+/// Runs `body` with the terminal's echo off, and gives the terminal back exactly as it was, also
+/// after a command that a signal stopped while it read keys in raw mode. Without it the terminal
+/// would show the keys typed for a command before its first question.
+pub(crate) fn without_echo<T>(body: impl FnOnce() -> T) -> T {
+    let saved = system::enter_no_echo();
+    let result = body();
+    if let Some(saved) = &saved {
+        system::leave_raw(saved);
+    }
+    result
+}
+
+/// Drops what was typed and not read: it answers no question.
+pub(crate) fn drop_typed_ahead() {
+    system::drop_typed_ahead();
+}
+
 /// Raw mode on standard input while this lives: the modes before it come back on drop.
 pub(crate) struct RawMode {
     saved: system::Saved,
@@ -430,7 +513,9 @@ pub(crate) struct RawMode {
 impl RawMode {
     /// Raw mode, dropping what was typed ahead; `None` when standard input is no terminal.
     pub(crate) fn enter() -> Option<Self> {
-        system::enter_raw().map(|saved| Self { saved })
+        let saved = system::enter_raw()?;
+        suspend_by_default(false);
+        Some(Self { saved })
     }
 
     /// Restores the modes for a while, as before a suspension; [`RawMode::resume`] takes raw mode
@@ -448,6 +533,7 @@ impl RawMode {
 
 impl Drop for RawMode {
     fn drop(&mut self) {
+        suspend_by_default(true);
         system::leave_raw(&self.saved);
     }
 }

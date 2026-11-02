@@ -4,7 +4,6 @@
 
 // Test code throughout, so that clippy's allow-*-in-tests keys cover the helpers too.
 #![cfg(test)]
-#![cfg(feature = "sskr")]
 
 use mnemocode::bip39::phrase::Phrase;
 use mnemocode::dates::parse_date;
@@ -12,7 +11,7 @@ use mnemocode::forms::Form;
 use mnemocode::forms::hints::{WordHint, WordHints};
 use mnemocode::modes::Mode;
 use mnemocode::random::{Random, RandomError};
-use mnemocode::refusal::{Refusal, RefusalKind};
+use mnemocode::refusal::Refusal;
 use mnemocode::search::{Search, Step};
 use mnemocode::sskr::export::ShareExport;
 use mnemocode::sskr::forms::{ShareFormat, check_share_qr, read_share};
@@ -22,7 +21,7 @@ use mnemocode::sskr::joint::{
 };
 use mnemocode::sskr::keeping::{Packaging, share_keeping_note};
 use mnemocode::sskr::marks::{exceeds_marks, mark_count, mark_problem};
-use mnemocode::sskr::repair::report::{DateWork, RepairReport, ReportLine};
+use mnemocode::sskr::repair::report::{DateWork, RepairReport};
 use mnemocode::sskr::restore::{MarkedElement, SetShare, ShareSet};
 use mnemocode::sskr::set::read_set;
 use mnemocode::sskr::share::Share;
@@ -35,7 +34,7 @@ use serde_json::{Map, Value, json};
 
 mod common;
 
-use common::{text, texts};
+use common::{close, items, line_value, optional, refused, repairs_list, text, texts};
 
 const RECORDED: &str = include_str!("../../../vectors/ts-0.1.0/shares-v1.json");
 const RECORDED_REPAIR: &str = include_str!("../../../vectors/ts-0.1.0/share-repair-v1.json");
@@ -52,7 +51,9 @@ const SEED: u8 = 7;
 const DECODE: &str = "Decode";
 
 fn recorded() -> Value {
-    serde_json::from_str(RECORDED).expect("the recorded file is JSON")
+    // Two refusals name the function that a caller takes, by this library's name for it.
+    let written = RECORDED.replace("combineSskrShareSet", "ShareSet::combine");
+    serde_json::from_str(&written).expect("the recorded file is JSON")
 }
 
 fn recorded_repair() -> Value {
@@ -70,25 +71,6 @@ fn numbers(value: &Value) -> Vec<usize> {
         .iter()
         .map(number)
         .collect()
-}
-
-fn items(value: &Value) -> &Vec<Value> {
-    value.as_array().expect("an array")
-}
-
-/// `value`, or JSON's null.
-fn optional(value: Option<String>) -> Value {
-    value.map_or(Value::Null, Value::String)
-}
-
-/// A refusal as the recorder writes it.
-fn refused(error: &impl Refusal) -> Value {
-    let kind = match error.kind() {
-        RefusalKind::Error => "Error",
-        RefusalKind::Range => "RangeError",
-        RefusalKind::Type => "TypeError",
-    };
-    json!({ "code": error.code(), "message": error.to_string(), "kind": kind })
 }
 
 /// A share's UR.
@@ -253,6 +235,11 @@ fn sets_are_checked_and_restored_as_ts_does() {
             Err(error) => json!({ "refused": refused(&error) }),
         };
         assert_eq!(restored, entry["restored"], "{shares:?}");
+        let phrase = match ShareSet::combine_phrase(&shares) {
+            Ok(phrase) => json!({ "phrase": phrase.text().as_str() }),
+            Err(error) => json!({ "refused": refused(&error) }),
+        };
+        assert_eq!(phrase, entry["phrase"], "{shares:?}");
     }
 }
 
@@ -313,12 +300,6 @@ const fn verdict_name(verdict: Verdict) -> &'static str {
         Verdict::NotEnough => "not-enough",
         Verdict::Stopped => "stopped",
     }
-}
-
-/// Whether two numbers a report gives are the same, but for the last bits of a recorded double.
-fn close(actual: f64, recorded: &Value) -> bool {
-    let recorded = recorded.as_f64().expect("a number");
-    (actual - recorded).abs() <= recorded.abs() * 1e-12
 }
 
 /// Checks `assessment`, field by field, against the recorder's.
@@ -392,19 +373,6 @@ fn check_assessment(assessment: &JointAssessment, entry: &Value, name: &str) {
     );
 }
 
-/// A line of a report as the recorder writes it.
-fn line_value(line: &ReportLine) -> Value {
-    match line {
-        ReportLine::Status { label, value, good } => {
-            json!({ "kind": "status", "label": label, "value": value, "good": good })
-        }
-        ReportLine::Hint(text) => json!({ "kind": "hint", "text": text }),
-        ReportLine::Notice(text) => json!({ "kind": "notice", "text": text }),
-        ReportLine::Warning(text) => json!({ "kind": "warning", "text": text }),
-        ReportLine::More(anchor) => json!({ "kind": "more", "anchor": anchor }),
-    }
-}
-
 /// Checks the report of `assessment` against the recorder's.
 fn check_report(assessment: &JointAssessment, places: &[usize], entry: &Value, name: &str) {
     let report = RepairReport::new(assessment.clone(), PACE, Some(places)).expect("a pace");
@@ -451,23 +419,7 @@ fn check_report(assessment: &JointAssessment, places: &[usize], entry: &Value, n
 
 /// The repairs of `set`, as the recorder writes them.
 fn repairs_value(set: &ShareSet, places: &[usize]) -> Value {
-    let list: Vec<Value> = RepairReport::repairs(set, Some(places))
-        .iter()
-        .map(|repairs| {
-            let elements: Vec<Value> = repairs
-                .elements
-                .iter()
-                .map(|element| {
-                    json!({
-                        "position": element.position,
-                        "value": element.value,
-                        "guess": element.guess,
-                    })
-                })
-                .collect();
-            json!({ "share": repairs.share, "elements": elements })
-        })
-        .collect();
+    let list = repairs_list(&RepairReport::repairs(set, Some(places)));
     let lines: Vec<Value> = RepairReport::repair_lines(set, Some(places))
         .iter()
         .map(line_value)
@@ -719,6 +671,12 @@ fn export_value(kind: &str, written: &ShareExport, trouble: Option<&ShareTrouble
         .iter()
         .map(|share| share.format.write(&share.share).as_str().to_owned())
         .collect();
+    let colors = written.in_form(ShareFormat::Colors);
+    let in_colors: Vec<Value> = colors
+        .shown()
+        .iter()
+        .map(|share| json!({ "format": share.format.name(), "number": share.number }))
+        .collect();
     json!({
         "kind": kind,
         "trouble": trouble.map_or(Value::Null, trouble_value),
@@ -730,6 +688,7 @@ fn export_value(kind: &str, written: &ShareExport, trouble: Option<&ShareTrouble
         "total": written.total(),
         "note": written.copies_note(),
         "text": writings,
+        "inColors": in_colors,
     })
 }
 

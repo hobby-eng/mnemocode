@@ -7,7 +7,10 @@
 use mnemocode::forms::Form;
 use mnemocode::text::codes::compact_code;
 
-use super::{Channel, can_redraw, paint, result_lines, show_result, style, wrap_text};
+use super::{
+    Channel, NoticeKind, can_redraw, lasting_warning, more_line, notice, notice_lines, paint,
+    result_lines, show_result, style, wrap_text,
+};
 
 /// Words a row of a phrase.
 const WORDS_PER_ROW: usize = 4;
@@ -26,10 +29,7 @@ pub(crate) const FINGERPRINT_NOTE: &str = "empty BIP39 passphrase";
 pub(crate) fn print(channel: Channel, lines: &[String]) {
     for line in lines {
         match channel {
-            Channel::Output => {
-                // A closed standard output ends the command at its next write; nothing to add here.
-                let _closed = super::output_line(line);
-            }
+            Channel::Output => super::result_line(line),
             Channel::Error => super::error_line(line),
         }
     }
@@ -156,6 +156,54 @@ pub(crate) fn backup_code_lines(text: &str, form: Form, kind: &str) -> Vec<Strin
     lines
 }
 
+/// The label of a part of a result, after a blank line: bold where `strong`, otherwise grey.
+pub(crate) fn part_line(label: &str, strong: bool, channel: Channel) -> String {
+    let code = if strong { style::STRONG } else { style::MUTED };
+    format!("\n{}", paint(channel, code, label))
+}
+
+/// Writes the label of a part of a result.
+pub(crate) fn print_part(label: &str, strong: bool, channel: Channel) {
+    print(channel, &[part_line(label, strong, channel)]);
+}
+
+/// A fingerprint on one line: its label, its value and its note.
+pub(crate) fn print_fingerprint(label: &str, value: &str, note: &str, channel: Channel) {
+    let line = format!(
+        "{}  {}  {}",
+        paint(channel, style::MUTED, label),
+        paint(channel, style::STRONG, value),
+        paint(channel, style::MUTED, &format!("({note})"))
+    );
+    print(channel, &[line]);
+}
+
+/// A note after a result: a notice, a warning that still holds once the command has ended, or a
+/// link to read more.
+pub(crate) enum ResultNote {
+    Notice(String, NoticeKind),
+    Lasting(String),
+    More(&'static str),
+}
+
+/// The lines that [`print_note`] writes, for a check of the room on the screen.
+pub(crate) fn note_lines(note: &ResultNote) -> Vec<String> {
+    match note {
+        ResultNote::Notice(text, kind) => notice_lines(text, *kind),
+        ResultNote::Lasting(text) => notice_lines(text, NoticeKind::Warning),
+        ResultNote::More(anchor) => vec![more_line(anchor)],
+    }
+}
+
+/// Writes `note` as its kind says.
+pub(crate) fn print_note(note: &ResultNote) {
+    match note {
+        ResultNote::Notice(text, kind) => notice(text, *kind),
+        ResultNote::Lasting(text) => lasting_warning(text),
+        ResultNote::More(anchor) => super::error_line(&more_line(anchor)),
+    }
+}
+
 /// A fingerprint as a plain line for a script: the original's, or the encoded one, of the masked
 /// phrase where `masked`.
 pub(crate) fn plain_fingerprint_line(original: bool, value: &str, masked: bool) -> String {
@@ -164,14 +212,15 @@ pub(crate) fn plain_fingerprint_line(original: bool, value: &str, masked: bool) 
     format!("{phrase} BIP32 master fingerprint{of} ({FINGERPRINT_NOTE}): {value}")
 }
 
-/// Running text on standard error: wrapped on a terminal, on one line otherwise.
+/// Running text of a secret result: wrapped on a terminal, on one line otherwise.
 pub(crate) fn print_sentence(sentence: &str) {
-    let lines = if can_redraw(Channel::Error) {
+    let channel = super::secret_channel();
+    let lines = if can_redraw(channel) {
         wrap_text(sentence, super::TEXT_WIDTH)
     } else {
         vec![sentence.to_owned()]
     };
-    print(Channel::Error, &lines);
+    print(channel, &lines);
 }
 
 #[cfg(test)]

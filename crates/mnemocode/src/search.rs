@@ -21,6 +21,8 @@ pub struct Progress {
     pub total: Option<u64>,
     /// What passed the search's own check so far: a BIP39 checksum, a digest or the wallet check.
     pub found: u64,
+    /// What the wallet matched so far, or every one found without a wallet.
+    pub matched: u64,
 }
 
 /// What one step left: the search goes on, or it has tried everything.
@@ -138,6 +140,7 @@ mod tests {
             checked: 3,
             total: Some(10),
             found: 1,
+            matched: 1,
         };
         assert_eq!(Step::Running(progress).progress(), progress);
         assert_eq!(Step::Done(progress).progress().checked, 3);

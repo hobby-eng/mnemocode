@@ -341,6 +341,11 @@ impl ReadingSpace {
         &self.reading
     }
 
+    /// The number of marked bits.
+    pub(crate) fn unknown_bits(&self) -> usize {
+        self.reading.unknown_bits()
+    }
+
     /// One solution.
     pub(crate) const fn particular(&self) -> &Bits {
         &self.particular

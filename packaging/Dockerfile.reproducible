@@ -1,0 +1,65 @@
+# Canonical release build. It produces, byte for byte the same on every machine, the executables
+# for Linux on x86-64 and ARM64 and for Windows on x86-64, and every page's WebAssembly file. macOS
+# builds need Apple's SDK and are made by the release workflow on macOS runners. Every tool is
+# pinned: the base image by digest, downloads by SHA-256, Ubuntu packages by an archive snapshot
+# date, Rust crates by Cargo.lock.
+
+FROM buildpack-deps:noble@sha256:27bdb6ab1ca0df6acfe341752ee4d9c08a341d80e3ee75ccc3b34b79af0dfaf1 AS toolchain
+
+ARG RUSTUP_VERSION=1.29.2
+ARG RUSTUP_INIT_SHA256=5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4
+# Ubuntu archive snapshot for the cross compilers, so that their versions never change.
+ARG UBUNTU_SNAPSHOT=20261009T000000Z
+
+ENV CARGO_HOME=/root/.cargo \
+    RUSTUP_HOME=/root/.rustup \
+    PATH=/root/.cargo/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin \
+    CI=true
+
+# C cross compilers' linkers for ARM64 Linux and for Windows (MinGW-w64). The update and security
+# suites of the same snapshot are needed too: the base image already carries updated packages, such
+# as binutils-common, that the cross binutils must match.
+RUN for suite in noble noble-updates noble-security; do \
+      printf 'deb [check-valid-until=no] https://snapshot.ubuntu.com/ubuntu/%s %s main universe\n' \
+        "${UBUNTU_SNAPSHOT}" "${suite}"; \
+    done > /etc/apt/sources.list.d/snapshot.list \
+    && rm -f /etc/apt/sources.list.d/ubuntu.sources \
+    && apt-get update \
+    && apt-get install --yes --no-install-recommends \
+         gcc-aarch64-linux-gnu libc6-dev-arm64-cross gcc-mingw-w64-x86-64 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl --fail --silent --show-error --location \
+      "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/x86_64-unknown-linux-gnu/rustup-init" \
+      --output /tmp/rustup-init \
+    && echo "${RUSTUP_INIT_SHA256}  /tmp/rustup-init" | sha256sum --check --strict \
+    && chmod 0755 /tmp/rustup-init \
+    && /tmp/rustup-init -y --profile minimal --default-toolchain 1.99.1 \
+         --target wasm32-unknown-unknown --target aarch64-unknown-linux-gnu \
+         --target x86_64-pc-windows-gnu \
+    && rm /tmp/rustup-init \
+    && cargo install wasm-bindgen-cli --version 0.2.129 --locked \
+    && test "$(rustc --version | cut -d ' ' -f 1-2)" = "rustc 1.99.1" \
+    && test "$(wasm-bindgen --version)" = "wasm-bindgen 0.2.129"
+
+# The MinGW linker writes the build time into every Windows executable's header, and the header
+# checksum with it; --no-insert-timestamp writes zero instead, so that two builds give the same
+# bytes.
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
+    CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc \
+    CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS="-C link-arg=-Wl,--no-insert-timestamp"
+
+FROM toolchain AS build
+WORKDIR /workspace
+COPY . .
+RUN cargo fetch --locked
+ENV CARGO_NET_OFFLINE=true
+RUN --network=none cargo xtask release build x86_64-unknown-linux-gnu \
+    && cargo xtask release build aarch64-unknown-linux-gnu \
+    && cargo xtask release build x86_64-pc-windows-gnu \
+    && cargo xtask wasm build \
+    && cargo xtask wasm verify \
+    && cargo xtask release pages
+
+FROM scratch AS artifacts
+COPY --from=build /workspace/dist/release /release

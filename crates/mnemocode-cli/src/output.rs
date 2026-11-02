@@ -6,12 +6,15 @@
 //! secret). The folders it gives are the command's needs (os::Needs). A cloud service that copies
 //! an output's folder is warned of.
 
+use std::ffi::OsString;
+use std::io;
 use std::path::{Component, Path, PathBuf};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use mnemocode::refusal::Refusal;
 
 use crate::args::{FILE_OUTPUTS, FOLDER_OUTPUTS, Given, Parsed, option_label, value, values};
-use crate::os::{self, Entry, FileError, Needs};
+use crate::os::{self, Entry, FileError, FileLook, Needs};
 use crate::terminal::{self, lasting_warning, printable, warning_with_more};
 
 /// The most numbered copies of one name.
@@ -55,6 +58,20 @@ pub(crate) enum OutputError {
     OverlapsInput(&'static str, &'static str),
     /// The file system refused.
     File(FileError),
+    /// A file output given as "-" or blank.
+    NoFilePath,
+    /// A file that must be new exists.
+    FileExists,
+    /// A file's folder is missing or may not be written.
+    FileFolderUnwritable,
+    /// A new name outside the folders that the rules on writes leave open: those folders.
+    OutsideRuled(String),
+    /// An output's place that cannot be told.
+    NotResolved,
+    /// An input that cannot be read, by its option's label.
+    UnreadableInput(&'static str),
+    /// A file's folder is a file.
+    FileFolderIsAFile,
 }
 
 impl std::fmt::Display for OutputError {
@@ -93,6 +110,27 @@ impl std::fmt::Display for OutputError {
                 write!(f, "The {output} must not overlap the {input}.")
             }
             Self::File(error) => error.fmt(f),
+            Self::NoFilePath => f.write_str(
+                "File export requires a file path; - and empty paths are not accepted. Results always appear in the terminal.",
+            ),
+            Self::FileExists => {
+                f.write_str("The output file already exists. Choose a new path.")
+            }
+            Self::FileFolderUnwritable => f.write_str(
+                "The folder containing the output file must already exist and be writable.",
+            ),
+            Self::OutsideRuled(folders) => write!(
+                f,
+                "MnemoCode may save only in the folders ruled before the secret was asked: {folders}."
+            ),
+            Self::NotResolved => f.write_str("The output path could not be resolved safely."),
+            Self::UnreadableInput(label) => write!(
+                f,
+                "The {label} could not be read. Check that the file exists and is readable."
+            ),
+            Self::FileFolderIsAFile => {
+                f.write_str("The folder containing the output file is not a directory.")
+            }
         }
     }
 }
@@ -121,6 +159,13 @@ impl Refusal for OutputError {
             Self::Overlapping(..) => "cli.output-paths.use-separate-non-overlapping-paths",
             Self::OverlapsInput(..) => "cli.output-paths.not-overlap",
             Self::File(error) => error.code(),
+            Self::NoFilePath => "cli.output-paths.file-export-requires-file-path-empty-paths-not",
+            Self::FileExists => "cli.output-paths.output-file-already-exists-choose-new-path",
+            Self::FileFolderUnwritable => "cli.output-paths.folder-unwritable-file",
+            Self::OutsideRuled(_) => "cli.output-paths.outside-ruled-folders",
+            Self::NotResolved => "cli.output-paths.output-path-could-not-resolved-safely",
+            Self::UnreadableInput(label) => FileError::Unreadable(label).code(),
+            Self::FileFolderIsAFile => "cli.output-paths.folder-file",
         }
     }
 }
@@ -136,8 +181,8 @@ fn unusable(path: &str) -> bool {
     path.trim().is_empty() || path == "-"
 }
 
-/// `path` resolved against the current folder.
-fn resolved(path: &str) -> PathBuf {
+/// `path` of an option, made absolute against the folder the program started in.
+pub(crate) fn resolved(path: &str) -> PathBuf {
     os::resolve(Path::new(path), terminal::environment().current.as_deref())
 }
 
@@ -166,6 +211,14 @@ fn numbered_name(path: &str, number: usize, folder: bool) -> String {
     }
 }
 
+/// `path`, or where something is there its first numbered name that nothing takes.
+pub(crate) fn first_free_name(path: &str) -> Result<String, OutputError> {
+    if os::entry_at(&resolved(path)).map_err(FileError::from)? == Entry::None {
+        return Ok(path.to_owned());
+    }
+    first_free_numbered(path, false)
+}
+
 /// The first numbered name of `path` that nothing takes.
 fn first_free_numbered(path: &str, folder: bool) -> Result<String, OutputError> {
     for number in 1..=MAX_COPY_NUMBER {
@@ -177,95 +230,266 @@ fn first_free_numbered(path: &str, folder: bool) -> Result<String, OutputError> 
     Err(OutputError::TooManyCopies(printable(path)))
 }
 
-/// The outputs of a run that were numbered: the name used and the name given.
-#[derive(Debug, Default)]
-pub(crate) struct Renamed(Vec<(String, String)>);
+/// The outputs of a run that were numbered, the name used and the name given: one record for the
+/// process, as a result that is not saved after all drops out of it wherever it is decided.
+static RENAMED: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
 
-impl Renamed {
-    /// Says, once each is saved, which taken names were numbered.
-    pub(crate) fn report(&mut self) {
-        for (used, given) in self.0.drain(..) {
-            lasting_warning(&format!(
-                "{} already exists: saved as {} instead.",
-                printable(&given),
-                printable(&used)
-            ));
+/// The record of numbered names; a poisoned lock holds names, which stay usable.
+fn renamed() -> MutexGuard<'static, Vec<(String, String)>> {
+    RENAMED.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// For a result at `path` that was not saved after all: its numbered name is not reported.
+pub(crate) fn discard_renamed(path: &str) {
+    renamed().retain(|(used, _)| used != path);
+}
+
+/// Says, once each is saved, which taken names were numbered.
+pub(crate) fn report_renamed() {
+    for (used, given) in renamed().drain(..) {
+        lasting_warning(&format!(
+            "{} already exists: saved as {} instead.",
+            printable(&given),
+            printable(&used)
+        ));
+    }
+}
+
+/// Refuses the output `key` given as no path.
+pub(crate) fn check_usable(key: &str, path: &str) -> Result<(), OutputError> {
+    if unusable(path) {
+        return Err(OutputError::Unusable(option_label(key)));
+    }
+    Ok(())
+}
+
+/// Refuses a new name outside the folders that the rules on writes leave open, naming them: the
+/// system would refuse the save, whatever else may be said of the folder.
+pub(crate) fn check_ruled(path: &str) -> Result<(), OutputError> {
+    let Some(ruled) = os::ruled_folders() else {
+        return Ok(());
+    };
+    let target = resolved(path);
+    if ruled.iter().any(|folder| target.starts_with(folder)) {
+        return Ok(());
+    }
+    let names: Vec<String> = ruled
+        .iter()
+        .map(|folder| terminal::printable(&folder.to_string_lossy()))
+        .collect();
+    Err(OutputError::OutsideRuled(names.join(", ")))
+}
+
+/// The nearest of `folder` and the folders above it that exists, its links resolved, and the names
+/// below it that do not exist yet, from the top; none when one cannot be looked at.
+fn nearest_existing(folder: &Path) -> Option<(PathBuf, Vec<OsString>)> {
+    let mut missing = Vec::new();
+    let mut ancestor = folder;
+    loop {
+        match os::real_path(ancestor) {
+            Ok(real) => {
+                missing.reverse();
+                return Some((real, missing));
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                missing.push(ancestor.file_name()?.to_owned());
+                ancestor = ancestor.parent()?;
+            }
+            Err(_) => return None,
         }
     }
 }
 
-/// The preflight of a command's outputs, before any secret: refusals as above, a taken name
-/// numbered in `parsed`, each missing parent folder made, and the folders the command writes
-/// beneath, for the protections.
-pub(crate) fn preflight(parsed: &mut Parsed) -> Result<(Needs, Renamed), OutputError> {
-    let outputs: Vec<(&'static str, String)> = FILE_OUTPUTS
-        .iter()
-        .chain(FOLDER_OUTPUTS.iter())
-        .filter_map(|key| value(parsed, key).map(|path| (*key, path.to_owned())))
-        .collect();
+/// Where the output `path` lands, the links of the folders that exist resolved.
+fn effective_output_path(path: &str) -> Result<PathBuf, OutputError> {
+    let absolute = resolved(path);
+    let parent = absolute.parent().unwrap_or(&absolute);
+    let (mut real, missing) = nearest_existing(parent).ok_or(OutputError::NotResolved)?;
+    real.extend(missing);
+    real.extend(absolute.file_name());
+    Ok(real)
+}
+
+/// Refuses outputs that overlap each other or an input, or an input that cannot be read, by where
+/// they lie, their links resolved (validateOutputPaths).
+pub(crate) fn validate_output_paths(parsed: &Parsed) -> Result<(), OutputError> {
+    let outputs = outputs_of(parsed);
     for (key, path) in &outputs {
-        if unusable(path) {
-            return Err(OutputError::Unusable(option_label(key)));
-        }
+        check_usable(key, path)?;
     }
-    let inputs: Vec<(&'static str, PathBuf)> = FILE_INPUTS
+    let effective: Vec<(&'static str, PathBuf)> = outputs
         .iter()
-        .flat_map(|key| {
-            values(parsed, key)
-                .into_iter()
-                .filter(|source| *source != "-")
-                .map(|source| (*key, resolved(source)))
-        })
-        .collect();
-    for (index, (left_key, left)) in outputs.iter().enumerate() {
-        let left_path = resolved(left);
-        for (right_key, right) in outputs.iter().skip(index + 1) {
-            let right_path = resolved(right);
-            if within(&left_path, &right_path) || within(&right_path, &left_path) {
+        .map(|(key, path)| Ok((*key, effective_output_path(path)?)))
+        .collect::<Result<_, OutputError>>()?;
+    for (index, (left_key, left)) in effective.iter().enumerate() {
+        for (right_key, right) in effective.iter().skip(index + 1) {
+            if overlap(left, right) {
                 return Err(OutputError::Overlapping(
                     option_label(left_key),
                     option_label(right_key),
                 ));
             }
         }
-        for (input_key, input) in &inputs {
-            if within(&left_path, input) || within(input, &left_path) {
-                return Err(OutputError::OverlapsInput(
-                    option_label(left_key),
-                    option_label(input_key),
-                ));
+        for key in FILE_INPUTS {
+            for source in values(parsed, key) {
+                if source == "-" {
+                    continue;
+                }
+                let input = os::real_path(&resolved(source))
+                    .map_err(|_| OutputError::UnreadableInput(option_label(key)))?;
+                if overlap(left, &input) {
+                    return Err(OutputError::OverlapsInput(
+                        option_label(left_key),
+                        option_label(key),
+                    ));
+                }
             }
         }
     }
-    let mut renamed = Renamed::default();
+    Ok(())
+}
+
+/// Whether `left` and `right` are one place, or one lies in the other.
+fn overlap(left: &Path, right: &Path) -> bool {
+    within(left, right) || within(right, left)
+}
+
+/// The outputs that `parsed` names, each with its option.
+fn outputs_of(parsed: &Parsed) -> Vec<(&'static str, String)> {
+    FILE_OUTPUTS
+        .iter()
+        .chain(FOLDER_OUTPUTS.iter())
+        .filter_map(|key| value(parsed, key).map(|path| (*key, path.to_owned())))
+        .collect()
+}
+
+/// Gives each output whose name is taken its first free numbered name, in `parsed` (RenamedOutputs.
+/// settle). A folder given for a file, and an input of the command itself, are left for the checks
+/// that refuse them: a result named like its own input is a mistake, not a copy.
+fn settle(parsed: &mut Parsed) -> Result<(), OutputError> {
+    let real_or_resolved = |path: &str| {
+        let absolute = resolved(path);
+        os::real_path(&absolute).unwrap_or(absolute)
+    };
+    let inputs: Vec<PathBuf> = FILE_INPUTS
+        .iter()
+        .flat_map(|key| values(parsed, key))
+        .filter(|source| *source != "-")
+        .map(real_or_resolved)
+        .collect();
+    for (key, path) in outputs_of(parsed) {
+        if unusable(&path) {
+            continue;
+        }
+        let folder = FOLDER_OUTPUTS.contains(&key);
+        let taken = os::entry_at(&resolved(&path)).map_err(FileError::from)?;
+        if taken == Entry::None
+            || (taken == Entry::Folder && !folder)
+            || inputs.contains(&real_or_resolved(&path))
+        {
+            continue;
+        }
+        let free = first_free_numbered(&path, folder)?;
+        renamed().push((free.clone(), path));
+        parsed.insert(key.to_owned(), Given::One(free));
+    }
+    Ok(())
+}
+
+/// The preflight of a command's outputs, before any secret: a taken name numbered in `parsed`,
+/// refusals as above, each missing parent folder made, and the folders the command writes beneath,
+/// for the protections.
+pub(crate) fn preflight(parsed: &mut Parsed) -> Result<Needs, OutputError> {
+    settle(parsed)?;
+    validate_output_paths(parsed)?;
     let mut needs = Needs::default();
-    for (key, path) in outputs {
+    for (key, path) in outputs_of(parsed) {
         let folder = FOLDER_OUTPUTS.contains(&key);
         if folder {
             check_folder_name(&path)?;
         }
-        let taken = os::entry_at(&resolved(&path)).map_err(FileError::from)?;
-        if taken == Entry::Folder && !folder {
+        let target = resolved(&path);
+        if !folder && os::entry_at(&target).map_err(FileError::from)? == Entry::Folder {
             return Err(OutputError::FolderForFile);
         }
-        let used = if taken == Entry::None {
-            path.clone()
-        } else {
-            let free = first_free_numbered(&path, folder)?;
-            renamed.0.push((free.clone(), path.clone()));
-            parsed.insert(key.to_owned(), Given::One(free.clone()));
-            free
-        };
-        let parent = resolved(&used)
-            .parent()
-            .map(Path::to_path_buf)
-            .unwrap_or_default();
+        let parent = target.parent().map(Path::to_path_buf).unwrap_or_default();
         make_parent(&parent)?;
+        if !os::may_write(&parent) {
+            return Err(if folder {
+                OutputError::FolderUnwritable
+            } else {
+                OutputError::FileFolderUnwritable
+            });
+        }
         if !needs.folders.contains(&parent) {
             needs.folders.push(parent);
         }
     }
-    Ok((needs, renamed))
+    Ok(needs)
+}
+
+/// Refuses a new file's name that cannot be saved: an unusable name, something there already, a
+/// file for its folder, a folder that may not be written. Only looks; the save decides.
+pub(crate) fn check_new_file(path: &str, may_exist: bool) -> Result<(), OutputError> {
+    if unusable(path) {
+        return Err(OutputError::NoFilePath);
+    }
+    let target = resolved(path);
+    let taken = os::entry_at(&target).map_err(|error| {
+        // A name under a file, or a folder that cannot be looked into.
+        if error.kind() == io::ErrorKind::NotADirectory {
+            OutputError::FileFolderIsAFile
+        } else {
+            OutputError::FileFolderUnwritable
+        }
+    })?;
+    if taken != Entry::None && !may_exist {
+        return Err(OutputError::FileExists);
+    }
+    if taken == Entry::Folder {
+        return Err(OutputError::FolderForFile);
+    }
+    let parent = target.parent().unwrap_or(Path::new("."));
+    match os::look_at_file(parent) {
+        Ok(FileLook::Folder) if os::may_write(parent) => Ok(()),
+        Ok(FileLook::File { .. } | FileLook::NoFile) => Err(OutputError::FileFolderIsAFile),
+        _ => Err(OutputError::FileFolderUnwritable),
+    }
+}
+
+/// Refuses a new folder's name that cannot be made: one that ends as a document does, a file on the
+/// way, a folder above it that may not be written. The folders of its path that do not exist yet
+/// are made with it, so the nearest that exists is checked.
+pub(crate) fn check_new_folder(path: &str) -> Result<(), OutputError> {
+    check_folder_name(path)?;
+    let target = resolved(path);
+    let parent = target.parent().unwrap_or(&target);
+    let (existing, _) = nearest_existing(parent).ok_or(OutputError::FolderUnwritable)?;
+    if os::entry_at(&existing).map_err(FileError::from)? == Entry::Other {
+        return Err(OutputError::FileForFolder);
+    }
+    if os::may_write(&existing) {
+        Ok(())
+    } else {
+        Err(OutputError::FolderUnwritable)
+    }
+}
+
+/// Whether `left` and `right` are one place, or one lies in the other, by their resolved names.
+pub(crate) fn paths_overlap(left: &str, right: &str) -> bool {
+    overlap(&resolved(left), &resolved(right))
+}
+
+/// Warns of one output that a cloud service copies, as a name chosen after a failed save is.
+pub(crate) fn warn_of_cloud_copy(path: &str) {
+    if let Some(service) = cloud_service_of(&resolved(path)) {
+        let message = format!(
+            "{} keeps a copy of {}",
+            printable(&service),
+            printable(path)
+        );
+        warning_with_more(&message, "cloud-folders");
+    }
 }
 
 /// Refuses a new folder's name that ends as a document does.
@@ -275,8 +499,9 @@ fn check_folder_name(path: &str) -> Result<(), OutputError> {
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
-    if let Some((_, ending)) = name.rsplit_once('.') {
-        let ending = ending.to_lowercase();
+    // As Node's extname: a leading dot starts a name, it ends none.
+    if let Some(ending) = Path::new(&name).extension() {
+        let ending = ending.to_string_lossy().to_lowercase();
         if DOCUMENT_EXTENSIONS.contains(&ending.as_str()) {
             return Err(OutputError::FolderEnding(ending));
         }
@@ -287,12 +512,7 @@ fn check_folder_name(path: &str) -> Result<(), OutputError> {
 /// Makes `folder` with every missing folder above it; refused where a file stands on the way or
 /// the system refuses.
 fn make_parent(folder: &Path) -> Result<(), OutputError> {
-    let mut existing = folder.to_path_buf();
-    while os::entry_at(&existing).map_err(FileError::from)? == Entry::None {
-        if !existing.pop() {
-            break;
-        }
-    }
+    let (existing, _) = nearest_existing(folder).ok_or(OutputError::FolderUnwritable)?;
     if os::entry_at(&existing).map_err(FileError::from)? == Entry::Other {
         return Err(OutputError::FileForFolder);
     }
@@ -375,15 +595,8 @@ fn known_service(folder: &str) -> Option<&'static str> {
 /// Warns, with a link to the README, of each output that a cloud service copies.
 pub(crate) fn warn_of_cloud_copies(parsed: &Parsed) {
     for key in FILE_OUTPUTS.iter().chain(FOLDER_OUTPUTS.iter()) {
-        if let Some(path) = value(parsed, key)
-            && let Some(service) = cloud_service_of(&resolved(path))
-        {
-            let message = format!(
-                "{} keeps a copy of {}",
-                printable(&service),
-                printable(path)
-            );
-            warning_with_more(&message, "cloud-folders");
+        if let Some(path) = value(parsed, key) {
+            warn_of_cloud_copy(path);
         }
     }
 }

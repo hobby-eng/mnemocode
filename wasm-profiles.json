@@ -7,9 +7,24 @@
         "wallet",
         "qr",
         "candidates",
-        "sskr"
+        "sskr",
+        "recovery",
+        "cards"
       ],
       "units": [
+        "template-business-architect",
+        "template-business-it",
+        "template-business-estate",
+        "template-business-diagonal",
+        "template-business-contact",
+        "template-business-curves",
+        "template-business-facets",
+        "template-business-mixed",
+        "template-material-vehicle",
+        "template-material-enclosure",
+        "template-material-tile",
+        "template-material-switch",
+        "template-material-kitchen",
         "coin-bitcoin",
         "coin-bitcoin-cash",
         "coin-cosmos",
@@ -47,9 +62,13 @@
         "wallet",
         "qr",
         "candidates",
-        "sskr"
+        "sskr",
+        "recovery",
+        "cards"
       ],
       "units": [
+        "template-business-it",
+        "template-material-tile",
         "coin-bitcoin",
         "coin-bitcoin-cash",
         "coin-cosmos",
@@ -83,14 +102,24 @@
       "EncodedBackup",
       "likelyForm",
       "masterFingerprint",
-      "selfCheckPhrase"
+      "selfCheckPhrase",
+      "WordRow",
+      "RecoverySet",
+      "TypedHint",
+      "LegacyLastWords",
+      "wordLookup",
+      "wordTable",
+      "wordHint",
+      "legacyLastWords"
     ],
     "wallet": [
       "WalletEvidence",
       "WalletCheck",
-      "WalletPlace",
       "walletCoins",
       "selfCheckWallet"
+    ],
+    "coin-bitcoin": [
+      "WalletPlace"
     ],
     "qr": [
       "QrMatrix",
@@ -111,7 +140,40 @@
       "OpenedCandidateList",
       "decryptWithPassphrase",
       "protectList",
-      "selfCheckCandidates"
+      "selfCheckCandidates",
+      "candidateFileLock",
+      "checkCandidateFileSize"
+    ],
+    "recovery": [
+      "ReadBackup",
+      "DecodedBackup",
+      "BackupFinding",
+      "MarkedCodes",
+      "MarkedWay",
+      "Recovery",
+      "RecoverySearch",
+      "SearchQuestion",
+      "SearchProgress",
+      "SearchResult",
+      "shareKind",
+      "isCodes",
+      "checkBackup",
+      "checkShareBackup",
+      "selfCheckRecovery",
+      "ReEncoding"
+    ],
+    "cards": [
+      "CardDesign",
+      "CardDocuments",
+      "CardExport",
+      "CardPlan",
+      "HeirPage",
+      "ShareCards",
+      "cardDesign",
+      "cardDesignCount",
+      "ownShareCards",
+      "selfCheckCards",
+      "CardSession"
     ]
   }
 }

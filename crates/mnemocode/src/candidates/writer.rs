@@ -117,6 +117,11 @@ impl Writer {
         })
     }
 
+    /// The same protection storing `passphrase` instead, refused as [`Writer::new`] refuses it.
+    pub fn with_passphrase(self, passphrase: &str) -> Result<Self, ListError> {
+        Self::new(self.protection, passphrase)
+    }
+
     /// Whether it stores `passphrase`; it never gives its own out.
     pub fn uses_passphrase(&self, passphrase: &str) -> bool {
         let own = self.passphrase.as_ref().map_or("", SecretText::as_str);
@@ -161,25 +166,37 @@ impl Writer {
         if phrases.len() > MAX_CANDIDATE_RECORDS {
             return Ok(ListOutcome::Full);
         }
-        let Some(first) = phrases.first() else {
+        if phrases.is_empty() {
             return Ok(ListOutcome::Empty);
-        };
-        let length = entropy_bytes(first.len());
-        let mut entropies = SecretBytes::zeroed("a list's entropies", phrases.len() * length);
-        for (phrase, slot) in phrases.iter().zip(entropies.chunks_mut(length)) {
-            let mnemonic = phrase.mnemonic()?;
-            let (mut bytes, used) = mnemonic.to_entropy_array();
-            let fits = used == length;
-            if fits {
-                slot.copy_from_slice(&bytes[..length]);
-            }
-            zeroize::Zeroize::zeroize(&mut bytes);
-            if !fits {
-                return Err(ListError::EntropyLengths.into());
-            }
         }
+        let (entropies, length) = entropies_of(phrases)?;
         self.write(entropies, length, gate, random)
     }
+}
+
+/// The entropy of each of `phrases`, one after another, and its length; phrases of more than one
+/// length are refused.
+pub fn entropies_of(phrases: &[Phrase]) -> Result<(SecretBytes, usize), WriteError> {
+    let length = phrases
+        .first()
+        .map_or(0, |first| entropy_bytes(first.len()));
+    let mut entropies = SecretBytes::zeroed("a list's entropies", phrases.len() * length);
+    if length == 0 {
+        return Ok((entropies, 0));
+    }
+    for (phrase, slot) in phrases.iter().zip(entropies.chunks_mut(length)) {
+        let mnemonic = phrase.mnemonic()?;
+        let (mut bytes, used) = mnemonic.to_entropy_array();
+        let fits = used == length;
+        if fits {
+            slot.copy_from_slice(&bytes[..length]);
+        }
+        zeroize::Zeroize::zeroize(&mut bytes);
+        if !fits {
+            return Err(ListError::EntropyLengths.into());
+        }
+    }
+    Ok((entropies, length))
 }
 
 #[cfg(test)]

@@ -19,6 +19,7 @@
 //! - size (CORE-15): at most 800 lines of code per file, a Rust file's unit-test modules left out;
 //! - tests (CORE-32, CORE-34): test names of three words or more; fakes only of the Random port and
 //!   mhfe's Probes, in unit-test modules and test files alike;
+//! - refusals (CORE-23): each code of a `Refusal` is TS's or the port's own, and of one enum;
 //! - tooling (TOOL-01, TOOL-02): no script of another language than Rust and no Node.js, shell
 //!   scripts that stop on their first error and quote their expansions.
 
@@ -26,6 +27,7 @@ mod cases;
 pub(crate) mod deps;
 mod layers;
 mod lints;
+mod refusals;
 mod sizes;
 
 use std::collections::BTreeSet;
@@ -154,6 +156,7 @@ pub(crate) fn check_sources(problems: &mut Problems, sources: &[Source], map: &V
         lints::check(problems, source, map, test_file);
     }
     lints::check_tests(problems, sources, &tests);
+    refusals::check(problems, sources, map);
 }
 
 /// The gate.

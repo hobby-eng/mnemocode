@@ -1,16 +1,24 @@
 {
  "about": "Known answers of MnemoCode TS, recorded by its scripts/rust-parity.mjs from the build of one commit; the Rust tests replay them (RUST-14).",
  "repository": "hobby-eng/mnemocode",
- "commit": "524d00347bdb37cb3226fa67432f690840684ea0",
+ "commit": "e3ecde18cc83016f1d2f4f904fb1529b09d09f1c",
  "node": "v26.12.1",
  "recorders": {
+  "cards.mjs": "6a546372b9ec750e3dfdc17f9c7bc57e0725fcc3c8543352c30ad29e36e81090",
   "foundation.mjs": "82a5340fdfc0cd485b54ba8a3cd5f1589ea50151ccaa7d9fa43624bbbbfd756a",
+  "recovery.mjs": "dc924a793dd820ca9b7adca7099e0bbeceff70d24733482ca15a132bb2a06f54",
+  "refusals.mjs": "022d53e3750ec8fc6523cdff9c2efb03324da6993cac076c52848c4ce28383cc",
   "share-repair.mjs": "70554f286b334fbdefb65ba161cf3d40e2990167599b980742c5920224784826",
-  "shares.mjs": "eddef78cd4f5fc549d3493e46a957b51c93795a0c175007c84c2cdfaa0070bac"
+  "shares.mjs": "dc95ea599c4433ec75edd7e2856dce45788bb32d6f9bd931414d55a10b87ed37",
+  "transcripts.mjs": "4cf5461704575ea76d8f58bd52d523d7efe806a05c28e75161f48987bcde1c55"
  },
  "files": {
+  "cards-v1.json": "ee45069238050b7fe8fb4bd739b03e1842e7e6b70c5d7554377c6fa60d960ab1",
   "foundation-v1.json": "3085e55d83b307472dde4aca6ebec3183bade87f4184b016d360e65041ed3036",
+  "recovery-v1.json": "482d7e5e5895085e05f56aba89a93bfc5fb8ccdd1abae82f9b0f60babc9cb129",
+  "refusals-v1.json": "e0ab218aef43c171e3873cd57a51266916d48864833a6794a5306ddaf1f139a5",
   "share-repair-v1.json": "f96f67b4b36718c8cb1e879b2c47974b22960160a0cded7be92cb5190e61227a",
-  "shares-v1.json": "8fabbbfa319186a8657d38dfe6598fa2183eee5e1dc40563cc7b11b41c224f83"
+  "shares-v1.json": "e1ab9c16d4019ef26e6110326a37c65dca15bf476cbdec7d4b32a66564e5ea52",
+  "transcripts-v1.json": "30c579bdb78e22251177bca9cd7aeee570760943de7d4d18a776c890799710b9"
  }
 }

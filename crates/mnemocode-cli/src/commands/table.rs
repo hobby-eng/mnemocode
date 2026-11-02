@@ -10,10 +10,11 @@ use mnemocode::bip39::table::{self, Format, Lookup, Row};
 use mnemocode::pack;
 use mnemocode::refusal::Refusal;
 
+use super::saving::folder_taken;
 use crate::args::{Parsed, choice_option, integer_option, is_on, value};
 use crate::gate::Stop;
 use crate::os::{self, Folder};
-use crate::terminal::{self, Channel, output_line, printable, saved};
+use crate::terminal::{self, Channel, printable, result_line, saved};
 
 /// The options `table` takes.
 pub(crate) const OPTIONS: [&str; 8] = [
@@ -59,7 +60,7 @@ impl Refusal for TableCommandError {
 }
 
 /// One row: grey labels under the result's heading on a terminal, plain lines for a script.
-fn print_row(row: &Row) -> Result<(), Stop> {
+fn print_row(row: &Row) {
     let facts = [
         ("Index", row.index.to_string()),
         ("English", row.english.to_owned()),
@@ -67,18 +68,17 @@ fn print_row(row: &Row) -> Result<(), Stop> {
     ];
     if terminal::can_redraw(Channel::Output) {
         for line in terminal::result_lines(Channel::Output, "Word mapping", &facts) {
-            output_line(&line).map_err(|_| Stop::Cancelled)?;
+            result_line(&line);
         }
-        return Ok(());
+        return;
     }
     for line in [
         format!("index:       {}", row.index),
         format!("english:     {}", row.english),
         format!("unicode hex: {}", row.unicode_hex),
     ] {
-        output_line(&line).map_err(|_| Stop::Cancelled)?;
+        result_line(&line);
     }
-    Ok(())
 }
 
 /// The format named by `--table-format`.
@@ -128,10 +128,10 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
                 });
                 let facts = [("Rows", "2048".to_owned()), ("Columns", columns)];
                 for line in terminal::result_lines(Channel::Output, "Word table", &facts) {
-                    output_line(&line).map_err(|_| Stop::Cancelled)?;
+                    result_line(&line);
                 }
             }
-            os::write_output(text.as_bytes()).map_err(|_| Stop::Cancelled)?;
+            let _unwritten = os::write_output(text.as_bytes());
             return Ok(());
         };
         let path = os::resolve(
@@ -155,7 +155,8 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
     } else {
         table::lookup(Lookup::Unicode, unicode.unwrap_or_default())?
     };
-    print_row(&row)
+    print_row(&row);
+    Ok(())
 }
 
 /// The column names of a numbered dictionary, as its header names them.
@@ -169,7 +170,7 @@ fn table_columns(format: Format) -> String {
 
 /// Publishes every dictionary and the guide together as a new folder, never over an old one.
 fn save_pack(directory: &str) -> Result<(), Stop> {
-    let taken = "Choose a new folder for the word-list set.".to_owned();
+    let taken = folder_taken("word-lists-dir").to_owned();
     let folder = Folder::claim(
         Path::new(directory),
         terminal::environment().current.as_deref(),

@@ -32,6 +32,8 @@ pub const MAX_JOINT_MARKED_ELEMENTS: usize = 64;
 /// Combinations a search may try, 2^40 in all: they take weeks, and leave about 2^8 phrases that
 /// pass by chance.
 pub const MAX_SEARCH_BITS: u32 = 40;
+/// The combinations that a search of marked shares tries at most.
+pub const MAX_REPAIR_COMBINATIONS: u64 = 1 << MAX_SEARCH_BITS;
 /// Combinations of words that the partly read Unicode codes of all the shares are tried in.
 const CODE_TRIALS: usize = super::marks::MAX_PARTIAL_UNIT_CANDIDATES;
 /// The work all of those may do together for the choices of thresholds and member numbers.
@@ -364,6 +366,7 @@ impl JointSearch {
             checked: self.checked,
             total: Some(self.total),
             found: self.found.len() as u64,
+            matched: self.found.len() as u64,
         }
     }
 

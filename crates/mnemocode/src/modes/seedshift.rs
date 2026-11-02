@@ -35,6 +35,11 @@ impl Indexes {
         &self.0
     }
 
+    /// The indexes, to change in place.
+    pub(crate) fn as_mut_slice(&mut self) -> &mut [u16] {
+        &mut self.0
+    }
+
     /// Refuses a count that no phrase has and an index outside the lists.
     pub fn check(&self) -> Result<(), SizesError> {
         check_word_count(self.0.len())?;

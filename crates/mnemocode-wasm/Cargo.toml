@@ -22,6 +22,9 @@ browser-probe = [
   "browser-qr",
   "browser-candidates",
   "browser-sskr",
+  "browser-recovery",
+  "browser-cards",
+  "template-material-tile",
   "coin-bitcoin",
 ]
 # One module per library part (ARCHITECTURE.md §9); a page's profile names those it uses.
@@ -29,8 +32,29 @@ browser-phrase = []
 browser-wallet = []
 browser-qr = []
 browser-candidates = []
+browser-cards = ["dep:mnemocode-cards"]
 # Shamir shares: the library's sskr, and the browser backend of its engine's randomness crate.
-browser-sskr = ["mnemocode/sskr", "dep:getrandom03"]
+browser-sskr = ["mnemocode/sskr", "dep:getrandom03", "mnemocode-cards?/sskr"]
+browser-recovery = [
+  "browser-sskr",
+  "mnemocode/search-date",
+  "mnemocode/search-word",
+  "mnemocode/search-marked-codes",
+]
+# The cards' units, which a page's profile names: each design with its artwork.
+template-business-architect = ["mnemocode-cards?/template-business-architect"]
+template-business-it = ["mnemocode-cards?/template-business-it"]
+template-business-estate = ["mnemocode-cards?/template-business-estate"]
+template-business-diagonal = ["mnemocode-cards?/template-business-diagonal"]
+template-business-contact = ["mnemocode-cards?/template-business-contact"]
+template-business-curves = ["mnemocode-cards?/template-business-curves"]
+template-business-facets = ["mnemocode-cards?/template-business-facets"]
+template-business-mixed = ["mnemocode-cards?/template-business-mixed"]
+template-material-vehicle = ["mnemocode-cards?/template-material-vehicle"]
+template-material-enclosure = ["mnemocode-cards?/template-material-enclosure"]
+template-material-tile = ["mnemocode-cards?/template-material-tile"]
+template-material-switch = ["mnemocode-cards?/template-material-switch"]
+template-material-kitchen = ["mnemocode-cards?/template-material-kitchen"]
 # The library's units, which a page's profile names: each coin of the wallet module.
 coin-bitcoin = ["mnemocode/coin-bitcoin"]
 coin-bitcoin-cash = ["mnemocode/coin-bitcoin-cash"]
@@ -47,6 +71,7 @@ coin-zcash = ["mnemocode/coin-zcash"]
 
 [dependencies]
 mnemocode.workspace = true
+mnemocode-cards = { workspace = true, optional = true }
 # The randomness of the library's Random port: the browser's (crypto.getRandomValues) in the
 # WebAssembly, the system's in the native builds of the gates.
 getrandom.workspace = true

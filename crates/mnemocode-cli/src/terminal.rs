@@ -6,14 +6,17 @@
 //! messages go to standard error; results to standard output.
 
 mod answer;
+mod choice;
 mod hints;
 mod keys;
 mod line;
+mod page;
 mod private;
 mod progress;
 pub(crate) mod result;
+mod screen_rows;
 
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 
 use mnemocode::text::display::safe_display;
 use mnemocode::text::widths::text_width;
@@ -21,12 +24,20 @@ use mnemocode::text::widths::text_width;
 use crate::os::{self, Environment, Stream};
 
 pub(crate) use answer::Hints;
-pub(crate) use keys::{Interrupted, Key, Keys};
+pub(crate) use choice::{
+    Choice, Chosen, Digit, Explanation, LineQuestion, ListQuestion, answer_mark, ask_line, choose,
+    choose_from, erase_answers_since, list_rows, notes_room, rows_of, start_answer_record,
+    type_hint, wait_for_enter, wait_for_enter_or_escape, write_prompt,
+};
+pub(crate) use keys::{Interrupted, Keys, key};
 pub(crate) use line::{LineOptions, LineOutcome, read_line};
 pub(crate) use private::{
-    PrivateScreen, answer_accepted, clear_private_screen, keep_context, on_private_screen,
-    remember_warning, show_protection, show_result, step_begin,
+    ANSWER_LABEL_WIDTH, CLOSING_ROWS, Lifetime, PrivateScreen, answer_accepted,
+    clear_private_screen, end_warnings, keep_context, keep_result_from_start, leave_result,
+    on_private_screen, question_ended, remember_warning, show_protection, show_result,
+    showing_result, step_begin,
 };
+pub(crate) use progress::{ProgressLine, SEARCH_PROGRESS_SECONDS, seconds_of};
 
 /// SGR codes of the shared palette. Bright black is the grey of most schemes; "dim" is too faint
 /// in some.
@@ -51,6 +62,8 @@ pub(crate) mod style {
 const SGR_RESET: &str = "\x1b[0m";
 /// Longest line of running text, so that messages read well in an 80-column terminal.
 pub(crate) const TEXT_WIDTH: usize = 78;
+/// The columns a tab moves on to the multiples of.
+const TAB_STOP: usize = 8;
 /// A notice's mark ("✓" or "!") and the space after it, before each of its lines.
 const NOTICE_MARK_WIDTH: usize = 2;
 /// The mark of an error on a terminal, as in `mhfe`.
@@ -185,6 +198,22 @@ pub(crate) fn terminals_attached() -> bool {
     context.input && context.error
 }
 
+/// Whether standard output is a terminal, whatever its type.
+pub(crate) fn output_is_terminal() -> bool {
+    context().output
+}
+
+/// Where a line of a secret result that goes to standard error is written: there, unless that is a
+/// terminal with no private screen open, where the line would stay in the scrollback; then with the
+/// rest of the result on standard output, which the gate has seen is no terminal.
+pub(crate) fn secret_channel() -> Channel {
+    if context().error && !private::on_private_screen() {
+        Channel::Output
+    } else {
+        Channel::Error
+    }
+}
+
 /// `text` in the style `code` when `channel` gets colour, otherwise unchanged.
 pub(crate) fn paint(channel: Channel, code: &str, text: &str) -> String {
     if gets_color(channel) {
@@ -199,17 +228,23 @@ pub(crate) fn printable(text: &str) -> String {
     safe_display(text)
 }
 
-/// The cells that `text` shows on a terminal: its colour codes take none.
-pub(crate) fn shown_width(text: &str) -> usize {
-    let mut width = 0;
+/// `text` without its colour codes.
+pub(crate) fn without_style(text: &str) -> String {
+    let mut shown = String::with_capacity(text.len());
     let mut rest = text;
     while let Some(at) = rest.find("\x1b[") {
-        width += text_width(rest.get(..at).unwrap_or_default());
+        shown.push_str(rest.get(..at).unwrap_or_default());
         let after = rest.get(at + 2..).unwrap_or_default();
         let end = after.find('m').map_or(after.len(), |end| end + 1);
         rest = after.get(end..).unwrap_or_default();
     }
-    width + text_width(rest)
+    shown.push_str(rest);
+    shown
+}
+
+/// The cells that `text` shows on a terminal: its colour codes take none.
+pub(crate) fn shown_width(text: &str) -> usize {
+    text_width(&without_style(text))
 }
 
 /// Breaks `text` into lines of at most `width` cells at spaces; colour codes take no room, and a
@@ -426,11 +461,17 @@ pub(crate) fn error_line(text: &str) {
     let mut bytes = String::with_capacity(text.len() + 1);
     bytes.push_str(text);
     bytes.push('\n');
-    let _ignored = os::write_error(bytes.as_bytes());
+    error_raw(&bytes);
 }
 
 /// Writes `text` to standard error as it is.
 pub(crate) fn error_raw(text: &str) {
+    page::record_written(text);
+    error_raw_unrecorded(text);
+}
+
+/// Writes `text` to standard error, outside the page of the private screen.
+fn error_raw_unrecorded(text: &str) {
     let _ignored = os::write_error(text.as_bytes());
 }
 
@@ -439,7 +480,16 @@ pub(crate) fn output_line(text: &str) -> std::io::Result<()> {
     let mut bytes = String::with_capacity(text.len() + 1);
     bytes.push_str(text);
     bytes.push('\n');
+    if context().output {
+        page::record_written(&bytes);
+    }
     os::write_output(bytes.as_bytes())
+}
+
+/// Writes `text`, a line of a result, to standard output; as TS, what a closed or full standard
+/// output does not take is not reported.
+pub(crate) fn result_line(text: &str) {
+    let _unwritten = output_line(text);
 }
 
 /// Advice that can be read and passed over: grey, wrapped.
@@ -509,28 +559,17 @@ pub(crate) fn failure(message: &str) {
 /// What a stopped command says, and its exit status: "Cancelled.", 130.
 pub(crate) const CANCELLED_MESSAGE: &str = "Cancelled.";
 
-/// Says that the command was cancelled.
-pub(crate) fn cancelled() {
-    hint(CANCELLED_MESSAGE);
-}
-
-/// The redraw request after a continue (SIGCONT after SIGTSTP): the alternate screen was left and
-/// its content is gone, so the next step draws itself again.
-static REDRAW: Mutex<bool> = Mutex::new(false);
-
-/// Asks the next step screen to draw itself again.
-pub(crate) fn request_redraw() {
-    if let Ok(mut redraw) = REDRAW.lock() {
-        *redraw = true;
+/// Shows a slow step on the private screen; scripts keep their output.
+pub(crate) fn work(message: &str) {
+    if on_private_screen() {
+        step_begin();
+        hint(message);
     }
 }
 
-/// Whether a redraw was asked since the last call.
-pub(crate) fn take_redraw() -> bool {
-    REDRAW
-        .lock()
-        .map(|mut redraw| std::mem::take(&mut *redraw))
-        .unwrap_or(false)
+/// Says that the command was cancelled.
+pub(crate) fn cancelled() {
+    hint(CANCELLED_MESSAGE);
 }
 
 /// The terminal's width for wrapping a visible answer: 80 when it does not say.
@@ -541,6 +580,53 @@ pub(crate) fn columns() -> usize {
 /// The terminal's height: a VT100's 24 rows when it does not say.
 pub(crate) fn rows() -> usize {
     os::terminal_size().map_or(24, |(_, rows)| usize::from(rows))
+}
+
+/// The brightness above which a colour takes black text.
+const LIGHT_LUMA: u32 = 150;
+
+/// `colors`, written #rrggbb, each in true colour where `channel` shows colours: the colour itself
+/// is the content here, so it is not the palette's.
+pub(crate) fn color_cards(colors: &[String], channel: Channel) -> String {
+    if !gets_color(channel) {
+        return colors.join(" ");
+    }
+    let cards: Vec<String> = colors
+        .iter()
+        .map(|color| {
+            let byte = |at: usize| {
+                color
+                    .get(at..at + 2)
+                    .and_then(|hex| u8::from_str_radix(hex, 16).ok())
+                    .unwrap_or(0)
+            };
+            let (red, green, blue) = (byte(1), byte(3), byte(5));
+            // BT.601 in thousandths, compared without rounding.
+            let luma = 299 * u32::from(red) + 587 * u32::from(green) + 114 * u32::from(blue);
+            let ink = if luma > LIGHT_LUMA * 1000 { "30" } else { "97" };
+            format!("\x1b[48;2;{red};{green};{blue}m\x1b[{ink}m {color} \x1b[0m")
+        })
+        .collect();
+    cards.join(" ")
+}
+
+/// The rows a line of standard output takes: each tab moves on to the next tab stop, then it wraps,
+/// a wide character that does not fit at the end of a row going whole to the next.
+pub(crate) fn output_rows(line: &str) -> usize {
+    let columns = columns().max(1);
+    let width = line
+        .split('\t')
+        .enumerate()
+        .fold(0, |width, (place, part)| {
+            let stop = if place == 0 {
+                0
+            } else {
+                TAB_STOP - width % TAB_STOP
+            };
+            let plain = without_style(part);
+            answer::placed_after(plain.as_bytes(), 0, plain.len(), width + stop, columns)
+        });
+    width.max(1).div_ceil(columns)
 }
 
 #[cfg(test)]

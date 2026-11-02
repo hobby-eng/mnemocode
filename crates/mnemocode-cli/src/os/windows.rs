@@ -12,6 +12,7 @@
 )]
 
 use std::mem::size_of;
+use std::path::PathBuf;
 use std::ptr;
 
 use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, HANDLE};
@@ -147,6 +148,9 @@ pub(super) fn restrict(protection: &mut Protection, _needs: &Needs) {
     protection.lack("network and file writes: Windows refuses them only for an administrator");
     protection.lack("core dumps: written only where an administrator set up LocalDumps");
 }
+
+/// Windows rules no writes for an unprivileged program.
+pub(super) const fn rule_writes(_protection: &mut Protection, _folders: &[PathBuf]) {}
 
 /// The error of the call just made.
 fn last_error() -> u32 {

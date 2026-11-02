@@ -39,7 +39,7 @@ use crate::text::numbers::{WholeRange, integer_refusal};
 use crate::text::space::trim;
 use encodings::{
     Alphabet, BECH32_ALPHABET, CASHADDR_CHECKSUM_GROUPS, HASH160_BYTES, bytes_of_groups,
-    cashaddr_polymod, checked_data, decode_bech32, decode_segwit, eip55, hash160, keccak_account,
+    cashaddr_polymod, checked_data, decode_bech32, decode_segwit, hash160, keccak_account,
     nested_segwit_hash, taproot_output_key, written_as_an_address,
 };
 
@@ -111,8 +111,10 @@ pub enum CoinError {
     /// A coin this build has not: the coins it has.
     UnknownCoin(String),
     /// No 40 hexadecimal digits after 0x.
+    #[cfg(any(feature = "coin-ethereum", feature = "coin-ethereum-classic"))]
     NotHexAccount,
     /// A wrong EIP-55 checksum.
+    #[cfg(any(feature = "coin-ethereum", feature = "coin-ethereum-classic"))]
     WrongEip55,
     /// A key BIP341's tweak gives no output key for.
     NoTaprootKey,
@@ -145,6 +147,7 @@ impl fmt::Display for CoinError {
             ),
             Self::Location(message) => f.write_str(message),
             Self::UnknownCoin(coins) => write!(f, "Unknown coin; the coins are {coins}."),
+            #[cfg(any(feature = "coin-ethereum", feature = "coin-ethereum-classic"))]
             Self::NotHexAccount => address_refusal(
                 f,
                 &format!(
@@ -152,6 +155,7 @@ impl fmt::Display for CoinError {
                     2 * HASH160_BYTES
                 ),
             ),
+            #[cfg(any(feature = "coin-ethereum", feature = "coin-ethereum-classic"))]
             Self::WrongEip55 => address_refusal(
                 f,
                 "its EIP-55 checksum, the mix of capital and small letters, is wrong",
@@ -174,7 +178,9 @@ impl Refusal for CoinError {
             Self::Shielded(_) => "core.coins.coin.address-shielded",
             Self::Location(_) => "core.coins.coin.assert-address-location-refused",
             Self::UnknownCoin(_) => "core.coins.coin.unknown-coin-coins",
+            #[cfg(any(feature = "coin-ethereum", feature = "coin-ethereum-classic"))]
             Self::NotHexAccount => "core.coins.ethereum.address-not-hex-account",
+            #[cfg(any(feature = "coin-ethereum", feature = "coin-ethereum-classic"))]
             Self::WrongEip55 => "core.coins.ethereum.address-wrong-eip55-checksum",
             Self::NoTaprootKey => "core.coins.taproot.bip341-gives-no-taproot-output-key-key",
         }
@@ -270,6 +276,7 @@ pub enum Reader {
         versions: &'static [Version],
     },
     /// An account in 40 hexadecimal digits after 0x, with or without EIP-55.
+    #[cfg(any(feature = "coin-ethereum", feature = "coin-ethereum-classic"))]
     Hex,
     /// A Bech32 account of 20 bytes under `prefix`, of `kind`.
     Bech32Account {
@@ -579,6 +586,7 @@ impl Coin {
                 }
                 self.read_cashaddr(text)
             }
+            #[cfg(any(feature = "coin-ethereum", feature = "coin-ethereum-classic"))]
             Reader::Hex => self.read_hex(text),
             Reader::Bech32Account { prefix, kind } => {
                 let read = decode_bech32(text, false).ok_or(CoinError::Damaged)?;
@@ -714,6 +722,7 @@ impl Coin {
         }
     }
 
+    #[cfg(any(feature = "coin-ethereum", feature = "coin-ethereum-classic"))]
     fn read_hex(&'static self, text: &str) -> Result<CoinAddress, CoinError> {
         let digits = text
             .strip_prefix("0x")
@@ -727,7 +736,7 @@ impl Coin {
         let account: Vec<u8> = (0..HASH160_BYTES)
             .map(|at| u8::from_str_radix(&lower[2 * at..2 * at + 2], 16).unwrap_or(0))
             .collect();
-        let checksummed = eip55(&account);
+        let checksummed = encodings::eip55(&account);
         let small = digits.bytes().any(|byte| matches!(byte, b'a'..=b'f'));
         let capital = digits.bytes().any(|byte| matches!(byte, b'A'..=b'F'));
         if small && capital && digits != checksummed {
@@ -744,7 +753,7 @@ impl Coin {
 
 /// An address read by its coin: its type, the commitment it holds, its text as the coin writes it,
 /// and whether it is a testnet's.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CoinAddress {
     /// The coin.
     pub coin: &'static Coin,

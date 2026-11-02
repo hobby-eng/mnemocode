@@ -165,10 +165,10 @@ impl fmt::Display for CombineError {
                 "More than one phrase fits these shares: read more of the marked elements, or add a share.",
             ),
             Self::NoDigest => f.write_str(
-                "No SSKR digest checks the phrase of these shares: each group that restores it takes one share. Use combineSskrShareSet, whose result says so, or restore on the command line.",
+                "No SSKR digest checks the phrase of these shares: each group that restores it takes one share. Use ShareSet::combine, whose result says so, or restore on the command line.",
             ),
             Self::Unchecked => f.write_str(
-                "Some shares or repaired elements could not be checked. Use combineSskrShareSet to inspect them, or restore on the command line.",
+                "Some shares or repaired elements could not be checked. Use ShareSet::combine to inspect them, or restore on the command line.",
             ),
         }
     }

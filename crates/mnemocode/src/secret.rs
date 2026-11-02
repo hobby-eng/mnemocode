@@ -115,6 +115,17 @@ impl SecretBytes {
         copy
     }
 
+    /// Bytes too large for the lock budget, such as a drawn page: kept where they are and wiped on
+    /// drop, never locked, so that the lock warning does not speak of them.
+    pub fn large(label: &'static str, bytes: Vec<u8>) -> Self {
+        let locked = pages::LockedPages::of(bytes.as_ptr(), 0);
+        Self {
+            bytes,
+            locked,
+            label,
+        }
+    }
+
     /// `length` zero bytes in a locked buffer, for a secret written in place afterwards.
     pub fn zeroed(label: &'static str, length: usize) -> Self {
         let mut bytes = Vec::with_capacity(length);

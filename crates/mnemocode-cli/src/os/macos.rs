@@ -11,6 +11,7 @@
 )]
 
 use std::ffi::{CStr, c_char, c_int};
+use std::path::PathBuf;
 use std::ptr;
 
 use super::protect::{CoreDumps, Found, Needs, Protection};
@@ -98,6 +99,9 @@ pub(super) fn restrict(protection: &mut Protection, _needs: &Needs) {
     });
     protection.group_since(from, "sandbox");
 }
+
+/// Seatbelt rules the network alone: nothing to narrow.
+pub(super) const fn rule_writes(_protection: &mut Protection, _folders: &[PathBuf]) {}
 
 /// A UDP socket connected to the discard port of the loopback address, which sends nothing.
 fn network_refused() -> Found {

@@ -18,11 +18,18 @@ use crate::text::space::trim;
 
 /// A date of the calendar, checked: a year from 1 through 9999, a month from 1 through 12 and a day
 /// its month has.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Date {
     year: u16,
     month: u8,
     day: u8,
+}
+
+/// Redacted: a date is part of the secret.
+impl fmt::Debug for Date {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        crate::secret::redacted(f, "a date")
+    }
 }
 
 /// Dates kept as a secret (ARCHITECTURE.md §6): in a locked buffer, four bytes a date, wiped when
@@ -362,12 +369,19 @@ pub fn is_date_pattern(value: &str) -> bool {
 
 /// The dates a pattern allows: each part's values, each once, ascending, and a key that names it
 /// in one canonical way, year first, such as 2025-??-05|15.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct DatePattern {
     key: String,
     years: Vec<u16>,
     months: Vec<u8>,
     days: Vec<u8>,
+}
+
+/// Redacted: a date pattern is part of the secret.
+impl fmt::Debug for DatePattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        crate::secret::redacted(f, "a date pattern")
+    }
 }
 
 impl DatePattern {
@@ -405,6 +419,18 @@ impl DatePattern {
     /// Its key.
     pub fn key(&self) -> &str {
         &self.key
+    }
+
+    /// Its days, ascending.
+    pub fn days(&self) -> &[u8] {
+        &self.days
+    }
+
+    /// Whether its parts take `year`, `month` and `day`.
+    pub fn allows(&self, year: u16, month: u8, day: u8) -> bool {
+        self.years.binary_search(&year).is_ok()
+            && self.months.binary_search(&month).is_ok()
+            && self.days.binary_search(&day).is_ok()
     }
 
     /// Whether it allows the same dates as `other`.

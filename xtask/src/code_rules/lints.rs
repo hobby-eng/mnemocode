@@ -34,7 +34,7 @@ const LINT_GROUPS: [&str; 11] = [
     "clippy::cargo",
 ];
 /// The only traits a test may fake (CORE-32).
-const FAKEABLE: [&str; 2] = ["Random", "Probes"];
+const FAKEABLE: [&str; 3] = ["Random", "Probes", "HeirRoute"];
 /// CORE-34: words in a test's name.
 const MIN_TEST_WORDS: usize = 3;
 /// The release profile of RUST-12, value by key.
@@ -154,8 +154,10 @@ pub(super) fn check_tests(
                 && own_traits.contains(trait_name.as_str())
                 && !FAKEABLE.contains(&trait_name.as_str())
             {
-                let message =
-                    format!("a test fake of {trait_name}: only Random and Probes are faked");
+                let message = format!(
+                    "a test fake of {trait_name}: only {} are faked",
+                    FAKEABLE.join(", ")
+                );
                 problems.report(&source.path, *line, "CORE-32", &message);
             }
         }

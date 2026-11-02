@@ -45,6 +45,23 @@ impl Case {
 pub(super) fn cases() -> Vec<Case> {
     vec![
         Case::sources(
+            "a refusal code that TS never wrote",
+            Some("core.no-such.code is no code of TS"),
+            vec![(
+                "crates/mnemocode/src/random.rs",
+                "impl Refusal for Odd { fn code(&self) -> &'static str { \"core.no-such.code\" } }",
+            )],
+        ),
+        Case::sources(
+            "one refusal code in two enums",
+            Some("is written by Two and by One"),
+            vec![(
+                "crates/mnemocode/src/random.rs",
+                "impl Refusal for One { fn code(&self) -> &'static str { \"core.dates.no-date\" } }\n\
+                 impl Refusal for Two { fn code(&self) -> &'static str { \"core.dates.no-date\" } }",
+            )],
+        ),
+        Case::sources(
             "a braced group's last item",
             Some("text may not use crate::wallet"),
             vec![(

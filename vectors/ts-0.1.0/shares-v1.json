@@ -5155,6 +5155,9 @@
     "wordCount": 12,
     "note": null,
     "plainNote": null
+   },
+   "phrase": {
+    "phrase": "laundry feature duty pear action denial make creek gallery dwarf whale glove"
    }
   },
   {
@@ -5247,6 +5250,9 @@
     "wordCount": 12,
     "note": null,
     "plainNote": null
+   },
+   "phrase": {
+    "phrase": "laundry feature duty pear action denial make creek gallery dwarf whale glove"
    }
   },
   {
@@ -5268,6 +5274,13 @@
     ]
    },
    "restored": {
+    "refused": {
+     "code": "sskr.transport.not-enough-sskr-shares-meet-recorded-threshold",
+     "message": "Not enough SSKR shares to meet the recorded threshold.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
     "refused": {
      "code": "sskr.transport.not-enough-sskr-shares-meet-recorded-threshold",
      "message": "Not enough SSKR shares to meet the recorded threshold.",
@@ -5303,6 +5316,13 @@
      "message": "Not enough SSKR shares to meet the recorded threshold.",
      "kind": "Error"
     }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.transport.not-enough-sskr-shares-meet-recorded-threshold",
+     "message": "Not enough SSKR shares to meet the recorded threshold.",
+     "kind": "Error"
+    }
    }
   },
   {
@@ -5333,6 +5353,13 @@
      "message": "The same SSKR member was supplied more than once.",
      "kind": "Error"
     }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.transport.member-given-twice",
+     "message": "The same SSKR member was supplied more than once.",
+     "kind": "Error"
+    }
    }
   },
   {
@@ -5352,6 +5379,13 @@
     }
    },
    "restored": {
+    "refused": {
+     "code": "sskr.transport.assert-share-count-refused",
+     "message": "Provide between 1 and 256 SSKR shares.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
     "refused": {
      "code": "sskr.transport.assert-share-count-refused",
      "message": "Provide between 1 and 256 SSKR shares.",
@@ -5479,6 +5513,9 @@
     "wordCount": 12,
     "note": null,
     "plainNote": null
+   },
+   "phrase": {
+    "phrase": "laundry feature duty pear action denial make creek gallery dwarf whale glove"
    }
   },
   {
@@ -5513,6 +5550,13 @@
      "message": "The same SSKR member was supplied more than once.",
      "kind": "Error"
     }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.transport.member-given-twice",
+     "message": "The same SSKR member was supplied more than once.",
+     "kind": "Error"
+    }
    }
   },
   {
@@ -5535,6 +5579,13 @@
     }
    },
    "restored": {
+    "refused": {
+     "code": "sskr.transport.shares-of-different-sets",
+     "message": "SSKR shares belong to different sets.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
     "refused": {
      "code": "sskr.transport.shares-of-different-sets",
      "message": "SSKR shares belong to different sets.",
@@ -5606,6 +5657,9 @@
     "wordCount": 12,
     "note": null,
     "plainNote": null
+   },
+   "phrase": {
+    "phrase": "abandon amount liar amount expire adjust cage candy arch gather drum buyer"
    }
   },
   {
@@ -5625,6 +5679,13 @@
     ]
    },
    "restored": {
+    "refused": {
+     "code": "sskr.transport.not-enough-sskr-shares-meet-recorded-threshold",
+     "message": "Not enough SSKR shares to meet the recorded threshold.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
     "refused": {
      "code": "sskr.transport.not-enough-sskr-shares-meet-recorded-threshold",
      "message": "Not enough SSKR shares to meet the recorded threshold.",
@@ -5686,6 +5747,9 @@
     "wordCount": 12,
     "note": null,
     "plainNote": null
+   },
+   "phrase": {
+    "phrase": "abandon amount liar amount expire adjust cage candy arch gather drum buyer"
    }
   },
   {
@@ -5742,6 +5806,9 @@
     "wordCount": 24,
     "note": null,
     "plainNote": null
+   },
+   "phrase": {
+    "phrase": "abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware"
    }
   },
   {
@@ -5769,6 +5836,13 @@
      "message": "The same SSKR member was supplied more than once.",
      "kind": "Error"
     }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.transport.member-given-twice",
+     "message": "The same SSKR member was supplied more than once.",
+     "kind": "Error"
+    }
    }
   },
   {
@@ -5789,6 +5863,13 @@
     ]
    },
    "restored": {
+    "refused": {
+     "code": "sskr.complete-shares.no-secret",
+     "message": "These shares do not restore a secret: check them, and that all belong to one set.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
     "refused": {
      "code": "sskr.complete-shares.no-secret",
      "message": "These shares do not restore a secret: check them, and that all belong to one set.",
@@ -5822,6 +5903,13 @@
      "message": "Share 5 does not fit with the others: with it they give another phrase or none. Leave it out, or check it.",
      "kind": "Error"
     }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.complete-shares.share-does-not-fit",
+     "message": "Share 3 does not fit with the others: with it they give another phrase or none. Leave it out, or check it.",
+     "kind": "Error"
+    }
    }
   },
   {
@@ -5844,6 +5932,13 @@
     }
    },
    "restored": {
+    "refused": {
+     "code": "sskr.transport.member-given-twice",
+     "message": "The same SSKR member was supplied more than once.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
     "refused": {
      "code": "sskr.transport.member-given-twice",
      "message": "The same SSKR member was supplied more than once.",
@@ -5895,6 +5990,13 @@
     "wordCount": 12,
     "note": "No SSKR digest checked this phrase: the groups that restored it take one share each. A changed share would give another phrase.",
     "plainNote": "No SSKR digest checked this phrase: the groups that restored it take one share each. A changed share would give another phrase."
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.shares.no-digest-checked-phrase",
+     "message": "No SSKR digest checks the phrase of these shares: each group that restores it takes one share. Use combineSskrShareSet, whose result says so, or restore on the command line.",
+     "kind": "Error"
+    }
    }
   },
   {
@@ -5941,6 +6043,13 @@
     "wordCount": 12,
     "note": "No SSKR digest checked this phrase: the groups that restored it take one share each. A changed share would give another phrase.",
     "plainNote": "No SSKR digest checked this phrase: the groups that restored it take one share each. A changed share would give another phrase."
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.shares.no-digest-checked-phrase",
+     "message": "No SSKR digest checks the phrase of these shares: each group that restores it takes one share. Use combineSskrShareSet, whose result says so, or restore on the command line.",
+     "kind": "Error"
+    }
    }
   },
   {
@@ -5997,6 +6106,13 @@
     "wordCount": 12,
     "note": "No SSKR digest checked this phrase: the groups that restored it take one share each. A changed share would give another phrase.",
     "plainNote": "No SSKR digest checked this phrase: the groups that restored it take one share each. A changed share would give another phrase."
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.shares.no-digest-checked-phrase",
+     "message": "No SSKR digest checks the phrase of these shares: each group that restores it takes one share. Use combineSskrShareSet, whose result says so, or restore on the command line.",
+     "kind": "Error"
+    }
    }
   },
   {
@@ -6017,6 +6133,13 @@
     ]
    },
    "restored": {
+    "refused": {
+     "code": "sskr.complete-shares.unchecked-disagreement",
+     "message": "These shares give different secrets, and none of them can be checked on its own: MnemoCode cannot tell which is wrong. Check each of them.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
     "refused": {
      "code": "sskr.complete-shares.unchecked-disagreement",
      "message": "These shares give different secrets, and none of them can be checked on its own: MnemoCode cannot tell which is wrong. Check each of them.",
@@ -6051,6 +6174,13 @@
     "refused": {
      "code": "sskr.complete-shares.group-does-not-fit",
      "message": "Shares 5, 6 of another group do not fit with the others: leave them out, or check them.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.complete-shares.group-does-not-fit",
+     "message": "Shares 3, 4 of another group do not fit with the others: leave them out, or check them.",
      "kind": "Error"
     }
    }
@@ -6127,6 +6257,13 @@
     "wordCount": 12,
     "note": "Share 5: too few shares of its group to take part; not checked.",
     "plainNote": "Share 3: too few shares of its group to take part; not checked."
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.shares.some-shares-repaired-elements-could-not-checked-use",
+     "message": "Some shares or repaired elements could not be checked. Use combineSskrShareSet to inspect them, or restore on the command line.",
+     "kind": "Error"
+    }
    }
   },
   {
@@ -6209,6 +6346,9 @@
     "wordCount": 12,
     "note": null,
     "plainNote": null
+   },
+   "phrase": {
+    "phrase": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
    }
   },
   {
@@ -6317,6 +6457,9 @@
     "wordCount": 12,
     "note": null,
     "plainNote": null
+   },
+   "phrase": {
+    "phrase": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
    }
   },
   {
@@ -6338,6 +6481,13 @@
     ]
    },
    "restored": {
+    "refused": {
+     "code": "sskr.transport.not-enough-sskr-shares-meet-recorded-threshold",
+     "message": "Not enough SSKR shares to meet the recorded threshold.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
     "refused": {
      "code": "sskr.transport.not-enough-sskr-shares-meet-recorded-threshold",
      "message": "Not enough SSKR shares to meet the recorded threshold.",
@@ -6441,6 +6591,9 @@
     "wordCount": 12,
     "note": null,
     "plainNote": null
+   },
+   "phrase": {
+    "phrase": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
    }
   },
   {
@@ -6529,6 +6682,9 @@
     "wordCount": 12,
     "note": null,
     "plainNote": null
+   },
+   "phrase": {
+    "phrase": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
    }
   },
   {
@@ -6549,6 +6705,13 @@
     ]
    },
    "restored": {
+    "refused": {
+     "code": "sskr.complete-shares.unchecked-disagreement",
+     "message": "These shares give different secrets, and none of them can be checked on its own: MnemoCode cannot tell which is wrong. Check each of them.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
     "refused": {
      "code": "sskr.complete-shares.unchecked-disagreement",
      "message": "These shares give different secrets, and none of them can be checked on its own: MnemoCode cannot tell which is wrong. Check each of them.",
@@ -6626,6 +6789,13 @@
     "wordCount": 12,
     "note": "No SSKR digest checked this phrase: the groups that restored it take one share each. A changed share would give another phrase.",
     "plainNote": "No SSKR digest checked this phrase: the groups that restored it take one share each. A changed share would give another phrase."
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.shares.no-digest-checked-phrase",
+     "message": "No SSKR digest checks the phrase of these shares: each group that restores it takes one share. Use combineSskrShareSet, whose result says so, or restore on the command line.",
+     "kind": "Error"
+    }
    }
   },
   {
@@ -6708,6 +6878,13 @@
     "wordCount": 12,
     "note": "No SSKR digest checked this phrase: the groups that restored it take one share each. A changed share would give another phrase.",
     "plainNote": "No SSKR digest checked this phrase: the groups that restored it take one share each. A changed share would give another phrase."
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.shares.no-digest-checked-phrase",
+     "message": "No SSKR digest checks the phrase of these shares: each group that restores it takes one share. Use combineSskrShareSet, whose result says so, or restore on the command line.",
+     "kind": "Error"
+    }
    }
   },
   {
@@ -6743,6 +6920,13 @@
     "refused": {
      "code": "sskr.complete-shares.group-does-not-fit",
      "message": "Shares 7, 8 of another group do not fit with the others: leave them out, or check them.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.complete-shares.group-does-not-fit",
+     "message": "Shares 5, 6 of another group do not fit with the others: leave them out, or check them.",
      "kind": "Error"
     }
    }
@@ -6782,6 +6966,13 @@
      "message": "Shares 3, 4 of another group do not fit with the others: leave them out, or check them.",
      "kind": "Error"
     }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.complete-shares.group-does-not-fit",
+     "message": "Shares 1, 2 of another group do not fit with the others: leave them out, or check them.",
+     "kind": "Error"
+    }
    }
   },
   {
@@ -6817,6 +7008,353 @@
     "refused": {
      "code": "sskr.complete-shares.group-does-not-fit",
      "message": "Shares 5, 6 of another group do not fit with the others: leave them out, or check them.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.complete-shares.group-does-not-fit",
+     "message": "Shares 3, 4 of another group do not fit with the others: leave them out, or check them.",
+     "kind": "Error"
+    }
+   }
+  },
+  {
+   "texts": [
+    "tuna next keep gyro work able able acid ? task door curl lung cola warm gyro fizz redo glow memo leaf user sets flew aqua skew unit hawk drum",
+    "ur:sskr/gowkaeaeadadrohemhlsgefpotadpsrdwfetjkktfrjyrfeehfeh"
+   ],
+   "valid": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "loose": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "restored": {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "shares": [
+     {
+      "ur": "ur:sskr/gowkaeaeadaetkdrcllgcawmgofzrogwmolfurssfwaatldazcwy",
+      "format": "words",
+      "repaired": true,
+      "filled": [
+       {
+        "position": 9,
+        "value": "able"
+       }
+      ]
+     },
+     {
+      "ur": "ur:sskr/gowkaeaeadadrohemhlsgefpotadpsrdwfetjkktfrjyrfeehfeh",
+      "format": "ur",
+      "repaired": false,
+      "filled": []
+     }
+    ],
+    "unsettled": [],
+    "unchecked": [],
+    "digestUnchecked": false,
+    "digestChecked": true,
+    "checked": true,
+    "groupThreshold": 1,
+    "groupCount": 1,
+    "groups": [
+     {
+      "index": 0,
+      "threshold": 2,
+      "members": [
+       1,
+       2
+      ]
+     }
+    ],
+    "secretBytes": 16,
+    "wordCount": 12,
+    "note": null,
+    "plainNote": null
+   },
+   "phrase": {
+    "phrase": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+   }
+  },
+  {
+   "texts": [
+    "tuna next keep gyro work able able acid ? task door curl lung cola warm gyro fizz redo glow memo leaf user sets flew aqua skew unit hawk drum",
+    "tuna next keep gyro work able able acid acid ? hope math legs game flap omit acid plus road wolf exit junk kept fair jury pose surf whiz when"
+   ],
+   "valid": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "loose": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "restored": {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "shares": [
+     {
+      "ur": "ur:sskr/gowkaeaeadaetkdrcllgcawmgofzrogwmolfurssfwaatldazcwy",
+      "format": "words",
+      "repaired": true,
+      "filled": [
+       {
+        "position": 9,
+        "value": "able"
+       }
+      ]
+     },
+     {
+      "ur": "ur:sskr/gowkaeaeadadrohemhlsgefpotadpsrdwfetjkktfrjyrfeehfeh",
+      "format": "words",
+      "repaired": true,
+      "filled": [
+       {
+        "position": 10,
+        "value": "redo"
+       }
+      ]
+     }
+    ],
+    "unsettled": [],
+    "unchecked": [],
+    "digestUnchecked": false,
+    "digestChecked": true,
+    "checked": true,
+    "groupThreshold": 1,
+    "groupCount": 1,
+    "groups": [
+     {
+      "index": 0,
+      "threshold": 2,
+      "members": [
+       1,
+       2
+      ]
+     }
+    ],
+    "secretBytes": 16,
+    "wordCount": 12,
+    "note": null,
+    "plainNote": null
+   },
+   "phrase": {
+    "phrase": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+   }
+  },
+  {
+   "texts": [
+    "tuna next keep gyro work able able acid ? task door curl lung cola warm gyro fizz redo glow memo leaf user sets flew aqua skew unit hawk drum"
+   ],
+   "valid": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "loose": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "restored": {
+    "refused": {
+     "code": "sskr.share-set.more-shares-needed",
+     "message": "Too few shares: the threshold of this set needs more of them.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.share-set.more-shares-needed",
+     "message": "Too few shares: the threshold of this set needs more of them.",
+     "kind": "Error"
+    }
+   }
+  },
+  {
+   "texts": [
+    "tuna next keep gyro work able able acid ? task door curl lung cola warm gyro fizz redo glow memo leaf user sets flew aqua skew unit hawk drum",
+    "ur:sskr/gowkaeaeadaduoprrebahkgmpfbgrsptvtdnhniedeioonptbgsp"
+   ],
+   "valid": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "loose": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "restored": {
+    "refused": {
+     "code": "sskr.share-set.no-phrase-fits",
+     "message": "No phrase fits these shares: a ? may stand at a wrong place, or an element without ? be misread.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.share-set.no-phrase-fits",
+     "message": "No phrase fits these shares: a ? may stand at a wrong place, or an element without ? be misread.",
+     "kind": "Error"
+    }
+   }
+  },
+  {
+   "texts": [
+    "tuna next keep gyro work able able acid ? task door curl lung cola warm gyro fizz redo glow memo leaf user sets flew aqua skew unit hawk drum",
+    "tuna next keep gyro work able able acid acid ? purr race beta hawk grim puff brag runs part vast down horn idle dice into ramp gray ramp away"
+   ],
+   "valid": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "loose": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "restored": {
+    "refused": {
+     "code": "sskr.share-set.no-phrase-fits",
+     "message": "No phrase fits these shares: a ? may stand at a wrong place, or an element without ? be misread.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.share-set.no-phrase-fits",
+     "message": "No phrase fits these shares: a ? may stand at a wrong place, or an element without ? be misread.",
+     "kind": "Error"
+    }
+   }
+  },
+  {
+   "texts": [
+    "tuna next keep gyro work able able acid ? ? ? ? ? ? warm gyro fizz redo glow memo leaf user sets flew aqua skew unit hawk drum",
+    "tuna next keep gyro work able able acid ? ? ? ? ? ? flap omit acid plus road wolf exit junk kept fair jury pose surf whiz when"
+   ],
+   "valid": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "loose": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "restored": {
+    "refused": {
+     "code": "sskr.share-set.too-many-combinations-open",
+     "message": "Too many combinations are open: read more of the marked elements, or add a share.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.share-set.too-many-combinations-open",
+     "message": "Too many combinations are open: read more of the marked elements, or add a share.",
+     "kind": "Error"
+    }
+   }
+  },
+  {
+   "texts": [
+    "tuna next keep gyro work able able able ? able able able able able able able able able able able able able able able able need inky iris rock"
+   ],
+   "valid": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "loose": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "restored": {
+    "refused": {
+     "code": "sskr.share-set.more-shares-needed",
+     "message": "Too few shares: the threshold of this set needs more of them.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.share-set.more-shares-needed",
+     "message": "Too few shares: the threshold of this set needs more of them.",
+     "kind": "Error"
+    }
+   }
+  },
+  {
+   "texts": [
+    "tuna next keep gyro work able acid acid ? task door curl lung cola warm gyro fizz redo glow memo leaf user sets flew aqua body fish tuna keno",
+    "ur:sskr/gowkaeadadadrohemhlsgefpotadpsrdwfetjkktfrjyjetbtbin",
+    "ur:sskr/gowkaeadbyaefwrhwzatbtfwfduyrodybbcahyhliyvwfnlfwtfm"
+   ],
+   "valid": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "loose": {
+    "refused": {
+     "code": "sskr.transport.decoded-bytes-refused",
+     "message": "Unknown SSKR Byteword.",
+     "kind": "Error"
+    }
+   },
+   "restored": {
+    "refused": {
+     "code": "sskr.share-set.several-groups",
+     "message": "These shares belong to a set of several groups; only sets of one group are repaired.",
+     "kind": "Error"
+    }
+   },
+   "phrase": {
+    "refused": {
+     "code": "sskr.share-set.several-groups",
+     "message": "These shares belong to a set of several groups; only sets of one group are repaired.",
      "kind": "Error"
     }
    }
@@ -9063,6 +9601,20 @@
      "ur:sskr/goemjzaeadaejoinoyvotkwlptsskispvwbkbwjnamstlubnampf",
      "ur:sskr/goemjzaeadadflihpkmhspcheycndschfhcmkelyvaveiesolrls",
      "ur:sskr/goemjzaeadaejoinoyvotkwlptsskispvwbkbwjnamstlubnampf"
+    ],
+    "inColors": [
+     {
+      "format": "colors",
+      "number": 2
+     },
+     {
+      "format": "colors",
+      "number": 4
+     },
+     {
+      "format": "colors",
+      "number": 5
+     }
     ]
    }
   },
@@ -9114,6 +9666,20 @@
      "#8B0C06 #B0D4F5 #0CF800 #FA41D6 #37B8CA #1F9121 #DB206C #4FD8A1 #1BF322 #750000",
      "#64C984 #835170 #897D85 #7FC452 #853144 #E8135A #C542B2 #158738 #F19A47 #D30000",
      "#8B0C06 #B0D4F5 #0CF800 #FA41D6 #37B8CA #1F9121 #DB206C #4FD8A1 #1BF322 #750000"
+    ],
+    "inColors": [
+     {
+      "format": "colors",
+      "number": 2
+     },
+     {
+      "format": "colors",
+      "number": 4
+     },
+     {
+      "format": "colors",
+      "number": 5
+     }
     ]
    }
   },
@@ -9159,6 +9725,12 @@
     "note": null,
     "text": [
      "ur:sskr/goemjzaeadaejoinoyvotkwlptsskispvwbkbwjnamstlubnampf"
+    ],
+    "inColors": [
+     {
+      "format": "colors",
+      "number": 1
+     }
     ]
    }
   },
@@ -9198,7 +9770,8 @@
     ],
     "total": 2,
     "note": null,
-    "text": []
+    "text": [],
+    "inColors": []
    }
   },
   {
@@ -9245,6 +9818,16 @@
     "text": [
      "ur:sskr/goemjzaeadaejoinoyvotkwlptsskispvwbkbwjnamstlubnampf",
      "ur:sskr/hdcfemjzaeadaentleykkitkwlptsskispvwbkbwjnamsttssnpmhpgwmoetcm"
+    ],
+    "inColors": [
+     {
+      "format": "colors",
+      "number": 1
+     },
+     {
+      "format": "colors",
+      "number": 2
+     }
     ]
    }
   },

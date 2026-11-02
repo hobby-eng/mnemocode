@@ -87,7 +87,7 @@ impl Refusal for RepairError {
             Self::Read(error) => error.code(),
             Self::EachAtPlace => "sskr.repair.each-at-place",
             Self::Refused(_) => "sskr.repair.repair-candidates-refused",
-            Self::Ambiguous => "ambiguous-marks",
+            Self::Ambiguous => super::marks::AmbiguousMarks.code(),
             Self::TooManyMarks => "sskr.repair.too-many-marks-for-form",
             Self::NoShareFits(_) => "sskr.repair.no-share-fits-marks",
             Self::Variants(..) => "share-variants",

@@ -4,6 +4,7 @@ on:
   push:
     branches: ["**"]
   pull_request:
+  workflow_call:
   workflow_dispatch:
 
 # A newer push to the same branch or pull request makes a running check pointless (CI-03).
@@ -26,10 +27,20 @@ jobs:
           persist-credentials: false
       - name: Install the pinned Rust toolchain
         run: rustup show
-      - name: Install the pinned wasm-bindgen CLI and dprint
+      - name: Install the pinned wasm-bindgen CLI
+        run: cargo install wasm-bindgen-cli --version 0.2.129 --locked
+      - name: Install dprint, checked against its SHA-256
+        env:
+          DPRINT: "0.63.0"
+          DPRINT_SHA256: f58b5d7c13ccd613cfa264f1ae82d4e5db1373f8fe20462bc1126051d111b0ce
         run: |
-          cargo install wasm-bindgen-cli --version 0.2.129 --locked
-          cargo install dprint --version 0.64.3 --locked
+          archive="dprint-x86_64-unknown-linux-gnu.zip"
+          curl --fail --silent --show-error --location --proto '=https' \
+            --output "$RUNNER_TEMP/$archive" \
+            "https://github.com/dprint/dprint/releases/download/$DPRINT/$archive"
+          echo "$DPRINT_SHA256  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/$archive" -d "$RUNNER_TEMP/dprint"
+          echo "$RUNNER_TEMP/dprint" >> "$GITHUB_PATH"
       - name: Run the fast gates
         run: cargo xtask check
 

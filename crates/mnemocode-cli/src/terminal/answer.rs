@@ -40,14 +40,6 @@ impl Unusable {
             Self::NotUtf8 => mnemocode::text::utf8::not_utf8_text("The answer"),
         }
     }
-
-    /// The stable code of the reason.
-    pub(crate) const fn code(self) -> &'static str {
-        match self {
-            Self::TooLong(_) => "answer-too-long",
-            Self::NotUtf8 => "answer-not-utf8",
-        }
-    }
 }
 
 /// The words that a hint is given: the word being typed and three before it.
@@ -93,7 +85,13 @@ fn width_of(line: &[u8], from: usize, to: usize) -> usize {
 /// Where a terminal `columns` wide puts the cursor after the characters between `from` and `to`,
 /// written from `offset`: a wide character that does not fit at the end of a row goes whole to
 /// the next (xterm, VTE, Konsole, Windows Terminal and tmux).
-fn placed_after(line: &[u8], from: usize, to: usize, offset: usize, columns: usize) -> usize {
+pub(super) fn placed_after(
+    line: &[u8],
+    from: usize,
+    to: usize,
+    offset: usize,
+    columns: usize,
+) -> usize {
     let mut end = offset;
     let mut index = from;
     while index < to {
@@ -207,11 +205,6 @@ impl<'h> TypedAnswer<'h> {
     /// The row of the cursor below the first row of the prompt, where the answer shows.
     pub(crate) fn row_from_prompt(&self) -> usize {
         self.shown.as_ref().map_or(0, ShownLine::row_from_prompt)
-    }
-
-    /// The cells that the answer takes.
-    pub(crate) fn columns(&self) -> usize {
-        width_of(&self.line, 0, self.length)
     }
 
     /// The byte before the cursor.

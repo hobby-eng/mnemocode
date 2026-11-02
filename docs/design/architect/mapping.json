@@ -327,7 +327,7 @@
       "crate": "mnemocode-cli",
       "module": "terminal",
       "status": "redesign",
-      "reason": "One driver steps any library search, shows progress, asks consent and stops on Ctrl+C or Ctrl+\\; Ctrl+Z read as a key only sends SIGTSTP to the process group, as TS 0.1.0, and the N-SIGNALS handler leaves and takes raw mode; after continue the driver redraws its screen when the redraw flag is set (no job control on Windows)."
+      "reason": "One driver steps any library search, shows progress, asks consent and stops on Ctrl+C or Ctrl+\\; Ctrl+Z read as a key only sends SIGTSTP to the process group, as TS 0.1.0, and the N-SIGNALS handler leaves and takes raw mode; the private screen stays up, so nothing is drawn again, as TS (no job control on Windows)."
     },
     {
       "id": "CAP-CLI-MACOS-DENY-DEBUGGER",
@@ -628,7 +628,7 @@
       "crate": "mnemocode-cli",
       "module": "terminal",
       "status": "port",
-      "reason": "Same step screens; a step draws itself again when the N-SIGNALS redraw flag is set after a continue, since re-entering the alternate screen (ESC[?1049h) clears it."
+      "reason": "Same step screens; the private screen stays up over a stop and a continue, so a step needs no drawing again."
     },
     {
       "id": "CAP-CLI-SWAP-WARNING",
@@ -1732,7 +1732,7 @@
     },
     {
       "defect": "CORE-23: words.ts and word-table.ts each build an ErrorCatalog with the same namespace 'core.words'. Code uniqueness across the two modules holds only by convention.",
-      "how": "Each module has its own enum; a test over the refusal known-answer file (vectors/ts-0.1.0/refusals-v1.json) checks that every code across all enums is unique."
+      "how": "Each module has its own enum; `cargo xtask code-rules` finds every code in the refusal file (vectors/ts-0.1.0/refusals-v1.json) or the port's own list, and refuses one code in two enums."
     },
     {
       "defect": "CORE-23: in re-encode-command.ts, phraseEndingWith recognises the refusal by comparing error.message with NO_SUCH_LAST_WORD instead of using its code core.re-encoding.no-such-last-word.",

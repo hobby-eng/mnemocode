@@ -9,10 +9,11 @@ use std::fmt;
 
 use mnemocode::refusal::Refusal;
 
-use crate::args::Parsed;
-use crate::os::{Needs, Protection, Signal, unprotected_swap};
-use crate::output::{Renamed, warn_of_cloud_copies};
-use crate::terminal::{PrivateScreen, show_protection, warning_with_more};
+use crate::args::{Parsed, is_on};
+use crate::input::assert_terminal;
+use crate::os::{Protection, Signal, unprotected_swap};
+use crate::output::{report_renamed, warn_of_cloud_copies};
+use crate::terminal::{Interrupted, PrivateScreen, show_protection, warning_with_more};
 
 /// How a command ended other than done: refused, cancelled by the person, or ended by a signal.
 #[derive(Debug)]
@@ -28,6 +29,25 @@ pub(crate) enum Stop {
 impl<E: Refusal + 'static> From<E> for Stop {
     fn from(error: E) -> Self {
         Self::Refused(Box::new(error))
+    }
+}
+
+impl Stop {
+    /// What a refusal says, for a question that shows it and asks again.
+    pub(crate) fn message(&self) -> String {
+        match self {
+            Self::Refused(refusal) => refusal.to_string(),
+            Self::Cancelled | Self::Signal(_) => String::new(),
+        }
+    }
+}
+
+impl From<Interrupted> for Stop {
+    fn from(interrupted: Interrupted) -> Self {
+        match interrupted {
+            Interrupted::Signal(signal) => Self::Signal(signal),
+            Interrupted::Failed(_) => Self::Cancelled,
+        }
     }
 }
 
@@ -72,45 +92,39 @@ impl Refusal for NoPrivateScreen {
 /// The lock warning, given once where a secret's pages could not be locked.
 const LOCK_WARNING: &str = "The system did not lock all of this memory: a secret may reach swap";
 
-/// Runs `body`, a command that takes or shows a secret, behind the gate: `needs` restricts the
-/// protections, then a secret is refused or the private screen titled `title` opens, and `body`
-/// runs on it; `shows_secret` for a command whose result is secret, refused on a terminal without
-/// a private screen. The numbered outputs are reported once it is done.
+/// Runs `body`, a command that takes or shows a secret, behind the gate, its protections restricted:
+/// a secret is refused or the private screen titled `title` opens, and `body` runs on it;
+/// `shows_secret` for a command whose result is secret, refused on a terminal without a private
+/// screen. The numbered outputs are reported once it is done.
 pub(crate) fn run_secret(
     protection: &mut Protection,
-    needs: &Needs,
     parsed: &Parsed,
-    renamed: &mut Renamed,
     title: &str,
     shows_secret: bool,
-    body: impl FnOnce(&mut PrivateScreen) -> Result<(), Stop>,
+    body: impl FnOnce(&mut Protection) -> Result<(), Stop>,
 ) -> Result<(), Stop> {
-    protection.restrict(needs);
     if let Some(reason) = protection.refusal() {
         return Err(Unprotected(reason).into());
     }
     let mut screen = PrivateScreen::enter(title);
-    let output_terminal = crate::terminal::can_redraw(crate::terminal::Channel::Output);
-    if shows_secret && !screen.is_active() && output_terminal {
+    if shows_secret && !screen.is_active() && crate::terminal::output_is_terminal() {
+        // --ask-secrets says what its questions need, as TS does.
+        if is_on(parsed, "ask-secrets") {
+            assert_terminal()?;
+        }
         return Err(NoPrivateScreen.into());
     }
-    show_protection(&protection.summary());
+    show_protection(&protection.report());
     if let Some(swap) = unprotected_swap() {
         warning_with_more(&swap, "unencrypted-swap");
     }
     warn_of_cloud_copies(parsed);
-    body(&mut screen)?;
+    body(protection)?;
     if mnemocode::secret::any_lock_refused() {
         warning_with_more(LOCK_WARNING, "memory-lock");
     }
-    renamed.report();
-    if !screen
-        .wait_to_clear()
-        .map_err(|interrupted| match interrupted {
-            crate::terminal::Interrupted::Signal(signal) => Stop::Signal(signal),
-            crate::terminal::Interrupted::Failed(_) => Stop::Cancelled,
-        })?
-    {
+    report_renamed();
+    if !screen.wait_to_clear()? {
         return Err(Stop::Cancelled);
     }
     screen.leave();

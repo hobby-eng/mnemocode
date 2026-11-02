@@ -2,8 +2,7 @@
 //! search reads them (MnemoCode TS 0.1.0's `terminal-keys.ts`, `key-sequences.ts` and
 //! `TerminalKeys` of `terminal-input.ts`). Entering raw mode drops what was typed ahead, so that a
 //! question is answered only by keys pressed after it shows. A signal wakes a read: an ending signal
-//! is returned as such, and SIGTSTP from outside gives the terminal back, stops, takes it again and
-//! asks the screen to redraw.
+//! is returned as such, and SIGTSTP from outside gives the terminal back, stops and takes it again.
 
 use std::io;
 
@@ -74,6 +73,7 @@ pub(crate) struct Keys {
     end: usize,
     again: Vec<u8>,
     ended: bool,
+    only_escape: bool,
 }
 
 impl Keys {
@@ -86,7 +86,13 @@ impl Keys {
             end: 0,
             again: Vec::with_capacity(MAX_KEY_SEQUENCE_BYTES * 2),
             ended: false,
+            only_escape: false,
         }
+    }
+
+    /// From now on only Escape goes back: q, Q and Ctrl+D are other keys.
+    pub(crate) const fn only_escape_leaves(&mut self) {
+        self.only_escape = true;
     }
 
     /// Whether raw mode is on: standard input is a terminal.
@@ -141,12 +147,15 @@ impl Keys {
         }
     }
 
-    /// Stops for SIGTSTP when it arrived: the terminal as the shell expects it, then raw mode again
-    /// and a redraw once continued.
-    fn suspend_if_asked(&self) {
-        if !os::suspend_requested() {
-            return;
+    /// Stops for SIGTSTP when it arrived.
+    pub(crate) fn suspend_if_asked(&self) {
+        if os::suspend_requested() {
+            self.suspend();
         }
+    }
+
+    /// Stops now: the terminal as the shell expects it, then raw mode again once continued.
+    pub(crate) fn suspend(&self) {
         if let Some(raw) = &self.raw {
             raw.pause();
         }
@@ -154,7 +163,6 @@ impl Keys {
         if let Some(raw) = &self.raw {
             raw.resume();
         }
-        super::request_redraw();
     }
 
     /// Whether another byte arrives within `milliseconds`, without taking it.
@@ -176,23 +184,34 @@ impl Keys {
         bytes.zeroize();
     }
 
-    /// Drops the rest of an answer refused while it still arrived, such as a paste longer than any
-    /// answer: everything until no byte has come for PASTE_GAP_MS. Whether Ctrl+C was among it.
-    pub(crate) fn drop_rest_of_paste(&mut self) -> Result<bool, Interrupted> {
-        let mut cancelled = false;
-        while self.more_within(PASTE_GAP_MS) {
-            match self.next()? {
-                Some(key::CTRL_C) => cancelled = true,
-                Some(_) => {}
-                None => break,
+    /// Drops the rest of what arrived, such as a paste longer than any answer: everything read and
+    /// not used, and what the terminal holds until no byte has come for PASTE_GAP_MS. Whether
+    /// Ctrl+C was among it.
+    pub(crate) fn drop_rest_of_paste(&mut self) -> bool {
+        let unused = self.chunk.get(self.start..self.end).unwrap_or_default();
+        let mut cancelled = unused.contains(&key::CTRL_C) || self.again.contains(&key::CTRL_C);
+        self.start = self.end;
+        self.again.zeroize();
+        while os::input_within(PASTE_GAP_MS).unwrap_or(false) {
+            match os::read_input(&mut self.chunk) {
+                Ok(count @ 1..) => {
+                    let read = self.chunk.get(..count).unwrap_or_default();
+                    cancelled |= read.contains(&key::CTRL_C);
+                }
+                _ => break,
             }
         }
-        Ok(cancelled)
+        cancelled
     }
 }
 
 impl Drop for Keys {
+    /// The rest of a paste goes with the keys, so that no shell reads it when the program ends;
+    /// Ctrl+C among it still cancels.
     fn drop(&mut self) {
+        if self.raw.is_some() && self.drop_rest_of_paste() {
+            os::cancel();
+        }
         self.chunk.zeroize();
         self.again.zeroize();
     }
@@ -385,7 +404,7 @@ pub(crate) fn read_key(keys: &mut Keys) -> Result<Key, Interrupted> {
         key::CTRL_C => Key::Cancel,
         key::CARRIAGE_RETURN | key::LINE_FEED => Key::Enter,
         b'0'..=b'9' => Key::Digit(byte - b'0'),
-        b'q' | b'Q' | key::CTRL_D => Key::Back,
+        b'q' | b'Q' | key::CTRL_D if !keys.only_escape => Key::Back,
         key::ESCAPE => {
             if !keys.more_within(ESCAPE_DELAY_MS) {
                 return Ok(Key::Back);

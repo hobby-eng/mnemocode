@@ -3,3 +3,20 @@
 //! library, never the other way.
 
 #![forbid(unsafe_code)]
+
+mod assets;
+pub mod checks;
+pub mod content;
+pub mod details;
+pub mod export;
+pub mod heir;
+pub mod palette;
+pub mod pdf;
+pub mod plan;
+pub mod preflight;
+pub mod raster;
+pub mod scene;
+pub mod settings;
+pub mod sheet;
+pub mod templates;
+pub mod text_rules;

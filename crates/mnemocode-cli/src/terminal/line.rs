@@ -43,18 +43,22 @@ pub(crate) enum LineOutcome {
     Answer(SecretBytes),
     /// The input ended before anything was typed.
     Ended,
-    /// Escape went back; the columns the abandoned answer took and the row of the cursor after it,
-    /// counted from the prompt's first row, so that the caller erases what it wrapped onto.
+    /// Escape went back; the row of the cursor after the abandoned answer, counted from the
+    /// prompt's first row, so that the caller erases what it wrapped onto.
     Back {
-        /// The columns of the abandoned answer.
-        columns: usize,
         /// The row of the cursor after it.
         row: usize,
     },
     /// Ctrl+C.
     Cancelled,
-    /// The answer cannot be used, and its rest was dropped: asked again with this refusal.
-    Refused(Unusable),
+    /// The answer cannot be used, and its rest was dropped: asked again with this refusal; the row
+    /// of the cursor after what was shown of it.
+    Refused {
+        /// Why it cannot be used.
+        reason: Unusable,
+        /// The row of the cursor after it.
+        row: usize,
+    },
 }
 
 /// Reads one line from `keys` as described at the top. A visible answer leaves the cursor just
@@ -73,13 +77,20 @@ pub(crate) fn read_line(
         Ok(Some(outcome)) => Ok(outcome),
         Ok(None) => match answer.take() {
             Ok(text) => Ok(LineOutcome::Answer(text)),
-            Err(reason) => Ok(LineOutcome::Refused(reason)),
+            Err(reason) => Ok(LineOutcome::Refused {
+                reason,
+                row: answer.row_from_prompt(),
+            }),
         },
         Err(reason) => {
-            if keys.drop_rest_of_paste()? {
+            if keys.drop_rest_of_paste() {
                 return Ok(LineOutcome::Cancelled);
             }
-            Ok(LineOutcome::Refused(reason))
+            answer.move_to_end();
+            Ok(LineOutcome::Refused {
+                reason,
+                row: answer.row_from_prompt(),
+            })
         }
     }
 }
@@ -131,7 +142,6 @@ fn edit(
                     if options.escape_goes_back {
                         answer.move_to_end();
                         return Ok(Ok(Some(LineOutcome::Back {
-                            columns: answer.columns(),
                             row: answer.row_from_prompt(),
                         })));
                     }

@@ -28,6 +28,9 @@ const PAYLOAD_DIGITS: usize = 6;
 /// The digits of a word number in the colours.
 const WORD_DIGITS: usize = 4;
 
+/// The colours of a phrase as the help and the questions name them: "8 to 16".
+pub const COLOR_COUNTS_TEXT: &str = "8 to 16";
+
 /// The colours of a phrase of each word count: 8, 10, 12, 14 or 16.
 pub fn color_count(word_count: usize) -> usize {
     word_count * WORD_DIGITS / PAYLOAD_DIGITS

@@ -32,8 +32,9 @@ const ENTRY_DATE_BYTES: [u8; 8] = [0x07, 0xd1, 2, 1, 0x07, 0xea, 9, 23];
 const ENTRY_KEY_START: u8 = 0x13;
 const ENTRY_KEY_STEP: u8 = 7;
 /// The steps of entries that hold no secret and so no scrub: a page's free, and public text.
-const UNSCRUBBED_STEPS: [&str; 7] = [
+const UNSCRUBBED_STEPS: [&str; 8] = [
     "drop of a backup",
+    "drop of a decoding",
     "drop of a list",
     "drop of a split",
     "drop of a restore",

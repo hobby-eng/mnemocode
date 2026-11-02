@@ -6,12 +6,21 @@
 mod candidates;
 #[cfg(feature = "any-coin")]
 mod coins;
+#[cfg(feature = "search-date")]
+mod date_search;
+#[cfg(feature = "search-marked-codes")]
+mod marked_search;
 pub mod public_vectors;
 mod qr;
 mod re_encoding;
+mod recovery;
 #[cfg(feature = "sskr")]
 mod sskr;
+#[cfg(all(feature = "sskr", feature = "search-date"))]
+mod unmasking;
 mod wallet;
+#[cfg(feature = "search-word")]
+mod word_search;
 
 use bip39::{Language, Mnemonic};
 use sha2::{Digest, Sha256};
@@ -166,6 +175,14 @@ const MATRIX_MODES: [Mode; 3] = [Mode::Direct, Mode::Seedshift, Mode::SeedshiftL
 /// The round trips of the representation matrix: every length, form and mode of it.
 pub const ROUND_TRIPS: usize = WORD_COUNTS.len() * Form::ALL.len() * MATRIX_MODES.len();
 
+/// What the Word hints row covers, Bytewords where this build holds shares.
+#[cfg(feature = "sskr")]
+const WORD_HINTS_DETAIL: &str =
+    "BIP39 words and Bytewords below a word typed, Tab completion, codes without hints";
+#[cfg(not(feature = "sskr"))]
+const WORD_HINTS_DETAIL: &str =
+    "BIP39 words below a word typed, Tab completion, codes without hints";
+
 /// One row: its name and what it covers, as the report shows them, and its cases.
 #[derive(Debug)]
 pub struct Row {
@@ -176,7 +193,7 @@ pub struct Row {
 
 impl Row {
     /// A row named `name`, covering `detail`, whose cases `run` runs.
-    pub(crate) const fn new(
+    pub const fn new(
         name: &'static str,
         detail: &'static str,
         run: fn(Tier) -> Result<(), CheckFailure>,
@@ -231,13 +248,13 @@ pub const ROWS: [Row; 11] = [
         detail: "published seed, NFKD salt, refusals; 24 BIP39 vectors",
         run: bip39_seed,
     },
+    candidates::ROW,
     Row {
         name: "Word hints",
-        detail: "BIP39 words below a word typed, Tab completion, codes without hints",
+        detail: WORD_HINTS_DETAIL,
         run: word_hints,
     },
     re_encoding::ROW,
-    candidates::ROW,
     qr::PNG_ADMISSION,
     qr::QR_ADAPTER,
 ];
@@ -249,16 +266,45 @@ pub fn rows() -> impl Iterator<Item = &'static Row> {
     #[cfg(not(feature = "any-coin"))]
     let coins: &[Row] = &[];
     #[cfg(feature = "sskr")]
-    let (integrity, shares): (&[Row], &[Row]) = (&SSKR_INTEGRITY, &SSKR_SHARES);
+    let (integrity, repair): (&[Row], &[Row]) = (&SSKR_INTEGRITY, &SSKR_REPAIR);
     #[cfg(not(feature = "sskr"))]
-    let (integrity, shares): (&[Row], &[Row]) = (&[], &[]);
+    let (integrity, repair): (&[Row], &[Row]) = (&[], &[]);
+    #[cfg(feature = "sskr")]
+    let split: &[Row] = &SSKR_SPLIT;
+    #[cfg(not(feature = "sskr"))]
+    let split: &[Row] = &[];
+    #[cfg(feature = "search-date")]
+    let dates: &[Row] = &DATE_ROWS;
+    #[cfg(not(feature = "search-date"))]
+    let dates: &[Row] = &[];
+    #[cfg(feature = "search-marked-codes")]
+    let marked: &[Row] = &MARKED_ROWS;
+    #[cfg(not(feature = "search-marked-codes"))]
+    let marked: &[Row] = &[];
+    #[cfg(feature = "search-word")]
+    let words: &[Row] = &WORD_ROWS;
+    #[cfg(not(feature = "search-word"))]
+    let words: &[Row] = &[];
+    #[cfg(all(feature = "sskr", feature = "search-date"))]
+    let unmasking: &[Row] = &UNMASKING_ROWS;
+    #[cfg(not(all(feature = "sskr", feature = "search-date")))]
+    let unmasking: &[Row] = &[];
     ROWS[..1]
         .iter()
         .chain(integrity)
-        .chain(&ROWS[1..])
-        .chain(shares)
+        .chain(&ROWS[1..LAST_BEFORE_DATES])
+        .chain(dates)
+        .chain([&recovery::BACKUP_READING])
+        .chain(marked)
+        .chain(words)
+        .chain(&ROWS[LAST_BEFORE_DATES..FIRST_OF_THE_END])
+        .chain([&recovery::BACKUP_CHECK])
+        .chain(repair)
+        .chain(unmasking)
+        .chain(split)
         .chain([&wallet::ROW])
         .chain(coins)
+        .chain(&ROWS[FIRST_OF_THE_END..])
 }
 
 /// The row of the share engine, after Core integrity, and those of the shares, after the
@@ -266,7 +312,22 @@ pub fn rows() -> impl Iterator<Item = &'static Row> {
 #[cfg(feature = "sskr")]
 const SSKR_INTEGRITY: [Row; 1] = [sskr::INTEGRITY];
 #[cfg(feature = "sskr")]
-const SSKR_SHARES: [Row; 2] = [sskr::REPAIR, sskr::SPLIT];
+const SSKR_REPAIR: [Row; 1] = [sskr::REPAIR];
+#[cfg(feature = "sskr")]
+const SSKR_SPLIT: [Row; 1] = [sskr::SPLIT];
+/// The rows of the searches, each with its feature.
+#[cfg(feature = "search-date")]
+const DATE_ROWS: [Row; 1] = [date_search::ROW];
+#[cfg(feature = "search-marked-codes")]
+const MARKED_ROWS: [Row; 1] = [marked_search::ROW];
+#[cfg(feature = "search-word")]
+const WORD_ROWS: [Row; 1] = [word_search::ROW];
+#[cfg(all(feature = "sskr", feature = "search-date"))]
+const UNMASKING_ROWS: [Row; 1] = [unmasking::ROW];
+/// How many of [`ROWS`] come before the rows of dates, the end of "BIP39 seed".
+const LAST_BEFORE_DATES: usize = 6;
+/// Where the rows after the coins start among [`ROWS`], at "Word hints".
+const FIRST_OF_THE_END: usize = 7;
 
 /// The parts that the binding's modules compute, each checked by its own rows in the module's
 /// `selfCheck` (ARCHITECTURE.md §6).
@@ -283,6 +344,8 @@ pub enum Part {
     /// Shamir shares: their engine, forms, split, restore and repair.
     #[cfg(feature = "sskr")]
     Sskr,
+    /// What a backup lost, found again: reading, searches, checks and shares unmasked.
+    Recovery,
 }
 
 /// The rows of the phrase part.
@@ -309,6 +372,15 @@ impl Part {
             Self::Sskr => matches!(
                 row.name,
                 "SSKR integrity" | "Share repair" | "Share split and restore"
+            ),
+            Self::Recovery => matches!(
+                row.name,
+                "Dates"
+                    | "Backup reading"
+                    | "Marked codes search"
+                    | "Word search"
+                    | "Backup check"
+                    | "Share unmasking"
             ),
         }
     }
@@ -725,6 +797,8 @@ fn word_hints(_: Tier) -> Result<(), CheckFailure> {
     for (hints, line, expected, name) in cases {
         expect_same(hint_text(&hints.hint(line)).as_str(), expected, name)?;
     }
+    #[cfg(feature = "sskr")]
+    sskr::share_hints()?;
     let completion = |line: &str| {
         let completion = BIP39.completion(line);
         format!("{} {}", completion.letters, completion.word_ends)
@@ -757,5 +831,15 @@ mod tests {
             assert_eq!(row.run(Tier::Full), Ok(()), "{}", row.name());
         }
         assert_eq!(ROUND_TRIPS, 75);
+    }
+
+    #[cfg(feature = "sskr")]
+    #[test]
+    fn the_word_hints_row_names_the_bytewords_it_checks_as_ts_does() {
+        let row = rows().find(|row| row.name() == "Word hints").unwrap();
+        assert_eq!(
+            row.detail(),
+            "BIP39 words and Bytewords below a word typed, Tab completion, codes without hints"
+        );
     }
 }

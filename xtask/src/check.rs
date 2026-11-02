@@ -14,7 +14,7 @@ use crate::{Failure, action_pins, code_rules, copies, markdown, notices, run_too
 
 /// Clippy with `arguments`, warnings refused; a clippy.toml path that does not resolve, which
 /// -D warnings lets pass, refused too.
-fn clippy(root: &Path, arguments: &[&str]) -> Result<(), Failure> {
+pub(crate) fn clippy(root: &Path, arguments: &[&str]) -> Result<(), Failure> {
     let mut all = vec!["clippy", "--locked"];
     all.extend_from_slice(arguments);
     all.extend_from_slice(&["--", "-D", "warnings"]);

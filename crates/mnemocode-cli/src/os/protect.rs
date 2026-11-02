@@ -10,6 +10,7 @@
 //!   tracer is attached (decision 1); everything else the system refuses is reported, never assumed.
 
 use std::path::PathBuf;
+use std::sync::{Mutex, PoisonError};
 
 /// What a command needs beyond reading: the folders it saves into, each the parent folder of an
 /// output, made before the secret (files::make_folders). Empty for a command that saves nothing.
@@ -17,6 +18,8 @@ use std::path::PathBuf;
 pub(crate) struct Needs {
     /// The folders beneath which the command writes, resolved.
     pub(crate) folders: Vec<PathBuf>,
+    /// Whether the answers on its private screen name the folders: writes stay open until then.
+    pub(crate) answers_name_folders: bool,
 }
 
 /// What the system did with core dumps.
@@ -27,10 +30,15 @@ pub(crate) enum CoreDumps {
     /// Not switched off, for the reason given.
     Failed(String),
     /// Left as the system has them: Windows writes none unless an administrator set one up.
+    #[cfg_attr(
+        not(windows),
+        allow(dead_code, reason = "Windows's own, and the tests'")
+    )]
     Untouched,
 }
 
 /// What a probe of one protection found.
+#[cfg(unix)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Found {
     /// The probe was refused as the protection refuses it.
@@ -40,6 +48,17 @@ pub(super) enum Found {
     /// The probe could not tell.
     Unknown,
 }
+
+/// The folders beneath which the system lets this process write, where it rules writes.
+static RULED: Mutex<Option<Vec<PathBuf>>> = Mutex::new(None);
+
+/// The folders that the rules on writes leave open; none where the system rules no writes.
+pub(crate) fn ruled_folders() -> Option<Vec<PathBuf>> {
+    RULED.lock().unwrap_or_else(PoisonError::into_inner).clone()
+}
+
+/// What the report says where a command's answers name the folders it saves into.
+pub(super) const WRITES_OPEN: &str = "file writes: open, as the answers name the outputs";
 
 /// What protects this process, as read back: what holds, what the system did not give and why,
 /// and the core dumps.
@@ -73,6 +92,19 @@ impl Protection {
         self.read_back();
     }
 
+    /// Rules writes where a command's answers named its folders, which `restrict` left open.
+    pub(crate) fn rule_writes(&mut self, folders: &[PathBuf]) {
+        self.reasons.retain(|reason| reason != WRITES_OPEN);
+        platform::rule_writes(self, folders);
+        self.read_back();
+    }
+
+    /// Records that the system now lets this process write beneath `folders` alone.
+    #[cfg(target_os = "linux")]
+    pub(super) fn writes_ruled(folders: &[PathBuf]) {
+        *RULED.lock().unwrap_or_else(PoisonError::into_inner) = Some(folders.to_vec());
+    }
+
     /// Reads back what can change after start: on Linux, whether the process is still not
     /// dumpable and whether a tracer is attached.
     pub(crate) fn read_back(&mut self) {
@@ -96,11 +128,6 @@ impl Protection {
         })
     }
 
-    /// The core dumps as last read back.
-    pub(crate) fn core_dumps(&self) -> &CoreDumps {
-        &self.core_dumps
-    }
-
     /// What protects this process now, for the private screen: "no core dumps · kernel: no
     /// sockets, no file writes" and the like.
     pub(crate) fn summary(&self) -> String {
@@ -112,7 +139,7 @@ impl Protection {
         parts.join(" · ")
     }
 
-    /// What the system enforces for this run and what it could not, for the self-test.
+    /// What the system enforces for this run and what it could not.
     pub(crate) fn report(&self) -> String {
         let held = self.summary();
         let mut text = if held.is_empty() {
@@ -149,6 +176,7 @@ impl Protection {
     }
 
     /// Records `protection` as holding when its probe `found` so; otherwise why not.
+    #[cfg(unix)]
     pub(super) fn claim(&mut self, protection: &str, found: Found, broken: &str) {
         match found {
             Found::Holds => self.hold(protection),
@@ -159,14 +187,23 @@ impl Protection {
 
     /// The held protections recorded since `from`, joined after `label`, replacing them: the
     /// kernel's own as "kernel: no sockets, no file writes".
+    #[cfg(unix)]
     pub(super) fn group_since(&mut self, from: usize, label: &str) {
         if self.held.len() > from {
             let group = self.held.split_off(from).join(", ");
-            self.held.push(format!("{label}: {group}"));
+            let start = format!("{label}: ");
+            match self.held.iter_mut().find(|held| held.starts_with(&start)) {
+                Some(earlier) => {
+                    earlier.push_str(", ");
+                    earlier.push_str(&group);
+                }
+                None => self.held.push(format!("{start}{group}")),
+            }
         }
     }
 
     /// How many protections hold so far, for [`Protection::group_since`].
+    #[cfg(unix)]
     pub(super) fn held_count(&self) -> usize {
         self.held.len()
     }
@@ -176,8 +213,11 @@ impl Protection {
 /// heaviest operation's measured peak plus a quarter, rounded up to a multiple of 64 MiB. The
 /// increments that bring the heaviest operations (the encrypted candidate list, the card export)
 /// measure them and run them under it: the largest list the writer makes, encrypted through scrypt
-/// and opened again, peaks at 293 MiB resident (increment 6, `os::linux` tests); the card export,
-/// measured with increment 9, sets the cap.
+/// and opened again, peaks at 293 MiB resident (increment 6, `os::linux` tests). A card export draws
+/// and writes one page at a time: the largest, the cards of 16 shares of a 24-word phrase in Unicode
+/// codes on release builds, peak at 147 MiB resident and 145 MiB of data, as A4 page images; their
+/// PDFs of up to 337 MB at 73 MiB, and their business-size images and separate files at 55 MiB.
+#[cfg(any(target_os = "linux", windows))]
 pub(super) const MEMORY_CAP_BYTES: u64 = 768 * 1024 * 1024;
 
 /// The read-back of a system where nothing changes after start: the core dumps as they were
@@ -228,6 +268,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn the_kernel_protections_are_named_together() {
         let mut protection = record();
