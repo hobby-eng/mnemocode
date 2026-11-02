@@ -16,4 +16,4 @@ MnemoCode is rewritten in Rust: one executable that needs nothing else installed
 
 ## 0.1.0
 
-The TypeScript version: [its changelog](https://github.com/hobby-eng/mnemocode/blob/v0.1.0/CHANGELOG.md).
+The TypeScript version, now in its own repository, [mnemocode_typescript](https://github.com/hobby-eng/mnemocode_typescript): [its changelog](https://github.com/hobby-eng/mnemocode_typescript/blob/v0.1.0/CHANGELOG.md).

@@ -10,7 +10,8 @@ The workspace `AGENTS.md` and its coding guide apply. This repository adds:
   code-rules, copies, Markdown lists, notices, action pins, every page's WebAssembly file built and
   started in wasmi against its glue, the RustSec audit). Run it before every commit, with the workspace's Rust and
   `CARGO_BUILD_JOBS=4` under the workspace's heavy-checks lock.
-- The TS known answers: the TS repository's `pnpm record:rust-parity <this repo>/vectors/ts-0.1.0`
+- The TS known answers: the TypeScript repository's (hobby-eng/mnemocode_typescript)
+  `pnpm record:rust-parity <this repo>/vectors/ts-0.1.0`
   writes them from a clean commit there; never edit them by hand (DOC-04).
 - `vendor/` holds the SSKR engine exactly as `UPSTREAM.json` records it; never edit it. The
   `bc-crypto` stand-in in `shims/` replaces crates.io's through `[patch.crates-io]`.

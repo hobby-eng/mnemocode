@@ -1,10 +1,12 @@
 # MnemoCode
 
 [![CI](https://github.com/hobby-eng/mnemocode/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hobby-eng/mnemocode/actions/workflows/ci.yml)
+[![RustSec audit](https://github.com/hobby-eng/mnemocode/actions/workflows/audit.yml/badge.svg)](https://github.com/hobby-eng/mnemocode/actions/workflows/audit.yml)
+[![Release](https://github.com/hobby-eng/mnemocode/actions/workflows/release.yml/badge.svg)](https://github.com/hobby-eng/mnemocode/actions/workflows/release.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#provenance-and-license)
 [![Build provenance: GitHub attestations](https://img.shields.io/badge/build%20provenance-GitHub%20attestations-2ea44f)](https://github.com/hobby-eng/mnemocode/attestations)
 
-This README describes version 0.2.0, the Rust version of MnemoCode. Until the release of 0.2.0, use the released [MnemoCode 0.1.0](https://github.com/hobby-eng/mnemocode/releases).
+This README describes version 0.2.0, the Rust version of MnemoCode. Until the release of 0.2.0, use the released [MnemoCode 0.1.0](https://github.com/hobby-eng/mnemocode_typescript/releases), the TypeScript version, which reads and writes the same backups.
 
 **Have you inherited a backup made with MnemoCode?** Start with [A guide for heirs](docs/HEIRS.md).
 

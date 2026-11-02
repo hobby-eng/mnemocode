@@ -941,7 +941,7 @@
       "expected": "CORE-50: work that grows with input stops at a limit that the program states. The size limits of the image hold; time has none.",
       "observed": "rqrr clones the whole image for each group of finder patterns it tests, and noise offers many. Its API gives no count of them and no way to stop. 0.1.0's reader takes 34 s on the same noise.",
       "impact": "A hostile or damaged image can keep one command busy for minutes or more, ignoring Ctrl+C; closing the terminal or SIGKILL ends it. No secret is touched, since the read happens before any result.",
-      "recommendedFix": "None taken: a bound would need an own pre-scan of finder patterns in front of rqrr, which risks losing photographs that read today. Recorded in PLAN.md's parity list and CLI.md. The owner decides.",
+      "recommendedFix": "Not bounded yet. On 2026-11-02 the owner lowered the limit to 2 megapixels (fix commit 448adc83877fcf03a60693df7d0e8110a9771ca2), which shortens the search: seeds of noise at 2 megapixels still took up to 21 s. A bound needs an own pre-scan in front of rqrr, another reader, or a read that Ctrl+C ends at once; the owner decides.",
       "requiredVerification": "If it is fixed: the two images refused or read within seconds, and every page image still read.",
       "evidence": [
         "probes.log, reviewer report and source lines as named above (local)"
@@ -1164,7 +1164,7 @@
       "kind": "finding",
       "title": "The help of `--ask-secrets` leaves out standard error",
       "severity": "low",
-      "status": "deferred",
+      "status": "verified",
       "releaseBlocking": false,
       "group": "Commands",
       "affectedFiles": [
@@ -1175,8 +1175,8 @@
       "expected": "The help: standard input must be the terminal.",
       "observed": "Standard error must be one too. The refusal says so, and the help keeps 0.1.0's words.",
       "impact": "A person who redirects standard error gets a refusal that explains itself.",
-      "recommendedFix": "None taken: the help is byte-equal to the recorded 0.1.0 help on every page, and this sentence would change it in the TS program first. It goes with the next change of the help (a Low finding, audits.instructions.md).",
-      "requiredVerification": "If it is fixed: the transcripts recorded from the TS program.",
+      "recommendedFix": "Name standard error in the help, and write the difference into the TS transcripts the replay expects, as the owner decided on 2026-11-02 once the TS program was kept for critical fixes alone.",
+      "requiredVerification": "The transcripts replay with the sentence written in.",
       "evidence": [
         "probes.log, reviewer report and source lines as named above (local)"
       ]
@@ -1233,7 +1233,7 @@
       "status": "deferred",
       "fixCommit": null,
       "verificationCommit": null,
-      "evidence": "None taken: a bound would need an own pre-scan of finder patterns in front of rqrr, which risks losing photographs that read today. Recorded in PLAN.md's parity list and CLI.md. The owner decides."
+      "evidence": "Not bounded yet. On 2026-11-02 the owner lowered the limit to 2 megapixels (fix commit 448adc83877fcf03a60693df7d0e8110a9771ca2), which shortens the search: seeds of noise at 2 megapixels still took up to 21 s. A bound needs an own pre-scan in front of rqrr, another reader, or a read that Ctrl+C ends at once; the owner decides."
     },
     {
       "id": "AUD-001-BLD001",
@@ -1300,10 +1300,10 @@
     },
     {
       "id": "AUD-001-DOC008",
-      "status": "deferred",
-      "fixCommit": null,
-      "verificationCommit": null,
-      "evidence": "None taken: the help is byte-equal to the recorded 0.1.0 help on every page, and this sentence would change it in the TS program first. It goes with the next change of the help (a Low finding, audits.instructions.md)."
+      "status": "verified",
+      "fixCommit": "448adc83877fcf03a60693df7d0e8110a9771ca2",
+      "verificationCommit": "448adc83877fcf03a60693df7d0e8110a9771ca2",
+      "evidence": "followup-check.log, followup-features.log (local)"
     },
     {
       "id": "AUD-001-DOC009",
@@ -1327,12 +1327,12 @@
     "The reference program is one implementation of the same design, by the same project: agreement shows parity, not correctness against an independent oracle, beyond the published vectors.",
     "Fuzzing was bounded to 300 seconds a target, `text` at 64 inputs a second. Upstream crates were not fuzzed on their own.",
     "A real unencrypted swap area, a failed self-test in the menu, FAT and exFAT media and a real photograph of a QR code were not exercised.",
-    "SEC004 and DOC008 stay deferred. The owner's open questions of the port remain as the commit record and PLAN.md list them."
+    "SEC004 stays deferred. The owner's open questions of the port remain as the commit record and PLAN.md list them."
   ],
   "harnessFiles": [
     "docs/audits/AUD-001-harnesses/README.md"
   ],
-  "releaseVerdict": "No critical or high finding stands, and none of the 15 blocks a release. 13 are verified on the fix commit, and 2 Low findings are deferred with their reasons. Within what ran, the Rust program gave the reference's results in every case, read and wrote its formats, kept its secrets out of errors and output, and built to the same bytes twice. This is the owner's record for the release decision, not a certification. Release acceptance stays open until the release workflow has run on the three systems, which needs a remote, as GATES.md requires.",
+  "releaseVerdict": "No critical or high finding stands, and none of the 15 blocks a release. 14 are verified on their fix commits, and 1 Low finding is deferred with its reason. Within what ran, the Rust program gave the reference's results in every case, read and wrote its formats, kept its secrets out of errors and output, and built to the same bytes twice. This is the owner's record for the release decision, not a certification. Release acceptance stays open until the release workflow has run on the three systems, which needs a remote, as GATES.md requires.",
   "actionsNotPerformed": [
     "no push, tag, release or remote change",
     "no change to the owner's settings",
