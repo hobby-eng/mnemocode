@@ -45,9 +45,16 @@ RUN curl --fail --silent --show-error --location \
 # The MinGW linker writes the build time into every Windows executable's header, and the header
 # checksum with it; --no-insert-timestamp writes zero instead, so that two builds give the same
 # bytes.
+#
+# Rust's std takes pidfd_spawnp and pidfd_getpid as weak symbols of glibc 2.39, this image's. On
+# glibc 2.35 to 2.38 the loader then writes "weak version `GLIBC_2.39' not found" at every start.
+# Defined as 0 here, std takes them as missing, as it does on such a system, and starts a child the
+# older way; the executable keeps no reference to that version.
 ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
     CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc \
-    CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS="-C link-arg=-Wl,--no-insert-timestamp"
+    CARGO_TARGET_X86_64_PC_WINDOWS_GNU_RUSTFLAGS="-C link-arg=-Wl,--no-insert-timestamp" \
+    CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-Wl,--defsym=pidfd_spawnp=0 -C link-arg=-Wl,--defsym=pidfd_getpid=0" \
+    CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-Wl,--defsym=pidfd_spawnp=0 -C link-arg=-Wl,--defsym=pidfd_getpid=0"
 
 FROM toolchain AS build
 WORKDIR /workspace

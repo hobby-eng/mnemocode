@@ -292,7 +292,7 @@ fn way_result(result: MissingCodesResult) -> Value {
     match result {
         MissingCodesResult::Found(found) => json!({
             "kind": "found",
-            "codes": found.backup.text().expect("codes"),
+            "codes": found.backup.text().expect("codes").as_str(),
             "dates": found.dates.as_ref().map(written_dates),
             "foundDates": found.found_dates.as_ref().map(|dates| dates.as_str().to_owned()),
             "others": found.others,

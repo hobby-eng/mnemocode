@@ -1,6 +1,7 @@
 //! A command of the start menu in a process of its own, the same executable (N-FRESH-PROCESS): the
 //! protections of a command are set before its first thread and read back before its first secret.
-//! Its arguments hold no secret, and it reads and writes the terminal itself.
+//! Its arguments hold no secret but the word that the menu's lookup passes to `table`, which
+//! SECURITY.md names as no private question, and it reads and writes the terminal itself.
 
 #![expect(
     clippy::disallowed_methods,

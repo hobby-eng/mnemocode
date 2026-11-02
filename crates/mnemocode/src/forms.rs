@@ -16,6 +16,7 @@ use crate::bip39::phrase::{
 use crate::bip39::sizes::{SizesError, check_word_count, check_word_indexes};
 use crate::bip39::table::{english, index_of_english, unicode_code};
 use crate::refusal::Refusal;
+use crate::secret::SecretText;
 use crate::text::codes::{UNICODE_CODE_DIGITS, code_tokens, compact_code, elements_fit, hex_units};
 use crate::text::pieces::text_pieces;
 use colors::{
@@ -207,10 +208,11 @@ impl Form {
         })
     }
 
-    /// The codes of `indexes` written in this form; indexes that are no phrase are refused.
-    pub fn codes(self, indexes: &[u16]) -> Result<String, FormError> {
+    /// The codes of `indexes` written in this form, in an owner of their own; indexes that are no
+    /// phrase are refused.
+    pub fn codes(self, indexes: &[u16]) -> Result<SecretText, FormError> {
         phrase_indexes(indexes)?;
-        Ok(match self {
+        let codes = match self {
             Self::English => indexes
                 .iter()
                 .map(|&index| english()[usize::from(index)])
@@ -227,7 +229,8 @@ impl Form {
                 .collect(),
             Self::ColorsUnicode => colors_to_unicode(&indexes_to_colors(indexes)?)?,
             Self::Colors => indexes_to_colors(indexes)?.join(" "),
-        })
+        };
+        Ok(SecretText::copy_of("codes", &codes))
     }
 
     /// What a place of a phrase is called in a message: a code where each code is a word, a word

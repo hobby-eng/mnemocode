@@ -125,7 +125,7 @@ fn variant_rows(variants: &[ShareVariant]) -> Vec<FoundRow> {
 
 /// A row for each phrase the codes `found` give; one without a phrase where the way needed no dates.
 fn found_rows(found: &MissingCodesFound) -> Result<Vec<FoundRow>, JsValue> {
-    let codes = found.backup.text().map_err(fail)?;
+    let codes = found.backup.text().map_err(fail)?.as_str().to_owned();
     let Some(dates) = &found.dates else {
         return Ok(vec![FoundRow {
             codes,

@@ -30,7 +30,8 @@ jobs:
       - name: Verify the tag and its release notes
         if: github.event_name == 'push'
         run: |
-          test "$GITHUB_REF_NAME" = "v$(cargo metadata --locked --no-deps --format-version 1 | python3 -c 'import json,sys; print(next(p["version"] for p in json.load(sys.stdin)["packages"] if p["name"] == "mnemocode-cli"))')"
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          test "$GITHUB_REF_NAME" = "v$version"
           test -s "docs/releases/$GITHUB_REF_NAME.md"
       - name: Refuse a tag that has a release or draft already
         if: github.event_name == 'push'
@@ -156,11 +157,15 @@ jobs:
         with:
           persist-credentials: false
       - name: Install the pinned Rust toolchain and target
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
           rustup show
-          rustup target add ${{ matrix.target }}
+          rustup target add "$TARGET"
       - name: Build the executable
-        run: cargo xtask release build ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+        run: cargo xtask release build "$TARGET"
       - name: Run the executable on its own
         env:
           FILE: ${{ matrix.file }}

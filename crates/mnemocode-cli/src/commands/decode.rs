@@ -25,6 +25,7 @@ use mnemocode::recovery::date_search::{wallet_needed, wallet_reason};
 use mnemocode::recovery::marked::MissingCodes;
 use mnemocode::recovery::marked_search::MissingCodesFound;
 use mnemocode::refusal::Refusal;
+use mnemocode::secret::SecretText;
 use mnemocode::wallet::evidence::parse_master_fingerprint;
 
 use super::asking::{AfterFailure, WHAT_NOW, after_failure};
@@ -142,10 +143,10 @@ impl Refusal for DecodeError {
 }
 
 /// The words `result` holds, and its phrase where its checksum is valid.
-pub(crate) fn words_of(result: &Unmasked) -> Result<(String, Option<Phrase>), Stop> {
+pub(crate) fn words_of(result: &Unmasked) -> Result<(SecretText, Option<Phrase>), Stop> {
     let words = Form::English.codes(result.recovered.as_slice())?;
     let phrase = if result.checksum_valid {
-        Some(Phrase::parse(&words)?)
+        Some(Phrase::parse(words.as_str())?)
     } else {
         None
     };
@@ -167,9 +168,9 @@ pub(crate) fn show_recovered(
         ("Words", result.recovered.as_slice().len().to_string()),
     ];
     if result_header("Recovered result", &facts, channel) {
-        return show_original_phrase(&words, phrase.as_ref(), channel);
+        return show_original_phrase(words.as_str(), phrase.as_ref(), channel);
     }
-    print(channel, &[words]);
+    print(channel, &[words.as_str().to_owned()]);
     report_checksum(phrase.as_ref())
 }
 
@@ -230,7 +231,7 @@ fn show_legacy_valid_candidates(backup: &Backup, dates: &[Date]) -> Result<(), S
     for candidate in backup.candidates(dates)? {
         let (words, phrase) = words_of(&candidate)?;
         let fingerprint = phrase.as_ref().map_or(Ok(String::new()), fingerprint_of)?;
-        candidates.push((words, fingerprint));
+        candidates.push((words.as_str().to_owned(), fingerprint));
     }
     let summary = format!(
         "Recovered {} checksum-valid candidates for {ORIGINAL}.",

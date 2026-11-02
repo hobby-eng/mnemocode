@@ -392,7 +392,7 @@ fn check_encoded_search() -> Result<(), CheckFailure> {
             Mode::Seedshift,
         ))?;
         if ok(backup.fingerprint())?.map(fingerprint_hex).as_deref() == Some(ENCODED_FINGERPRINT) {
-            passed.push(ok(backup.text())?);
+            passed.push(ok(backup.text())?.as_str().to_owned());
         }
     }
     expect_same(&count, &MARKED_DIGITS.candidates, "Marked codes checked")?;

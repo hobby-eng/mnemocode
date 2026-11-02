@@ -33,7 +33,7 @@ target/release/mnemocode
 
 ### One executable file
 
-The executable builds target Linux on x64 and ARM64, Windows on x64 and macOS on ARM64 and x64, and need nothing else installed. [Download verification and build instructions](docs/CLI.md#download-verification) cover signatures, checksums and GitHub attestations. The release signing key fingerprint is `28FC51B1DB80DF2101128CB30EDD4814591DD095`.
+The executable builds target Linux on x64 and ARM64, Windows on x64 and macOS on ARM64 and x64, and need nothing else installed but, on Linux, glibc 2.35 or later, which Ubuntu 22.04, Debian 12 and newer systems have; musl systems such as Alpine cannot run them. [Download verification and build instructions](docs/CLI.md#download-verification) cover signatures, checksums and GitHub attestations. The release signing key fingerprint is `28FC51B1DB80DF2101128CB30EDD4814591DD095`.
 
 The examples below use `mnemocode`. In a checkout, use `target/release/mnemocode` in its place. For options, run `mnemocode <command> --help`.
 
@@ -57,7 +57,7 @@ You can also show the phrase after Seedshift as words. With or without shares, y
 
 Without `--mode`, supplying `--dates-file` selects `seedshift`; otherwise the mode is `direct`.
 
-Enter recovery material on the private screen or through local files, never as command-line text. Raw phrase, backup, share, date and final-word arguments are refused, even for public examples. Headless operations accept `--mnemonic-file`, `--input-file`, `--share-file`, `--dates-file`, `--old-dates-file` and `--last-word-file`; one source may use `-` for standard input. Refusal cannot remove text already entered from shell history or process arguments. See [input files and limits](docs/CLI.md#input-files-and-limits).
+Enter recovery material on the private screen or through local files, never as command-line text. The word lookup of `table` and of the menu is the exception: what it is given stands on the command line and on the screen, so use it for public words, and a saved word list for a real phrase. Raw phrase, backup, share, date and final-word arguments are refused, even for public examples. Headless operations accept `--mnemonic-file`, `--input-file`, `--share-file`, `--dates-file`, `--old-dates-file` and `--last-word-file`; one source may use `-` for standard input. Refusal cannot remove text already entered from shell history or process arguments. See [input files and limits](docs/CLI.md#input-files-and-limits).
 
 **Wrong dates can produce a valid phrase for a different wallet.** A checksum does not confirm the dates. Keep an original fingerprint, address or public key for a [recovery check](#exact-local-recovery-checks).
 
@@ -179,7 +179,7 @@ Typed codes and QR codes have no header: retain the original mode. MnemoCode can
 
 `re-encode` reads an existing backup, restores its phrase and makes another with new dates, mode, form, cards or shares. It requires recognition of the recovered phrase or a wallet check before creating the replacement. A valid checksum alone is not confirmation.
 
-On the private screen it asks for the new backup first: its form, its mode and where it is saved, so that the system can hold writes to those folders before the old phrase is read. A failed save may then take another name only in those folders.
+On the private screen it asks for the new backup first: its form, its mode and where it is saved, so that the system can hold writes to those folders before the old phrase is read. On Linux with Landlock a failed save may then take another name only in those folders.
 
 On the private screen it also accepts Shamir shares in every supported form, separated by `;` or line breaks, or read from a text file. The input prompt reminds you about `;` and using `?` for each missing or unreadable code or digit. Use `?` for an unreadable share code or digit: it runs the same repair as Restore from Shamir shares, removes Seedshift with the old dates where used, and only then asks you to confirm the original phrase. A forgotten date digit can also be searched with the original wallet's fingerprint or address. At least the threshold number of shares is needed; a fingerprint or address cannot replace a missing share. If no repair fits, check the unmarked codes and the positions of `?`.
 
@@ -255,7 +255,7 @@ With no known reference, save candidates using `--candidates-file candidates.age
 
 ## Self-tests and public vectors
 
-The startup self-test, quick known-answer and refusal checks, runs before secret operations; a failure stops the operation, and the menu then offers only the self-test, the help and Quit. Share operations also check the SSKR engine against published answers. These checks do not replace verifying a download or the stored backup.
+The startup self-test, quick known-answer and refusal checks, runs before secret operations; a failure stops the operation, and the menu then offers only the self-test, the help and Quit. It also checks the SSKR engine against published answers. These checks do not replace verifying a download or the stored backup.
 
 `mnemocode self-test` runs the full self-test, the startup self-test and more, including PDF and QR rendering, and can take longer. [Check coverage](docs/CLI.md#installation-checks) lists what it exercises; [public vectors](vectors/mnemocode-v1.json) are available for independent verification.
 
@@ -277,7 +277,7 @@ On Linux, MnemoCode warns when swap is unencrypted or cannot be assessed. Secret
 
 ### Memory lock
 
-MnemoCode asks the system to keep the memory of each secret out of swap. A system may refuse beyond its limit, 8 MiB on a current Linux; MnemoCode then says so once. The drawn pages of cards are too large for the limit: they are wiped when freed but not locked. Use encrypted swap or none for a real phrase.
+MnemoCode asks the system to keep the memory of each secret out of swap. A system may refuse beyond its limit, 8 MiB on a current Linux; MnemoCode then says so once. The drawn pages of cards are too large for the limit: they are wiped when freed but not locked. The codes on cards, the dates of a command and the working copies of a step are not locked either. Use encrypted swap or none for a real phrase.
 
 ### Cloud folders
 
@@ -285,7 +285,7 @@ A synchronized folder can upload records, cards and shares. MnemoCode warns for 
 
 ## Library use
 
-The crates `mnemocode` and `mnemocode-cards` provide the same transformations, recovery, sharing and drawing as the CLI, and `mnemocode-wasm` binds them for a web page. A host supplies its own randomness and files. The crates are distributed from this repository and are not published.
+The crates `mnemocode` and `mnemocode-cards` provide the same transformations, recovery, sharing and drawing as the CLI, and `mnemocode-wasm` binds them for a web page. A host supplies its own randomness and files, and registers the library's zeroing allocator, which the example shows. The crates are distributed from this repository and are not published.
 
 [The architecture](docs/design/architect/ARCHITECTURE.md) describes the crates and their ownership contracts; [library examples](docs/CLI.md#library-example) show encoding and decoding.
 

@@ -83,8 +83,8 @@ fn marked_codes_search(tier: Tier) -> Result<(), CheckFailure> {
     let by_encoded = ok(search.by_encoded_fingerprint(ENCODED_FINGERPRINT))?;
     let found = found_by(by_encoded, "Marked codes by the encoded fingerprint")?;
     expect_same(
-        &ok(found.backup.text())?,
-        &MASKED_NUMBERS.to_owned(),
+        ok(found.backup.text())?.as_str(),
+        MASKED_NUMBERS,
         "Marked codes found by the encoded fingerprint",
     )?;
     let MissingCodesResult::List(rows) = ran(ok(search.listed(&day))?)? else {
@@ -115,8 +115,8 @@ fn marked_codes_search(tier: Tier) -> Result<(), CheckFailure> {
     let way = ok(search.by_wallet(Rc::new(public_wallet()?), Some(Rc::new(dates))))?;
     let found = found_by(way, "Marked codes and a date by the wallet")?;
     expect_same(
-        &ok(found.backup.text())?,
-        &MASKED_NUMBERS.to_owned(),
+        ok(found.backup.text())?.as_str(),
+        MASKED_NUMBERS,
         "Marked codes found by the wallet",
     )?;
     expect_same(

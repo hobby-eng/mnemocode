@@ -78,6 +78,7 @@ impl EncodedBackup {
             self.encoding
                 .backup
                 .text()
+                .map(|codes| codes.as_str().to_owned())
                 .map_err(|refusal| refused(&refusal))
         })
     }
@@ -88,6 +89,7 @@ impl EncodedBackup {
             self.encoding
                 .backup
                 .record()
+                .map(|record| record.as_str().to_owned())
                 .map_err(|refusal| refused(&refusal))
         })
     }

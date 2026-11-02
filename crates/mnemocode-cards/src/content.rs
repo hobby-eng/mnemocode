@@ -528,7 +528,9 @@ pub fn backup_card_content(
     };
     let payload = backup
         .text()
-        .map_err(|_| ContentError::NoCards(form.name().to_owned()))?;
+        .map_err(|_| ContentError::NoCards(form.name().to_owned()))?
+        .as_str()
+        .to_owned();
     Ok(ColorCards {
         kind: ContentKind::Colors,
         codes: CardCodes {

@@ -571,6 +571,7 @@ mod tests {
         let phrase = Phrase::parse(TWELVE).unwrap();
         let masked = mode.encode(&phrase, dates).unwrap();
         let text = Form::English.codes(masked.shifted.as_slice()).unwrap();
+        let text = text.as_str().to_owned();
         let check = EncodedBackupCheck::new(EncodedOriginal {
             phrase,
             form: Form::English,

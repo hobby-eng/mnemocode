@@ -15,6 +15,7 @@ use mnemocode::modes::phrase_words::{FINGERPRINT_ROLES, ORIGINAL_FINGERPRINT};
 use mnemocode::modes::{DateWords, Mode};
 use mnemocode::recovery::backup_check::EncodedOriginal;
 use mnemocode::refusal::Refusal;
+use mnemocode::secret::SecretText;
 
 use super::backup_check::{backup_check_answer, offer_encoded_check};
 use super::cards::{
@@ -129,7 +130,7 @@ pub(crate) fn print_encoded_backup(backup: &Backup, title: &str) -> Result<(), S
     terminal::keep_result_from_start();
     print(
         Channel::Output,
-        &backup_code_lines(&backup.text()?, backup.form(), "backup"),
+        &backup_code_lines(backup.text()?.as_str(), backup.form(), "backup"),
     );
     Ok(())
 }
@@ -223,7 +224,7 @@ fn print_result(
     let english = |indexes: &[u16]| Form::English.codes(indexes);
     if masked_words && !backup.form().written_in_words() {
         print_masked_words(
-            &english(encoding.result().shifted.as_slice())?,
+            english(encoding.result().shifted.as_slice())?.as_str(),
             backup.mode(),
         );
     }
@@ -248,9 +249,10 @@ fn legacy_sentences(encoding: &Encoding) -> Result<Vec<String>, Stop> {
     // The last of the words: a single index is no phrase that a form writes.
     let last = |indexes: &[u16]| -> Result<String, Stop> {
         let words = english(indexes)?;
+        let words = words.as_str();
         Ok(words
             .rsplit_once(' ')
-            .map_or(words.as_str(), |(_, last)| last)
+            .map_or(words, |(_, last)| last)
             .to_owned())
     };
     Ok(match &encoding.valid_last_word {
@@ -262,7 +264,10 @@ fn legacy_sentences(encoding: &Encoding) -> Result<Vec<String>, Stop> {
             let words = valid.shifted.as_slice();
             vec![
                 format!("Optional checksum-valid final word: {}", last(words)?),
-                format!("Optional checksum-valid legacy phrase: {}", english(words)?),
+                format!(
+                    "Optional checksum-valid legacy phrase: {}",
+                    english(words)?.as_str()
+                ),
             ]
         }
         _ => vec![
@@ -533,12 +538,13 @@ fn save_results(
 ) -> Result<Parsed, Stop> {
     let mut outputs = parsed.clone();
     let backup = &encoding.backup;
-    let record = format!("{}\n", backup.record()?);
+    let record = backup.record()?;
+    let record = SecretText::copy_of("record", &format!("{}\n", record.as_str()));
     let record_saved = save_output(
         &mut outputs,
         "output",
         ResultName::one("The record"),
-        |path| os::publish_new_file(&resolved(path), record.as_bytes()),
+        |path| os::publish_new_file(&resolved(path), record.as_str().as_bytes()),
     )?;
     if let Some(path) = record_saved {
         saved(&format!("Saved MnemoCode record: {}", printable(&path)));
@@ -555,7 +561,7 @@ fn save_results(
         None => (None, None),
     };
     let qr_saved = save_output(&mut outputs, "qr", ResultName::one("The QR code"), |path| {
-        write_qr(&text, path)
+        write_qr(text.as_str(), path)
     })?;
     if let Some(path) = qr_saved {
         report_qr_verified(1);

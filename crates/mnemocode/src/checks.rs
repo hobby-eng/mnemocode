@@ -414,7 +414,9 @@ fn decoded(mode: Mode, form: Form, text: &str, dates: &[Date]) -> Result<String,
     let first = phrases
         .first()
         .ok_or(CheckFailure::Mismatch("Decoded phrase"))?;
-    ok(Form::English.codes(first.recovered.as_slice()))
+    Ok(ok(Form::English.codes(first.recovered.as_slice()))?
+        .as_str()
+        .to_owned())
 }
 
 /// Every form of `vector`, forward and back.

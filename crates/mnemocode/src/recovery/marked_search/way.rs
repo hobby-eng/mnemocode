@@ -23,7 +23,6 @@ use crate::recovery::marked::{MAX_FOUND_CODES, MarkedCandidates, MissingCodes};
 use crate::recovery::wallet_check::WalletCheck;
 use crate::search::plan::{SearchPlan, counted};
 use crate::search::{Progress, Search, SearchSize, Step};
-use crate::secret::SecretText;
 use crate::wallet::evidence::FINGERPRINT_WARNING;
 
 /// The phrases that `backup` gives with `dates` and that pass their own checksum.
@@ -306,7 +305,7 @@ impl WaySearch {
                 }
                 let fingerprint = fingerprint_of(&phrase)?;
                 rows.push(MissingCodesRow {
-                    codes: SecretText::copy_of("codes", &backup.text()?),
+                    codes: backup.text()?,
                     phrase,
                     fingerprint,
                 });

@@ -57,8 +57,8 @@ pub(crate) fn example(form: Form) -> Result<String, Stop> {
     let written = form.codes(&indexes)?;
     // Forms written joined, as Unicode codes are, are spaced apart code by code.
     Ok(form
-        .apart_codes(&written)?
-        .map_or(written, |codes| codes.join(" ")))
+        .apart_codes(written.as_str())?
+        .map_or_else(|| written.as_str().to_owned(), |codes| codes.join(" ")))
 }
 
 /// `text`, a sample of codes separated by spaces, cut after the last whole code that fits `room`

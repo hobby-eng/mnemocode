@@ -6,6 +6,7 @@
 
 use crate::forms::{Form, FormError};
 use crate::modes::seedshift::Masked;
+use crate::secret::SecretText;
 
 /// `items` as a JSON array of one value a line, at the depth of a key of the top object.
 fn array(items: impl Iterator<Item = String>) -> String {
@@ -17,7 +18,7 @@ fn array(items: impl Iterator<Item = String>) -> String {
 }
 
 /// The JSON of `result`; refused for indexes that are no phrase, as every form refuses them.
-pub fn json(result: &Masked) -> Result<String, FormError> {
+pub fn json(result: &Masked) -> Result<SecretText, FormError> {
     let indexes = result.shifted.as_slice();
     let english = Form::English.codes(indexes)?;
     let unicode = Form::Unicode.codes(indexes)?;
@@ -32,7 +33,7 @@ pub fn json(result: &Masked) -> Result<String, FormError> {
             "shifts",
             array(result.shifts.iter().map(|shift| shift.to_string())),
         ),
-        ("english", array(english.split(' ').map(quoted))),
+        ("english", array(english.as_str().split(' ').map(quoted))),
         (
             "indexes",
             array(
@@ -41,13 +42,14 @@ pub fn json(result: &Masked) -> Result<String, FormError> {
                     .map(|&index| (u32::from(index) + 1).to_string()),
             ),
         ),
-        ("unicodeCodePoints", quoted(&unicode)),
+        ("unicodeCodePoints", quoted(unicode.as_str())),
     ];
     let body: Vec<String> = fields
         .iter()
         .map(|(key, value)| format!("  \"{key}\": {value}"))
         .collect();
-    Ok(format!("{{\n{}\n}}", body.join(",\n")))
+    let text = format!("{{\n{}\n}}", body.join(",\n"));
+    Ok(SecretText::copy_of("json", &text))
 }
 
 #[cfg(test)]
@@ -64,6 +66,7 @@ mod tests {
         .unwrap();
         let direct = Mode::Direct.encode(&phrase, &[]).unwrap();
         let text = json(&direct).unwrap();
+        let text = text.as_str();
         assert!(text.starts_with("{\n  \"algorithm\": \"Seedshift-compatible date shift\",\n  \"dates\": [],\n  \"shifts\": [\n    0,\n"));
         assert!(text.ends_with("    \"about\"\n  ],\n  \"indexes\": [\n    1,\n    1,\n    1,\n    1,\n    1,\n    1,\n    1,\n    1,\n    1,\n    1,\n    1,\n    4\n  ],\n  \"unicodeCodePoints\": \"768476847684768476847684768476847684768476845728\"\n}"));
     }

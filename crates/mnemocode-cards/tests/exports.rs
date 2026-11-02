@@ -321,7 +321,7 @@ fn sample_words(preview: &CardPreview) -> String {
     let backup = Backup::read(&job.cards.codes.payload, Form::Colors, Mode::Seedshift);
     let phrase = backup.expect("the codes").decode(&dates).expect("a phrase");
     let words = Form::English.codes(phrase.recovered.as_slice());
-    words.expect("the words")
+    words.expect("the words").as_str().to_owned()
 }
 
 #[test]

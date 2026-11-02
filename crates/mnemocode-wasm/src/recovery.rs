@@ -243,7 +243,7 @@ pub(crate) fn decoded_phrases(
         let words = Form::English
             .codes(result.recovered.as_slice())
             .map_err(fail)?;
-        phrases.push((words, result.checksum_valid));
+        phrases.push((words.as_str().to_owned(), result.checksum_valid));
     }
     Ok(phrases)
 }

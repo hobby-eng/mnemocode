@@ -151,7 +151,8 @@ fn a_written_backup_is_checked_as_ts_checks_it() {
     assert_eq!(
         Form::English
             .codes(masked.shifted.as_slice())
-            .expect("codes"),
+            .expect("codes")
+            .as_str(),
         text(&recorded["encodedChecks"]["words"])
     );
     for entry in items(&recorded["encodedChecks"]["answers"]) {

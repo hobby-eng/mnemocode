@@ -4,7 +4,7 @@ For choosing a backup or recovery method, start with the [README](../README.md).
 
 ## Download verification
 
-Release assets use one executable file for Linux, Windows and macOS that runs without anything else installed: `mnemocode-<version>-linux-x64`, `mnemocode-<version>-linux-arm64`, `mnemocode-<version>-win-x64.exe`, `mnemocode-<version>-macos-arm64` and `mnemocode-<version>-macos-x64`. Next to each file is a file of the same name ending in `-licenses.txt`, for example `mnemocode-0.2.0-linux-x64-licenses.txt`, with the licenses of every library the file contains.
+Release assets use one executable file for Linux, Windows and macOS that runs without anything else installed, apart from glibc 2.35 or later on Linux, which Ubuntu 22.04, Debian 12 and newer systems have; musl systems such as Alpine cannot run it: `mnemocode-<version>-linux-x64`, `mnemocode-<version>-linux-arm64`, `mnemocode-<version>-win-x64.exe`, `mnemocode-<version>-macos-arm64` and `mnemocode-<version>-macos-x64`. Next to each file is a file of the same name ending in `-licenses.txt`, for example `mnemocode-0.2.0-linux-x64-licenses.txt`, with the licenses of every library the file contains.
 
 Check a download once before you run it. The release's `SHA256SUMS` holds the SHA-256 of every file and is signed with the maintainer's OpenPGP key: `SHA256SUMS.asc` is the signature and `RELEASE-SIGNING-KEY.asc` the public key, whose fingerprint is `28FC51B1DB80DF2101128CB30EDD4814591DD095`. GitHub shows the same key for the maintainer at https://github.com/hobby-eng.gpg. Look at the key's fingerprint before you import it, check the signature and the SHA-256 of your file, then run it as `mnemocode`:
 
@@ -133,7 +133,7 @@ Refusal cannot remove text already entered in shell history or process arguments
 
 For headless operations, `--dates-file PATH` reads whitespace-separated dates; `recover-date` also accepts its `?` patterns there. Re-encode uses `--old-dates-file PATH` for the old backup and `--dates-file PATH` for the new one; a legacy-valid backup takes its original final word from `--last-word-file PATH`. These three options also accept `-`. Only one material source may read standard input in a command. Do not combine these date/final-word files with `--ask-secrets`, which asks for those answers itself. Protect and keep date files yourself: dates are not added to encoded records.
 
-Each text input has its own limit, which `--help` names: 256 bytes for a seed phrase, 128 for dates, 4 KiB for a passphrase or a date pattern, 32 KiB for a `recover-word` pattern, 64 KiB for encoded input or a set of shares, as an answer or a file. A QR image may be up to 16 MiB, 4096 pixels on either side and 8 megapixels, with up to 8 bits per sample. Larger inputs are refused. An image is read whole: noise at the largest size can take minutes, and Ctrl+C acts when that reading ends. A multiline paste is one answer: words, codes and dates may be on separate lines; separate shares become semicolon-separated.
+Each text input has its own limit, which `--help` names: 256 bytes for a seed phrase, 128 for dates, 4 KiB for a passphrase or a date pattern, 32 KiB for a `recover-word` pattern, 64 KiB for encoded input or a set of shares, as an answer or a file. A QR image may be up to 16 MiB, 4096 pixels on either side and 8 megapixels (8,388,608 pixels), with up to 8 bits per sample. Larger inputs are refused. An image is read whole: noise at the largest size can take minutes, and Ctrl+C acts when that reading ends. A multiline paste is one answer: words, codes and dates may be on separate lines; separate shares become semicolon-separated.
 
 ## Card options
 
@@ -152,7 +152,7 @@ Each text input has its own limit, which `--help` names: 256 bytes for a seed ph
 
 Replace random identity fields with `--card-name`, `--card-role`, `--card-company`, `--card-email`, `--card-phone`, `--card-website` and `--card-location`. Names accept Latin letters, spaces, apostrophes and hyphens. Characters missing from the font and text that does not fit are refused before any secret is asked or read. `--studio-name` names the collection studio; material sheets print `--card-name` as the recipient. [Identity defaults](card-identities.md) describes the generated values.
 
-`--card-slogan`, `--card-subtitle`, `--card-footer` and `--card-reference-label` replace the text on the sheet. The value `-` hides a field. The default reference label is `Ref.`.
+`--card-slogan`, `--card-subtitle` and `--card-footer` replace the text on the sheet. `--card-reference-label` sets the label before each code on separate cards, by default `Ref.`; sheets print none. The value `-` hides a field.
 
 Images are drawn by the program itself and use 300 dpi; PNG keeps text and QR codes sharp, while JPEG uses quality 90. Separate-card corners are transparent in PNG and white in JPEG.
 
@@ -237,7 +237,7 @@ A WIF can spend the funds. Never put it in a shell command or an issue report.
 
 ## Installation checks
 
-Before processing data, MnemoCode runs its startup self-test: quick checks without files, renderers or a share engine. Known answers come from published vectors or an independent implementation that first reproduces one. They cover:
+Before processing data, MnemoCode runs its startup self-test: quick checks without files or renderers. Known answers come from published vectors or an independent implementation that first reproduces one. They cover:
 
 - Both BIP39 word lists' lengths and SHA-256 hashes, the BIP39 seed and master fingerprint.
 - Every transformation mode; exact 12- and 24-word answers in all five representations, 15-, 18- and 21-word answers with MnemoCode Seedshift, and independent legacy-valid answers for all five lengths, with numbering, checksum and Color Unicode refusals.
@@ -254,7 +254,7 @@ No mnemonic data was processed.
 
 In the menu, a failed self-test leaves only Run the self-test, the help and Quit; the other entries stay closed.
 
-Before it splits or combines shares, MnemoCode also restores an official grouped set and a set holding the 32-byte secret of a 24-word phrase, creates a test set from a fixed seed and restores it from every two of its shares, makes sure that another seed gives other shares, and checks that the engine refuses an incomplete quorum and a damaged share value even when its transport checksum is correct. The fixed creation seeds are public test data and are never used for a person's shares.
+Before every command that processes data MnemoCode also restores an official grouped set and a set holding the 32-byte secret of a 24-word phrase, creates a test set from a fixed seed and restores it from every two of its shares, makes sure that another seed gives other shares, and checks that the engine refuses an incomplete quorum and a damaged share value even when its transport checksum is correct. The fixed creation seeds are public test data and are never used for a person's shares.
 
 For the full self-test, including PDF rendering:
 
@@ -274,17 +274,22 @@ use mnemocode::bip39::phrase::Phrase;
 use mnemocode::dates::parse_date;
 use mnemocode::forms::Form;
 use mnemocode::modes::Mode;
+use mnemocode::secret::ZeroingAllocator;
+
+// Every block the program frees is wiped first, the copies dependencies make of a secret included.
+#[global_allocator]
+static ALLOCATOR: ZeroingAllocator = ZeroingAllocator;
 
 let phrase = Phrase::parse(text)?;
 let dates = [parse_date("10-07-1963")?, parse_date("31-01-4489")?];
 let encoding = Backup::encode(&phrase, &dates, Form::Unicode, Mode::Seedshift, false)?;
 let unicode = encoding.backup.text()?;
-let read = Backup::read(&unicode, Form::Unicode, Mode::Seedshift)?;
+let read = Backup::read(unicode.as_str(), Form::Unicode, Mode::Seedshift)?;
 let recovered = read.decode(&dates)?;
 // recovered holds the phrase in owner types, which wipe it and never print it.
 ```
 
-A secret stays in its owner type, which wipes it when it is dropped; every block the program frees is wiped too.
+A secret stays in its owner type, which wipes it when it is dropped; the array of dates here is a working copy. Every block the program frees is wiped too where the program registers the allocator, as above: a library cannot do that for its host, and a host without it leaves the copies that dependencies make.
 
 ## Output destinations in the menu
 

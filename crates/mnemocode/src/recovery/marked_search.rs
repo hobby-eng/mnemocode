@@ -559,7 +559,7 @@ mod tests {
         let MissingCodesResult::Found(found) = result else {
             panic!("no codes found");
         };
-        assert_eq!(found.backup.text().unwrap(), TWELVE);
+        assert_eq!(found.backup.text().unwrap().as_str(), TWELVE);
         assert!(found.warning.is_some());
     }
 

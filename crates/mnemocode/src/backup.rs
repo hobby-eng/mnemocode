@@ -18,6 +18,7 @@ use crate::forms::{Form, FormError};
 use crate::modes::seedshift::{Indexes, Masked, Unmasked};
 use crate::modes::{DateWords, Mode, ModeError};
 use crate::refusal::Refusal;
+use crate::secret::SecretText;
 use record::{RecordError, serialize_record};
 
 /// The refusals of backups, word for word as TS 0.1.0 writes them.
@@ -254,13 +255,17 @@ impl Backup {
     }
 
     /// Its codes in its form.
-    pub fn text(&self) -> Result<String, BackupError> {
+    pub fn text(&self) -> Result<SecretText, BackupError> {
         Ok(self.form.codes(self.indexes())?)
     }
 
     /// Its record.
-    pub fn record(&self) -> Result<String, BackupError> {
-        serialize_record(self.mode, self.form, &self.text()?).map_err(BackupError::Record)
+    pub fn record(&self) -> Result<SecretText, BackupError> {
+        let record = serialize_record(self.mode, self.form, self.text()?.as_str());
+        Ok(SecretText::copy_of(
+            "record",
+            &record.map_err(BackupError::Record)?,
+        ))
     }
 
     /// The phrase it holds under `dates`; refused where the mode gives several.
@@ -327,13 +332,25 @@ mod tests {
     const ABANDON: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
     #[test]
+    fn its_codes_and_its_record_stay_in_owners_that_print_as_redacted() {
+        let phrase = Phrase::parse(ABANDON).unwrap();
+        let encoding = Backup::encode(&phrase, &[], Form::Unicode, Mode::Direct, false).unwrap();
+        let text = encoding.backup.text().unwrap();
+        let record = encoding.backup.record().unwrap();
+        assert!(text.as_str().starts_with("76847684"));
+        let expected = format!("MNC1:direct:unicode:{}", text.as_str());
+        assert_eq!(record.as_str(), expected);
+        assert!(!format!("{text:?} {record:?}").contains("7684"));
+    }
+
+    #[test]
     fn a_backup_encodes_and_decodes_its_phrase() {
         let phrase = Phrase::parse(ABANDON).unwrap();
         let dates = [Date::new(2020, 5, 17).unwrap()];
         let encoding =
             Backup::encode(&phrase, &dates, Form::Unicode, Mode::Seedshift, false).unwrap();
         let read = Backup::read(
-            &encoding.backup.text().unwrap(),
+            encoding.backup.text().unwrap().as_str(),
             Form::Unicode,
             Mode::Seedshift,
         )

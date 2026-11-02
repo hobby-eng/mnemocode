@@ -270,7 +270,8 @@ fn the_codes_before_the_decoys_are_taken_from_the_start_in_every_form() {
     for form in Form::ALL {
         let text = form.codes(backup.indexes()).expect("the codes");
         let decoys = form.codes(&[2047; 12]).expect("the decoys");
-        let read = form.read(&form.leading_codes(&format!("{text} {decoys}"), 12));
+        let codes = format!("{} {}", text.as_str(), decoys.as_str());
+        let read = form.read(&form.leading_codes(&codes, 12));
         assert_eq!(
             read.expect("the codes"),
             backup.indexes(),
@@ -289,7 +290,7 @@ fn the_codes_before_the_decoys_are_read_by_the_words_of_the_phrase_given() {
     let backup = phrase_backup();
     let own = Form::Unicode.codes(backup.indexes()).expect("the codes");
     // Four decoys: sixteen codes, which no phrase has.
-    let codes = format!("{own} 4E00 5E7E 7684 7684");
+    let codes = format!("{} 4E00 5E7E 7684 7684", own.as_str());
     let rules = ReadingRules {
         seedshift_only: false,
         share_reader: "the restore",
@@ -325,7 +326,7 @@ fn phrases_of(found: &[(usize, mnemocode::modes::seedshift::Unmasked)]) -> Vec<(
         .iter()
         .map(|(words, result)| {
             let phrase = Form::English.codes(result.recovered.as_slice());
-            (*words, phrase.expect("a phrase"))
+            (*words, phrase.expect("a phrase").as_str().to_owned())
         })
         .collect()
 }
@@ -656,7 +657,10 @@ fn unicode_codes_print_in_colors_that_decorate_them_and_a_form_without_cards_is_
         .collect();
     assert_eq!(labels, codes);
     assert_eq!(cards.codes.colors, code_colors(&labels).expect("colors"));
-    assert_eq!(cards.codes.payload, unicode.text().expect("the text"));
+    assert_eq!(
+        cards.codes.payload,
+        unicode.text().expect("the text").as_str()
+    );
     for (form, name) in [(Form::English, "english"), (Form::Indexes, "indexes")] {
         let refusal = backup_card_content(&backup(form), CardSettings::default(), None);
         assert_eq!(

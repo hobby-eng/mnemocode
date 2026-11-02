@@ -116,11 +116,6 @@ pub struct ReEncoding {
     confirmation: Option<Confirmation>,
 }
 
-/// The English words of `indexes`.
-fn words_of(indexes: &[u16]) -> String {
-    Form::English.codes(indexes).unwrap_or_default()
-}
-
 impl ReEncoding {
     /// The phrase `backup` gives with `dates`; for the Original Seedshift with a valid last word,
     /// the one that ends with `last_word`. Refused: a last word where none is taken, none where one
@@ -135,7 +130,9 @@ impl ReEncoding {
             let typed = english_tokens(last_word);
             let found = match typed.as_slice() {
                 [word] => backup.candidates(dates)?.into_iter().find(|candidate| {
-                    english_tokens(&words_of(candidate.recovered.as_slice())).last() == Some(word)
+                    Form::English
+                        .codes(candidate.recovered.as_slice())
+                        .is_ok_and(|words| english_tokens(words.as_str()).last() == Some(word))
                 }),
                 _ => None,
             };

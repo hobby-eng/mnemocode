@@ -21,7 +21,10 @@ fn colors_of(phrase: &str) -> Option<String> {
         .filter_map(|place| phrase.index(place))
         .map(|index| index as u16)
         .collect();
-    Form::Colors.codes(&indexes).ok()
+    Form::Colors
+        .codes(&indexes)
+        .ok()
+        .map(|codes| codes.as_str().to_owned())
 }
 
 /// Calls the secret entries of the cards on the colors of `phrase`.

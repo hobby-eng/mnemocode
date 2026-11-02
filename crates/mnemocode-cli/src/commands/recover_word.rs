@@ -144,7 +144,7 @@ impl Refusal for RecoverWordError {
 /// 1, and what the wallet check said.
 struct Row {
     columns: Vec<String>,
-    phrase: String,
+    phrase: SecretText,
     number: u64,
     answer: Option<WalletMatch>,
 }
@@ -162,7 +162,7 @@ impl Row {
                 (true, false) => matched_at(path),
             });
         }
-        fields.push(self.phrase.clone());
+        fields.push(self.phrase.as_str().to_owned());
         fields
     }
 }
@@ -216,7 +216,7 @@ fn legacy_replacements(text: &str, wallet: &GivenWallet) -> Result<Found, Stop> 
         };
         rows.push(Row {
             columns: vec![word, number, last_word_bits(phrase), kept.to_owned()],
-            phrase: phrase.text().as_str().to_owned(),
+            phrase: phrase.text(),
             number: place as u64 + 1,
             answer,
         });
@@ -279,7 +279,7 @@ fn row_of(shown: &ShownCandidate, unknown: &[usize]) -> Result<Row, Stop> {
     };
     Ok(Row {
         columns,
-        phrase: shown.candidate.phrase()?.text().as_str().to_owned(),
+        phrase: shown.candidate.phrase()?.text(),
         number: shown.candidate.number(),
         answer: shown.answer.clone(),
     })
