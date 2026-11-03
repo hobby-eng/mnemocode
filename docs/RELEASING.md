@@ -60,7 +60,7 @@ cargo xtask sign v<version> --publish
 `cargo xtask sign` refuses a draft of more than 32 files or with a file over 512 MiB, downloads it
 into `release-signing-v<version>/`, checks that each file of `SHA256SUMS` is of the version and listed
 once, checks every file against `SHA256SUMS` and its build attestation, signs `SHA256SUMS`, checks the signature, and uploads it with
-the public key. GnuPG asks for the passphrase; the task never reads a private key. Move the folder
+the public key. GnuPG asks for the passphrase in the terminal; the task never reads a private key. Move the folder
 away before you run it again. The key's fingerprint is
 `28FC 51B1 DB80 DF21 0112  8CB3 0EDD 4814 591D D095`.
 

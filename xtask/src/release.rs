@@ -558,7 +558,11 @@ pub(crate) fn sign(root: &Path, tag: &str, publish: bool) -> Result<(), Failure>
     run_tool(
         &folder,
         "gpg",
+        // GnuPG asks for the passphrase in this terminal itself: a pinentry that the agent starts
+        // knows no terminal unless GPG_TTY names it, and the signing then fails as cancelled.
         &[
+            "--pinentry-mode",
+            "loopback",
             "--yes",
             "--armor",
             "--local-user",
