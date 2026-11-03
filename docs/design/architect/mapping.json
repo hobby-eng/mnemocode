@@ -1796,7 +1796,7 @@
     },
     {
       "defect": "Bitcoin address evidence whose type is in none of the selected --bitcoin-profile values is accepted by assertWalletEvidence and can never match. Confirmed against dist/: the BIP84 address with profiles ['legacy'] passes the check and never matches, while ['native-segwit'] matches. A long search then reports 'not matched' for every candidate instead of refusing the evidence before any secret is typed (src/core/wallet-evidence.ts:697, 630).",
-      "how": "Decided (owner, 2026-10-27): fixed, TS first: evidence of an address type outside the selected profiles is refused before any secret, with a new code; the wallet-tools session is told."
+      "how": "Decided (owner, 2026-10-27): fixed, TS first: evidence of an address type outside the selected profiles is refused before any secret, with a new code; the wallet-tools session is told. Since the owner's request of 2026-11-03 the Rust program has no profiles to select: an address's type names its own (PLAN.md, parity), so the defect cannot arise and its refusal is gone."
     },
     {
       "defect": "LocatedEvidence.compare derives the branch key and every scanned child in every selected profile, even for 'address' evidence, where only the profile of the address's own type can match. That is up to 4x wasted BIP32 derivations per candidate, which also inflates the search-time estimates (src/core/wallet-evidence.ts:652).",

@@ -426,30 +426,14 @@ fn wallet_entries(given: Given<'_>, met: &mut Met) {
         let check = evidence.check(js(given.phrase), js(given.passphrase));
         met.ok("wallet check", check);
     }
-    let evidence = WalletEvidence::wif(
-        js(given.wif),
-        js("mainnet"),
-        js("native-segwit"),
-        0.0,
-        0.0,
-        0.0,
-        f64::NAN,
-    );
+    let evidence = WalletEvidence::wif(js(given.wif), js("mainnet"), 0.0, 0.0, 0.0, f64::NAN);
     if let Some(evidence) = met.ok("wif evidence", evidence) {
         met.ok(
             "wif check",
             evidence.check(js(given.phrase), JsValue::UNDEFINED),
         );
     }
-    let refused = WalletEvidence::wif(
-        js(given.wif),
-        js("no network"),
-        js("native-segwit"),
-        0.0,
-        0.0,
-        0.0,
-        f64::NAN,
-    );
+    let refused = WalletEvidence::wif(js(given.wif), js("no network"), 0.0, 0.0, 0.0, f64::NAN);
     met.refused("wif on no network", refused);
 }
 

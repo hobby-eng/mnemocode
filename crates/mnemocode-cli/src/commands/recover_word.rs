@@ -52,7 +52,7 @@ use crate::terminal::{
 };
 
 /// The options `recover-word` takes.
-pub(crate) const OPTIONS: [&str; 25] = [
+pub(crate) const OPTIONS: [&str; 24] = [
     "mnemonic",
     "mnemonic-file",
     "legacy-valid-last-word",
@@ -75,7 +75,6 @@ pub(crate) const OPTIONS: [&str; 25] = [
     "account",
     "branch",
     "index",
-    "bitcoin-profile",
     "scan-gap",
     "bip39-passphrase-file",
 ];

@@ -79,6 +79,14 @@ owner set on 2026-10-27:
 - NFKD and NFC: Unicode 18 against the TS's 17; they differ only for characters new in 18.
 - SeedStitch (owner, 2026-11-03; ADR 0010): the `stitch` command and a legend that Decode takes
   are new, so the overview of the help lists one command more than TS's.
+- Coins from the address (owner, 2026-11-03, through the mhfe session): an address is read as every
+  coin whose form it has, so the question which coin it is for is gone and `--coin` only narrows;
+  `--bitcoin-profile` is gone, an address's or a key's form naming its paths. An address asked on
+  the private screen or in the menu is looked for on the network it names, so a testnet address is
+  no longer refused there. A text without the `bitcoincash:` prefix has CashAddr's form only when
+  it starts with q or p, so that another coin's damaged address keeps that coin's reason. The help
+  of the commands with a wallet check differs from TS's in those options (`ts_transcripts`,
+  WRITTEN_IN).
 
 The 25 defects whose fix changes a TS result are decided in `mapping.json` ("how" beginning
 with "Decided"): 17 are fixed, one in the documents only, and 8 kept, one with a new warning. A fix is made in the TS first, once reproduced, with

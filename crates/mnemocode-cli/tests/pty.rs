@@ -298,18 +298,52 @@ fn the_menu_leaves_a_secret_to_the_private_screen_of_its_command() {
 }
 
 #[test]
-fn a_cancelled_command_comes_back_to_the_menu() {
+fn the_menu_reads_an_address_as_every_coin_of_its_form_with_no_coin_asked() {
     let mut session = Session::start(PROGRAM, &[]);
     session.wait_for("What do you want to do?");
-    session.press("5");
-    session.wait_for("Was Seedshift used");
+    session.press("6");
+    session.wait_for("What is forgotten?");
+    session.press("3");
+    session.wait_for("Where is the encoded seed phrase?");
     session.press("1");
+    session.wait_for("How many words");
+    session.press("1");
+    session.wait_for("Which Seedshift was used?");
+    session.press("1");
+    session.wait_for("How can MnemoCode recognise the wallet?");
+    session.press("2");
+    // A wrong EIP-55 checksum is the reason of the coins whose form the address has.
+    session.wait_for("(one of the first receiving ones): ");
+    session.press("0x9858efFD232B4033E47d90003D41EC34EcaEda94\r");
+    session.wait_for("EIP-55 checksum");
+    session.press("0x9858EfFD232B4033E47d90003D41EC34EcaEda94\r");
+    session.wait_for("Compare with how many addresses");
+    session.press("\r");
+    session.wait_for("--coin-address 0x9858EfFD232B4033E47d90003D41EC34EcaEda94 --scan-gap 20");
+    let written = cancelled_back_to_the_menu(session);
+    assert!(!written.contains("Which coin"), "{written}");
+}
+
+/// What the program wrote, once the command that the menu started is cancelled at its first secret
+/// question and the menu, back again, is left with q.
+fn cancelled_back_to_the_menu(mut session: Session) -> String {
     session.wait_for("(Esc cancels)");
     session.press("\x03");
     session.wait_for("What do you want to do?");
     session.press("q");
     let (status, written) = session.end();
     assert_eq!(status, 0, "{written}");
+    written
+}
+
+#[test]
+fn a_cancelled_command_comes_back_to_the_menu() {
+    let mut session = Session::start(PROGRAM, &[]);
+    session.wait_for("What do you want to do?");
+    session.press("5");
+    session.wait_for("Was Seedshift used");
+    session.press("1");
+    cancelled_back_to_the_menu(session);
 }
 
 #[test]

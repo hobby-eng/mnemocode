@@ -413,22 +413,22 @@ pub(super) const BITCOIN_ADDRESS: HelpOption = HelpOption {
     flag: "--bitcoin-address",
     value: Some("ADDRESS"),
     summary: "A Bitcoin address of the wallet, one of the --scan-gap from the selected place",
-    details: &[],
+    details: &["Its form names its path: 1… BIP44, 3… BIP49, bc1q… BIP84 and bc1p… BIP86."],
 };
 
 pub(super) const COIN_ADDRESS: HelpOption = HelpOption {
     flag: "--coin-address",
     value: Some("ADDRESS"),
-    summary: "An address of another coin, one of the --scan-gap from the place, with --coin",
+    summary: "An address of the wallet, of any coin, one of the --scan-gap from the place",
     details: &[
-        "Single-key receiving addresses of the coins of mhfe, on their standard paths: Bitcoin Cash, Cosmos, Dash (also Platform), Dogecoin, Ethereum and EVM networks, Ethereum Classic, Injective, Litecoin, Tron, XRP and Zcash (transparent). The address tells its type and network.",
+        "Single-key receiving addresses on their standard paths: Bitcoin, Bitcoin Cash, Cosmos, Dash (also Platform), Dogecoin, Ethereum and EVM networks, Ethereum Classic, Injective, Litecoin, Tron, XRP and Zcash (transparent). The address tells its coin, type and network. Where coins share a form, as 1…, 3… and 0x… do, the paths of each are searched.",
     ],
 };
 
 pub(super) const COIN: HelpOption = HelpOption {
     flag: "--coin",
     value: Some("ID"),
-    summary: "The coin of --coin-address, such as ethereum, litecoin or bitcoin-cash",
+    summary: "Read --coin-address as this coin's alone, such as ethereum or bitcoin-cash",
     details: &[],
 };
 
@@ -445,14 +445,16 @@ pub(super) const ACCOUNT_XPUB: HelpOption = HelpOption {
     flag: "--account-xpub",
     value: Some("XPUB"),
     summary: "The extended public key of the selected account",
-    details: &["The same forms as --master-xpub are accepted."],
+    details: &[
+        "The same forms as --master-xpub are accepted. A ypub or upub is looked for at BIP49, a zpub or vpub at BIP84; any other form at BIP44, BIP49, BIP84 and BIP86.",
+    ],
 };
 
 pub(super) const COMPRESSED_PUBLIC_KEY: HelpOption = HelpOption {
     flag: "--compressed-public-key",
     value: Some("HEX"),
     summary: "A 33-byte compressed public key, one of the --scan-gap from the selected place",
-    details: &[],
+    details: &["It is looked for at BIP44, BIP49, BIP84 and BIP86, as a WIF is."],
 };
 
 pub(super) const WIF_FILE: HelpOption = HelpOption {
@@ -477,15 +479,6 @@ pub(super) const NETWORK: HelpOption = HelpOption {
     value: Some("mainnet|testnet"),
     summary: "Network of the address or key; default mainnet",
     details: &[],
-};
-
-pub(super) const BITCOIN_PROFILE: HelpOption = HelpOption {
-    flag: "--bitcoin-profile",
-    value: Some("NAME"),
-    summary: "auto (default), or a comma-separated list of address types",
-    details: &[
-        "The types are legacy (BIP44), nested-segwit (BIP49), native-segwit (BIP84) and taproot (BIP86), such as native-segwit,taproot, each named once. auto tries all four at the selected place.",
-    ],
 };
 
 pub(super) const ACCOUNT: HelpOption = HelpOption {
@@ -650,7 +643,6 @@ pub(super) const RUN_1: &[&HelpOption] = &[
     &WIF_FILE,
     &BIP39_PASSPHRASE_FILE,
     &NETWORK,
-    &BITCOIN_PROFILE,
     &ACCOUNT,
     &BRANCH,
     &INDEX,

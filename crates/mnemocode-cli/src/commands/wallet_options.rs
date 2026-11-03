@@ -10,9 +10,10 @@ use mnemocode::backup::re_encoding::MatchedBy;
 use mnemocode::recovery::wallet_check::WalletCheck;
 use mnemocode::refusal::Refusal;
 use mnemocode::secret::SecretText;
-use mnemocode::text::space::{trim, without_byte_order_mark};
+use mnemocode::text::space::without_byte_order_mark;
+use mnemocode::text::words::list_in_words;
 use mnemocode::wallet::coins::{AddressLocation, Coin};
-use mnemocode::wallet::evidence::{BitcoinProfile, Evidence, KeyNetwork, Place};
+use mnemocode::wallet::evidence::{Evidence, KeyNetwork, Place};
 use mnemocode::wallet::scan::{ADDRESS_COUNT_RANGE, NORMAL_INDEX_RANGE, default_address_count};
 
 use super::given::PATH_LIMIT;
@@ -47,14 +48,13 @@ const SCANNED_OPTIONS: [&str; 4] = [
 /// What an account key, which its account places, refuses.
 const ADDRESS_PLACE_OPTIONS: [&str; 2] = ["branch", "index"];
 /// What a master key, which has no place, refuses.
-const ACCOUNT_PLACE_OPTIONS: [&str; 4] = ["account", "branch", "index", "bitcoin-profile"];
+const ACCOUNT_PLACE_OPTIONS: [&str; 3] = ["account", "branch", "index"];
 /// What says where a wallet given with an option is looked for.
-const WALLET_PLACE_OPTIONS: [&str; 5] =
-    ["network", "account", "branch", "index", "bitcoin-profile"];
-/// What only Bitcoin evidence takes: the address of another coin tells its own.
-const BITCOIN_ONLY_OPTIONS: [&str; 2] = ["network", "bitcoin-profile"];
+const WALLET_PLACE_OPTIONS: [&str; 4] = ["network", "account", "branch", "index"];
+/// What only Bitcoin evidence takes: the address of a coin tells its own network.
+const BITCOIN_ONLY_OPTIONS: [&str; 1] = ["network"];
 /// The options that name a wallet, which decode takes only on the private screen.
-pub(crate) const WALLET_EVIDENCE_OPTIONS: [&str; 15] = [
+pub(crate) const WALLET_EVIDENCE_OPTIONS: [&str; 14] = [
     "bitcoin-address",
     "coin-address",
     "master-xpub",
@@ -67,7 +67,6 @@ pub(crate) const WALLET_EVIDENCE_OPTIONS: [&str; 15] = [
     "account",
     "branch",
     "index",
-    "bitcoin-profile",
     "scan-gap",
     "bip39-passphrase-file",
 ];
@@ -82,8 +81,6 @@ pub(crate) fn wallet_option_given(parsed: &Parsed) -> bool {
 /// The refusals of the wallet's options, word for word as TS 0.1.0 writes them.
 #[derive(Debug)]
 enum WalletOptionError {
-    /// A profile that is none.
-    Profile,
     /// A network that is none.
     Network,
     /// --coin without --coin-address.
@@ -92,8 +89,6 @@ enum WalletOptionError {
     NotOne,
     /// --scan-gap beside evidence of one key.
     ScanGapKind,
-    /// --coin-address without --coin.
-    NoCoin,
     /// A Bitcoin option beside a coin's address.
     BitcoinOnly(&'static str),
     /// A place beside a master key.
@@ -109,21 +104,12 @@ enum WalletOptionError {
 impl fmt::Display for WalletOptionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Profile => {
-                let names: Vec<&str> = BitcoinProfile::ALL.map(BitcoinProfile::name).to_vec();
-                write!(
-                    f,
-                    "The Bitcoin address profile must be auto or a comma-separated list of: {}.",
-                    names.join(", ")
-                )
-            }
             Self::Network => f.write_str("The Bitcoin network must be mainnet or testnet."),
             Self::CoinWithoutAddress => f.write_str("--coin names the coin of --coin-address."),
             Self::NotOne => f.write_str("Select exactly one recovery-evidence option."),
             Self::ScanGapKind => f.write_str(
                 "--scan-gap applies to an address, a compressed public key or a WIF, one of several in a row.",
             ),
-            Self::NoCoin => f.write_str("--coin-address needs --coin, such as --coin ethereum."),
             Self::BitcoinOnly(key) => write!(
                 f,
                 "--{key} is for Bitcoin evidence; the coin's address tells its own."
@@ -143,7 +129,7 @@ impl fmt::Display for WalletOptionError {
                 f,
                 "--{key} applies to a wallet given as an option, such as --bitcoin-address{}.",
                 if *asked {
-                    "; the wallet asked on the screen is looked for on mainnet among its first receiving addresses"
+                    "; the wallet asked on the screen is looked for among its first receiving addresses, on the network its address names"
                 } else {
                     ""
                 }
@@ -157,16 +143,12 @@ impl std::error::Error for WalletOptionError {}
 impl Refusal for WalletOptionError {
     fn code(&self) -> &'static str {
         match self {
-            Self::Profile => {
-                "cli.bitcoin-options.bitcoin-address-profile-auto-comma-separated-list"
-            }
             Self::Network => "cli.bitcoin-options.bitcoin-network",
             Self::CoinWithoutAddress => "cli.bitcoin-options.coin-names-coin-coin-address",
             Self::NotOne => "cli.bitcoin-options.select-exactly-one-recovery-evidence-option",
             Self::ScanGapKind => {
                 "cli.bitcoin-options.scan-gap-applies-address-compressed-public-key-wif"
             }
-            Self::NoCoin => "cli.bitcoin-options.coin-address-coin-such-as-coin-ethereum",
             Self::BitcoinOnly(_) => "cli.bitcoin-options.bitcoin-evidence-coin-s-address-tells-own",
             Self::MasterPlace(_) => {
                 "cli.bitcoin-options.places-address-key-wif-master-key-no-place"
@@ -242,25 +224,18 @@ impl GivenWallet {
     }
 }
 
+/// What a report names an address by: "address of Bitcoin or Bitcoin Cash", the coins it was read
+/// as.
+pub(crate) fn address_label(evidence: &Evidence) -> String {
+    let names: Vec<&str> = evidence.coins().iter().map(|coin| coin.name).collect();
+    format!("address of {}", list_in_words(&names, "or"))
+}
+
 /// The first of `keys` given, as the program spells it.
 fn given_of(parsed: &Parsed, keys: &[&'static str]) -> Option<&'static str> {
     keys.iter()
         .find(|key| value(parsed, key).is_some())
         .copied()
-}
-
-/// The profiles of --bitcoin-profile, all four by default.
-fn profiles_of(parsed: &Parsed) -> Result<Vec<BitcoinProfile>, Stop> {
-    let requested = value(parsed, "bitcoin-profile").unwrap_or("auto");
-    if requested == "auto" {
-        return Ok(BitcoinProfile::ALL.to_vec());
-    }
-    let names: Vec<&str> = requested.split(',').map(trim).collect();
-    let known = |name: &&str| BitcoinProfile::ALL.iter().any(|each| each.name() == *name);
-    if !names.iter().all(known) {
-        return Err(WalletOptionError::Profile.into());
-    }
-    Ok(BitcoinProfile::checked(&names)?)
 }
 
 /// The network of --network, mainnet by default.
@@ -296,11 +271,10 @@ fn scan_gap_of(parsed: &Parsed) -> Result<Option<u64>, Stop> {
     )?))
 }
 
-/// The first receiving address of the first account on mainnet, in each of the four profiles.
+/// The first receiving address of the first account on mainnet.
 fn first_receiving(addresses: Option<u64>) -> Place {
     Place {
         network: KeyNetwork::Mainnet,
-        profiles: BitcoinProfile::ALL.to_vec(),
         location: AddressLocation {
             account: 0,
             branch: 0,
@@ -311,7 +285,7 @@ fn first_receiving(addresses: Option<u64>) -> Place {
 }
 
 /// Where another wallet is looked for after the one of `option`: on its network, and for an address
-/// or a key at its place, in its profiles and among as many addresses.
+/// or a key at its place and among as many addresses.
 fn place_of(parsed: &Parsed, option: &str) -> Result<Place, Stop> {
     let mut place = first_receiving(scan_gap_of(parsed)?);
     match option {
@@ -319,7 +293,6 @@ fn place_of(parsed: &Parsed, option: &str) -> Result<Place, Stop> {
         "coin-address" => place.location = location_of(parsed)?,
         _ => {
             place.network = network_of(parsed)?;
-            place.profiles = profiles_of(parsed)?;
             place.location = location_of(parsed)?;
         }
     }
@@ -351,16 +324,11 @@ fn evidence_of(
     let location = location_of(parsed)?;
     let counted = counted.or(Some(u64::from(default_address_count(location.index))));
     if option == "coin-address" {
-        let coin = value(parsed, "coin").ok_or(WalletOptionError::NoCoin)?;
         if let Some(key) = given_of(parsed, &BITCOIN_ONLY_OPTIONS) {
             return Err(WalletOptionError::BitcoinOnly(key).into());
         }
-        return Ok(Some(Evidence::coin_address(
-            Coin::named(coin)?,
-            text,
-            location,
-            counted,
-        )?));
+        let coin = value(parsed, "coin").map(Coin::named).transpose()?;
+        return Ok(Some(Evidence::address(coin, text, location, counted)?));
     }
     let wif_path = (option == "wif-file").then(|| Path::new(text));
     if let (Some(path), SecretFiles::Look) = (wif_path, files) {
@@ -386,20 +354,18 @@ fn evidence_of(
         }));
     }
     if option == "account-xpub" {
-        let (network, profiles) = (network_of(parsed)?, profiles_of(parsed)?);
+        let network = network_of(parsed)?;
         if let Some(key) = given_of(parsed, &ADDRESS_PLACE_OPTIONS) {
             return Err(WalletOptionError::AccountPlace(key).into());
         }
         return Ok(Some(Evidence::account_key(
             text,
             network,
-            profiles,
             u64::from(location.account),
         )?));
     }
     let place = Place {
         network: network_of(parsed)?,
-        profiles: profiles_of(parsed)?,
         location,
         addresses: counted,
     };
@@ -485,10 +451,7 @@ fn wallet_of(parsed: &Parsed, files: SecretFiles) -> Result<GivenWallet, Stop> {
     let label = match option {
         "bitcoin-address" => option_label("address").to_owned(),
         "wif-file" => "WIF".to_owned(),
-        "coin-address" => format!(
-            "address of {}",
-            value(parsed, "coin").map_or(Ok(""), |coin| Coin::named(coin).map(|coin| coin.name))?
-        ),
+        "coin-address" => evidence.as_ref().map(address_label).unwrap_or_default(),
         kind => option_label(kind).to_owned(),
     };
     let place = place_of(parsed, option)?;
@@ -506,4 +469,46 @@ fn wallet_of(parsed: &Parsed, files: SecretFiles) -> Result<GivenWallet, Stop> {
         with_passphrase: !passphrase.is_empty(),
         passphrase,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use mnemocode::bip39::phrase::Phrase;
+    use mnemocode::self_check::vectors::PUBLIC_MNEMONIC;
+
+    use super::*;
+    use crate::args::parse_arguments;
+
+    /// The public phrase's first legacy Bitcoin address, which Bitcoin Cash writes alike.
+    const LEGACY: &str = "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA";
+
+    fn parsed(arguments: &[&str]) -> Parsed {
+        let arguments: Vec<String> = arguments.iter().map(|item| (*item).to_owned()).collect();
+        parse_arguments(&arguments).unwrap()
+    }
+
+    #[test]
+    fn an_address_without_a_coin_is_read_as_every_coin_of_its_form() {
+        let wallet = given_wallet(&parsed(&["--coin-address", LEGACY])).unwrap();
+        assert_eq!(
+            wallet.label.as_deref(),
+            Some("address of Bitcoin or Bitcoin Cash")
+        );
+        let phrase = Phrase::parse(PUBLIC_MNEMONIC).unwrap();
+        let found = wallet.check.unwrap().check(&phrase).unwrap();
+        assert_eq!(found.path.as_deref(), Some("m/44'/0'/0'/0/0"));
+        let narrowed = given_wallet(&parsed(&[
+            "--coin-address",
+            LEGACY,
+            "--coin",
+            "bitcoin-cash",
+        ]))
+        .unwrap();
+        assert_eq!(narrowed.label.as_deref(), Some("address of Bitcoin Cash"));
+        let refused = given_wallet(&parsed(&["--coin-address", LEGACY, "--network", "testnet"]));
+        assert_eq!(
+            refused.unwrap_err().message(),
+            "--network is for Bitcoin evidence; the coin's address tells its own."
+        );
+    }
 }

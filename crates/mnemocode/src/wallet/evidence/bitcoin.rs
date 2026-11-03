@@ -1,6 +1,8 @@
 //! The evidence of a Bitcoin wallet (the part of MnemoCode TS 0.1.0's `core/wallet-evidence.ts`
 //! that a build without Bitcoin leaves out, CORE-31): an account extended public key, a Bitcoin
-//! address, a compressed public key or a WIF at its place under the selected address profiles.
+//! address, a compressed public key or a WIF at its place. Its form names its address profile: an
+//! address's type names one, a SLIP-132 key (ypub, zpub and their kin) one, and an xpub, a tpub, a
+//! public key or a WIF none, so that all four are looked under.
 
 use std::fmt;
 
@@ -40,7 +42,7 @@ impl KeyNetwork {
 
 /// The Bitcoin address profiles a check goes through: each a type of address and its purpose.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BitcoinProfile {
+pub(crate) enum BitcoinProfile {
     /// P2PKH (BIP44).
     Legacy,
     /// P2SH-P2WPKH (BIP49).
@@ -52,26 +54,16 @@ pub enum BitcoinProfile {
 }
 
 impl BitcoinProfile {
-    /// Every profile, in the order of the options.
-    pub const ALL: [Self; 4] = [
+    /// Every profile, in the order they are looked under.
+    pub(crate) const ALL: [Self; 4] = [
         Self::Legacy,
         Self::NestedSegwit,
         Self::NativeSegwit,
         Self::Taproot,
     ];
 
-    /// Its name.
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Legacy => "legacy",
-            Self::NestedSegwit => "nested-segwit",
-            Self::NativeSegwit => "native-segwit",
-            Self::Taproot => "taproot",
-        }
-    }
-
     /// The type of its addresses.
-    pub const fn kind(self) -> AddressType {
+    pub(crate) const fn kind(self) -> AddressType {
         match self {
             Self::Legacy => AddressType::P2pkh,
             Self::NestedSegwit => AddressType::P2shP2wpkh,
@@ -80,23 +72,24 @@ impl BitcoinProfile {
         }
     }
 
-    /// The profiles `names` name, each once and at least one.
-    pub fn checked(names: &[&str]) -> Result<Vec<Self>, EvidenceError> {
-        if names.is_empty() {
-            return Err(BitcoinError::NoProfile.into());
+    /// The profile of addresses of `kind`, in a list: none for a type no Bitcoin profile writes.
+    fn of_kind(kind: AddressType) -> Vec<Self> {
+        Self::ALL
+            .into_iter()
+            .filter(|profile| profile.kind() == kind)
+            .collect()
+    }
+
+    /// The profiles the form of the extended key `text` names (SLIP-132): ypub and upub nested
+    /// SegWit, zpub and vpub native SegWit. xpub and tpub name none, and SLIP-132's Ypub, Zpub, Upub
+    /// and Vpub name multisig accounts, which no profile of a single key is: every profile is looked
+    /// under for them.
+    fn named_by_key(text: &str) -> Vec<Self> {
+        match trim(text).get(..4) {
+            Some("ypub" | "upub") => vec![Self::NestedSegwit],
+            Some("zpub" | "vpub") => vec![Self::NativeSegwit],
+            _ => Self::ALL.to_vec(),
         }
-        let mut profiles = Vec::new();
-        for name in names {
-            let profile = Self::ALL
-                .into_iter()
-                .find(|profile| profile.name() == *name)
-                .ok_or(BitcoinError::UnknownProfile)?;
-            if profiles.contains(&profile) {
-                return Err(BitcoinError::ProfileTwice.into());
-            }
-            profiles.push(profile);
-        }
-        Ok(profiles)
     }
 }
 
@@ -107,14 +100,6 @@ pub enum BitcoinError {
     AddressNotValid(KeyNetwork),
     /// An address of the other network: the one asked and the one it is.
     AddressOtherNetwork(KeyNetwork, KeyNetwork),
-    /// An address of a type no selected profile writes: the profile that writes it.
-    OutsideProfiles(&'static str),
-    /// No profile.
-    NoProfile,
-    /// A profile that is none.
-    UnknownProfile,
-    /// A profile named twice.
-    ProfileTwice,
     /// A public key of another length or not hexadecimal.
     PublicKeyLength,
     /// A public key that is not compressed.
@@ -141,17 +126,6 @@ impl fmt::Display for BitcoinError {
                 asked.name(),
                 is.name()
             ),
-            Self::OutsideProfiles(writer) => write!(
-                f,
-                "The address is a {writer} address, which none of the selected Bitcoin address profiles writes."
-            ),
-            Self::NoProfile => {
-                f.write_str("At least one Bitcoin address profile must be selected.")
-            }
-            Self::UnknownProfile => f.write_str("Unknown Bitcoin address profile."),
-            Self::ProfileTwice => {
-                f.write_str("Each Bitcoin address profile may be named only once.")
-            }
             Self::PublicKeyLength => write!(
                 f,
                 "A compressed public key must be exactly {COMPRESSED_KEY_BYTES} bytes encoded as {} hexadecimal characters.",
@@ -180,10 +154,6 @@ impl Refusal for BitcoinError {
             Self::AddressOtherNetwork(..) => {
                 "core.wallet-evidence.address-not-valid-bitcoin-address"
             }
-            Self::OutsideProfiles(_) => "core.wallet-evidence.address-outside-profiles",
-            Self::NoProfile => "core.wallet-evidence.at-least-one-bitcoin-address-profile-selected",
-            Self::UnknownProfile => "core.wallet-evidence.unknown-bitcoin-address-profile",
-            Self::ProfileTwice => "core.wallet-evidence.bitcoin-address-profile-given-twice",
             Self::PublicKeyLength => {
                 "core.wallet-evidence.compressed-public-key-exactly-bytes-encoded-as-hexadecimal"
             }
@@ -322,14 +292,12 @@ impl Kind {
     }
 }
 
-/// Where a located kind of evidence is looked for: on `network`, under `profiles`, from
-/// `location`, and compared with `addresses` keys from its index (the scan's default without).
+/// Where a located kind of evidence is looked for: on `network`, from `location`, and compared with
+/// `addresses` keys from its index (the scan's default without), under the profiles its form names.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Place {
     /// The network.
     pub network: KeyNetwork,
-    /// The profiles, at least one.
-    pub profiles: Vec<BitcoinProfile>,
     /// The place of the first key.
     pub location: AddressLocation,
     /// How many addresses from it are compared.
@@ -337,82 +305,72 @@ pub struct Place {
 }
 
 impl Evidence {
-    /// A Bitcoin address at `place`: the place checked first, as TS's `LocatedEvidence` checks it,
-    /// then the address, which one of the place's profiles must write.
+    /// A Bitcoin address at `place`, under the one profile its type names: the place checked
+    /// first, as TS's `LocatedEvidence` checks it, then the address.
     pub fn bitcoin_address(text: &str, place: Place) -> Result<Self, EvidenceError> {
         let network = place.network;
-        let read = |text: &str, profiles: &[BitcoinProfile]| {
+        let read = |text: &str| {
             let address = bitcoin_address_on(text, network)?;
-            if profiles
-                .iter()
-                .any(|profile| profile.kind() == address.kind)
-            {
-                return Ok(Expected::Address(address));
-            }
-            let writer = BitcoinProfile::ALL
-                .into_iter()
-                .find(|profile| profile.kind() == address.kind);
-            Err(BitcoinError::OutsideProfiles(writer.map_or("", BitcoinProfile::name)).into())
+            let profiles = BitcoinProfile::of_kind(address.kind);
+            Ok((Expected::Address(address), profiles))
         };
         Self::at_place(text, place, read)
     }
 
-    /// A compressed public key at `place`, the place checked first.
+    /// A compressed public key at `place`, under every profile, the place checked first.
     pub fn public_key(text: &str, place: Place) -> Result<Self, EvidenceError> {
-        let read = |text: &str, _: &[BitcoinProfile]| {
-            Ok(Expected::PublicKey(parse_compressed_public_key(text)?))
+        let read = |text: &str| {
+            let key = parse_compressed_public_key(text)?;
+            Ok((Expected::PublicKey(key), BitcoinProfile::ALL.to_vec()))
         };
         Self::at_place(text, place, read)
     }
 
-    /// The key of a WIF at `place`, the place checked first.
+    /// The key of a WIF at `place`, under every profile, the place checked first.
     pub fn wif(text: &str, place: Place) -> Result<Self, EvidenceError> {
         let network = place.network;
-        let read = |text: &str, _: &[BitcoinProfile]| {
-            Ok(Expected::PublicKey(wif_public_key(text, network)?))
+        let read = |text: &str| {
+            let key = wif_public_key(text, network)?;
+            Ok((Expected::PublicKey(key), BitcoinProfile::ALL.to_vec()))
         };
         Self::at_place(text, place, read)
     }
 
-    /// An account's extended public key at `account` under `profiles`: its account alone places
-    /// it, with no branch or index (TS a7aecf5), the place checked first.
+    /// An account's extended public key at `account`, under the profile its SLIP-132 form names or
+    /// every profile for any other form: its account alone places it, with no branch or index
+    /// (TS a7aecf5), the place checked first.
     pub fn account_key(
         text: &str,
         network: KeyNetwork,
-        profiles: Vec<BitcoinProfile>,
         account: u64,
     ) -> Result<Self, EvidenceError> {
         let place = Place {
             network,
-            profiles,
             location: AddressLocation::new(account, 0, 0)?,
             addresses: None,
         };
-        let read = |text: &str, _: &[BitcoinProfile]| {
-            Ok(Expected::Account(parse_extended_public_key(text, network)?))
+        let read = |text: &str| {
+            let key = parse_extended_public_key(text, network)?;
+            Ok((Expected::Account(key), BitcoinProfile::named_by_key(text)))
         };
         Self::at_place(text, place, read)
     }
 
     /// The evidence that `read` makes of `text` at its place, which is checked before the value is
-    /// read, as TS's `LocatedEvidence` checks it: at least one profile, then the addresses compared
-    /// from the place's index.
+    /// read, as TS's `LocatedEvidence` checks it: the addresses compared from the place's index.
+    /// `read` gives the profiles the value's form names.
     fn at_place(
         text: &str,
         place: Place,
-        read: impl FnOnce(&str, &[BitcoinProfile]) -> Result<Expected, EvidenceError>,
+        read: impl FnOnce(&str) -> Result<(Expected, Vec<BitcoinProfile>), EvidenceError>,
     ) -> Result<Self, EvidenceError> {
         let Place {
             network,
-            profiles,
             location,
             addresses,
         } = place;
-        if profiles.is_empty() {
-            return Err(BitcoinError::NoProfile.into());
-        }
         let count = address_count(addresses, u64::from(location.index))?;
-        let expected = read(text, &profiles)?;
+        let (expected, profiles) = read(text)?;
         Ok(Self(EvidenceKind::Bitcoin(Kind::Located {
             expected,
             network,
@@ -469,76 +427,60 @@ mod tests {
     use super::super::tests::root;
     use super::*;
 
+    /// The first place on the main network, compared with `addresses` keys.
+    fn first(addresses: Option<u64>) -> Place {
+        Place {
+            network: KeyNetwork::Mainnet,
+            location: AddressLocation::new(0, 0, 0).unwrap(),
+            addresses,
+        }
+    }
+
     #[test]
-    fn an_address_is_found_among_the_first_keys() {
-        let location = AddressLocation::new(0, 0, 0).unwrap();
-        let profiles = BitcoinProfile::checked(&["native-segwit"]).unwrap();
-        let evidence = Evidence::bitcoin_address(
-            "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g",
-            Place {
-                network: KeyNetwork::Mainnet,
-                profiles: profiles.clone(),
-                location,
-                addresses: Some(5),
-            },
-        )
-        .unwrap();
+    fn an_address_is_found_among_the_first_keys_under_the_profile_of_its_type() {
+        let evidence =
+            Evidence::bitcoin_address("bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g", first(Some(5)))
+                .unwrap();
         let matched = evidence.compare(&root()).unwrap();
         assert_eq!(matched.path.as_deref(), Some("m/84'/0'/0'/0/1"));
-        assert_eq!(
-            Evidence::bitcoin_address(
-                "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA",
-                Place {
-                    network: KeyNetwork::Mainnet,
-                    profiles,
-                    location,
-                    addresses: None
-                },
-            )
-            .unwrap_err(),
-            EvidenceError::Bitcoin(BitcoinError::OutsideProfiles("legacy"))
-        );
+        let legacy = Evidence::bitcoin_address("1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA", first(None))
+            .unwrap()
+            .compare(&root())
+            .unwrap();
+        assert_eq!(legacy.path.as_deref(), Some("m/44'/0'/0'/0/0"));
     }
 
     #[test]
     fn the_place_is_checked_before_the_value_as_ts_checks_it() {
-        let location = AddressLocation::new(0, 0, 0).unwrap();
-        let refusal = Evidence::bitcoin_address(
-            "garbage",
-            Place {
-                network: KeyNetwork::Mainnet,
-                profiles: BitcoinProfile::ALL.to_vec(),
-                location,
-                addresses: Some(0),
-            },
-        )
-        .unwrap_err();
+        let refusal = Evidence::bitcoin_address("garbage", first(Some(0))).unwrap_err();
         assert_eq!(refusal.code(), "core.address-scan.address-count-refused");
-        let refusal = Evidence::bitcoin_address(
-            "garbage",
-            Place {
-                network: KeyNetwork::Mainnet,
-                profiles: Vec::new(),
-                location,
-                addresses: None,
-            },
-        )
-        .unwrap_err();
-        assert_eq!(refusal, EvidenceError::Bitcoin(BitcoinError::NoProfile));
     }
 
     #[test]
-    fn an_account_key_is_found_at_its_account() {
+    fn an_account_key_is_found_at_its_account_under_the_profile_its_form_names() {
         let zpub = "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs";
-        let profiles = BitcoinProfile::checked(&["legacy", "native-segwit"]).unwrap();
-        let matched = Evidence::account_key(zpub, KeyNetwork::Mainnet, profiles, 0)
+        let matched = Evidence::account_key(zpub, KeyNetwork::Mainnet, 0)
             .unwrap()
             .compare(&root())
             .unwrap();
         assert_eq!(matched.path.as_deref(), Some("m/84'/0'/0'"));
         assert_eq!(
-            BitcoinProfile::checked(&["legacy", "legacy"]).unwrap_err(),
-            EvidenceError::Bitcoin(BitcoinError::ProfileTwice)
+            BitcoinProfile::named_by_key(zpub),
+            [BitcoinProfile::NativeSegwit]
+        );
+        assert_eq!(
+            BitcoinProfile::named_by_key(
+                " ypub6Ww3ibxVfGzLrAH1PNcjyAWenMTbbAosGNB6VvmSEgytSER9azLDWCxoJwW7Ke7icmizBMXrzBx9979FfaHxHcrArf3zbeJJJUZPf663zsP"
+            ),
+            [BitcoinProfile::NestedSegwit]
+        );
+        assert_eq!(
+            BitcoinProfile::named_by_key("xpub6BgBgses"),
+            BitcoinProfile::ALL
+        );
+        assert_eq!(
+            BitcoinProfile::named_by_key("Zpub74Ckw2Kz"),
+            BitcoinProfile::ALL
         );
     }
 }

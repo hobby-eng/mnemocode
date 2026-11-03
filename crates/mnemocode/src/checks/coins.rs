@@ -35,12 +35,14 @@ fn location_of(path: &str) -> Result<AddressLocation, CheckFailure> {
 }
 
 impl Family {
-    /// Where the public phrase's key matches the vector `place` at `location`, `addresses` of them.
+    /// Where the public phrase's key matches the vector `place` at `location`, `addresses` of them:
+    /// the address read as its coin where `named`, else as every coin whose form it has.
     fn found_at(
         &self,
         place: usize,
         location: AddressLocation,
         addresses: Option<u64>,
+        named: bool,
     ) -> Result<String, CheckFailure> {
         let (id, passphrase, _, address) = self
             .vectors
@@ -51,12 +53,12 @@ impl Family {
             &ok(Phrase::parse(PUBLIC_MNEMONIC))?,
             passphrase,
         ))?;
-        let evidence = ok(Evidence::coin_address(
-            ok(Coin::named(id))?,
-            address,
-            location,
-            addresses,
-        ))?;
+        let coin = if named {
+            Some(ok(Coin::named(id))?)
+        } else {
+            None
+        };
+        let evidence = ok(Evidence::address(coin, address, location, addresses))?;
         let found = ok(evidence.compare(&root))?;
         Ok(match (found.matched, found.path, found.derived) {
             (true, Some(path), Some(derived)) => format!("{path} {derived}"),
@@ -64,27 +66,35 @@ impl Family {
         })
     }
 
-    /// The vector `place` found at its own path.
-    fn check_vector(&self, place: usize) -> Result<(), CheckFailure> {
+    /// The vector `place` found at its own path, read as its coin where `named`, else as every coin
+    /// whose form it has: then the paths of a coin that shares its form with another are searched
+    /// too, as 1… of Bitcoin Cash and 0x… of Ethereum Classic show.
+    fn check_vector(&self, place: usize, named: bool) -> Result<(), CheckFailure> {
         let (_, _, path, address) = self
             .vectors
             .get(place)
             .copied()
             .ok_or(CheckFailure::Mismatch("Coin vector"))?;
+        let name = if named {
+            "Coin address at its path"
+        } else {
+            "Address of every coin of its form at its path"
+        };
         expect_same(
-            self.found_at(place, location_of(path)?, None)?.as_str(),
+            self.found_at(place, location_of(path)?, None, named)?
+                .as_str(),
             format!("{path} {address}").as_str(),
-            "Coin address at its path",
+            name,
         )
     }
 
     fn run(&self, tier: Tier) -> Result<(), CheckFailure> {
         for &place in self.startup.iter().filter(|&&place| self.built(place)) {
-            self.check_vector(place)?;
+            self.check_vector(place, true)?;
         }
         if self.built(self.elsewhere) {
             let first = ok(AddressLocation::new(0, 0, 0))?;
-            let found = self.found_at(self.elsewhere, first, None)?;
+            let found = self.found_at(self.elsewhere, first, None, true)?;
             expect_same(
                 found.as_str(),
                 "not matched",
@@ -101,12 +111,12 @@ impl Family {
             ))?;
             let expected = format!("{path} {address}");
             expect_same(
-                self.found_at(place, start, Some(2))?.as_str(),
+                self.found_at(place, start, Some(2), true)?.as_str(),
                 expected.as_str(),
                 "Second address among two",
             )?;
             expect_same(
-                self.found_at(place, start, Some(1))?.as_str(),
+                self.found_at(place, start, Some(1), true)?.as_str(),
                 "not matched",
                 "First address only",
             )?;
@@ -115,7 +125,8 @@ impl Family {
             return Ok(());
         }
         for place in (0..self.vectors.len()).filter(|&place| self.built(place)) {
-            self.check_vector(place)?;
+            self.check_vector(place, true)?;
+            self.check_vector(place, false)?;
         }
         for &(id, address, because) in self.refused {
             let Ok(coin) = Coin::named(id) else {

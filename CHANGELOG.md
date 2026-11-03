@@ -11,6 +11,12 @@ MnemoCode is now written in Rust. Each system gets one executable with nothing e
 - The self-test reads the format's example legend at every start; the full self-test also makes a pattern and reads its legend back.
 - The WebAssembly files of the Deriver pages hold it too, as the `browser-embroidery` module.
 
+### Wallet checks
+
+- An address names its coin: the question "Which coin is the address for?" is gone, and `--coin-address` needs no `--coin`. An address is read as every coin whose form it has, and the paths of each are searched: `1…` as Bitcoin and Bitcoin Cash, `3…` as Bitcoin and Litecoin, `0x…` as Ethereum and Ethereum Classic. `--coin` only narrows it to one coin. An address of no coin is refused with the reason of a coin whose form it has, such as a wrong EIP-55 checksum.
+- `--bitcoin-profile` is gone. A Bitcoin address's form names its path; a ypub or upub names BIP49 and a zpub or vpub BIP84; any other extended key form, a compressed public key or a WIF is looked for at BIP44, BIP49, BIP84 and BIP86.
+- In the WebAssembly files, `WalletPlace`, `WalletEvidence.wif` and `WalletEvidence.accountKey` take no profiles; `WalletEvidence.coinAddress` with an empty coin reads the address as every coin, and `coins` names them.
+
 ### Install and run
 
 - One executable each for Linux on x86-64 and ARM64, Windows on x86-64, and macOS on ARM64 and x86-64, and an archive of the WebAssembly files for the pages.

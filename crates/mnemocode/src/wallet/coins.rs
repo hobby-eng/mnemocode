@@ -118,6 +118,17 @@ pub enum CoinError {
     WrongEip55,
     /// A key BIP341's tweak gives no output key for.
     NoTaprootKey,
+    /// An address that no coin of this build reads, with no reason of a coin whose form it has.
+    NoCoin,
+}
+
+impl CoinError {
+    /// Whether it says only that an address is not of the coin's form, or does not read, and nothing
+    /// of what is wrong with it: a reading as every coin keeps the reason of a coin whose form the
+    /// address has instead.
+    const fn says_another_form(&self) -> bool {
+        matches!(self, Self::Damaged | Self::NotThisCoin(..))
+    }
 }
 
 /// A refusal of an address, after what it is about.
@@ -161,6 +172,10 @@ impl fmt::Display for CoinError {
                 "its EIP-55 checksum, the mix of capital and small letters, is wrong",
             ),
             Self::NoTaprootKey => f.write_str("BIP341 gives no Taproot output key for this key."),
+            Self::NoCoin => address_refusal(
+                f,
+                "its checksum or format is wrong, or it is no address of a coin the check knows",
+            ),
         }
     }
 }
@@ -183,6 +198,7 @@ impl Refusal for CoinError {
             #[cfg(any(feature = "coin-ethereum", feature = "coin-ethereum-classic"))]
             Self::WrongEip55 => "core.coins.ethereum.address-wrong-eip55-checksum",
             Self::NoTaprootKey => "core.coins.taproot.bip341-gives-no-taproot-output-key-key",
+            Self::NoCoin => "core.coins.coin.address-of-no-coin",
         }
     }
 }
@@ -689,7 +705,10 @@ impl Coin {
         let payload = match lower.split_once(':') {
             Some((prefix, _)) if prefix != CASHADDR_PREFIX => return Err(self.not_ours()),
             Some((_, payload)) => payload,
-            None => lower.as_str(),
+            // Without the prefix only q… and p… have the form of a CashAddr, so that another coin's
+            // damaged address is not taken for one (mhfe 8fd9f46).
+            None if lower.starts_with(['q', 'p']) => lower.as_str(),
+            None => return Err(self.not_ours()),
         };
         let groups: Option<Vec<u8>> = payload
             .chars()
@@ -749,6 +768,32 @@ impl Coin {
             false,
         ))
     }
+}
+
+/// `text`, trimmed, read as an address of every coin of this build whose form it has, in the order
+/// of [`COINS`]: one coin for most addresses, more where coins share a form, as Bitcoin and Bitcoin
+/// Cash share 1…, Bitcoin and Litecoin's older P2SH 3…, and Ethereum and Ethereum Classic 0x…, so
+/// that a check searches the paths of each. A coin added to the registry takes part with no list
+/// of such pairs.
+///
+/// # Errors
+///
+/// An address of no coin is refused with the reason of the first coin whose form it has, such as a
+/// wrong EIP-55 checksum or a shielded address; else as [`CoinError::NoCoin`].
+pub fn parse_any(text: &str) -> Result<Vec<CoinAddress>, CoinError> {
+    let mut read = Vec::new();
+    let mut reason = None;
+    for coin in COINS {
+        match coin.parse(text) {
+            Ok(address) => read.push(address),
+            Err(error) if reason.is_none() && !error.says_another_form() => reason = Some(error),
+            Err(_) => {}
+        }
+    }
+    if read.is_empty() {
+        return Err(reason.unwrap_or(CoinError::NoCoin));
+    }
+    Ok(read)
 }
 
 /// An address read by its coin: its type, the commitment it holds, its text as the coin writes it,
@@ -921,6 +966,58 @@ mod tests {
             let location = AddressLocation::new(0, 0, 0).unwrap();
             assert!(!address.branch_paths(location).is_empty());
         }
+    }
+
+    /// An address is read as every coin whose form it has; an address of no coin keeps the reason
+    /// of the coin whose form it has.
+    #[test]
+    fn an_address_is_read_as_every_coin_of_its_form() {
+        let coins = |text: &str| -> Vec<&str> {
+            parse_any(text)
+                .unwrap()
+                .iter()
+                .map(|address| address.coin.id)
+                .collect()
+        };
+        assert_eq!(
+            coins("1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA"),
+            ["bitcoin", "bitcoin-cash"]
+        );
+        assert_eq!(
+            coins("37VucYSaXLCAsxYyAPfbSi9eh4iEcbShgf"),
+            ["bitcoin", "litecoin"]
+        );
+        assert_eq!(
+            coins("0x9858EfFD232B4033E47d90003D41EC34EcaEda94"),
+            ["ethereum", "ethereum-classic"]
+        );
+        assert_eq!(
+            coins("bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu"),
+            ["bitcoin"]
+        );
+        assert_eq!(coins("XoJA8qE3N2Y3jMLEtZ3vcN42qseZ8LvFf5"), ["dash"]);
+        assert_eq!(
+            parse_any("0x9858efFD232B4033E47d90003D41EC34EcaEda94").unwrap_err(),
+            CoinError::WrongEip55
+        );
+        // 39 digits, none of them 1 or b: no CashAddr reason in place of Ethereum's own.
+        assert_eq!(
+            parse_any("0x9858EfFD232C4033E47d90003D4CEC34EcaEda9").unwrap_err(),
+            CoinError::NotHexAccount
+        );
+        assert_eq!(
+            parse_any(
+                "zs1z7rejlpsa98s2rrrfkwmaxu53e4ue0ulcrw0h4x5g8jl04tak0d3mm47vdtahatqrlkngh9sly"
+            )
+            .unwrap_err()
+            .code(),
+            "core.coins.coin.address-shielded"
+        );
+        assert_eq!(
+            parse_any("bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyv").unwrap_err(),
+            CoinError::NoCoin
+        );
+        assert_eq!(parse_any("not an address").unwrap_err(), CoinError::NoCoin);
     }
 
     #[test]

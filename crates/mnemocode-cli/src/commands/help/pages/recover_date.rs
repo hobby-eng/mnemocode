@@ -94,7 +94,7 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
             "Find the forgotten day with the fingerprint",
         ),
         (
-            "mnemocode recover-date --mode seedshift --input-file shifted.txt --dates-file date-patterns.txt --bitcoin-address bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu --bitcoin-profile native-segwit",
+            "mnemocode recover-date --mode seedshift --input-file shifted.txt --dates-file date-patterns.txt --coin-address bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
             "The same with the first native SegWit receiving address, m/84'/0'/0'/0/0",
         ),
     ],

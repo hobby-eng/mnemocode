@@ -34,7 +34,7 @@ use crate::gate::Stop;
 use crate::terminal::{NoticeKind, leave_result, notice};
 
 /// The options `recover-date` takes.
-pub(crate) const OPTIONS: [&str; 32] = [
+pub(crate) const OPTIONS: [&str; 31] = [
     "mode",
     "input",
     "input-file",
@@ -64,7 +64,6 @@ pub(crate) const OPTIONS: [&str; 32] = [
     "account",
     "branch",
     "index",
-    "bitcoin-profile",
     "scan-gap",
     "bip39-passphrase-file",
 ];
