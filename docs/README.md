@@ -32,7 +32,7 @@ Start with the [README](../README.md) to choose a task. Its sections follow the 
 | [Design and decisions](design/README.md)         | Architecture, platform protections, crate choices and decisions |
 | [Audit index](audits/README.md)                  | Reports and their original scope, source identities and limits  |
 | [Changelog](../CHANGELOG.md)                     | Version-by-version changes                                      |
-| [0.2.0 release notes](releases/v0.2.0.md)        | Changes from the TypeScript version and release requirements    |
+| [0.2.0 release notes](releases/v0.2.0.md)        | What 0.2.0 changes, in short                                    |
 | [Third-party notices](../THIRD_PARTY_NOTICES.md) | Dependencies, artwork and attribution                           |
 
 The [TypeScript documentation and audit history](https://github.com/hobby-eng/mnemocode_typescript/tree/main/docs) remain with that version. This repository keeps the Rust design, changelog, release notes and audit records. Each historical record describes its own snapshot, not a later build.

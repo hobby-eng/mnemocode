@@ -2,19 +2,56 @@
 
 ## 0.2.0 (unreleased)
 
-MnemoCode is rewritten in Rust: one executable that needs nothing else installed but glibc 2.35 or later on Linux, for Linux, macOS and Windows, and a WebAssembly file for each page of the wallet tools. It reads every backup, record and share of 0.1.0 and writes the same ones, and its commands, questions and messages are those of 0.1.0, but for what follows.
+MnemoCode is now written in Rust. Each system gets one executable with nothing else to install, and each page of the wallet tools gets a WebAssembly file. It reads every backup, record and share that 0.1.0 made and writes the same ones. Commands, questions and messages stay as in 0.1.0, apart from the changes below.
 
-- The README follows the menu order, with paired command examples and a documentation index. Each menu task and recovery choice shows its own explanation and a link to that section.
-- Secrets live in types that wipe them, every freed block of memory is wiped, and the memory of a secret is kept out of swap where the system allows it.
-- Re-encode asks for the new backup before the old one, and on Linux with Landlock a failed save may take another name only in the folders of its outputs.
-- A command whose result is secret is refused on a terminal without a private screen.
-- A tracer attached to the process refuses secrets on Linux.
-- Cards draw PNG and JPEG images in the program: Poppler's `pdftocairo` is no longer needed.
-- An answer, a file or standard input longer than its question's limit is refused with that limit, a BIP39 passphrase over 4 KiB included.
-- A missing parent folder of an output file is made before the secret is read.
-- A QR code image may have up to 2 megapixels, where 0.1.0 took 8: a screen of 1920 × 1080 fits, and a page image is cropped to its code.
-- A result that standard output does not take, as on a full disk, ends the command with exit code 1 and says so; a closed pipe ends it as done.
-- As in TS 0.1.1, after its audit AUD-039: shares under a threshold of 1, which keep no SSKR digest, are refused as a set where they disagree, since their agreement does not tell which one is wrong; a file name typed again after an unreadable file, and the name of the next share's QR image, are read only from regular files, so a named pipe is refused at once; and a word of a host's instructions for heirs wider than the page is refused.
+### Install and run
+
+- One executable each for Linux on x86-64 and ARM64, Windows on x86-64, and macOS on ARM64 and x86-64, and an archive of the WebAssembly files for the pages.
+- The Linux executables need glibc 2.35 or later, which Ubuntu 22.04, Debian 12 and newer have. They do not run on musl systems such as Alpine.
+- Cards draw their PNG and JPEG images themselves, so Poppler's `pdftocairo` is no longer needed. The program starts no other program, and the Protection line and the self-test no longer mention "no other programs".
+- The npm package and the Node.js library are gone: the pages take the WebAssembly files instead. The Node.js permission model and the start-up check of the SSKR engine's files are gone too, since the engine is part of the program.
+
+### Menu and help
+
+- The README follows the order of the menu, with paired command examples and an index of the documentation. Each menu task and recovery choice shows its own explanation and a link to its section.
+- Re-encode asks for the new backup before the old one, so that its outputs are checked before any secret is typed.
+- The help of `--ask-secrets` says that standard error must be the terminal too, as its refusal does.
+
+### Limits and refusals
+
+- Each answer, file and standard input has its own limit, which `--help` names, and a longer one is refused with that limit. A BIP39 passphrase may have 4 KiB. 0.1.0 read up to 1 MiB for each.
+- A QR code image may have up to 2 megapixels, where 0.1.0 took 8. A 1920 × 1080 screenshot fits, and the QR images that MnemoCode saves are 720 px; crop a larger photo or page image to the code. An image of noise can still take seconds, and Ctrl+C acts only when the reading ends.
+- Card text is drawn without ligatures, so a text that fit only thanks to a ligature may now be refused as too long. U+FFFF is refused, since the card font lacks it.
+- A word of a host's instructions for heirs wider than the page, such as a long subtitle without a space, is refused. 0.1.0 drew it off the page. As in TS 0.1.1.
+- Shares with a threshold of 1 keep no SSKR digest, so a set of them that disagrees is refused. 0.1.0 named one of them as the share that does not fit, which their agreement does not prove. As in TS 0.1.1.
+- A file name typed again after an unreadable file, and the name of the next share's QR image, are read only from regular files. A named pipe without a writer is refused at once, where 0.1.0 waited for one and held Ctrl+C. As in TS 0.1.1.
+
+### Output
+
+- A missing parent folder of an output file is made before any secret is read. Output paths are checked before the command's own options: of a wrong path and a wrong option, the path is named first, and a folder made for a refused command stays.
+- On Linux with Landlock, a failed save may take another name only in the folders of its outputs.
+- If standard output does not take the result, as on a full disk, the command says so and ends with exit code 1. A closed pipe, as with `| head`, ends it as done.
+- A line of a secret result that 0.1.0 wrote to standard error goes to standard output when standard error is a terminal and no private screen is open.
+
+### Secrets
+
+- A command with a secret result is refused on a terminal without a private screen. Files and pipes get the result as before.
+- On Linux, a tracer attached to the process refuses secrets.
+- Secrets live in types that wipe them, every freed block of memory is wiped, and the memory of a secret is kept out of swap where the system allows it. SECURITY.md lists what is wiped but not locked: drawn pages, the codes on cards, a command's dates and a step's working copies.
+- No secret stays in the memory of a page's WebAssembly file once a call returns; the gates check this on every commit.
+- Random numbers come only from the operating system, or in a browser from `crypto.getRandomValues`.
+
+### Same results, other bytes
+
+- PDF files hold the same pages, text, positions and images. Their bytes differ, since another library writes them.
+- PNG files other than page images have the same pixels. QR codes have the same payload, version and error-correction level; their mask may differ.
+- Page images have the same size. Read cropped to the code, the QR code of each page holds the same payload, with pixels within a small tolerance of 0.1.0's.
+
+### Builds and signatures
+
+- The Linux and Windows executables and the WebAssembly files are built twice in a pinned container, and a byte that differs stops the release. The macOS executables are built on macOS runners, as Apple's SDK requires, and are checked but not rebuilt byte for byte.
+- GitHub signs the build provenance of every release file, and the maintainer signs each release's `SHA256SUMS` with an OpenPGP key. [Releasing](docs/RELEASING.md) describes the steps.
+- MnemoCode is licensed under the MIT license or the Apache License, Version 2.0, at your option. `THIRD_PARTY_NOTICES.md` carries the notices of every crate, font, map and image in a release.
 
 ## 0.1.0
 
