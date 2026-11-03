@@ -1,16 +1,17 @@
 //! The question how MnemoCode can recognise a wallet, asked on the private screen (MnemoCode TS
 //! 0.1.0's `cli/wallet-question.ts`): its master fingerprint, or one of its first receiving
-//! addresses, of any coin, each checked at once and asked again until it can be used, or "It
-//! cannot" where the mode can list candidates without the wallet.
+//! addresses, of any coin, read as every coin whose form it has with no question which, each
+//! checked at once and asked again until it can be used, or "It cannot" where the mode can list
+//! candidates without the wallet.
 
 use mnemocode::text::numbers::typed_whole_number;
-use mnemocode::wallet::coins::{AddressLocation, COINS, Coin};
+use mnemocode::wallet::coins::{AddressLocation, COINS, parse_any};
 use mnemocode::wallet::evidence::{Evidence, Place, parse_master_fingerprint};
 use mnemocode::wallet::scan::{ADDRESS_COUNT_RANGE, address_count, default_address_count};
 
 use super::asking::value_until;
 use super::given::PATH_LIMIT;
-use super::wallet_options::AskedEvidence;
+use super::wallet_options::{AskedEvidence, address_label};
 use crate::args::option_label;
 use crate::gate::Stop;
 use crate::terminal::{Choice, Chosen, Explanation, LineQuestion, ListQuestion, ask_line, choose};
@@ -189,67 +190,27 @@ fn counted_addresses(place: &Place, asker: Asker) -> Result<Option<u64>, Stop> {
         .map_or_else(|| ask_address_count(place, asker), |count| Ok(Some(count)))
 }
 
-/// Asks which coin the address is for, then its address at `place`, each asked until it is one of
-/// that coin; none when the person goes back.
+/// Asks the wallet's address at `place`, of any coin: read as every coin whose form it has, each
+/// on its own paths, and asked until one reads it; none when the person goes back.
 fn ask_address(
     place: &Place,
     words: &AddressWords,
     asker: Asker,
 ) -> Result<Option<AskedEvidence>, Stop> {
-    let coins: Vec<Choice<&'static Coin>> = COINS
-        .iter()
-        .map(|coin| {
-            Choice::noted(
-                coin.name,
-                coin.address_forms_on(place.network.testnet()),
-                *coin,
-            )
-        })
-        .collect();
-    let asked = ListQuestion {
-        question: "Which coin is the address for?",
-        label: "Coin",
-        quit: "goes back",
-        explanation: None,
-    };
-    let coin = match choose(&asked, None, &coins)? {
-        Chosen::One(coin) => coin,
-        Chosen::Back => return Ok(None),
-        Chosen::Cancelled => return Err(Stop::Cancelled),
-    };
-    let bitcoin = coin.id == "bitcoin";
-    let (prompt, what) = if bitcoin {
-        (
-            format!("Bitcoin address ({})", words.prompt),
-            words.what.clone(),
-        )
-    } else {
-        (
-            format!("Address ({}, {})", coin.name, words.prompt),
-            format!("the wallet's address of {}", coin.name),
-        )
-    };
+    let prompt = format!("Address ({})", words.prompt);
     let counted = |text: &str, count: Option<u64>| -> Result<Evidence, Stop> {
-        if bitcoin {
-            let at = Place {
-                addresses: count,
-                ..place.clone()
-            };
-            Ok(Evidence::bitcoin_address(text, at)?)
-        } else {
-            Ok(Evidence::coin_address(coin, text, place.location, count)?)
-        }
+        Ok(Evidence::address(None, text, place.location, count)?)
     };
-    // An address is read once to be refused at once, then again with its count, as the coin
+    // An address is read once to be refused at once, then again with its count, as its first coin
     // writes it.
     let read = |answer: &str| {
         counted(answer, Some(1))
-            .and_then(|_| Ok(coin.parse(answer)?.text))
+            .and_then(|_| Ok(parse_any(answer)?.remove(0).text))
             .map_err(|stop| stop.message())
     };
     let value = Value {
         prompt: &prompt,
-        what: &what,
+        what: &words.what,
         label: "Address",
         fallback: None,
     };
@@ -260,22 +221,13 @@ fn ask_address(
         return Ok(None);
     };
     let evidence = counted(&text, Some(count))?;
-    let label = if bitcoin {
-        option_label("address").to_owned()
-    } else {
-        format!("address of {}", coin.name)
-    };
-    let mut options = if bitcoin {
-        vec!["--bitcoin-address".to_owned(), text]
-    } else {
-        vec![
-            "--coin".to_owned(),
-            coin.id.to_owned(),
-            "--coin-address".to_owned(),
-            text,
-        ]
-    };
-    options.extend(["--scan-gap".to_owned(), count.to_string()]);
+    let label = address_label(&evidence);
+    let options = vec![
+        "--coin-address".to_owned(),
+        text,
+        "--scan-gap".to_owned(),
+        count.to_string(),
+    ];
     Ok(Some(AskedEvidence {
         evidence,
         label,

@@ -1,13 +1,13 @@
 //! What tells that a phrase opens the person's wallet (MnemoCode TS 0.1.0's
 //! `core/wallet-evidence.ts`, `wallet-check.ts` and `coin-address-evidence.ts`,
 //! CAP-WALLET-EVIDENCE-*, CAP-WALLET-FINGERPRINT-EVIDENCE): a master fingerprint, the master
-//! extended public key of `master` or an address of a coin at its place in every build, with
-//! Bitcoin also the keys of `bitcoin`; each compared with the keys a master key derives, the
-//! private half of each wiped once it is compared.
+//! extended public key of `master` or an address at its place in every build, read as every coin
+//! whose form it has unless one is named, with Bitcoin also the keys of `bitcoin`; each compared
+//! with the keys a master key derives, the private half of each wiped once it is compared.
 
 use std::fmt;
 
-use super::coins::{AddressLocation, Coin, CoinAddress, CoinError, KeyPath};
+use super::coins::{AddressLocation, Coin, CoinAddress, CoinError, KeyPath, parse_any};
 use super::scan::{ScanError, address_count, scan_branch};
 use crate::bip32::{Bip32Error, ExtendedKey, ExtendedPublicKey, fingerprint_hex};
 use crate::refusal::Refusal;
@@ -19,8 +19,8 @@ mod master;
 
 #[cfg(feature = "coin-bitcoin")]
 pub use bitcoin::{
-    BitcoinError, BitcoinProfile, COMPRESSED_KEY_BYTES, Place, bitcoin_address_on,
-    parse_compressed_public_key, wif_public_key,
+    BitcoinError, COMPRESSED_KEY_BYTES, Place, bitcoin_address_on, parse_compressed_public_key,
+    wif_public_key,
 };
 pub use master::{KeyError, KeyNetwork, parse_extended_public_key};
 
@@ -144,7 +144,8 @@ enum Kind {
     #[cfg(feature = "coin-bitcoin")]
     Bitcoin(bitcoin::Kind),
     Coin {
-        address: CoinAddress,
+        /// The address as each coin read it.
+        addresses: Vec<CoinAddress>,
         location: AddressLocation,
         count: u32,
     },
@@ -156,20 +157,34 @@ impl Evidence {
         Ok(Self(Kind::Fingerprint(parse_master_fingerprint(text)?)))
     }
 
-    /// An address of `coin` at `location`, compared with `addresses` keys from its index.
-    pub fn coin_address(
-        coin: &'static Coin,
+    /// An address at `location`, compared with `addresses` keys from its index: of `coin`, or where
+    /// none is named, of every coin of this build whose form it has ([`parse_any`]), each on its
+    /// own paths.
+    pub fn address(
+        coin: Option<&'static Coin>,
         text: &str,
         location: AddressLocation,
         addresses: Option<u64>,
     ) -> Result<Self, EvidenceError> {
-        let address = coin.parse(text)?;
+        let read = match coin {
+            Some(coin) => vec![coin.parse(text)?],
+            None => parse_any(text)?,
+        };
         let count = address_count(addresses, u64::from(location.index))?;
         Ok(Self(Kind::Coin {
-            address,
+            addresses: read,
             location,
             count,
         }))
+    }
+
+    /// The coins that an address was read as, in the order of the registry; none for other
+    /// evidence.
+    pub fn coins(&self) -> Vec<&'static Coin> {
+        match &self.0 {
+            Kind::Coin { addresses, .. } => addresses.iter().map(|address| address.coin).collect(),
+            _ => Vec::new(),
+        }
     }
 
     /// Whether it is matched by the keys of `root`, the master key of the phrase.
@@ -196,20 +211,29 @@ impl Evidence {
             #[cfg(feature = "coin-bitcoin")]
             Kind::Bitcoin(kind) => kind.compare(root),
             Kind::Coin {
-                address,
+                addresses,
                 location,
                 count,
             } => {
-                let mut matched = |_: &ExtendedKey, key: &[u8; 33]| {
-                    address
-                        .is_address_of(key)
-                        .ok()
-                        .filter(|matched| *matched)
-                        .map(|_| address.text.clone())
-                };
-                for branch in address.branch_paths(*location) {
+                // The branches of every coin, each once: coins of one form may share one.
+                let mut branches: Vec<(KeyPath, Vec<&CoinAddress>)> = Vec::new();
+                for address in addresses {
+                    for branch in address.branch_paths(*location) {
+                        match branches.iter_mut().find(|(known, _)| *known == branch) {
+                            Some((_, there)) => there.push(address),
+                            None => branches.push((branch, vec![address])),
+                        }
+                    }
+                }
+                for (branch, there) in &branches {
+                    let mut matched = |_: &ExtendedKey, key: &[u8; 33]| {
+                        there
+                            .iter()
+                            .find(|address| address.is_address_of(key).unwrap_or(false))
+                            .map(|address| address.text.clone())
+                    };
                     if let Some(found) =
-                        scan_branch(root, &branch, (location.index, *count), &mut matched)?
+                        scan_branch(root, branch, (location.index, *count), &mut matched)?
                     {
                         return Ok(found_match(found.derived, &found.path));
                     }

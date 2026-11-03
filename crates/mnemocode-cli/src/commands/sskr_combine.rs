@@ -52,7 +52,7 @@ use crate::terminal::{
 const CHANGE_SHARES: &str = "Which shares to change?";
 
 /// The options `sskr-combine` takes.
-pub(crate) const OPTIONS: [&str; 29] = [
+pub(crate) const OPTIONS: [&str; 28] = [
     "share",
     "share-file",
     "share-qr",
@@ -72,7 +72,6 @@ pub(crate) const OPTIONS: [&str; 29] = [
     "account",
     "branch",
     "index",
-    "bitcoin-profile",
     "scan-gap",
     "bip39-passphrase-file",
     "max-tries",

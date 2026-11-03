@@ -21,7 +21,33 @@ const RECORDED: &str = include_str!("../../../vectors/ts-0.1.0/transcripts-v1.js
 /// What TS's help says that differs here, each by a decision of PLAN.md's "Parity with TS 0.1.0":
 /// images need no other program, a missing folder is made, each text input has its own limit, and
 /// re-encode asks the new backup first; the stitch command is new.
-const WRITTEN_IN: [(&str, &str); 18] = [
+const WRITTEN_IN: [(&str, &str); 24] = [
+    // The owner's request of 2026-11-03, through the mhfe session: an address names its coins, as
+    // every coin whose form it has, and a key's form its Bitcoin profiles; --bitcoin-profile is gone.
+    (
+        "      --bitcoin-address <ADDRESS>\n          A Bitcoin address of the wallet, one of the --scan-gap from the\n          selected place.\n\n      --coin-address <ADDRESS>\n          An address of another coin, one of the --scan-gap from the place, with\n          --coin.\n\n          Single-key receiving addresses of the coins of mhfe, on their standard\n          paths: Bitcoin Cash, Cosmos, Dash (also Platform), Dogecoin, Ethereum\n          and EVM networks, Ethereum Classic, Injective, Litecoin, Tron, XRP and\n          Zcash (transparent). The address tells its type and network.\n\n      --coin <ID>\n          The coin of --coin-address, such as ethereum, litecoin or\n          bitcoin-cash.\n\n",
+        "      --bitcoin-address <ADDRESS>\n          A Bitcoin address of the wallet, one of the --scan-gap from the\n          selected place.\n\n          Its form names its path: 1… BIP44, 3… BIP49, bc1q… BIP84 and bc1p…\n          BIP86.\n\n      --coin-address <ADDRESS>\n          An address of the wallet, of any coin, one of the --scan-gap from the\n          place.\n\n          Single-key receiving addresses on their standard paths: Bitcoin,\n          Bitcoin Cash, Cosmos, Dash (also Platform), Dogecoin, Ethereum and EVM\n          networks, Ethereum Classic, Injective, Litecoin, Tron, XRP and Zcash\n          (transparent). The address tells its coin, type and network. Where\n          coins share a form, as 1…, 3… and 0x… do, the paths of each are\n          searched.\n\n      --coin <ID>\n          Read --coin-address as this coin's alone, such as ethereum or\n          bitcoin-cash.\n\n",
+    ),
+    (
+        "          The same forms as --master-xpub are accepted.\n\n      --compressed-public-key <HEX>\n          A 33-byte compressed public key, one of the --scan-gap from the\n          selected place.\n\n",
+        "          The same forms as --master-xpub are accepted. A ypub or upub is looked\n          for at BIP49, a zpub or vpub at BIP84; any other form at BIP44, BIP49,\n          BIP84 and BIP86.\n\n      --compressed-public-key <HEX>\n          A 33-byte compressed public key, one of the --scan-gap from the\n          selected place.\n\n          It is looked for at BIP44, BIP49, BIP84 and BIP86, as a WIF is.\n\n",
+    ),
+    (
+        "      --bitcoin-profile <NAME>\n          auto (default), or a comma-separated list of address types.\n\n          The types are legacy (BIP44), nested-segwit (BIP49), native-segwit\n          (BIP84) and taproot (BIP86), such as native-segwit,taproot, each named\n          once. auto tries all four at the selected place.\n\n",
+        "",
+    ),
+    (
+        "      --coin-address <ADDRESS>     An address of another coin, one of the\n                                   --scan-gap from the place, with --coin\n      --coin <ID>                  The coin of --coin-address, such as ethereum,\n                                   litecoin or bitcoin-cash\n",
+        "      --coin-address <ADDRESS>     An address of the wallet, of any coin, one of\n                                   the --scan-gap from the place\n      --coin <ID>                  Read --coin-address as this coin's alone,\n                                   such as ethereum or bitcoin-cash\n",
+    ),
+    (
+        "      --bitcoin-profile <NAME>     auto (default), or a comma-separated list of\n                                   address types\n",
+        "",
+    ),
+    (
+        "    --dates-file date-patterns.txt \\\n    --bitcoin-address bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu \\\n    --bitcoin-profile native-segwit\n",
+        "    --dates-file date-patterns.txt \\\n    --coin-address bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu\n",
+    ),
     // The owner's SeedStitch of 2026-11-03 (ADR 0010): a command TS does not have.
     (
         "  sskr-export   Print existing Shamir shares as cards\n  preview",

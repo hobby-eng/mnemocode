@@ -154,7 +154,7 @@ mod bitcoin {
     use super::{Build, match_of, run_cases};
     use crate::self_check::{CheckFailure, Tier, expect_same};
     use crate::wallet::coins::AddressLocation;
-    use crate::wallet::evidence::{BitcoinProfile, Evidence, EvidenceError, KeyNetwork, Place};
+    use crate::wallet::evidence::{Evidence, EvidenceError, KeyNetwork, Place};
 
     /// The public phrase's account keys and addresses, published or computed independently.
     const ACCOUNT_84_ZPUB: &str = "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs";
@@ -186,17 +186,12 @@ mod bitcoin {
         }
     }
 
-    /// A located piece of evidence under `profiles` on the main network.
-    fn located(
-        kind: Located,
-        value: &str,
-        profiles: &[BitcoinProfile],
-    ) -> Result<Evidence, EvidenceError> {
+    /// A located piece of evidence on the main network.
+    fn located(kind: Located, value: &str) -> Result<Evidence, EvidenceError> {
         kind(
             value,
             Place {
                 network: KeyNetwork::Mainnet,
-                profiles: profiles.to_vec(),
                 location: first(),
                 addresses: None,
             },
@@ -210,100 +205,89 @@ mod bitcoin {
             SECOND_84,
             Place {
                 network: KeyNetwork::Mainnet,
-                profiles: vec![BitcoinProfile::NativeSegwit],
                 location,
                 addresses,
             },
         )
     }
 
-    const NATIVE: [BitcoinProfile; 1] = [BitcoinProfile::NativeSegwit];
-
     /// Each case: its name, its evidence, what it gives, and the BIP39 passphrase.
-    const MATCHES: [(&str, Build, &str, &str); 15] = [
+    const MATCHES: [(&str, Build, &str, &str); 16] = [
         (
             "Account zpub",
-            || Evidence::account_key(ACCOUNT_84_ZPUB, KeyNetwork::Mainnet, NATIVE.to_vec(), 0),
+            || Evidence::account_key(ACCOUNT_84_ZPUB, KeyNetwork::Mainnet, 0),
             "matched at m/84'/0'/0'",
             "",
         ),
         (
-            "Account xpub of Taproot",
-            || {
-                Evidence::account_key(
-                    ACCOUNT_86_XPUB,
-                    KeyNetwork::Mainnet,
-                    vec![BitcoinProfile::Taproot],
-                    0,
-                )
-            },
+            "Account xpub of Taproot, under every profile",
+            || Evidence::account_key(ACCOUNT_86_XPUB, KeyNetwork::Mainnet, 0),
             "matched at m/86'/0'/0'",
             "",
         ),
         (
             "Testnet account upub",
-            || {
-                Evidence::account_key(
-                    ACCOUNT_49_TESTNET_UPUB,
-                    KeyNetwork::Testnet,
-                    vec![BitcoinProfile::NestedSegwit],
-                    0,
-                )
-            },
+            || Evidence::account_key(ACCOUNT_49_TESTNET_UPUB, KeyNetwork::Testnet, 0),
             "matched at m/49'/1'/0'",
             "",
         ),
         (
             "Legacy address",
-            || located(Evidence::bitcoin_address, ADDRESS_44, &BitcoinProfile::ALL),
+            || located(Evidence::bitcoin_address, ADDRESS_44),
             "matched at m/44'/0'/0'/0/0",
             "",
         ),
         (
             "Nested SegWit address",
-            || located(Evidence::bitcoin_address, ADDRESS_49, &BitcoinProfile::ALL),
+            || located(Evidence::bitcoin_address, ADDRESS_49),
             "matched at m/49'/0'/0'/0/0",
             "",
         ),
         (
             "Native SegWit address",
-            || located(Evidence::bitcoin_address, ADDRESS_84, &BitcoinProfile::ALL),
+            || located(Evidence::bitcoin_address, ADDRESS_84),
             "matched at m/84'/0'/0'/0/0",
             "",
         ),
         (
             "Taproot address",
-            || located(Evidence::bitcoin_address, ADDRESS_86, &BitcoinProfile::ALL),
+            || located(Evidence::bitcoin_address, ADDRESS_86),
             "matched at m/86'/0'/0'/0/0",
             "",
         ),
         (
-            "Compressed public key",
-            || located(Evidence::public_key, PUBLIC_KEY_84, &NATIVE),
+            "An address read as every coin of its form",
+            || Evidence::address(None, ADDRESS_44, first(), None),
+            "matched at m/44'/0'/0'/0/0",
+            "",
+        ),
+        (
+            "Compressed public key, under every profile",
+            || located(Evidence::public_key, PUBLIC_KEY_84),
             "matched at m/84'/0'/0'/0/0",
             "",
         ),
         (
             "WIF",
-            || located(Evidence::wif, WIF_84, &NATIVE),
+            || located(Evidence::wif, WIF_84),
             "matched at m/84'/0'/0'/0/0",
             "",
         ),
         (
             "Another WIF",
-            || located(Evidence::wif, KEY_ONE_WIF, &BitcoinProfile::ALL),
+            || located(Evidence::wif, KEY_ONE_WIF),
             "not matched",
             "",
         ),
         (
             "Address with the passphrase TREZOR",
-            || located(Evidence::bitcoin_address, TREZOR_ADDRESS_84, &NATIVE),
+            || located(Evidence::bitcoin_address, TREZOR_ADDRESS_84),
             "matched at m/84'/0'/0'/0/0",
             "TREZOR",
         ),
         (
             "Address without its passphrase",
-            || located(Evidence::bitcoin_address, TREZOR_ADDRESS_84, &NATIVE),
+            || located(Evidence::bitcoin_address, TREZOR_ADDRESS_84),
             "not matched",
             "",
         ),
@@ -335,7 +319,6 @@ mod bitcoin {
                 located(
                     Evidence::public_key,
                     "0430d54fd0dd420a6e5f8d3624f5f3482cae350f79d5f0753bf5beef9c2d91af3c",
-                    &NATIVE,
                 )
             },
             "must start with 02 or 03",
@@ -346,34 +329,30 @@ mod bitcoin {
                 located(
                     Evidence::public_key,
                     "020000000000000000000000000000000000000000000000000000000000000000",
-                    &NATIVE,
                 )
             },
             "not a point of the secp256k1 curve",
         ),
         (
             "A script address",
-            || located(Evidence::bitcoin_address, SCRIPT_ADDRESS, &NATIVE),
+            || located(Evidence::bitcoin_address, SCRIPT_ADDRESS),
             "not the address of a single key",
         ),
         (
-            "An address that none of the profiles writes",
+            "An address of no coin",
             || {
-                located(
-                    Evidence::bitcoin_address,
-                    ADDRESS_86,
-                    &[
-                        BitcoinProfile::Legacy,
-                        BitcoinProfile::NestedSegwit,
-                        BitcoinProfile::NativeSegwit,
-                    ],
+                Evidence::address(
+                    None,
+                    "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyv",
+                    first(),
+                    None,
                 )
             },
-            "none of the selected Bitcoin address profiles writes",
+            "no address of a coin the check knows",
         ),
         (
             "A testnet address on mainnet",
-            || located(Evidence::bitcoin_address, TESTNET_ADDRESS, &NATIVE),
+            || located(Evidence::bitcoin_address, TESTNET_ADDRESS),
             "it is a testnet address",
         ),
         (
@@ -389,8 +368,8 @@ mod bitcoin {
     ];
 
     pub(super) fn run(tier: Tier) -> Result<(), CheckFailure> {
-        run_cases(tier, &MATCHES, &[5, 12, 13], &[])?;
-        let change = || located(Evidence::bitcoin_address, CHANGE_84, &NATIVE);
+        run_cases(tier, &MATCHES, &[5, 13, 14], &[])?;
+        let change = || located(Evidence::bitcoin_address, CHANGE_84);
         expect_same(
             match_of(change, "")?.as_str(),
             "not matched",
@@ -399,7 +378,6 @@ mod bitcoin {
         let damaged = located(
             Evidence::bitcoin_address,
             "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyv",
-            &NATIVE,
         );
         let refusal = damaged.err().map(|error| error.to_string());
         expect_same(

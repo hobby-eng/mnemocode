@@ -417,7 +417,7 @@ pub(crate) fn option_value(key: &str) -> String {
 }
 
 /// How each option is named in a sentence (TS 0.1.0's OPTION_LABELS).
-const OPTION_LABELS: [(&str, &str); 98] = [
+const OPTION_LABELS: [(&str, &str); 97] = [
     ("card-name", "card name"),
     ("card-role", "card role"),
     ("card-company", "card company"),
@@ -440,7 +440,6 @@ const OPTION_LABELS: [(&str, &str); 98] = [
     ("backup-check", "written-backup check"),
     ("bip39-passphrase-file", "BIP39 passphrase file"),
     ("bitcoin-address", "Bitcoin address"),
-    ("bitcoin-profile", "Bitcoin address profile"),
     ("coin", "coin"),
     ("coin-address", "coin address"),
     ("card-layout", "card layout"),

@@ -71,7 +71,7 @@ const SCREEN_ANSWERS: [&str; 6] = [
 ];
 
 /// The options `decode` takes.
-pub(crate) const OPTIONS: [&str; 30] = [
+pub(crate) const OPTIONS: [&str; 29] = [
     "ask-secrets",
     "mode",
     "input",
@@ -99,7 +99,6 @@ pub(crate) const OPTIONS: [&str; 30] = [
     "account",
     "branch",
     "index",
-    "bitcoin-profile",
     "scan-gap",
     "bip39-passphrase-file",
 ];

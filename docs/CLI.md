@@ -338,66 +338,68 @@ printf '%s\n' 'wool abuse actual wool abuse actual wool abuse actual wool abuse 
   > output/public-stored.txt
 printf '%s\n' '??-09-2026' > output/public-date-pattern.txt
 
-# A native-SegWit receiving address, one of the first 20: here m/84'/0'/0'/0/0.
+# An address of any coin, one of the first 20 receiving ones. Its form names the
+# path: here Bitcoin's native SegWit, m/84'/0'/0'/0/0.
 mnemocode recover-date --mode seedshift \
   --input-file output/public-stored.txt \
   --format 1 --dates-file output/public-date-pattern.txt \
-  --bitcoin-address bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu \
-  --bitcoin-profile native-segwit
+  --coin-address bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu
 
 # A master or account extended public key. Standard and SLIP-132 forms are accepted:
 # xpub, ypub, zpub, Ypub, Zpub; testnet tpub, upub, vpub, Upub, Vpub.
 mnemocode recover-date --mode seedshift \
   --input-file output/public-stored.txt \
   --format 1 --dates-file output/public-date-pattern.txt \
-  --account-xpub zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs \
-  --bitcoin-profile native-segwit
+  --account-xpub zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs
 
-# An address of another coin, here the first Ethereum one: m/44'/60'/0'/0/0.
+# An 0x… address, read as Ethereum and Ethereum Classic, whose paths are both
+# searched: here the first Ethereum one, m/44'/60'/0'/0/0.
 mnemocode recover-date --mode seedshift \
   --input-file output/public-stored.txt \
   --format 1 --dates-file output/public-date-pattern.txt \
-  --coin ethereum --coin-address 0x9858EfFD232B4033E47d90003D41EC34EcaEda94
+  --coin-address 0x9858EfFD232B4033E47d90003D41EC34EcaEda94
 
-# A 33-byte compressed public key at exactly one BIP44/49/84/86 path.
+# A 33-byte compressed public key at index 0 of account 0, looked for at BIP44,
+# BIP49, BIP84 and BIP86.
 mnemocode recover-date --mode seedshift \
   --input-file output/public-stored.txt \
   --format 1 --dates-file output/public-date-pattern.txt \
   --compressed-public-key 03cc8a4bc64d897bddc5fbc2f670f7a8ba0b386779106cf1223c6fc5d7cd6fc115 \
-  --bitcoin-profile taproot --account 0 --branch 0 --index 0 --scan-gap 1
+  --account 0 --branch 0 --index 0 --scan-gap 1
 ```
 
 | Option                            | What you know                                                                                                               |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `--master-xpub`, `--account-xpub` | An extended public key                                                                                                      |
-| `--bitcoin-address`               | An address                                                                                                                  |
-| `--coin-address` with `--coin`    | An address of another coin                                                                                                  |
+| `--coin-address`                  | An address of any coin; `--coin` narrows it to one                                                                          |
+| `--bitcoin-address`               | A Bitcoin address, refused on the other network                                                                             |
 | `--compressed-public-key`         | A public key                                                                                                                |
 | `--master-fingerprint`            | The wallet's own fingerprint, the original one, not the encoded one. It has only 32 bits, so it is a filter and not a proof |
 | `--wif-file PATH`                 | A private key in WIF form, read from a protected local file                                                                 |
 | `--bip39-passphrase-file PATH`    | The BIP39 passphrase, if the wallet uses one. The file is secret                                                            |
 
-`--index` sets the first address and `--scan-gap N` the count to compare, up to 1000. `--bitcoin-profile auto` tries BIP44, BIP49, BIP84 and BIP86. A comma-separated list such as `native-segwit,taproot` selects profiles without repeats; an incompatible address type is refused before secret input.
+`--index` sets the first address and `--scan-gap N` the count to compare, up to 1000. A Bitcoin address's form names its path: `1…` BIP44, `3…` BIP49, `bc1q…` BIP84 and `bc1p…` BIP86. A ypub or upub names BIP49 and a zpub or vpub BIP84; any other extended key form, a compressed public key or a WIF is looked for at all four. SLIP-132's Ypub, Zpub, Upub and Vpub name multisig accounts, which these single-key paths do not hold.
 
 For an account extended public key, `--account` selects the account. `--branch` and `--index` describe addresses within it and are refused beside `--account-xpub`. Standard and SLIP-132 versions are accepted as listed above.
 
-Other coins use standard single-key paths and infer type/network from the address:
+Every coin uses its standard single-key paths, and the address tells its coin, type and network. `--coin-address` reads an address as every coin whose form it has: where coins share one, as `1…` (Bitcoin and Bitcoin Cash), `3…` (Bitcoin and Litecoin) and `0x…` (Ethereum and Ethereum Classic) do, the paths of each are searched. `--coin` narrows it to one coin:
 
-| Coin                      | `--coin`           | Address forms                                         |
-| ------------------------- | ------------------ | ----------------------------------------------------- |
-| Bitcoin Cash              | `bitcoin-cash`     | `bitcoincash:q…` or `1…`                              |
-| Cosmos                    | `cosmos`           | `cosmos1…`                                            |
-| Dash                      | `dash`             | `X…`, Platform `dash1k…`, testnet Platform `tdash1k…` |
-| Dogecoin                  | `dogecoin`         | `D…`                                                  |
-| Ethereum and EVM networks | `ethereum`         | `0x…`                                                 |
-| Ethereum Classic          | `ethereum-classic` | `0x…`                                                 |
-| Injective                 | `injective`        | `inj1…`                                               |
-| Litecoin                  | `litecoin`         | `L…`, `M…`, `3…` or `ltc1q…`                          |
-| Tron                      | `tron`             | `T…`                                                  |
-| XRP                       | `xrp`              | `r…`                                                  |
-| Zcash                     | `zcash`            | Transparent `t1…` only                                |
+| Coin                      | `--coin`           | Address forms                                                  |
+| ------------------------- | ------------------ | -------------------------------------------------------------- |
+| Bitcoin                   | `bitcoin`          | `1…`, `3…`, `bc1q…`, `bc1p…`; testnet `m…`, `n…`, `2…`, `tb1…` |
+| Bitcoin Cash              | `bitcoin-cash`     | `bitcoincash:q…` or `1…`                                       |
+| Cosmos                    | `cosmos`           | `cosmos1…`                                                     |
+| Dash                      | `dash`             | `X…`, Platform `dash1k…`, testnet Platform `tdash1k…`          |
+| Dogecoin                  | `dogecoin`         | `D…`                                                           |
+| Ethereum and EVM networks | `ethereum`         | `0x…`                                                          |
+| Ethereum Classic          | `ethereum-classic` | `0x…`                                                          |
+| Injective                 | `injective`        | `inj1…`                                                        |
+| Litecoin                  | `litecoin`         | `L…`, `M…`, `3…` or `ltc1q…`                                   |
+| Tron                      | `tron`             | `T…`                                                           |
+| XRP                       | `xrp`              | `r…`                                                           |
+| Zcash                     | `zcash`            | Transparent `t1…` only                                         |
 
-Zcash shielded addresses are unsupported. Bitcoin Cash and Ethereum Classic try both their own coin type and their parent chain's. `--network` and `--bitcoin-profile` apply only to Bitcoin.
+Zcash shielded addresses are unsupported. Bitcoin Cash and Ethereum Classic try both their own coin type and their parent chain's. `--network` applies only to Bitcoin evidence given with `--bitcoin-address`, a key or a WIF; an address of any coin names its own.
 
 A WIF can spend the funds. Never put it in a shell command or an issue report.
 

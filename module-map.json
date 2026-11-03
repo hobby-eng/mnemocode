@@ -464,6 +464,7 @@
     "cli.stitch.no-pdf": "the port's own SeedStitch command (crates/mnemocode-cli/src/commands/stitch.rs): TS has no such command",
     "embroidery.phrase.legend-not-read": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
     "embroidery.phrase.legend-ambiguous": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
-    "cli.bounded-read.not-a-file": "the port's own SeedStitch command (crates/mnemocode-cli/src/os/files.rs): a picture, which holds no text, is read only from a regular file"
+    "cli.bounded-read.not-a-file": "the port's own SeedStitch command (crates/mnemocode-cli/src/os/files.rs): a picture, which holds no text, is read only from a regular file",
+    "core.coins.coin.address-of-no-coin": "the port's own reading of an address as every coin (crates/mnemocode/src/wallet/coins.rs), the owner's request of 2026-11-03: TS asks which coin first"
   }
 }
