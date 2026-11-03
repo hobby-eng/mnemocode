@@ -191,7 +191,12 @@ impl SearchResult {
                     .text()
                     .as_str()
                     .to_owned(),
-                matched_at: shown.answer.as_ref().and_then(|answer| answer.path.clone()),
+                // The answer names the path it compared also where the candidate did not match.
+                matched_at: shown
+                    .answer
+                    .as_ref()
+                    .filter(|answer| answer.matched)
+                    .and_then(|answer| answer.path.clone()),
                 number: shown.candidate.number(),
                 ..FoundRow::default()
             });
@@ -519,5 +524,45 @@ impl SearchResult {
     /// The number of the candidate of the row at `at`, from 1, or the place of its share.
     pub fn number(&self, at: f64) -> Option<f64> {
         self.rows.get(place(at)).map(|row| row.number as f64)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+
+    use mnemocode::recovery::places::WordSearch;
+    use mnemocode::recovery::wallet_check::WalletCheck;
+    use mnemocode::recovery::word_search::{WordCandidateSearch, WordLimits};
+    use mnemocode::search::{Search, Step};
+    use mnemocode::self_check::vectors::PUBLIC_FINGERPRINT;
+    use mnemocode::wallet::evidence::Evidence;
+
+    use super::SearchResult;
+
+    #[test]
+    fn a_word_search_names_where_only_the_rows_that_matched() {
+        let evidence = Evidence::master_fingerprint(PUBLIC_FINGERPRINT).unwrap();
+        let typed = format!("{}?", "abandon ".repeat(11));
+        let limits = WordLimits {
+            max_shown: None,
+            keep: Some(0),
+            stop_when_full: false,
+        };
+        let mut search = WordCandidateSearch::new(
+            WordSearch::unknown_words(&typed).unwrap(),
+            Some(Rc::new(WalletCheck::new(evidence, ""))),
+            limits,
+        )
+        .unwrap();
+        while let Step::Running(_) = search.step(1000).unwrap() {}
+        let result = SearchResult::of_words(search.finish()).unwrap();
+        assert_eq!((result.rows(), result.matched()), (128, 1.0));
+        let matched: Vec<_> = (0..result.rows())
+            .filter_map(|at| Some((result.phrase(at as f64)?, result.matched_at(at as f64)?)))
+            .collect();
+        assert_eq!(matched.len(), 1);
+        assert!(matched[0].0.ends_with(" about"));
+        assert_eq!(matched[0].1, "m");
     }
 }
