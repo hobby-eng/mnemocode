@@ -49,9 +49,26 @@
       "modules": [
         "phrase",
         "wallet",
-        "qr"
+        "qr",
+        "candidates",
+        "sskr",
+        "recovery",
+        "cards"
       ],
       "units": [
+        "template-business-architect",
+        "template-business-it",
+        "template-business-estate",
+        "template-business-diagonal",
+        "template-business-contact",
+        "template-business-curves",
+        "template-business-facets",
+        "template-business-mixed",
+        "template-material-vehicle",
+        "template-material-enclosure",
+        "template-material-tile",
+        "template-material-switch",
+        "template-material-kitchen",
         "coin-dash"
       ]
     },

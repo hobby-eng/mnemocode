@@ -408,8 +408,9 @@ for a host that does not search.
 
 `wasm-profiles.json` names, per wallet-tools edition and page, the `browser-*` modules and the
 unit features (today `multi-chain` Deriver: all; `multi-chain` Discovery Scanner:
-`browser-candidates` and no unit; `dash-community`: `coin-dash` and what the wallet-tools session
-asks; `multi-chain-wallet-tools/tooling/key-derivation-features.mjs:115-162` already removes share,
+`browser-candidates` and no unit; `dash-community` Deriver: every module, the 13 designs and
+`coin-dash` alone, as the wallet-tools session asked on 2026-11-03;
+`multi-chain-wallet-tools/tooling/key-derivation-features.mjs:115-162` already removes share,
 card and coin parts by edition). `cargo xtask wasm build <edition>/<page>` builds the file for
 `wasm32-unknown-unknown` with `--no-default-features --features <modules>,<units>` and no getrandom
 cfg in RUSTFLAGS (the binding's direct getrandom 0.3.4 line with `wasm_js` selects bc-rand's
