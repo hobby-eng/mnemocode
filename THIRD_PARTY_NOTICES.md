@@ -23,6 +23,15 @@ source code.
 The English and Traditional Chinese BIP39 word lists are the standard lists from
 [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki).
 
+## DMC thread colours
+
+MnemoCode's cross-stitch patterns take the number, name and colour of each of the 489 colours of
+DMC's six-strand floss from [craft-color-codes](https://github.com/makebead/craft-color-codes) by
+MakeBead (`data/csv/dmc-floss.csv` of commit 84dbdc26a961247f2aba58c91f314966a38e64ae), licensed
+under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Color data: craft-color-codes by
+MakeBead (https://makebead.com). `crates/mnemocode-embroidery/src/dmc.rs` holds the values
+unchanged. DMC is a trademark of its owner; MnemoCode is not affiliated with or endorsed by DMC.
+
 ## Embedded DejaVu Sans subset
 
 `crates/mnemocode-cards/assets/fonts/DejaVuSans-UI.ttf` is a generated subset of DejaVu Sans

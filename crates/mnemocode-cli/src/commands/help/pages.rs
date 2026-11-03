@@ -12,13 +12,14 @@ mod self_test;
 mod sskr_combine;
 mod sskr_export;
 mod sskr_split;
+mod stitch;
 mod table;
 mod topics;
 
 use super::{CommandHelp, TopicHelp};
 
 /// Every command's page, in the order the overview lists them.
-pub(super) const COMMAND_HELP: [(&str, CommandHelp); 11] = [
+pub(super) const COMMAND_HELP: [(&str, CommandHelp); 12] = [
     ("encode", encode::PAGE),
     ("decode", decode::PAGE),
     ("re-encode", re_encode::PAGE),
@@ -27,6 +28,7 @@ pub(super) const COMMAND_HELP: [(&str, CommandHelp); 11] = [
     ("sskr-combine", sskr_combine::PAGE),
     ("sskr-export", sskr_export::PAGE),
     ("sskr-split", sskr_split::PAGE),
+    ("stitch", stitch::PAGE),
     ("preview", preview::PAGE),
     ("table", table::PAGE),
     ("self-test", self_test::PAGE),

@@ -2,6 +2,7 @@
 members = [
   "crates/mnemocode",
   "crates/mnemocode-cards",
+  "crates/mnemocode-embroidery",
   "crates/mnemocode-cli",
   "crates/mnemocode-wasm",
   "shims/bc-crypto",
@@ -47,6 +48,7 @@ dbg_macro = "deny"
 [workspace.dependencies]
 mnemocode = { path = "crates/mnemocode", default-features = false }
 mnemocode-cards = { path = "crates/mnemocode-cards", default-features = false }
+mnemocode-embroidery = { path = "crates/mnemocode-embroidery" }
 # Text
 unicode-normalization = "=0.1.26"
 unicode-properties = { version = "=0.1.4", default-features = false, features = [

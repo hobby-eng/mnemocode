@@ -4,15 +4,16 @@ This is the Rust implementation of MnemoCode. The command line and WebAssembly b
 
 ## Crates and responsibilities
 
-| Crate                    | Responsibility                                                                                          |
-| ------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `crates/mnemocode`       | BIP39, representations, Seedshift, records, wallet checks, SSKR, recovery, candidate lists and QR codes |
-| `crates/mnemocode-cards` | Card settings, designs, drawing scenes, PDFs, PNG/JPEG images and heir sheets                           |
-| `crates/mnemocode-cli`   | Options, menu, terminal questions, files, operating-system protections and output                       |
-| `crates/mnemocode-wasm`  | Feature-selected browser classes and conversion between JavaScript values and library types             |
-| `xtask`                  | Repository gates, WebAssembly profiles, packaging, reproducible builds and release signing              |
+| Crate                         | Responsibility                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `crates/mnemocode`            | BIP39, representations, Seedshift, records, wallet checks, SSKR, recovery, candidate lists and QR codes             |
+| `crates/mnemocode-cards`      | Card settings, designs, drawing scenes, PDFs, PNG/JPEG images and heir sheets                                       |
+| `crates/mnemocode-embroidery` | SeedStitch: pictures turned into DMC cross-stitch patterns whose legend holds a masked phrase, and their PDF charts |
+| `crates/mnemocode-cli`        | Options, menu, terminal questions, files, operating-system protections and output                                   |
+| `crates/mnemocode-wasm`       | Feature-selected browser classes and conversion between JavaScript values and library types                         |
+| `xtask`                       | Repository gates, WebAssembly profiles, packaging, reproducible builds and release signing                          |
 
-The cards crate depends on the library; the library never depends on cards or either front end. `module-map.json` declares permitted dependencies, unsafe-code locations and OS access. `cargo xtask code-rules` checks the map against the source. The [design's module map](design/architect/ARCHITECTURE.md#3-module-map) explains the dependency direction.
+The cards crate depends on the library, and the embroidery crate on both; the library never depends on them or on either front end. `module-map.json` declares permitted dependencies, unsafe-code locations and OS access. `cargo xtask code-rules` checks the map against the source. The [design's module map](design/architect/ARCHITECTURE.md#3-module-map) explains the dependency direction.
 
 ## Modules for other hosts
 
@@ -31,6 +32,7 @@ Paths below are relative to `crates/mnemocode/src/`, except where another crate 
 | `pack`                                                          | The dictionaries and standalone manual-recovery guide                                    |
 | `secret`, `refusal`, `random`, `search`, `self_check`, `checks` | Secret owners, refusal contracts, randomness, stepped searches and known-answer checks   |
 | `mnemocode-cards`                                               | Drawing plans and output writers, shared by native and browser hosts                     |
+| `mnemocode-embroidery`                                          | Pictures, DMC threads, patterns, SeedStitch legends and charts ([format](SEEDSTITCH.md)) |
 
 `Cargo.toml` features select coins, searches, SSKR and card templates. `wasm-profiles.json` selects the parts and units included for each browser page. There is no Node.js runtime or TypeScript source import in these artifacts. [Feature and binding contracts](LIBRARY.md#browser-modules-and-features) explain what a host must select.
 

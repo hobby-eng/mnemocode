@@ -8,6 +8,8 @@
 pub mod candidates;
 #[cfg(feature = "browser-cards")]
 pub mod cards;
+#[cfg(feature = "browser-embroidery")]
+pub mod embroidery;
 pub mod host;
 #[cfg(feature = "browser-phrase")]
 pub mod phrase;

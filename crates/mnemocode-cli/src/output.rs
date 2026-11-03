@@ -22,7 +22,7 @@ const MAX_COPY_NUMBER: usize = 999;
 /// The endings of the documents a command writes, which a new folder's name may not take.
 const DOCUMENT_EXTENSIONS: [&str; 4] = ["pdf", "png", "jpg", "jpeg"];
 /// The file inputs, which no output may overlap.
-pub(crate) const FILE_INPUTS: [&str; 12] = [
+pub(crate) const FILE_INPUTS: [&str; 13] = [
     "mnemonic-file",
     "input-file",
     "share-file",
@@ -35,6 +35,7 @@ pub(crate) const FILE_INPUTS: [&str; 12] = [
     "bip39-passphrase-file",
     "wif-file",
     "qr-file",
+    "picture",
 ];
 
 /// Why the outputs cannot be used.

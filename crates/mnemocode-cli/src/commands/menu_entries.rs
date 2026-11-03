@@ -62,7 +62,7 @@ const fn entry(
 
 pub(crate) const ENCODE: MenuEntry = entry(
     1,
-    "Encode a seed phrase as numbers, codes or colors",
+    "Encode your seed phrase",
     "Make a backup in another form, with optional date masking, shares or printable cards.",
     "1-encode",
 );

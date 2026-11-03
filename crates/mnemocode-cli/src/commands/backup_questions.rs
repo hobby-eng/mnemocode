@@ -330,6 +330,16 @@ pub(crate) fn ask_encoded_backup(question: BackupQuestion<'_>) -> Result<ReadBac
     let mut problem = None;
     loop {
         let text = source.next(problem.take())?;
+        // A SeedStitch legend stands for the record of the masked phrase it holds.
+        let text = match super::stitch::record_of_legend(text.as_str()) {
+            Ok(record) => record.unwrap_or(text),
+            Err(stop @ Stop::Refused(_)) => {
+                question_ended();
+                problem = Some(stop.message());
+                continue;
+            }
+            Err(stop) => return Err(stop),
+        };
         match checked_backup(&text, question, &source)? {
             Ok(read) => return Ok(read),
             Err(Again(reason)) => {

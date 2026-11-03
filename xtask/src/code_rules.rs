@@ -40,9 +40,10 @@ use crate::rust_source::{self, RustFile};
 use crate::{Failure, report};
 
 /// The crates whose Rust files the parts read, by folder: the workspace's own.
-pub(crate) const OWN_CRATES: [(&str, &str); 6] = [
+pub(crate) const OWN_CRATES: [(&str, &str); 7] = [
     ("crates/mnemocode", "mnemocode"),
     ("crates/mnemocode-cards", "mnemocode-cards"),
+    ("crates/mnemocode-embroidery", "mnemocode-embroidery"),
     ("crates/mnemocode-cli", "mnemocode-cli"),
     ("crates/mnemocode-wasm", "mnemocode-wasm"),
     ("shims/bc-crypto", "bc-crypto"),

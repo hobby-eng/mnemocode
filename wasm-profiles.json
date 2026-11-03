@@ -9,7 +9,8 @@
         "candidates",
         "sskr",
         "recovery",
-        "cards"
+        "cards",
+        "embroidery"
       ],
       "units": [
         "template-business-architect",
@@ -53,7 +54,8 @@
         "candidates",
         "sskr",
         "recovery",
-        "cards"
+        "cards",
+        "embroidery"
       ],
       "units": [
         "template-business-architect",
@@ -81,7 +83,8 @@
         "candidates",
         "sskr",
         "recovery",
-        "cards"
+        "cards",
+        "embroidery"
       ],
       "units": [
         "template-business-it",
@@ -191,6 +194,12 @@
       "ownShareCards",
       "selfCheckCards",
       "CardSession"
+    ],
+    "embroidery": [
+      "StitchPattern",
+      "StitchLegend",
+      "readStitchLegend",
+      "selfCheckEmbroidery"
     ]
   }
 }

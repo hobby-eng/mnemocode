@@ -226,6 +226,13 @@ pub(crate) fn phrase_words(parsed: &Parsed) -> Result<Option<usize>, Stop> {
 
 /// The encoded seed phrase of --input, --input-file or --qr-file.
 pub(crate) fn encoded_input(parsed: &Parsed) -> Result<SecretText, Stop> {
+    let text = encoded_text(parsed)?;
+    // A SeedStitch legend stands for the record of the masked phrase it holds.
+    Ok(super::stitch::record_of_legend(text.as_str())?.unwrap_or(text))
+}
+
+/// The text of --input, --input-file or --qr-file, as given.
+fn encoded_text(parsed: &Parsed) -> Result<SecretText, Stop> {
     let Some(path) = value(parsed, "qr-file") else {
         return text_input(
             parsed,

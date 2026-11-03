@@ -27,9 +27,10 @@ const OUTPUT: &str = "THIRD_PARTY_NOTICES.md";
 /// The hand-written notices come first; everything from this line on is generated.
 const MARKER: &str = "<!-- Everything below is written by `cargo xtask notices` from Cargo.lock and the crates' own licence files; do not edit it by hand. -->";
 /// The workspace's own crates, which are MnemoCode itself.
-const OWN: [&str; 6] = [
+const OWN: [&str; 7] = [
     "mnemocode",
     "mnemocode-cards",
+    "mnemocode-embroidery",
     "mnemocode-cli",
     "mnemocode-wasm",
     "bc-crypto",

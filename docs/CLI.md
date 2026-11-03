@@ -62,7 +62,7 @@ Refusal cannot remove text already entered in shell history or process arguments
 
 For headless operations, `--dates-file PATH` reads whitespace-separated dates; `recover-date` also accepts its `?` patterns there. Re-encode uses `--old-dates-file PATH` for the old backup and `--dates-file PATH` for the new one; a legacy-valid backup takes its original final word from `--last-word-file PATH`. These three options also accept `-`. Only one material source may read standard input in a command. Do not combine these date/final-word files with `--ask-secrets`, which asks for those answers itself. Protect and keep date files yourself: dates are not added to encoded records.
 
-Each text input has its own limit, which `--help` names: 256 bytes for a seed phrase, 128 for dates, 4 KiB for a passphrase or a date pattern, 32 KiB for a `recover-word` pattern, 64 KiB for encoded input or a set of shares, as an answer or a file. A QR image may be up to 16 MiB, 4096 pixels on either side and 2 megapixels (2,097,152 pixels), with up to 8 bits per sample: a screen of 1920 × 1080 fits, and the QR images that MnemoCode saves are 720 px; crop a photograph or a page image to the code. Larger inputs are refused. An image is read whole, and Ctrl+C acts when that reading ends: an image of noise can keep it for seconds. A multiline paste is one answer: words, codes and dates may be on separate lines; separate shares become semicolon-separated.
+Each text input has its own limit, which `--help` names: 256 bytes for a seed phrase, 128 for dates, 4 KiB for a passphrase or a date pattern, 32 KiB for a `recover-word` pattern, 64 KiB for encoded input or a set of shares, as an answer or a file. A QR image may be up to 16 MiB, 4096 pixels on either side and 2 megapixels (2,097,152 pixels), with up to 8 bits per sample: a screen of 1920 × 1080 fits, and the QR images that MnemoCode saves are 720 px; crop a photograph or a page image to the code. The picture of a cross-stitch pattern may be a PNG or JPEG file of up to 40 MiB and 60 megapixels. Larger inputs are refused. An image is read whole, and Ctrl+C acts when that reading ends: an image of noise can keep it for seconds. A multiline paste is one answer: words, codes and dates may be on separate lines; separate shares become semicolon-separated.
 
 ## Public command examples
 
@@ -113,6 +113,18 @@ mnemocode decode --input-file output/public-unicode-record.txt
 ```
 
 Images are drawn by MnemoCode itself at 300 dpi. PNG keeps text and QR codes sharp; JPEG uses quality 90. Separate-card corners are transparent in PNG and white in JPEG.
+
+A cross-stitch pattern needs a picture of your own; any photograph works for this public phrase:
+
+```bash
+# The masked phrase hidden in the legend of a pattern, the legend also saved as a line.
+mnemocode stitch --mnemonic-file output/public-mnemonic.txt \
+  --dates-file output/public-dates.txt --picture photo.jpg --stitches-across 150 \
+  --pdf output/public-pattern.pdf --output output/public-legend.txt
+mnemocode decode --input-file output/public-legend.txt --dates-file output/public-dates.txt
+```
+
+The legend is drawn at random within the counts the picture allows, so the same phrase gives a different legend each time. A legend line is a row's symbol number (1 to 70, as [SeedStitch](SEEDSTITCH.md#the-symbols) lists them), a colon and its stitches, rows in the legend's order. Decode takes it typed, pasted or from a file, and corrects one mistyped row, naming it.
 
 ### Re-encode
 

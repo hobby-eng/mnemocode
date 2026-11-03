@@ -16,12 +16,13 @@ Start with the [README](../README.md) to choose a task. Its sections follow the 
 
 ## Library and formats
 
-| Guide                                               | What it covers                                                               |
-| --------------------------------------------------- | ---------------------------------------------------------------------------- |
-| [Using the Rust library](LIBRARY.md)                | Rust examples, WebAssembly modules, ownership and host contracts             |
-| [Source layout](ARCHITECTURE.md)                    | Module responsibilities, entry points, dependency boundaries and build tools |
-| [Candidate lists](CANDIDATES.md)                    | MNCL bytes, candidate ordering, encryption parameters and limits             |
-| [Seedshift construction](SEEDSHIFT_CONSTRUCTION.md) | The checksum-valid transformation and its reversibility proof                |
+| Guide                                               | What it covers                                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [Using the Rust library](LIBRARY.md)                | Rust examples, WebAssembly modules, ownership and host contracts                      |
+| [Source layout](ARCHITECTURE.md)                    | Module responsibilities, entry points, dependency boundaries and build tools          |
+| [Candidate lists](CANDIDATES.md)                    | MNCL bytes, candidate ordering, encryption parameters and limits                      |
+| [Seedshift construction](SEEDSHIFT_CONSTRUCTION.md) | The checksum-valid transformation and its reversibility proof                         |
+| [SeedStitch](SEEDSTITCH.md)                         | How a cross-stitch legend holds a phrase: symbols, reading, correction and an example |
 
 ## Maintenance and history
 

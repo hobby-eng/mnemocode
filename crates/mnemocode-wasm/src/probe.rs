@@ -14,6 +14,7 @@
 //! calls the Rust functions behind the generated wrappers, which pass on references alone.
 
 mod cards;
+mod embroidery;
 
 use mnemocode::bip32::{ExtendedKey, HARDENED_OFFSET};
 use mnemocode::bip39::phrase::Phrase;
@@ -835,6 +836,7 @@ fn entries(telling: bool, input: &str) -> String {
         qr_entries(phrase, &mut met);
         if place == 0 {
             cards::card_entries(phrase, &mut met);
+            embroidery::embroidery_entries(given, &mut met);
         }
         candidate_entries(&list, &mut met);
         share_entries(given, &mut met);

@@ -20,8 +20,13 @@ const RECORDED: &str = include_str!("../../../vectors/ts-0.1.0/transcripts-v1.js
 
 /// What TS's help says that differs here, each by a decision of PLAN.md's "Parity with TS 0.1.0":
 /// images need no other program, a missing folder is made, each text input has its own limit, and
-/// re-encode asks the new backup first.
-const WRITTEN_IN: [(&str, &str); 17] = [
+/// re-encode asks the new backup first; the stitch command is new.
+const WRITTEN_IN: [(&str, &str); 18] = [
+    // The owner's SeedStitch of 2026-11-03 (ADR 0010): a command TS does not have.
+    (
+        "  sskr-export   Print existing Shamir shares as cards\n  preview",
+        "  sskr-export   Print existing Shamir shares as cards\n  stitch        Hide a phrase in the legend of a cross-stitch pattern\n  preview",
+    ),
     // The owner's corrections of 2026-11-02 (PLAN.md, parity).
     (
         "Standard input must be the terminal; without one, or in a terminal\n          that says TERM=dumb, the command stops at once. Output sent to a file\n          goes there as before.",

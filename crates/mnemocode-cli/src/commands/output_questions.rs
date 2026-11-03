@@ -100,6 +100,12 @@ pub(crate) fn forget_claimed() {
     claimed().clear();
 }
 
+/// Claims `path`, a file that the task reads, so that no file it saves is given its name, which the
+/// command would refuse.
+pub(crate) fn claim_read(path: &str) {
+    claimed().push(path.to_owned());
+}
+
 /// A typed file or folder name as the file system knows it. A name that the command line would read
 /// as something else is refused: - stands for standard input or output there, and a name that starts
 /// with - for an option. So is a blank one: as a path it would be the current folder.

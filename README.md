@@ -8,7 +8,7 @@
 
 This README describes MnemoCode 0.2.0, the Rust version. Until 0.2.0 is released, the published executables are in the [TypeScript repository](https://github.com/hobby-eng/mnemocode_typescript/releases). Existing MnemoCode records and shares remain readable.
 
-MnemoCode writes a wallet seed phrase (a BIP39 mnemonic) as numbers, Unicode codes or colors. You can mask it with dates, divide it into Shamir shares, print it on cards, or search for missing recovery material. It works offline as a command-line program, Rust library or WebAssembly module.
+MnemoCode writes a wallet seed phrase (a BIP39 mnemonic) as numbers, Unicode codes or colors, or hides it in the legend of a cross-stitch pattern. You can mask it with dates, divide it into Shamir shares, print it on cards, or search for missing recovery material. It works offline as a command-line program, Rust library or WebAssembly module.
 
 The [documentation index](https://github.com/hobby-eng/mnemocode/tree/main/docs) lists all guides and reference documents, with a short description of each.
 
@@ -199,6 +199,22 @@ A6, A5 and A4 produce collection sheets. `--page-size business` produces 90 × 5
 
 Keep it apart from the backup. A handwritten hint should help heirs remember dates without disclosing them. The sheet cannot restore the wallet on its own; [A guide for heirs](docs/HEIRS.md) explains what else they need.
 
+### Embroidery
+
+Choose **Embroidery** among the forms, or run `stitch`, to hide the phrase in a cross-stitch pattern made from your own picture. MnemoCode masks the phrase with your dates, as Seedshift does, and turns the picture into a chart in DMC threads. The masked phrase is in the legend: in each row's symbol and in the last one or two digits of its stitch count. Nothing on the pattern names MnemoCode.
+
+```bash
+mnemocode stitch --ask-secrets --picture cat.jpg --stitches-across 200 \
+  --pdf cross-stitch-pattern.pdf --output legend.txt
+mnemocode decode --input-file legend.txt --ask-secrets
+```
+
+The PDF has a cover with a preview, the legend and the chart pages, with a bold line every ten stitches. 200 stitches across make about 36 cm on 14-count Aida; the width can be 40 to 500, and a pattern is at most 800 stitches high. A photograph with smooth shades works best. A flat picture with a few colors cannot hold a phrase: MnemoCode says so and asks for another picture or width, keeping what you typed.
+
+Decode needs the legend and the dates, not the picture. Type each row from the top as the symbol's number, a colon and its stitches: `28:1725 25:2163 57:3275 …`. The PDF shows the symbols; [the SeedStitch format](docs/SEEDSTITCH.md#the-symbols) numbers them 1 to 70, and `--output` saves the legend already typed out. A single mistyped row is corrected, and Decode names the row to check on paper.
+
+Treat the legend like an encoded backup: with the dates, it gives the phrase. Keep the legend page or the legend line. A finished embroidery holds the same counts, but counting thousands of stitches by hand is no practical way back.
+
 <a id="re-encoding-a-backup"></a>
 
 ## 2. Re-encode
@@ -218,7 +234,7 @@ For scripts, `--old-mode`, `--old-format` and `--old-dates-file` describe the in
 
 ## 3. Decode
 
-Read a saved record, pasted codes, a text file or a QR PNG. With Seedshift, enter the original dates to recover the original words. For damaged codes or dates, use the corresponding [recovery option](#6-recovery).
+Read a saved record, pasted codes, a text file, a QR PNG or the legend of a [cross-stitch pattern](#embroidery). With Seedshift, enter the original dates to recover the original words. For damaged codes or dates, use the corresponding [recovery option](#6-recovery).
 
 The [Encode examples](#make-a-backup-and-read-it-back) read records back directly; the [card and QR examples](#cards-and-qr-codes) give the mode and format needed for a headerless QR. To read Unicode codes copied into your own text file:
 
@@ -476,7 +492,7 @@ A synchronized folder can upload records, cards or shares. MnemoCode warns for u
 
 ## Library use
 
-The `mnemocode` crate provides transformations, recovery, shares and wallet checks; `mnemocode-cards` draws the printable output. Browser hosts use the feature-selected `mnemocode-wasm` binding. Hosts supply randomness and drive resumable searches; native file access and terminal questions stay in the CLI. The crates are built from this repository, not published to crates.io. [The library guide](docs/LIBRARY.md) covers examples, ownership and host contracts; [the module inventory](docs/ARCHITECTURE.md#modules-for-other-hosts) maps them to source.
+The `mnemocode` crate provides transformations, recovery, shares and wallet checks; `mnemocode-cards` draws the printable output, and `mnemocode-embroidery` makes cross-stitch patterns. Browser hosts use the feature-selected `mnemocode-wasm` binding. Hosts supply randomness and drive resumable searches; native file access and terminal questions stay in the CLI. The crates are built from this repository, not published to crates.io. [The library guide](docs/LIBRARY.md) covers examples, ownership and host contracts; [the module inventory](docs/ARCHITECTURE.md#modules-for-other-hosts) maps them to source.
 
 <a id="continuous-integration"></a>
 

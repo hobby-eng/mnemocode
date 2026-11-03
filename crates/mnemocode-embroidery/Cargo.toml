@@ -1,0 +1,21 @@
+[package]
+name = "mnemocode-embroidery"
+description = "MnemoCode's cross-stitch patterns: a picture in DMC threads whose legend holds a backup."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+mnemocode.workspace = true
+mnemocode-cards.workspace = true
+libm.workspace = true
+png.workspace = true
+sha2.workspace = true
+zeroize.workspace = true
+zune-jpeg.workspace = true
+
+[lints]
+workspace = true

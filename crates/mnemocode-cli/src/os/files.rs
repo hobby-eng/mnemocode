@@ -36,6 +36,8 @@ pub(crate) enum FileError {
     Unreadable(&'static str),
     /// The file named is a folder, a device or a pipe.
     NotRegular(&'static str),
+    /// The file named, which holds no text, is a folder, a device or a pipe.
+    NotAFile(&'static str),
     /// The file is longer than its limit.
     TooLarge(InputTooLarge),
     /// Something is at a new file's or folder's name already, said by the caller's message.
@@ -82,6 +84,7 @@ impl fmt::Display for FileError {
                 "{what} could not be read. Check that the file exists and is readable."
             ),
             Self::NotRegular(what) => write!(f, "{what} must be a regular text file."),
+            Self::NotAFile(what) => write!(f, "{what} must be a regular file."),
             Self::TooLarge(error) => error.fmt(f),
             Self::Taken(message) => f.write_str(message),
             Self::BlankPath => f.write_str("A new folder needs a path; an empty one is refused."),
@@ -124,6 +127,7 @@ impl Refusal for FileError {
         match self {
             Self::Unreadable(_) => "cli.bounded-read.file-unreadable",
             Self::NotRegular(_) => "cli.bounded-read.regular-file-required",
+            Self::NotAFile(_) => "cli.bounded-read.not-a-file",
             Self::TooLarge(error) => error.code(),
             Self::Taken(_) => "export.private-file.absent-path-refused",
             Self::BlankPath => "export.private-file.new-folder-path-empty-one-refused",
@@ -267,6 +271,40 @@ pub(crate) fn read_secret_file(
     }
     let capacity = usize::try_from(metadata.len()).unwrap_or(limit).min(limit) + 1;
     read_bounded(&mut file, capacity, limit, what)
+}
+
+/// The regular file at `path`, which holds no secret, such as the picture of a pattern, read whole:
+/// never more than `limit` bytes, refused as [`read_secret_file`] refuses; nothing of it is locked,
+/// so that it takes none of the lock budget that the secrets need.
+pub(crate) fn read_public_file(
+    path: &Path,
+    limit: usize,
+    what: &'static str,
+) -> Result<Vec<u8>, FileError> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NONBLOCK);
+    }
+    // Windows opens no folder: what lies at the path then names the refusal, as Unix's open does.
+    let file = options.open(path).map_err(|_| match fs::metadata(path) {
+        Ok(metadata) if !metadata.is_file() => FileError::NotAFile(what),
+        _ => FileError::Unreadable(what),
+    })?;
+    let metadata = file.metadata().map_err(|_| FileError::Unreadable(what))?;
+    if !metadata.is_file() {
+        return Err(FileError::NotAFile(what));
+    }
+    let mut bytes = Vec::new();
+    file.take(limit as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| FileError::Unreadable(what))?;
+    if bytes.len() > limit {
+        return Err(FileError::TooLarge(InputTooLarge::new(what, limit)));
+    }
+    Ok(bytes)
 }
 
 /// What `reader` gives to its end, into a locked buffer of `capacity` bytes that grows to at most

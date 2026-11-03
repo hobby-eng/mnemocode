@@ -4,6 +4,13 @@
 
 MnemoCode is now written in Rust. Each system gets one executable with nothing else to install, and each page of the wallet tools gets a WebAssembly file. It reads every backup, record and share that 0.1.0 made and writes the same ones. Commands, questions and messages stay as in 0.1.0, apart from the changes below.
 
+### Cross-stitch patterns
+
+- `stitch`, and Embroidery among the forms of the menu's Encode, hide a phrase in a cross-stitch pattern made from a picture. The phrase is masked with dates, as Seedshift does, and kept in the legend: in each row's symbol and in the last digits of its stitch count. The pattern is a PDF in DMC threads, with a cover, the legend and the chart. [SeedStitch](docs/SEEDSTITCH.md) describes the format.
+- Decode reads a legend back with the dates, typed or from a file, and corrects one mistyped row, naming it.
+- The self-test reads the format's example legend at every start; the full self-test also makes a pattern and reads its legend back.
+- The WebAssembly files of the Deriver pages hold it too, as the `browser-embroidery` module.
+
 ### Install and run
 
 - One executable each for Linux on x86-64 and ARM64, Windows on x86-64, and macOS on ARM64 and x86-64, and an archive of the WebAssembly files for the pages.

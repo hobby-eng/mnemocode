@@ -154,7 +154,7 @@ enum Source {
 fn ask_source() -> Result<Option<Vec<String>>, Stop> {
     let typed = Choice::noted(
         TYPED_SOURCE,
-        "numbers, codes, colors or a record",
+        "numbers, codes, colors, a record or a stitch legend",
         Source::Typed,
     );
     let record = Choice::noted(

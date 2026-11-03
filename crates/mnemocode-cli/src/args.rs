@@ -417,7 +417,7 @@ pub(crate) fn option_value(key: &str) -> String {
 }
 
 /// How each option is named in a sentence (TS 0.1.0's OPTION_LABELS).
-const OPTION_LABELS: [(&str, &str); 96] = [
+const OPTION_LABELS: [(&str, &str); 98] = [
     ("card-name", "card name"),
     ("card-role", "card role"),
     ("card-company", "card company"),
@@ -490,8 +490,10 @@ const OPTION_LABELS: [(&str, &str); 96] = [
     ("old-mode", "transformation mode of the old backup"),
     ("orientation", "page orientation"),
     ("output", "output record file"),
+    ("stitches-across", "stitches across"),
     ("page-size", "page size"),
     ("pdf", "PDF output file"),
+    ("picture", "picture file"),
     ("progress-every", "progress interval"),
     ("qr", "QR output file"),
     ("qr-dir", "share QR output folder"),

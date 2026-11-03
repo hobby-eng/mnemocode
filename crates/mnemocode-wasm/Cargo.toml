@@ -24,6 +24,7 @@ browser-probe = [
   "browser-sskr",
   "browser-recovery",
   "browser-cards",
+  "browser-embroidery",
   "template-material-tile",
   "coin-bitcoin",
 ]
@@ -33,6 +34,8 @@ browser-wallet = []
 browser-qr = []
 browser-candidates = []
 browser-cards = ["dep:mnemocode-cards"]
+# Cross-stitch patterns, written with the cards' PDF writer but none of their designs.
+browser-embroidery = ["dep:mnemocode-embroidery"]
 # Shamir shares: the library's sskr, and the browser backend of its engine's randomness crate.
 browser-sskr = ["mnemocode/sskr", "dep:getrandom03", "mnemocode-cards?/sskr"]
 browser-recovery = [
@@ -72,6 +75,7 @@ coin-zcash = ["mnemocode/coin-zcash"]
 [dependencies]
 mnemocode.workspace = true
 mnemocode-cards = { workspace = true, optional = true }
+mnemocode-embroidery = { workspace = true, optional = true }
 # The randomness of the library's Random port: the browser's (crypto.getRandomValues) in the
 # WebAssembly, the system's in the native builds of the gates.
 getrandom.workspace = true

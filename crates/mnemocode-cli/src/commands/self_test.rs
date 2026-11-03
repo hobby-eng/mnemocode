@@ -67,6 +67,7 @@ impl Refusal for CoreFailed {
 pub(crate) fn assert_core() -> Result<(), Stop> {
     startup()
         .and_then(|()| card_checks::startup())
+        .and_then(|()| mnemocode_embroidery::checks::startup())
         .and_then(|()| text_file_startup())
         .map_err(|failure| CoreFailed(failure).into())
 }
@@ -234,6 +235,8 @@ pub(crate) fn run(protection: &Protection) -> Result<(), Stop> {
                 for cards in card_checks::ROWS {
                     report.run(cards.name(), cards.detail(), || cards.run(Tier::Full))?;
                 }
+                let stitch = mnemocode_embroidery::checks::ROW;
+                report.run(stitch.name(), stitch.detail(), || stitch.run(Tier::Full))?;
             }
             if row.name() == AFTER_TEXT_FILES {
                 let detail = "local UTF-8 file, share lines retained, missing file refused";

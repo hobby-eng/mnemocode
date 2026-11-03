@@ -32,6 +32,7 @@ mod share_repair;
 pub(crate) mod sskr_combine;
 pub(crate) mod sskr_export;
 pub(crate) mod sskr_split;
+pub(crate) mod stitch;
 pub(crate) mod table;
 mod wallet_options;
 pub(crate) mod wallet_question;
@@ -70,7 +71,7 @@ pub(crate) enum Run {
 }
 
 /// Every command, in the order the help lists them.
-pub(crate) const COMMANDS: [Command; 11] = [
+pub(crate) const COMMANDS: [Command; 12] = [
     Command {
         name: "encode",
         options: &[
@@ -144,6 +145,13 @@ pub(crate) const COMMANDS: [Command; 11] = [
         options: &[&sskr_split::OPTIONS, &cards::CARD_OPTIONS, &["card-layout"]],
         secret: true,
         run: Run::Options(sskr_split::run),
+        asks_outputs: None,
+    },
+    Command {
+        name: "stitch",
+        options: &[&stitch::OPTIONS],
+        secret: true,
+        run: Run::Options(stitch::run),
         asks_outputs: None,
     },
     Command {

@@ -738,10 +738,24 @@ dependencies = [
  "libc",
  "mnemocode",
  "mnemocode-cards",
+ "mnemocode-embroidery",
  "portable-pty",
  "serde_json",
  "windows-sys",
  "zeroize",
+]
+
+[[package]]
+name = "mnemocode-embroidery"
+version = "0.2.0"
+dependencies = [
+ "libm",
+ "mnemocode",
+ "mnemocode-cards",
+ "png",
+ "sha2",
+ "zeroize",
+ "zune-jpeg",
 ]
 
 [[package]]
@@ -752,6 +766,7 @@ dependencies = [
  "getrandom 0.4.3",
  "mnemocode",
  "mnemocode-cards",
+ "mnemocode-embroidery",
  "wasm-bindgen",
 ]
 

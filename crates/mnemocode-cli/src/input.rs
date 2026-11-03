@@ -164,6 +164,17 @@ pub(crate) fn read_qr_bytes(path: &Path, regular_only: bool) -> Result<SecretByt
     )?)
 }
 
+/// The picture of a pattern at `path`, a regular file of at most
+/// [`mnemocode_embroidery::picture::MAX_FILE_BYTES`]; no secret, so read without a lock.
+pub(crate) fn read_picture(path: &Path) -> Result<Vec<u8>, InputError> {
+    let resolved = os::resolve(path, terminal::environment().current.as_deref());
+    Ok(os::read_public_file(
+        &resolved,
+        mnemocode_embroidery::picture::MAX_FILE_BYTES,
+        "The picture",
+    )?)
+}
+
 /// Standard input, read to its end within `limit`.
 fn read_standard_input(limit: usize) -> Result<SecretBytes, InputError> {
     struct Standard;

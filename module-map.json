@@ -182,6 +182,38 @@
         "checks"
       ]
     },
+    "mnemocode-embroidery": {
+      "unsafe": {
+        "level": "forbid"
+      },
+      "dependencies": {
+        "all": [
+          "mnemocode",
+          "mnemocode-cards",
+          "libm",
+          "png",
+          "sha2",
+          "zeroize",
+          "zune-jpeg"
+        ]
+      },
+      "devDependencies": [],
+      "library": [
+        "foundation"
+      ],
+      "order": [
+        "sample",
+        "color",
+        "dmc",
+        "picture",
+        "pattern",
+        "legend",
+        "phrase",
+        "hide",
+        "chart",
+        "checks"
+      ]
+    },
     "mnemocode-cli": {
       "unsafe": {
         "level": "deny",
@@ -194,6 +226,7 @@
         "all": [
           "mnemocode",
           "mnemocode-cards",
+          "mnemocode-embroidery",
           "getrandom",
           "zeroize"
         ],
@@ -239,6 +272,7 @@
         "all": [
           "mnemocode",
           "mnemocode-cards",
+          "mnemocode-embroidery",
           "wasm-bindgen",
           "getrandom"
         ],
@@ -247,7 +281,7 @@
           "getrandom03"
         ]
       },
-      "dependencyNotes": "wasm-bindgen and getrandom on every target, so that the native clippy and tests build the binding too and its entries that draw randomness run in the tests, from the system's source; getrandom =0.4.3 with wasm_js on wasm32 for the Random adapter, and from the sskr increment =0.3.4 with wasm_js renamed getrandom03, only to give bc-rand's tree its browser backend; mnemocode-cards only with feature browser-cards; no js-sys.",
+      "dependencyNotes": "wasm-bindgen and getrandom on every target, so that the native clippy and tests build the binding too and its entries that draw randomness run in the tests, from the system's source; getrandom =0.4.3 with wasm_js on wasm32 for the Random adapter, and from the sskr increment =0.3.4 with wasm_js renamed getrandom03, only to give bc-rand's tree its browser backend; mnemocode-cards only with feature browser-cards, mnemocode-embroidery only with browser-embroidery; no js-sys.",
       "library": "*",
       "modules": {
         "host": [],
@@ -276,6 +310,9 @@
         "cards": [
           "host"
         ],
+        "embroidery": [
+          "host"
+        ],
         "probe": [
           "host",
           "phrase",
@@ -285,6 +322,7 @@
           "qr",
           "recovery",
           "cards",
+          "embroidery",
           "words"
         ]
       }
@@ -407,6 +445,25 @@
     "sskr.engine.secret": "the linked engine's refusal",
     "sskr.engine.generate": "the linked engine's refusal",
     "sskr.engine.combine": "the linked engine's refusal",
-    "sskr.engine.no-shares": "the linked engine's refusal"
+    "sskr.engine.no-shares": "the linked engine's refusal",
+    "embroidery.picture.file-too-large": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.picture.not-a-picture": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.picture.too-many-pixels": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.picture.width-out-of-range": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.picture.narrower-than-pattern": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.picture.too-tall": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.legend.empty": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.legend.too-many-rows": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.legend.not-a-row": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.legend.unknown-symbol": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.legend.count-out-of-range": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.hide.not-an-entropy": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.hide.too-few-colours": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.hide.no-legend": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "cli.stitch.no-picture": "the port's own SeedStitch command (crates/mnemocode-cli/src/commands/stitch.rs): TS has no such command",
+    "cli.stitch.no-pdf": "the port's own SeedStitch command (crates/mnemocode-cli/src/commands/stitch.rs): TS has no such command",
+    "embroidery.phrase.legend-not-read": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.phrase.legend-ambiguous": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "cli.bounded-read.not-a-file": "the port's own SeedStitch command (crates/mnemocode-cli/src/os/files.rs): a picture, which holds no text, is read only from a regular file"
   }
 }

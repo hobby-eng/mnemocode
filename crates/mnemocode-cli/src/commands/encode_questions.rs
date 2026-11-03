@@ -2,22 +2,25 @@
 //! `cli/encode-questions.ts`): its form, Seedshift, Shamir shares, where it goes, its cards and the
 //! sheet for heirs, each answer checked at once and recorded as the command line takes it. The
 //! start menu asks them for Encode and for its other entries that write a backup; re-encode asks
-//! them on its private screen once the phrase of the old backup is confirmed. None of them is a
-//! secret.
+//! them on its private screen once the phrase of the old backup is confirmed. The menu's Encode also
+//! offers embroidery, whose questions build stitch's command line. None of them is a secret.
 
 use mnemocode::bip39::phrase::Phrase;
 use mnemocode::forms::Form;
 use mnemocode::modes::Mode;
 use mnemocode::sskr::forms::ShareFormat;
 use mnemocode::sskr::split::{MAX_SHARES, MIN_THRESHOLD, ShareSetChoice};
+use mnemocode::text::numbers::typed_whole_number;
 use mnemocode::text::words::list_in_words;
+use mnemocode_embroidery::legend::EXAMPLE as LEGEND_EXAMPLE;
+use mnemocode_embroidery::picture::{self, DEFAULT_WIDTH, WIDTHS};
 
 use super::asking::ask_list;
 use super::card_questions::ask_cards;
 use super::cards::color_cards_fit_of;
 use super::encode::ORIGINAL_COPY_FORM;
 use super::given::{PATH_LIMIT, format_number};
-use super::output_questions::{ask_new_folder, ask_output_file};
+use super::output_questions::{ask_new_folder, ask_output_file, claim_read, input_file};
 use super::share_output::share_cards_fit_of;
 use crate::gate::Stop;
 use crate::terminal::{
@@ -34,6 +37,10 @@ pub(crate) const RECORD_FILE: &str = "mnemocode-record.txt";
 pub(crate) const QR_FILE: &str = "mnemocode-qr.png";
 /// The sheet for heirs by default.
 pub(crate) const HEIR_SHEET_FILE: &str = "mnemocode-heirs.pdf";
+/// A cross-stitch pattern by default, its name saying nothing of what it holds.
+const PATTERN_FILE: &str = "cross-stitch-pattern.pdf";
+/// The first question of a new backup.
+const FORM_QUESTION: &str = "Which form should the seed phrase take?";
 /// The notes of the sheet's sizes, as the menu offers them.
 const HEIR_SHEET_SIZES: [(&str, &str, &str); 2] = [
     ("a5", "A5", "notebook size, 148 x 210 mm, larger print"),
@@ -45,6 +52,7 @@ pub(crate) mod file_questions {
     pub(crate) const TEXT: &str = "Text file name";
     pub(crate) const RECORD: &str = "Record file name";
     pub(crate) const QR: &str = "QR code file name";
+    pub(crate) const PICTURE: &str = "Picture file name (PNG or JPEG)";
 }
 
 /// `form` written out for the example phrase, in groups that read well.
@@ -550,24 +558,99 @@ pub(crate) fn ask_heir_sheet(mode: Mode) -> Result<Option<Vec<String>>, Stop> {
     ]))
 }
 
+/// What the first question of the menu's Encode chose.
+#[derive(Clone, Copy)]
+enum Made {
+    Form(Form),
+    /// A cross-stitch pattern whose legend holds the phrase masked with Seedshift
+    /// (docs/SEEDSTITCH.md).
+    Embroidery,
+}
+
 /// The questions of a new backup, as Encode asks them: its form, Seedshift, Shamir shares, where it
 /// goes and the sheet for heirs; Encode's command line, or none for back. The shares are written in
-/// the same form, so that whatever is chosen looks alike.
+/// the same form, so that whatever is chosen looks alike. After the forms comes embroidery, which
+/// asks its own questions.
 pub(crate) fn ask_encoding() -> Result<Option<Vec<String>>, Stop> {
-    let Some(form) = ask_form()? else {
-        return Ok(None);
-    };
-    ask_encoding_in(form)
+    let mut choices: Vec<Choice<Made>> = form_choices()?
+        .into_iter()
+        .map(|choice| Choice {
+            label: choice.label,
+            note: choice.note,
+            example: choice.example,
+            digit: choice.digit,
+            value: Made::Form(choice.value),
+        })
+        .collect();
+    // Its label is shorter than the longest form's, so it leaves the room of their samples as it is.
+    let sample = sample_of(LEGEND_EXAMPLE, notes_room(&choices));
+    choices.push(Choice {
+        example: Some(sample),
+        ..Choice::noted(
+            "Embroidery",
+            "hidden in a cross-stitch pattern, masked with your dates",
+            Made::Embroidery,
+        )
+    });
+    match ask_list(FORM_QUESTION, "Form", &choices, None)? {
+        None => Ok(None),
+        Some(Made::Form(form)) => ask_encoding_in(form),
+        Some(Made::Embroidery) => ask_pattern(),
+    }
 }
 
 /// The first question of a new backup: its form; none for back.
 pub(crate) fn ask_form() -> Result<Option<Form>, Stop> {
-    ask_list(
-        "Which form should the seed phrase take?",
-        "Form",
-        &form_choices()?,
-        None,
-    )
+    ask_list(FORM_QUESTION, "Form", &form_choices()?, None)
+}
+
+/// The questions of a cross-stitch pattern: the picture it shows, its stitches across and the PDF it
+/// is saved in; stitch's command line, or none for back. The phrase and the dates are asked on
+/// stitch's private screen.
+fn ask_pattern() -> Result<Option<Vec<String>>, Stop> {
+    let how = LineQuestion {
+        what: Some("the name of a PNG or JPEG file"),
+        limit: PATH_LIMIT,
+        ..LineQuestion::default()
+    };
+    let picture = match ask_line(file_questions::PICTURE, "Picture", how, |answer: &str| {
+        input_file(answer, picture::MAX_FILE_BYTES)
+    })? {
+        Chosen::One(path) => path,
+        Chosen::Back => return Ok(None),
+        Chosen::Cancelled => return Err(Stop::Cancelled),
+    };
+    // The pattern may not be saved over its own picture.
+    claim_read(&picture);
+    let fallback = DEFAULT_WIDTH.to_string();
+    let what = format!("a number from {}", WIDTHS.to());
+    let how = LineQuestion {
+        fallback: Some(&fallback),
+        what: Some(&what),
+        limit: PATH_LIMIT,
+        ..LineQuestion::default()
+    };
+    let question = format!("How many stitches across? ({})", WIDTHS.to());
+    let width = match ask_line(&question, "Across", how, |answer: &str| {
+        typed_whole_number(answer, WIDTHS, None).map(|width| width.to_string())
+    })? {
+        Chosen::One(width) => width,
+        Chosen::Back => return Ok(None),
+        Chosen::Cancelled => return Err(Stop::Cancelled),
+    };
+    let Some(pdf) = ask_output_file(file_questions::PDF, PATTERN_FILE)? else {
+        return Ok(None);
+    };
+    Ok(Some(vec![
+        "stitch".to_owned(),
+        "--ask-secrets".to_owned(),
+        "--picture".to_owned(),
+        picture,
+        "--stitches-across".to_owned(),
+        width,
+        "--pdf".to_owned(),
+        pdf,
+    ]))
 }
 
 /// The questions of a new backup after its `form`.

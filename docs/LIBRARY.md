@@ -1,11 +1,11 @@
 # Using the Rust library
 
-The `mnemocode` crate provides the same transformations, recovery, shares and wallet checks as the command line. `mnemocode-cards` draws cards and heir sheets; `mnemocode-wasm` exposes selected features to browser hosts. These crates are built from this repository and are not published to crates.io.
+The `mnemocode` crate provides the same transformations, recovery, shares and wallet checks as the command line. `mnemocode-cards` draws cards and heir sheets; `mnemocode-embroidery` makes cross-stitch patterns whose legend holds a masked phrase; `mnemocode-wasm` exposes selected features to browser hosts. These crates are built from this repository and are not published to crates.io.
 
 Use a path dependency on the checked-out crate, or pin a reviewed Git revision. Keep `Cargo.lock` and the selected features with your application. API details are in the source's rustdoc:
 
 ```sh
-cargo doc --locked --no-deps -p mnemocode -p mnemocode-cards
+cargo doc --locked --no-deps -p mnemocode -p mnemocode-cards -p mnemocode-embroidery
 ```
 
 The [source layout](ARCHITECTURE.md#modules-for-other-hosts) maps features to modules. The [architecture design](design/architect/ARCHITECTURE.md) records the dependencies and host boundaries.
@@ -67,6 +67,7 @@ Use the generated glue and its matching `.wasm` from the same build; do not mix 
 | `browser-candidates` | `candidates`      | Candidate-list admission, encryption and import      |
 | `browser-qr`         | `qr`              | QR images and decoding                               |
 | `browser-cards`      | `cards`           | Printable cards and heir sheets                      |
+| `browser-embroidery` | `embroidery`      | Cross-stitch patterns and reading their legends back |
 
 These sources are under `crates/mnemocode-wasm/src/`. Coin, search and template features select units independently. A build without a unit refuses its use; consult the selected profile rather than assuming the complete CLI's feature set. The `browser-probe` feature is for tests, not production page profiles.
 
@@ -118,3 +119,9 @@ The format allows 524,288 records. The largest padded plaintext is 155,189,248 b
 `mnemocode-cards` separates settings and preflight, content, drawing plans, and PDF/raster output. A host can request the same designs, share sheets and heir instructions as the CLI. The plans themselves contain recovery codes and must be treated as secret.
 
 The library draws bytes; the host chooses filenames, stages files privately and publishes without overwriting existing output. The CLI's filesystem policy is not automatically applied to an embedding application. Follow [export precautions](../SECURITY.md#exported-files), and check [card options](CLI.md#card-options) for the end-user behaviour to preserve.
+
+## Cross-stitch patterns
+
+`mnemocode-embroidery` implements [SeedStitch](SEEDSTITCH.md). The format is public, so a legend may hold only a phrase masked with Seedshift dates: `phrase::masked_entropy` makes the `MaskedEntropy` that `hide::hide` takes, and no other public way makes one. `picture::grid` reads a PNG or JPEG file within the limits of `picture` (40 MiB, 60 megapixels, 40 to 500 stitches across, at most 800 down); the picture holds no secret. `chart::chart` writes the PDF, and `legend::line` the line a person types back.
+
+Reading goes the other way: `phrase::record_of_legend` turns a typed legend line into the MNC1 record of the masked phrase, which Decode takes with the dates like any record, and names a row it corrected. The pattern, the legend and the record are secret material; the `Hidden` pattern wipes its rows when dropped.
