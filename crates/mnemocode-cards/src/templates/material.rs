@@ -180,13 +180,13 @@ pub fn material_samples(style: MaterialStyle) -> Result<Vec<MaterialSample>, Col
 /// of reference and sample are taken nearest first, each sample at most once, so that two codes
 /// never look alike while each keeps the direction of its colour as far as the catalogue allows. A
 /// repeated reference keeps its sample; its neighbours take part in the choice.
-pub fn choose_material_samples(
+pub fn choose_material_samples<S: AsRef<str>>(
     style: MaterialStyle,
-    references: &[String],
+    references: &[S],
 ) -> Result<Vec<MaterialSample>, TemplateError> {
     if !references
         .iter()
-        .all(|reference| is_rgb_reference(reference))
+        .all(|reference| is_rgb_reference(reference.as_ref()))
     {
         return Err(TemplateError::NoReference);
     }
@@ -194,7 +194,7 @@ pub fn choose_material_samples(
     let samples = material_samples(style)?;
     let mut codes: Vec<String> = Vec::new();
     for reference in references {
-        let digits = digits_of(reference)?;
+        let digits = digits_of(reference.as_ref())?;
         if !codes.contains(&digits) {
             codes.push(digits);
         }
@@ -238,7 +238,7 @@ pub fn choose_material_samples(
     references
         .iter()
         .map(|reference| {
-            let digits = digits_of(reference)?;
+            let digits = digits_of(reference.as_ref())?;
             let place = codes.iter().position(|code| *code == digits);
             place
                 .and_then(|place| chosen[place])

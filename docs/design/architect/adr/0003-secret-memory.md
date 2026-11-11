@@ -19,13 +19,18 @@ wipe (CAP-SSKR-ENGINE-MEMORY-WIPE).
 
 ## Decision
 
+- `SecretVec<T>`: the same fixed typed allocation owner for values implementing `Zeroize`.
+  It locks before filling through `with_capacity`, wipes a rejected appended element and wipes
+  before unlocking on drop. Adoption with `new` cannot protect the caller's earlier preparation.
+  Only the outer allocation is locked. Word indexes and retained embroidery rows and row order
+  use this owner, as do retained command dates and the outer card-code arrays; nested card text uses `SecretText`. Other nested allocations remain their element's responsibility.
 - `SecretBytes` and `SecretText`: a buffer reserved at its final size, locked before it is filled,
   never grown, zeroized then unlocked on drop; `Debug` is `[<Label>: redacted]`, no `Display`.
-  Domain owners wrap them and lend slices.
+  Domain owners wrap them and lend slices. `SecretText::take` adopts a prepared string without copying and protects it only from adoption onward; explicit wiping empties its UTF-8 text without releasing the page hold. Card codes use these owners for every color, label and QR payload. This supersedes the earlier small retained-card/date exception, not the large rendered-page limit.
 - Final sizes not known from the input are fixed when the work is made: a search's found list is
   one `SecretBytes` reserved at min(candidates, keep) × entropy length; the candidate-list writer
-  reserves the list owner at its exact size from the count; the CLI's answer buffer is reserved at
-  its question's limit (PLAN, "Owner decisions"; TS: 1 MiB). The search keeps one working phrase, never an owner per candidate.
+  reserves the list owner at its exact size from the count. The CLI editor keeps the question limit separately and starts with no allocation; typing grows storage geometrically from 256 bytes by replacing fixed owners. The new owner is locked before copying; the old owner remains held until it is wiped and released. Growth temporarily holds both capacities, and final extraction also holds its exact-size copy. The search keeps one working phrase, never an owner per candidate.
+- Word-index owners use aligned `Vec<u16>` storage with the same counted-lock and wipe lifetime as byte owners. Adoption locks the supplied allocation; Clone locks a new allocation before copying. This does not retroactively protect a caller's earlier preparation of an incoming vector.
 - Locks are counted per page, mhfe's code (`mhfe/src/memory.rs:231-349`), so small secrets share
   pages within RLIMIT_MEMLOCK. This replaces the platform report's "pages of their own"
   (decision 3), whose only gain was dropping the count. An owner over the lock budget is not

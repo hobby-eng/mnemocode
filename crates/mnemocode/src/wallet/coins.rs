@@ -321,18 +321,38 @@ pub struct Coin {
 }
 
 /// Where an address's key stands below its coin type: the account, the branch (0 receiving, 1
-/// change) and the index.
+/// change) and the index (CAP-WALLET-ADDRESS-LOCATION). Each part is a normal BIP32 index: a
+/// location is either [`AddressLocation::FIRST`] or made by [`AddressLocation::new`], which refuses
+/// a hardened index, so that no part can alias one:
+///
+/// ```
+/// use mnemocode::wallet::coins::AddressLocation;
+/// let first = AddressLocation::FIRST;
+/// assert_eq!((first.account(), first.branch(), first.index()), (0, 0, 0));
+/// assert!(AddressLocation::new(1 << 31, 0, 0).is_err());
+/// ```
+///
+/// Its parts cannot be set directly:
+///
+/// ```compile_fail
+/// use mnemocode::wallet::coins::AddressLocation;
+/// let aliased = AddressLocation { account: 1 << 31, branch: 0, index: 0 };
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AddressLocation {
-    /// The account.
-    pub account: u32,
-    /// The branch.
-    pub branch: u32,
-    /// The index.
-    pub index: u32,
+    account: u32,
+    branch: u32,
+    index: u32,
 }
 
 impl AddressLocation {
+    /// The first receiving address of the first account.
+    pub const FIRST: Self = Self {
+        account: 0,
+        branch: 0,
+        index: 0,
+    };
+
     /// The location, each part refused outside BIP32's normal indexes.
     pub fn new(account: u64, branch: u64, index: u64) -> Result<Self, CoinError> {
         let range = WholeRange::new(0, u64::from(LAST_NORMAL_INDEX));
@@ -347,6 +367,24 @@ impl AddressLocation {
             branch: part("branch", branch)?,
             index: part("index", index)?,
         })
+    }
+
+    /// The account.
+    #[must_use]
+    pub const fn account(self) -> u32 {
+        self.account
+    }
+
+    /// The branch: 0 receiving, 1 change.
+    #[must_use]
+    pub const fn branch(self) -> u32 {
+        self.branch
+    }
+
+    /// The index.
+    #[must_use]
+    pub const fn index(self) -> u32 {
+        self.index
     }
 }
 
@@ -409,24 +447,25 @@ impl Coin {
         }
     }
 
-    /// The path of the account `account` of keys of `kind` under `coin_type`.
-    pub fn account_path(&self, kind: AddressType, coin_type: u32, account: u32) -> KeyPath {
-        let mut path = vec![hardened(kind.purpose()), hardened(coin_type)];
-        if kind == AddressType::DashPlatform {
-            path.push(hardened(DIP17_FEATURE));
-        }
-        path.push(hardened(account));
-        KeyPath(path)
-    }
-
-    /// The path of the branch of `location`, under `coin_type`; Dash Platform hardens it.
-    pub fn branch_path(
+    /// The path of the account of `location` for keys of `kind` under `coin_type`, one of this
+    /// coin's normal coin types.
+    fn account_path(
         &self,
         kind: AddressType,
         coin_type: u32,
         location: AddressLocation,
     ) -> KeyPath {
-        let KeyPath(mut path) = self.account_path(kind, coin_type, location.account);
+        let mut path = vec![hardened(kind.purpose()), hardened(coin_type)];
+        if kind == AddressType::DashPlatform {
+            path.push(hardened(DIP17_FEATURE));
+        }
+        path.push(hardened(location.account));
+        KeyPath(path)
+    }
+
+    /// The path of the branch of `location`, under `coin_type`; Dash Platform hardens it.
+    fn branch_path(&self, kind: AddressType, coin_type: u32, location: AddressLocation) -> KeyPath {
+        let KeyPath(mut path) = self.account_path(kind, coin_type, location);
         path.push(if kind == AddressType::DashPlatform {
             hardened(location.branch)
         } else {
@@ -445,7 +484,7 @@ impl Coin {
     }
 
     /// The branch paths of `location` for keys of `kind`, one for each coin type.
-    pub fn branch_paths(
+    pub(crate) fn branch_paths(
         &self,
         kind: AddressType,
         testnet: bool,
@@ -457,11 +496,17 @@ impl Coin {
             .collect()
     }
 
-    /// The account paths of `account` for keys of `kind`, one for each coin type.
-    pub fn account_paths(&self, kind: AddressType, testnet: bool, account: u32) -> Vec<KeyPath> {
+    /// The account paths of the account of `location` for keys of `kind`, one for each coin type.
+    #[cfg(feature = "coin-bitcoin")]
+    pub(crate) fn account_paths(
+        &self,
+        kind: AddressType,
+        testnet: bool,
+        location: AddressLocation,
+    ) -> Vec<KeyPath> {
         self.coin_types_on(testnet)
             .iter()
-            .map(|&coin_type| self.account_path(kind, coin_type, account))
+            .map(|&coin_type| self.account_path(kind, coin_type, location))
             .collect()
     }
 
@@ -823,7 +868,7 @@ impl CoinAddress {
     }
 
     /// The branch paths its key may stand at, at `location`.
-    pub fn branch_paths(&self, location: AddressLocation) -> Vec<KeyPath> {
+    pub(crate) fn branch_paths(&self, location: AddressLocation) -> Vec<KeyPath> {
         self.coin.branch_paths(self.kind, self.testnet, location)
     }
 
@@ -963,7 +1008,7 @@ mod tests {
             let address = coin.parse(text).unwrap();
             let key = master.derive(&indexes(path)).unwrap().public_key().unwrap();
             assert!(address.is_address_of(&key).unwrap(), "{id} {path}");
-            let location = AddressLocation::new(0, 0, 0).unwrap();
+            let location = AddressLocation::FIRST;
             assert!(!address.branch_paths(location).is_empty());
         }
     }

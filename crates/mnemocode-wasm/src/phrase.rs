@@ -18,7 +18,9 @@ use crate::host::{after_secret, name, optional_text, phrase_and_dates, refused, 
 /// another form, and both fingerprints. The page frees it once the codes are shown or saved.
 #[wasm_bindgen]
 pub struct EncodedBackup {
-    encoding: Encoding,
+    // Keep the large result below the scrubbed entry frame; unused enum payload bytes
+    // must not travel through wasm-bindgen's by-value return and destructor frames.
+    encoding: Box<Encoding>,
     original: String,
 }
 
@@ -36,8 +38,10 @@ impl EncodedBackup {
         Backup::check_encodable(mode, valid_last_word, Some(form))
             .map_err(|refusal| refused(&refusal))?;
         let (phrase, dates) = phrase_and_dates(phrase, dates)?;
-        let encoding = Backup::encode(&phrase, &dates, form, mode, valid_last_word)
-            .map_err(|refusal| refused(&refusal))?;
+        let encoding = Box::new(
+            Backup::encode(&phrase, &dates, form, mode, valid_last_word)
+                .map_err(|refusal| refused(&refusal))?,
+        );
         let original = ExtendedKey::of_phrase(&phrase, "")
             .and_then(|key| key.fingerprint())
             .map_err(|refusal| refused(&refusal))?;

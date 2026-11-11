@@ -22,11 +22,8 @@ const PROGRAM: &str = env!("CARGO_BIN_EXE_mnemocode");
 
 /// The program with `args` and `environment`, its standard output as a pipe.
 fn piped(args: &[&str], environment: &[(&str, &str)]) -> String {
-    let output = Command::new(PROGRAM)
+    let output = terminal::colour::plain(&mut Command::new(PROGRAM))
         .args(args)
-        .env_remove("NO_COLOR")
-        .env_remove("CLICOLOR_FORCE")
-        .env_remove("CLICOLOR")
         .envs(environment.iter().copied())
         .stdin(Stdio::null())
         .output()
@@ -39,7 +36,7 @@ fn piped(args: &[&str], environment: &[(&str, &str)]) -> String {
 fn the_system_sees_a_command_at_its_first_question_protected() {
     use std::fs;
     let mut session = Session::start(PROGRAM, &["decode", "--ask-secrets"]);
-    session.wait_for("(Esc cancels)");
+    session.wait_for(" to cancel");
     let process = session.process();
     let limits = fs::read_to_string(format!("/proc/{process}/limits")).expect("its limits");
     let core = limits
@@ -75,7 +72,8 @@ fn the_report_says_that_the_probes_of_the_kernel_held() {
 #[cfg(target_os = "linux")]
 #[test]
 fn a_command_under_a_tracer_asks_for_no_secret() {
-    let traced = Command::new("strace")
+    // strace passes its environment on to the program.
+    let traced = terminal::colour::plain(&mut Command::new("strace"))
         .args(["-f", "-o", "/dev/null", PROGRAM, "decode", "--ask-secrets"])
         .stdin(Stdio::null())
         .output();

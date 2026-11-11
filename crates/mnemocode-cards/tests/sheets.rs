@@ -195,6 +195,7 @@ fn a_separate_card_has_rounded_corners_that_clip_its_artwork() {
 fn a_qr_code_on_separate_cards_is_refused() {
     let cards = unicode_cards(CardSettings {
         card_qr: true,
+        hidden_qr: false,
         ..page(Some(PageSize::Business), None)
     });
     let refusal = sizes_of(&CardDrawing::new(), "business-it", cards);
@@ -507,6 +508,7 @@ fn a_business_size_proposal_of_every_design_holds_one_whole_qr_code_and_every_co
     let settings = CardSettings {
         presentation: Some(studio("REVIEW STUDIO")),
         card_qr: true,
+        hidden_qr: false,
         ..page(Some(PageSize::Business), LANDSCAPE)
     };
     let cards = unicode_cards(settings);
@@ -524,7 +526,7 @@ fn a_business_size_proposal_of_every_design_holds_one_whole_qr_code_and_every_co
         );
         assert_eq!(
             read_drawn_qr(&pages[0]),
-            cards.codes.payload,
+            cards.codes.payload.as_str(),
             "{}",
             design.id
         );
@@ -542,7 +544,7 @@ fn a_business_size_proposal_of_every_design_holds_one_whole_qr_code_and_every_co
         );
         let codes = cards.codes.labels.as_ref().expect("Unicode codes");
         for (index, code) in codes.iter().enumerate() {
-            let number = format!("{:02}  {code}", index + 1);
+            let number = format!("{:02}  {}", index + 1, code.as_str());
             assert!(labels.contains(&number.as_str()), "{} {number}", design.id);
         }
     }
@@ -554,6 +556,7 @@ fn the_study_pages_of_shares_keep_one_studio_and_each_its_own_qr_code() {
     let settings = CardSettings {
         presentation: Some(studio("REVIEW STUDIO")),
         card_qr: true,
+        hidden_qr: false,
         ..page(Some(PageSize::A6), LANDSCAPE)
     };
     let options = share_options("material-vehicle", Some(SskrLayout::Collection), settings);
@@ -591,6 +594,7 @@ fn the_artwork_and_the_qr_code_of_a_design_stand_together_on_each_sheet() {
             for orientation in Orientation::ALL {
                 let settings = CardSettings {
                     card_qr: true,
+                    hidden_qr: false,
                     ..page(Some(size), Some(orientation))
                 };
                 let cards = unicode_cards(settings);
@@ -601,7 +605,11 @@ fn the_artwork_and_the_qr_code_of_a_design_stand_together_on_each_sheet() {
                 let images = count(&pages[0], |step| matches!(step, Step::Image { .. }));
                 assert!(images > 0, "{what}");
                 assert_eq!(drawn_modules(&pages[0]), dark_modules(&code), "{what}");
-                assert_eq!(read_drawn_qr(&pages[0]), cards.codes.payload, "{what}");
+                assert_eq!(
+                    read_drawn_qr(&pages[0]),
+                    cards.codes.payload.as_str(),
+                    "{what}"
+                );
             }
         }
     }

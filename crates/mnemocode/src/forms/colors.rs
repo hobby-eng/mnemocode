@@ -271,11 +271,11 @@ pub fn typed_places_of_colors(colors: &[String]) -> Result<Vec<usize>, ColorsErr
 }
 
 /// The word indexes, from 0, that colours stand for, in any order.
-pub fn colors_to_indexes(colors: &[String]) -> Result<Vec<u16>, ColorsError> {
+pub fn colors_to_indexes<S: AsRef<str>>(colors: &[S]) -> Result<Vec<u16>, ColorsError> {
     check_count(colors.len())?;
     let mut encoded = colors
         .iter()
-        .map(|color| tag_and_payload(color))
+        .map(|color| tag_and_payload(color.as_ref()))
         .collect::<Result<Vec<_>, _>>()?;
     encoded.sort_by_key(|(tag, _)| *tag);
     let step = tag_step(colors.len());

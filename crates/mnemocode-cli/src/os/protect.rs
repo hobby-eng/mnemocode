@@ -13,7 +13,8 @@ use std::path::PathBuf;
 use std::sync::{Mutex, PoisonError};
 
 /// What a command needs beyond reading: the folders it saves into, each the parent folder of an
-/// output, made before the secret (files::make_folders). Empty for a command that saves nothing.
+/// output, made before the seed phrase is read (files::make_folders). Empty for a command that
+/// saves nothing.
 #[derive(Debug, Default)]
 pub(crate) struct Needs {
     /// The folders beneath which the command writes, resolved.

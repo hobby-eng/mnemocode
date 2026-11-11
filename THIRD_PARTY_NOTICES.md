@@ -187,48 +187,50 @@ uses it under and the text of that licence.
 - `block-buffer` 0.12.1: `MIT OR Apache-2.0`, used under MIT; [text 11](#text-11).
 - `bs58` 0.5.1: `MIT/Apache-2.0`, used under MIT; [text 12](#text-12).
 - `bytemuck` 1.25.2: `Zlib OR Apache-2.0 OR MIT`, used under MIT; [text 13](#text-13).
-- `cfg-if` 1.0.5: `MIT OR Apache-2.0`, used under MIT; [text 14](#text-14).
-- `chacha20` 0.10.2: `MIT OR Apache-2.0`, used under MIT; [text 15](#text-15).
-- `chacha20poly1305` 0.11.0: `Apache-2.0 OR MIT`, used under MIT; [text 15](#text-15).
-- `cipher` 0.5.2: `MIT OR Apache-2.0`, used under MIT; [text 16](#text-16).
-- `cmov` 0.5.4: `Apache-2.0 OR MIT`, used under MIT; [text 17](#text-17).
-- `const-oid` 0.10.2: `Apache-2.0 OR MIT`, used under MIT; [text 18](#text-18).
-- `cpubits` 0.1.1: `MIT OR Apache-2.0`, used under MIT; [text 19](#text-19).
-- `cpufeatures` 0.3.1: `MIT OR Apache-2.0`, used under MIT; [text 18](#text-18).
-- `crc32fast` 1.5.3: `MIT OR Apache-2.0`, used under MIT; [text 20](#text-20).
-- `crypto-bigint` 0.7.10: `Apache-2.0 OR MIT`, used under MIT; [text 21](#text-21).
-- `crypto-common` 0.2.2: `MIT OR Apache-2.0`, used under MIT; [text 22](#text-22).
-- `ctutils` 0.4.6: `Apache-2.0 OR MIT`, used under MIT; [text 23](#text-23).
-- `curve25519-dalek` 5.0.0: `BSD-3-Clause`, used under BSD-3-Clause; [text 24](#text-24).
-- `der` 0.8.3: `Apache-2.0 OR MIT`, used under MIT; [text 18](#text-18).
-- `digest` 0.11.3: `MIT OR Apache-2.0`, used under MIT; [text 25](#text-25).
-- `elliptic-curve` 0.14.3: `Apache-2.0 OR MIT`, used under MIT; [text 26](#text-26).
-- `fdeflate` 0.3.7: `MIT OR Apache-2.0`, used under MIT; [text 27](#text-27).
-- `ff` 0.14.0: `MIT/Apache-2.0`, used under MIT; [text 28](#text-28).
-- `flate2` 1.1.10: `MIT OR Apache-2.0`, used under MIT; [text 29](#text-29).
-- `foldhash` 0.2.0: `Zlib`, used under Zlib; [text 30](#text-30).
-- `font-types` 0.12.7: `MIT OR Apache-2.0`, used under MIT; [text 31](#text-31).
-- `g2p` 1.2.2: `MIT/Apache-2.0`, used under MIT; [text 32](#text-32).
-- `g2poly` 1.2.2: `MIT/Apache-2.0`, used under MIT; [text 32](#text-32).
-- `getrandom` 0.3.4: `MIT OR Apache-2.0`, used under MIT; [text 33](#text-33).
-- `getrandom` 0.4.3: `MIT OR Apache-2.0`, used under MIT; [text 34](#text-34).
+- `byteorder-lite` 0.1.0: `Unlicense OR MIT`, used under MIT; [text 14](#text-14).
+- `cfg-if` 1.0.5: `MIT OR Apache-2.0`, used under MIT; [text 15](#text-15).
+- `chacha20` 0.10.2: `MIT OR Apache-2.0`, used under MIT; [text 16](#text-16).
+- `chacha20poly1305` 0.11.0: `Apache-2.0 OR MIT`, used under MIT; [text 16](#text-16).
+- `cipher` 0.5.2: `MIT OR Apache-2.0`, used under MIT; [text 17](#text-17).
+- `cmov` 0.5.4: `Apache-2.0 OR MIT`, used under MIT; [text 18](#text-18).
+- `const-oid` 0.10.2: `Apache-2.0 OR MIT`, used under MIT; [text 19](#text-19).
+- `cpubits` 0.1.1: `MIT OR Apache-2.0`, used under MIT; [text 20](#text-20).
+- `cpufeatures` 0.3.1: `MIT OR Apache-2.0`, used under MIT; [text 19](#text-19).
+- `crc32fast` 1.5.3: `MIT OR Apache-2.0`, used under MIT; [text 21](#text-21).
+- `crypto-bigint` 0.7.10: `Apache-2.0 OR MIT`, used under MIT; [text 22](#text-22).
+- `crypto-common` 0.2.2: `MIT OR Apache-2.0`, used under MIT; [text 23](#text-23).
+- `ctutils` 0.4.6: `Apache-2.0 OR MIT`, used under MIT; [text 24](#text-24).
+- `curve25519-dalek` 5.0.0: `BSD-3-Clause`, used under BSD-3-Clause; [text 25](#text-25).
+- `der` 0.8.3: `Apache-2.0 OR MIT`, used under MIT; [text 19](#text-19).
+- `digest` 0.11.3: `MIT OR Apache-2.0`, used under MIT; [text 26](#text-26).
+- `elliptic-curve` 0.14.3: `Apache-2.0 OR MIT`, used under MIT; [text 27](#text-27).
+- `fdeflate` 0.3.7: `MIT OR Apache-2.0`, used under MIT; [text 28](#text-28).
+- `ff` 0.14.0: `MIT/Apache-2.0`, used under MIT; [text 29](#text-29).
+- `flate2` 1.1.10: `MIT OR Apache-2.0`, used under MIT; [text 30](#text-30).
+- `foldhash` 0.2.0: `Zlib`, used under Zlib; [text 31](#text-31).
+- `font-types` 0.12.7: `MIT OR Apache-2.0`, used under MIT; [text 32](#text-32).
+- `g2p` 1.2.2: `MIT/Apache-2.0`, used under MIT; [text 33](#text-33).
+- `g2poly` 1.2.2: `MIT/Apache-2.0`, used under MIT; [text 33](#text-33).
+- `getrandom` 0.3.4: `MIT OR Apache-2.0`, used under MIT; [text 34](#text-34).
+- `getrandom` 0.4.3: `MIT OR Apache-2.0`, used under MIT; [text 35](#text-35).
 - `group` 0.14.0: `MIT/Apache-2.0`, used under MIT; [text 1](#text-1).
-- `hashbrown` 0.17.1: `MIT OR Apache-2.0`, used under MIT; [text 35](#text-35).
+- `hashbrown` 0.17.1: `MIT OR Apache-2.0`, used under MIT; [text 36](#text-36).
 - `hex-conservative` 0.2.3: `CC0-1.0`, used under CC0-1.0; [text 9](#text-9).
-- `hkdf` 0.13.0: `MIT OR Apache-2.0`, used under MIT; [text 36](#text-36).
-- `hmac` 0.13.0: `MIT OR Apache-2.0`, used under MIT; [text 37](#text-37).
-- `hybrid-array` 0.4.15: `MIT OR Apache-2.0`, used under MIT; [text 17](#text-17).
-- `inout` 0.2.5: `MIT OR Apache-2.0`, used under MIT; [text 38](#text-38).
+- `hkdf` 0.13.0: `MIT OR Apache-2.0`, used under MIT; [text 37](#text-37).
+- `hmac` 0.13.0: `MIT OR Apache-2.0`, used under MIT; [text 38](#text-38).
+- `hybrid-array` 0.4.15: `MIT OR Apache-2.0`, used under MIT; [text 18](#text-18).
+- `image-webp` 0.2.4: `MIT OR Apache-2.0`, used under MIT; [text 28](#text-28).
+- `inout` 0.2.5: `MIT OR Apache-2.0`, used under MIT; [text 39](#text-39).
 - `itoa` 1.0.18: `MIT OR Apache-2.0`, used under MIT; [text 1](#text-1).
-- `jpeg-encoder` 0.7.1: `(MIT OR Apache-2.0) AND IJG`, used under MIT and IJG; [text 39](#text-39), [text 40](#text-40).
-- `k256` 0.14.0: `Apache-2.0 OR MIT`, used under MIT; [text 41](#text-41).
-- `keccak` 0.2.2: `Apache-2.0 OR MIT`, used under MIT; [text 42](#text-42).
+- `jpeg-encoder` 0.7.1: `(MIT OR Apache-2.0) AND IJG`, used under MIT and IJG; [text 40](#text-40), [text 41](#text-41).
+- `k256` 0.14.0: `Apache-2.0 OR MIT`, used under MIT; [text 42](#text-42).
+- `keccak` 0.2.2: `Apache-2.0 OR MIT`, used under MIT; [text 43](#text-43).
 - `lazy_static` 1.5.1: `MIT OR Apache-2.0`, used under MIT; [text 1](#text-1).
-- `libc` 0.2.191: `MIT OR Apache-2.0`, used under MIT; [text 43](#text-43).
-- `libm` 0.2.16: `MIT`, used under MIT; [text 44](#text-44).
+- `libc` 0.2.191: `MIT OR Apache-2.0`, used under MIT; [text 44](#text-44).
+- `libm` 0.2.16: `MIT`, used under MIT; [text 45](#text-45).
 - `log` 0.4.35: `MIT OR Apache-2.0`, used under MIT; [text 10](#text-10).
-- `lru` 0.18.5: `MIT`, used under MIT; [text 45](#text-45).
-- `memchr` 2.8.3: `Unlicense OR MIT`, used under MIT; [text 46](#text-46).
+- `lru` 0.18.5: `MIT`, used under MIT; [text 46](#text-46).
+- `memchr` 2.8.3: `Unlicense OR MIT`, used under MIT; [text 14](#text-14).
 - `miniz_oxide` 0.8.9: `MIT OR Zlib OR Apache-2.0`, used under MIT; [text 47](#text-47).
 - `miniz_oxide` 0.9.1: `MIT OR Zlib OR Apache-2.0`, used under MIT; [text 47](#text-47).
 - `num-traits` 0.2.19: `MIT OR Apache-2.0`, used under MIT; [text 10](#text-10).
@@ -242,52 +244,53 @@ uses it under and the text of that licence.
 - `primeorder` 0.14.0: `Apache-2.0 OR MIT`, used under MIT; [text 54](#text-54).
 - `qrcodegen` 1.8.0: `MIT`, used under MIT; [text 55](#text-55).
   The crate publishes no licence file. This is the standard SPDX MIT text with the copyright holders taken from the crate's `authors`.
-- `rand` 0.9.5: `MIT OR Apache-2.0`, used under MIT; [text 56](#text-56).
-- `rand_chacha` 0.9.0: `MIT OR Apache-2.0`, used under MIT; [text 56](#text-56).
-- `rand_core` 0.10.1: `MIT OR Apache-2.0`, used under MIT; [text 57](#text-57).
-- `rand_core` 0.9.5: `MIT OR Apache-2.0`, used under MIT; [text 56](#text-56).
-- `rand_xoshiro` 0.7.0: `MIT OR Apache-2.0`, used under MIT; [text 58](#text-58).
-- `read-fonts` 0.46.0: `MIT OR Apache-2.0`, used under MIT; [text 31](#text-31).
-- `ripemd` 0.2.0: `MIT OR Apache-2.0`, used under MIT; [text 21](#text-21).
-- `rqrr` 0.11.0: `(MIT OR Apache-2.0) AND ISC`, used under MIT and ISC; [text 59](#text-59), [text 60](#text-60).
+- `quick-error` 2.0.1: `MIT/Apache-2.0`, used under MIT; [text 56](#text-56).
+- `rand` 0.9.5: `MIT OR Apache-2.0`, used under MIT; [text 57](#text-57).
+- `rand_chacha` 0.9.0: `MIT OR Apache-2.0`, used under MIT; [text 57](#text-57).
+- `rand_core` 0.10.1: `MIT OR Apache-2.0`, used under MIT; [text 58](#text-58).
+- `rand_core` 0.9.5: `MIT OR Apache-2.0`, used under MIT; [text 57](#text-57).
+- `rand_xoshiro` 0.7.0: `MIT OR Apache-2.0`, used under MIT; [text 59](#text-59).
+- `read-fonts` 0.46.0: `MIT OR Apache-2.0`, used under MIT; [text 32](#text-32).
+- `ripemd` 0.2.0: `MIT OR Apache-2.0`, used under MIT; [text 22](#text-22).
+- `rqrr` 0.11.0: `(MIT OR Apache-2.0) AND ISC`, used under MIT and ISC; [text 60](#text-60), [text 61](#text-61).
 - `rustc-hash` 2.1.3: `Apache-2.0 OR MIT`, used under MIT; [text 1](#text-1).
-- `ryu` 1.0.23: `Apache-2.0 OR BSL-1.0`, used under Apache-2.0; [text 61](#text-61).
-- `salsa20` 0.11.0: `MIT OR Apache-2.0`, used under MIT; [text 62](#text-62).
-- `scrypt` 0.12.0: `MIT OR Apache-2.0`, used under MIT; [text 21](#text-21).
-- `sec1` 0.8.1: `Apache-2.0 OR MIT`, used under MIT; [text 21](#text-21).
-- `sha2` 0.11.1: `MIT OR Apache-2.0`, used under MIT; [text 63](#text-63).
-- `sha3` 0.12.0: `MIT OR Apache-2.0`, used under MIT; [text 64](#text-64).
-- `simd-adler32` 0.3.10: `MIT`, used under MIT; [text 65](#text-65).
-- `skrifa` 0.49.0: `MIT OR Apache-2.0`, used under MIT; [text 31](#text-31).
-- `smallvec` 1.16.4: `MIT OR Apache-2.0`, used under MIT; [text 66](#text-66).
-- `sponge-cursor` 0.1.0: `MIT OR Apache-2.0`, used under MIT; [text 67](#text-67).
+- `ryu` 1.0.23: `Apache-2.0 OR BSL-1.0`, used under Apache-2.0; [text 62](#text-62).
+- `salsa20` 0.11.0: `MIT OR Apache-2.0`, used under MIT; [text 63](#text-63).
+- `scrypt` 0.12.0: `MIT OR Apache-2.0`, used under MIT; [text 22](#text-22).
+- `sec1` 0.8.1: `Apache-2.0 OR MIT`, used under MIT; [text 22](#text-22).
+- `sha2` 0.11.1: `MIT OR Apache-2.0`, used under MIT; [text 64](#text-64).
+- `sha3` 0.12.0: `MIT OR Apache-2.0`, used under MIT; [text 65](#text-65).
+- `simd-adler32` 0.3.10: `MIT`, used under MIT; [text 66](#text-66).
+- `skrifa` 0.49.0: `MIT OR Apache-2.0`, used under MIT; [text 32](#text-32).
+- `smallvec` 1.16.4: `MIT OR Apache-2.0`, used under MIT; [text 67](#text-67).
+- `sponge-cursor` 0.1.0: `MIT OR Apache-2.0`, used under MIT; [text 68](#text-68).
 - `sskr` 0.12.0: `BSD-2-Clause-Patent`, used under BSD-2-Clause-Patent; [text 7](#text-7).
-- `stable_deref_trait` 1.2.1: `MIT OR Apache-2.0`, used under MIT; [text 68](#text-68).
-- `strict-num` 0.1.1: `MIT`, used under MIT; [text 69](#text-69).
+- `stable_deref_trait` 1.2.1: `MIT OR Apache-2.0`, used under MIT; [text 69](#text-69).
+- `strict-num` 0.1.1: `MIT`, used under MIT; [text 70](#text-70).
 - `subsetter` 0.2.6: `MIT OR Apache-2.0`, used under MIT; [text 49](#text-49).
-- `subtle` 2.6.1: `BSD-3-Clause`, used under BSD-3-Clause; [text 70](#text-70).
+- `subtle` 2.6.1: `BSD-3-Clause`, used under BSD-3-Clause; [text 71](#text-71).
 - `thiserror` 2.0.21: `MIT OR Apache-2.0`, used under MIT; [text 1](#text-1).
-- `tiny-skia` 0.12.0: `BSD-3-Clause`, used under BSD-3-Clause; [text 71](#text-71).
-- `tiny-skia-path` 0.12.0: `BSD-3-Clause`, used under BSD-3-Clause; [text 71](#text-71).
-- `tinyvec` 1.13.3: `Zlib OR Apache-2.0 OR MIT`, used under MIT; [text 72](#text-72).
-- `typenum` 1.20.1: `MIT OR Apache-2.0`, used under MIT; [text 73](#text-73).
-- `unicode-ident` 1.0.27: `(MIT OR Apache-2.0) AND Unicode-3.0`, used under MIT and Unicode-3.0; [text 1](#text-1), [text 74](#text-74).
-- `unicode-normalization` 0.1.26: `(MIT OR Apache-2.0) AND Unicode-3.0`, used under MIT and Unicode-3.0; [text 75](#text-75), [text 74](#text-74).
-- `unicode-properties` 0.1.4: `MIT/Apache-2.0`, used under MIT; [text 75](#text-75).
-- `unicode-script` 0.5.8: `MIT OR Apache-2.0`, used under MIT; [text 76](#text-76).
-- `universal-hash` 0.6.1: `MIT OR Apache-2.0`, used under MIT; [text 77](#text-77).
-- `wasm-bindgen` 0.2.129: `MIT OR Apache-2.0`, used under MIT; [text 14](#text-14).
-- `wasm-bindgen-shared` 0.2.129: `MIT OR Apache-2.0`, used under MIT; [text 14](#text-14).
-- `windows-link` 0.2.1: `MIT OR Apache-2.0`, used under MIT; [text 78](#text-78).
-- `windows-sys` 0.61.2: `MIT OR Apache-2.0`, used under MIT; [text 78](#text-78).
-- `wnaf` 0.14.1: `Apache-2.0 OR MIT`, used under MIT; [text 79](#text-79).
-- `x25519-dalek` 3.0.0: `BSD-3-Clause`, used under BSD-3-Clause; [text 80](#text-80).
-- `yoke` 0.8.4: `Unicode-3.0`, used under Unicode-3.0; [text 81](#text-81).
-- `zerocopy` 0.8.63: `BSD-2-Clause OR Apache-2.0 OR MIT`, used under MIT; [text 82](#text-82).
-- `zerofrom` 0.1.8: `Unicode-3.0`, used under Unicode-3.0; [text 81](#text-81).
-- `zeroize` 1.9.1: `Apache-2.0 OR MIT`, used under MIT; [text 42](#text-42).
-- `zune-core` 0.5.3: `MIT OR Apache-2.0 OR Zlib`, used under MIT; [text 83](#text-83).
-- `zune-jpeg` 0.5.15: `MIT OR Apache-2.0 OR Zlib`, used under MIT; [text 83](#text-83).
+- `tiny-skia` 0.12.0: `BSD-3-Clause`, used under BSD-3-Clause; [text 72](#text-72).
+- `tiny-skia-path` 0.12.0: `BSD-3-Clause`, used under BSD-3-Clause; [text 72](#text-72).
+- `tinyvec` 1.13.3: `Zlib OR Apache-2.0 OR MIT`, used under MIT; [text 73](#text-73).
+- `typenum` 1.20.1: `MIT OR Apache-2.0`, used under MIT; [text 74](#text-74).
+- `unicode-ident` 1.0.27: `(MIT OR Apache-2.0) AND Unicode-3.0`, used under MIT and Unicode-3.0; [text 1](#text-1), [text 75](#text-75).
+- `unicode-normalization` 0.1.26: `(MIT OR Apache-2.0) AND Unicode-3.0`, used under MIT and Unicode-3.0; [text 76](#text-76), [text 75](#text-75).
+- `unicode-properties` 0.1.4: `MIT/Apache-2.0`, used under MIT; [text 76](#text-76).
+- `unicode-script` 0.5.8: `MIT OR Apache-2.0`, used under MIT; [text 77](#text-77).
+- `universal-hash` 0.6.1: `MIT OR Apache-2.0`, used under MIT; [text 78](#text-78).
+- `wasm-bindgen` 0.2.129: `MIT OR Apache-2.0`, used under MIT; [text 15](#text-15).
+- `wasm-bindgen-shared` 0.2.129: `MIT OR Apache-2.0`, used under MIT; [text 15](#text-15).
+- `windows-link` 0.2.1: `MIT OR Apache-2.0`, used under MIT; [text 79](#text-79).
+- `windows-sys` 0.61.2: `MIT OR Apache-2.0`, used under MIT; [text 79](#text-79).
+- `wnaf` 0.14.1: `Apache-2.0 OR MIT`, used under MIT; [text 80](#text-80).
+- `x25519-dalek` 3.0.0: `BSD-3-Clause`, used under BSD-3-Clause; [text 81](#text-81).
+- `yoke` 0.8.4: `Unicode-3.0`, used under Unicode-3.0; [text 82](#text-82).
+- `zerocopy` 0.8.63: `BSD-2-Clause OR Apache-2.0 OR MIT`, used under MIT; [text 83](#text-83).
+- `zerofrom` 0.1.8: `Unicode-3.0`, used under Unicode-3.0; [text 82](#text-82).
+- `zeroize` 1.9.1: `Apache-2.0 OR MIT`, used under MIT; [text 43](#text-43).
+- `zune-core` 0.5.3: `MIT OR Apache-2.0 OR Zlib`, used under MIT; [text 84](#text-84).
+- `zune-jpeg` 0.5.15: `MIT OR Apache-2.0 OR Zlib`, used under MIT; [text 84](#text-84).
 
 ### Licence texts
 
@@ -808,6 +811,34 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 #### Text 14
 
+MIT, for byteorder-lite 0.1.0, memchr 2.8.3.
+
+```
+The MIT License (MIT)
+
+Copyright (c) 2015 Andrew Gallant
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+#### Text 15
+
 MIT, for cfg-if 1.0.5, wasm-bindgen 0.2.129, wasm-bindgen-shared 0.2.129.
 
 ```
@@ -838,7 +869,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 15
+#### Text 16
 
 MIT, for chacha20 0.10.2, chacha20poly1305 0.11.0.
 
@@ -870,7 +901,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 16
+#### Text 17
 
 MIT, for cipher 0.5.2.
 
@@ -902,7 +933,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 17
+#### Text 18
 
 MIT, for cmov 0.5.4, hybrid-array 0.4.15.
 
@@ -934,7 +965,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 18
+#### Text 19
 
 MIT, for const-oid 0.10.2, cpufeatures 0.3.1, der 0.8.3.
 
@@ -966,7 +997,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 19
+#### Text 20
 
 MIT, for cpubits 0.1.1.
 
@@ -998,7 +1029,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 20
+#### Text 21
 
 MIT, for crc32fast 1.5.3.
 
@@ -1026,7 +1057,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-#### Text 21
+#### Text 22
 
 MIT, for crypto-bigint 0.7.10, ripemd 0.2.0, scrypt 0.12.0, sec1 0.8.1.
 
@@ -1058,7 +1089,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 22
+#### Text 23
 
 MIT, for crypto-common 0.2.2.
 
@@ -1090,7 +1121,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 23
+#### Text 24
 
 MIT, for ctutils 0.4.6.
 
@@ -1122,7 +1153,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 24
+#### Text 25
 
 BSD-3-Clause, for curve25519-dalek 5.0.0.
 
@@ -1158,7 +1189,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-#### Text 25
+#### Text 26
 
 MIT, for digest 0.11.3.
 
@@ -1191,7 +1222,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 26
+#### Text 27
 
 MIT, for elliptic-curve 0.14.3.
 
@@ -1223,9 +1254,9 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 27
+#### Text 28
 
-MIT, for fdeflate 0.3.7.
+MIT, for fdeflate 0.3.7, image-webp 0.2.4.
 
 ```
 MIT License
@@ -1255,7 +1286,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 28
+#### Text 29
 
 MIT, for ff 0.14.0.
 
@@ -1283,7 +1314,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-#### Text 29
+#### Text 30
 
 MIT, for flate2 1.1.10.
 
@@ -1315,7 +1346,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 30
+#### Text 31
 
 Zlib, for foldhash 0.2.0.
 
@@ -1341,7 +1372,7 @@ the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 ```
 
-#### Text 31
+#### Text 32
 
 MIT, for font-types 0.12.7, read-fonts 0.46.0, skrifa 0.49.0.
 
@@ -1373,7 +1404,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 32
+#### Text 33
 
 MIT, for g2p 1.2.2, g2poly 1.2.2.
 
@@ -1400,7 +1431,7 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
 OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 33
+#### Text 34
 
 MIT, for getrandom 0.3.4.
 
@@ -1433,7 +1464,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 34
+#### Text 35
 
 MIT, for getrandom 0.4.3.
 
@@ -1466,7 +1497,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 35
+#### Text 36
 
 MIT, for hashbrown 0.17.1.
 
@@ -1498,7 +1529,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 36
+#### Text 37
 
 MIT, for hkdf 0.13.0.
 
@@ -1531,7 +1562,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 37
+#### Text 38
 
 MIT, for hmac 0.13.0.
 
@@ -1563,7 +1594,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 38
+#### Text 39
 
 MIT, for inout 0.2.5.
 
@@ -1596,7 +1627,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 39
+#### Text 40
 
 MIT, for jpeg-encoder 0.7.1.
 
@@ -1628,7 +1659,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 40
+#### Text 41
 
 IJG, for jpeg-encoder 0.7.1.
 
@@ -1704,7 +1735,7 @@ commercial products, provided that all warranty or liability claims are
 assumed by the product vendor.
 ```
 
-#### Text 41
+#### Text 42
 
 MIT, for k256 0.14.0.
 
@@ -1736,7 +1767,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 42
+#### Text 43
 
 MIT, for keccak 0.2.2, zeroize 1.9.1.
 
@@ -1768,7 +1799,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 43
+#### Text 44
 
 MIT, for libc 0.2.191.
 
@@ -1800,7 +1831,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 44
+#### Text 45
 
 MIT, for libm 0.2.16.
 
@@ -2065,7 +2096,7 @@ have been licensed under extremely permissive terms.
 Copyright notices are retained in src/* files where relevant.
 ```
 
-#### Text 45
+#### Text 46
 
 MIT, for lru 0.18.5.
 
@@ -2091,34 +2122,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-```
-
-#### Text 46
-
-MIT, for memchr 2.8.3.
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2015 Andrew Gallant
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
 ```
 
 #### Text 47
@@ -2401,6 +2404,32 @@ SOFTWARE.
 
 #### Text 56
 
+MIT, for quick-error 2.0.1.
+
+```
+Copyright (c) 2015 The quick-error Developers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+#### Text 57
+
 MIT, for rand 0.9.5, rand_chacha 0.9.0, rand_core 0.9.5.
 
 ```
@@ -2432,7 +2461,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 57
+#### Text 58
 
 MIT, for rand_core 0.10.1.
 
@@ -2464,7 +2493,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 58
+#### Text 59
 
 MIT, for rand_xoshiro 0.7.0.
 
@@ -2496,7 +2525,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 59
+#### Text 60
 
 MIT, for rqrr 0.11.0.
 
@@ -2523,7 +2552,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-#### Text 60
+#### Text 61
 
 ISC, for rqrr 0.11.0.
 
@@ -2549,7 +2578,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-#### Text 61
+#### Text 62
 
 Apache-2.0, for ryu 1.0.23.
 
@@ -2732,7 +2761,7 @@ TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 END OF TERMS AND CONDITIONS
 ```
 
-#### Text 62
+#### Text 63
 
 MIT, for salsa20 0.11.0.
 
@@ -2765,7 +2794,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 63
+#### Text 64
 
 MIT, for sha2 0.11.1.
 
@@ -2800,7 +2829,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 64
+#### Text 65
 
 MIT, for sha3 0.12.0.
 
@@ -2836,7 +2865,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 65
+#### Text 66
 
 MIT, for simd-adler32 0.3.10.
 
@@ -2864,7 +2893,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-#### Text 66
+#### Text 67
 
 MIT, for smallvec 1.16.4.
 
@@ -2896,7 +2925,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 67
+#### Text 68
 
 MIT, for sponge-cursor 0.1.0.
 
@@ -2928,7 +2957,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 68
+#### Text 69
 
 MIT, for stable_deref_trait 1.2.1.
 
@@ -2960,7 +2989,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 69
+#### Text 70
 
 MIT, for strict-num 0.1.1.
 
@@ -2986,7 +3015,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-#### Text 70
+#### Text 71
 
 BSD-3-Clause, for subtle 2.6.1.
 
@@ -3022,7 +3051,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-#### Text 71
+#### Text 72
 
 BSD-3-Clause, for tiny-skia 0.12.0, tiny-skia-path 0.12.0.
 
@@ -3059,7 +3088,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-#### Text 72
+#### Text 73
 
 MIT, for tinyvec 1.13.3.
 
@@ -3071,7 +3100,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 73
+#### Text 74
 
 MIT, for typenum 1.20.1.
 
@@ -3099,7 +3128,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-#### Text 74
+#### Text 75
 
 Unicode-3.0, for unicode-ident 1.0.27, unicode-normalization 0.1.26.
 
@@ -3145,7 +3174,7 @@ dealings in these Data Files or Software without prior written
 authorization of the copyright holder.
 ```
 
-#### Text 75
+#### Text 76
 
 MIT, for unicode-normalization 0.1.26, unicode-properties 0.1.4.
 
@@ -3177,7 +3206,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 76
+#### Text 77
 
 MIT, for unicode-script 0.5.8.
 
@@ -3211,7 +3240,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 77
+#### Text 78
 
 MIT, for universal-hash 0.6.1.
 
@@ -3243,7 +3272,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 78
+#### Text 79
 
 MIT, for windows-link 0.2.1, windows-sys 0.61.2.
 
@@ -3271,7 +3300,7 @@ MIT, for windows-link 0.2.1, windows-sys 0.61.2.
     SOFTWARE
 ```
 
-#### Text 79
+#### Text 80
 
 MIT, for wnaf 0.14.1.
 
@@ -3304,7 +3333,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 80
+#### Text 81
 
 BSD-3-Clause, for x25519-dalek 3.0.0.
 
@@ -3340,7 +3369,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-#### Text 81
+#### Text 82
 
 Unicode-3.0, for yoke 0.8.4, zerofrom 0.1.8.
 
@@ -3393,7 +3422,7 @@ Portions of ICU4X may have been adapted from ICU4C and/or ICU4J.
 ICU 1.8.1 to ICU 57.1 © 1995-2016 International Business Machines Corporation and others.
 ```
 
-#### Text 82
+#### Text 83
 
 MIT, for zerocopy 0.8.63.
 
@@ -3425,7 +3454,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-#### Text 83
+#### Text 84
 
 MIT, for zune-core 0.5.3, zune-jpeg 0.5.15.
 

@@ -33,6 +33,8 @@ pub enum Bip32Error {
     InvalidMasterKey,
     /// No valid key at this index of the path, where wallets use the next (a chance of 2^-127).
     InvalidChild(u32),
+    /// Another child would exceed BIP32's one-byte depth field.
+    Depth,
     /// The phrase could not be read.
     Phrase(PhraseError),
 }
@@ -45,6 +47,7 @@ impl fmt::Display for Bip32Error {
                 f,
                 "BIP32 has no valid key at index {index} of this path; wallets use the next index."
             ),
+            Self::Depth => f.write_str("A BIP32 extended key cannot exceed 255 child levels."),
             Self::Phrase(error) => error.fmt(f),
         }
     }
@@ -57,6 +60,7 @@ impl Refusal for Bip32Error {
         match self {
             Self::InvalidMasterKey => "core.bip32.invalid-master-key",
             Self::InvalidChild(_) => "core.bip32.invalid-child-key",
+            Self::Depth => "core.bip32.depth-exceeded",
             Self::Phrase(error) => error.code(),
         }
     }
@@ -137,7 +141,9 @@ impl ExtendedKey {
 
     /// The child key at `index`, CKDpriv of BIP32: hardened from 2^31 up. An index without a valid
     /// key is refused rather than skipped, so that the key is never another than the path says.
+    /// A child beyond the serialized depth range is refused before derivation.
     pub fn child(&self, index: u32) -> Result<Self, Bip32Error> {
+        let depth = self.place.depth.checked_add(1).ok_or(Bip32Error::Depth)?;
         let index_bytes = index.to_be_bytes();
         let child = if index >= HARDENED_OFFSET {
             Self::of_hmac(&self.chain_code, &[&[0], &self.private, &index_bytes])?
@@ -155,7 +161,7 @@ impl ExtendedKey {
             private: SecretBytes::copy_of("a private key", &repr[..]),
             chain_code: child.chain_code,
             place: Place {
-                depth: self.place.depth.saturating_add(1),
+                depth,
                 parent: self.fingerprint()?,
                 index,
             },
@@ -335,6 +341,26 @@ mod tests {
         assert_eq!(public.encode(0x0488_b21e), xpub);
         assert_eq!(ExtendedPublicKey::decode(xpub, 0x0488_b21e), Some(public));
         assert_eq!(ExtendedPublicKey::decode(xpub, 0x0435_87cf), None);
+    }
+
+    #[test]
+    fn the_last_serializable_depth_is_valid_and_its_children_are_refused() {
+        let seed: Vec<u8> = (0..16).collect(); // BIP32 public test-vector seed.
+        let master = ExtendedKey::of_seed(&seed).unwrap();
+        let path = vec![0; usize::from(u8::MAX) - 1];
+        let parent = master.derive(&path).unwrap();
+        let last = parent.child(0).unwrap();
+        let public = last.public().unwrap();
+        assert_eq!(public.place.depth, u8::MAX);
+        let encoded = public.encode(0x0488_b21e);
+        assert_eq!(
+            ExtendedPublicKey::decode(&encoded, 0x0488_b21e),
+            Some(public)
+        );
+        for index in [0, HARDENED_OFFSET, u32::MAX] {
+            assert!(matches!(last.child(index), Err(Bip32Error::Depth)));
+        }
+        assert_eq!(Bip32Error::Depth.code(), "core.bip32.depth-exceeded");
     }
 
     #[test]

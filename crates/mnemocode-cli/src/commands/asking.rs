@@ -4,7 +4,9 @@
 
 use crate::gate::Stop;
 use crate::input::{Ask, Left, ask_until, assert_terminal, value_ask};
-use crate::terminal::{Choice, Chosen, Explanation, ListQuestion, choose};
+use crate::terminal::{
+    Choice, Chosen, Explanation, ListQuestion, choose, choose_from, choose_many,
+};
 
 /// The question after a failure, where nothing more particular is asked.
 pub(crate) const WHAT_NOW: &str = "What now?";
@@ -59,6 +61,46 @@ pub(crate) fn ask_list<T: Clone>(
     ask_warned(question, label, choices, explanation, None)
 }
 
+/// As [`ask_list`], the entry at `initial` selected first, with `explanation` if any.
+pub(crate) fn ask_list_at<T: Clone>(
+    question: &str,
+    label: &str,
+    choices: &[Choice<T>],
+    (initial, explanation): (usize, Option<&Explanation>),
+) -> Result<Option<T>, Stop> {
+    let asked = ListQuestion {
+        question,
+        label,
+        quit: "goes back",
+        explanation,
+    };
+    match choose_from(&asked, None, choices, initial)? {
+        Chosen::One(value) => Ok(Some(value)),
+        Chosen::Back => Ok(None),
+        Chosen::Cancelled => Err(Stop::Cancelled),
+    }
+}
+
+/// A checklist question, Escape going back: the values of the ticked entries, which may be none.
+pub(crate) fn ask_checks<T: Clone>(
+    question: &str,
+    label: &str,
+    choices: &[Choice<T>],
+    ticked: &[bool],
+) -> Result<Option<Vec<T>>, Stop> {
+    let asked = ListQuestion {
+        question,
+        label,
+        quit: "goes back",
+        explanation: None,
+    };
+    match choose_many(&asked, choices, ticked)? {
+        Chosen::One(values) => Ok(Some(values)),
+        Chosen::Back => Ok(None),
+        Chosen::Cancelled => Err(Stop::Cancelled),
+    }
+}
+
 /// As [`ask_list`], with `warning` above the question.
 pub(crate) fn ask_warned<T: Clone>(
     question: &str,
@@ -88,8 +130,9 @@ fn with_stop<T: Clone>(choices: &[Choice<T>]) -> Vec<Choice<Option<T>>> {
             label: choice.label.clone(),
             note: choice.note.clone(),
             example: choice.example.clone(),
-            digit: choice.digit,
+            shortcut: choice.shortcut,
             value: Some(choice.value.clone()),
+            enabled: choice.enabled,
         })
         .collect();
     all.push(Choice::new("Stop", None));

@@ -6,6 +6,9 @@
 
 FROM buildpack-deps:noble@sha256:27bdb6ab1ca0df6acfe341752ee4d9c08a341d80e3ee75ccc3b34b79af0dfaf1 AS toolchain
 
+# Optional local build budget; omitted in CI to keep Cargo's normal default.
+ARG CARGO_BUILD_JOBS
+
 ARG RUSTUP_VERSION=1.29.2
 ARG RUSTUP_INIT_SHA256=5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4
 # Ubuntu archive snapshot for the cross compilers, so that their versions never change.

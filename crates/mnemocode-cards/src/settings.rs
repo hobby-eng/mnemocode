@@ -300,6 +300,38 @@ pub struct CardSettings {
     pub presentation: Option<CardPresentation>,
     /// Whether a sheet prints the backup's QR code; separate cards never do.
     pub card_qr: bool,
+    /// Whether a sheet QR shows a contact and stores the backup after the terminator.
+    pub hidden_qr: bool,
+}
+
+impl CardProfile {
+    /// A vCard of the printed profile, with escaped text and no website field.
+    pub fn qr_contact(&self) -> String {
+        let escape = |text: &str| {
+            text.replace('\\', "\\\\")
+                .replace(';', "\\;")
+                .replace(',', "\\,")
+                .replace('\n', "\\n")
+                .replace('\r', "")
+        };
+        let mut lines = vec!["BEGIN:VCARD".to_owned(), "VERSION:3.0".to_owned()];
+        for (field, tag) in [
+            (ProfileField::Name, "FN"),
+            (ProfileField::Company, "ORG"),
+            (ProfileField::Role, "TITLE"),
+            (ProfileField::Email, "EMAIL"),
+            (ProfileField::Phone, "TEL"),
+        ] {
+            if let Some(value) = self.get(field) {
+                lines.push(format!("{tag}:{}", escape(value)));
+            }
+        }
+        if self.get(ProfileField::Name).is_none() {
+            lines.push("FN:Design collection".to_owned());
+        }
+        lines.push("END:VCARD".to_owned());
+        lines.join("\r\n")
+    }
 }
 
 /// The refusals of the settings, word for word as TS 0.1.0 writes them.

@@ -109,10 +109,22 @@ fn the_recording_holds_the_separate_cards_of_every_business_design() {
 #[test]
 fn a_decoy_label_stays_out_of_the_names_of_the_files() {
     let mut cards = unicode_cards(CardSettings::default());
-    cards.codes.colors.push("#468080".to_owned());
+    cards
+        .codes
+        .colors
+        .push(mnemocode::secret::SecretText::copy_of(
+            "Card code",
+            "#468080",
+        ))
+        .unwrap();
     cards.decoys = Some(1);
     if let Some(labels) = &mut cards.codes.labels {
-        labels.push("x/../../escaped".to_owned());
+        labels
+            .push(mnemocode::secret::SecretText::copy_of(
+                "Card code",
+                "x/../../escaped",
+            ))
+            .unwrap();
     }
     let documents = render_individual_cards(
         &CardDrawing::new(),
@@ -165,13 +177,14 @@ fn business_sheets_print_given_details_with_either_form_of_the_qr_code() {
         ),
     ] {
         let mut cards = phrase_cards(&colors);
-        cards.codes.payload.clone_from(&payload);
+        cards.codes.payload = mnemocode::secret::SecretText::copy_of("Card QR payload", &payload);
         cards.settings = CardSettings {
             page_size: Some(size),
             orientation: Some(orientation),
             profile: profile.clone(),
             presentation: Some(studio("VECTOR STUDIO")),
             card_qr: true,
+            hidden_qr: false,
         };
         let pages = sheet_pages(&drawing, id, &cards);
         assert_eq!(pages.len(), 1, "{id}");
@@ -196,13 +209,14 @@ fn a_sheet_refuses_other_qr_data_and_details_that_it_cannot_print() {
     };
     // Colors, but not all that the cards print: the QR code holds other references.
     let mut other = phrase_cards(&colors);
-    other.codes.payload = colors[1..].join(" ");
+    other.codes.payload =
+        mnemocode::secret::SecretText::take("Card QR payload", colors[1..].join(" "));
     assert_eq!(
         refused(draw(&other)).0,
         "export.content-kinds.collection-qr-does-not-match-printed-references"
     );
     // Text that is no colors is read as Color Unicode, which refuses it as such.
-    other.codes.payload = "MNC1:secret".to_owned();
+    other.codes.payload = mnemocode::secret::SecretText::copy_of("Card QR payload", "MNC1:secret");
     assert_eq!(refused(draw(&other)).0, "core.colors.codes-all");
     for (field, value, refusal) in [
         (
@@ -308,6 +322,7 @@ fn a_titled_sheet_keeps_the_orientation_asked_for_with_its_qr_code() {
             page_size: Some(size),
             orientation: Some(orientation),
             card_qr: true,
+            hidden_qr: false,
             ..CardSettings::default()
         };
         let backup = direct_backup(PHRASE, Form::Unicode);
@@ -321,7 +336,11 @@ fn a_titled_sheet_keeps_the_orientation_asked_for_with_its_qr_code() {
             let what = format!("{id} {size:?}");
             assert_eq!(pages.len(), 1, "{what}");
             assert_paints(&pages[0], &what);
-            assert_eq!(read_drawn_qr(&pages[0]), cards.codes.payload, "{what}");
+            assert_eq!(
+                read_drawn_qr(&pages[0]),
+                cards.codes.payload.as_str(),
+                "{what}"
+            );
             let wide = pages[0].width > pages[0].height;
             assert_eq!(wide, orientation == Orientation::Landscape, "{what}");
             if let Some(title) = title {
@@ -346,6 +365,7 @@ fn share_set(
         // Separate cards never carry a QR code, and refuse one.
         settings: CardSettings {
             card_qr: !layout.separate_cards(),
+            hidden_qr: false,
             ..CardSettings::default()
         },
     };

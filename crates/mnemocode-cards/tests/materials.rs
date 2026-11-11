@@ -232,7 +232,7 @@ fn sheet_of_every_sample(drawing: &CardDrawing, style: MaterialStyle) -> Page {
             .map(|sample| sample.look.clone()),
     );
     let mut cards = phrase_cards(&colors);
-    cards.codes.payload = own.join(" ");
+    cards.codes.payload = mnemocode::secret::SecretText::take("Card QR payload", own.join(" "));
     cards.decoys = Some(colors.len() - own.len());
     cards.settings.page_size = Some(PageSize::A4);
     sheet_pages(drawing, &design_of(style), &cards).remove(0)
@@ -372,6 +372,7 @@ fn a_material_sheet_prints_exact_references_and_finish_names_beside_its_qr_code(
             profile,
             presentation: Some(studio("AURORA STUDIO")),
             card_qr: true,
+            hidden_qr: false,
             ..CardSettings::default()
         },
         ..phrase_cards(&colors)
@@ -394,7 +395,7 @@ fn a_material_sheet_prints_exact_references_and_finish_names_beside_its_qr_code(
         // A long name may take two lines, drawn one after the other.
         assert!(whole.contains(&samples[index]), "{}", samples[index]);
     }
-    assert_eq!(read_drawn_qr(&pages[0]), cards.codes.payload);
+    assert_eq!(read_drawn_qr(&pages[0]), cards.codes.payload.as_str());
 }
 
 #[test]
@@ -430,7 +431,10 @@ fn a_material_design_draws_no_separate_cards() {
 fn a_material_sheet_refuses_a_qr_code_of_other_references() {
     let mut cards = phrase_cards(&material_colors());
     // The colors of other word numbers: a readable QR code of other references.
-    cards.codes.payload = colors_of((0..24).map(|index| index * 73 + 2)).join(" ");
+    cards.codes.payload = mnemocode::secret::SecretText::take(
+        "Card QR payload",
+        colors_of((0..24).map(|index| index * 73 + 2)).join(" "),
+    );
     let refusal =
         template("material-tile").draw(&CardDrawing::new(), &mut first_choices(), &cards, None, 0);
     assert_eq!(

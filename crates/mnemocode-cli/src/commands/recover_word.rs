@@ -83,9 +83,6 @@ pub(crate) const OPTIONS: [&str; 24] = [
 const TITLE: &str = "Missing word recovery";
 /// Combinations between two looks at the progress.
 const PROGRESS_EVERY: u32 = 4096;
-/// Why codes cannot be searched where the words of a seed phrase are, and where they can.
-const CODES_NOT_WORDS: &str = "These are the codes of an encoded seed phrase, not its words: Decode numbers, codes or colors back into a seed phrase reads them, with ? for each unread code.";
-
 /// A column of the candidates: its heading in the rows for a script, its label on a terminal.
 type Column = (&'static str, &'static str);
 
@@ -111,15 +108,19 @@ enum RecoverWordError {
 
 impl fmt::Display for RecoverWordError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::CodesNotWords => CODES_NOT_WORDS,
+        match self {
+            Self::CodesNotWords => write!(
+                f,
+                "These are the codes of an encoded seed phrase, not its words: {} reads them, with ? for each unread code.",
+                super::menu_entries::DECODE.label
+            ),
             Self::LegacyAndMissing => {
-                "--legacy-valid-last-word and --missing-word cannot be combined."
+                f.write_str("--legacy-valid-last-word and --missing-word cannot be combined.")
             }
-            Self::LegacyList => {
-                "--legacy-valid-last-word lists replacements, not wallets: no candidate list."
-            }
-        })
+            Self::LegacyList => f.write_str(
+                "--legacy-valid-last-word lists replacements, not wallets: no candidate list.",
+            ),
+        }
     }
 }
 

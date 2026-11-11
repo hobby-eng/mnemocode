@@ -5,8 +5,8 @@
 //! least.
 //!
 //! A legend is a backup of the phrase it holds, as any of MnemoCode's records is: a front end
-//! hides a phrase masked with Seedshift dates ([`phrase`]), never the phrase itself, since the
-//! format is public.
+//! normally hides a phrase masked with Seedshift dates ([`phrase`]). The explicit unmasked
+//! mode stores the phrase itself and is readable by anyone who knows this public format.
 
 #![forbid(unsafe_code)]
 
@@ -14,6 +14,7 @@ pub mod chart;
 pub mod checks;
 pub mod color;
 pub mod dmc;
+pub mod fabric;
 pub mod hide;
 pub mod legend;
 pub mod pattern;

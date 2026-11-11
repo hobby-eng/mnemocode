@@ -16,13 +16,16 @@ use mnemocode::forms::hints::BIP39;
 use mnemocode::modes::{DateWords, Mode};
 use mnemocode::recovery::reading::{BackupReading, ReadingRules, mode_conflict_of};
 use mnemocode::refusal::Refusal;
-use mnemocode::secret::SecretText;
+use mnemocode::secret::{SecretText, SecretVec};
 use mnemocode::text::numbers::WholeRange;
 use mnemocode::text::words::list_in_words;
 
 use crate::args::{Parsed, assert_asked_not_given, integer_option, is_on, value, values};
 use crate::gate::Stop;
-use crate::input::{Ask, Left, ask_until, read_input_text, read_qr_bytes, secret_ask};
+use crate::input::{
+    Ask, Left, ask_until, pattern_legend, read_input_path, read_input_text, read_qr_bytes,
+    secret_ask,
+};
 use crate::terminal::{
     Choice, Chosen, Lifetime, ListQuestion, NoticeKind, choose, keep_context, notice_lines,
     terminal_available,
@@ -51,7 +54,7 @@ pub(crate) const ENCODED_INPUT_FILE: &str = "The encoded input file";
 /// Where the person reads Shamir shares, for a share given in place of the codes.
 pub(crate) const SHARE_READER: &str = "Restore a seed phrase from Shamir shares";
 /// The menu's entry that decodes, which a seed phrase typed in place of a share is sent to.
-pub(crate) const DECODE_ENTRY: &str = "Decode numbers, codes or colors back into a seed phrase";
+pub(crate) const DECODE_ENTRY: &str = super::menu_entries::DECODE.label;
 /// The word counts of --words, within which a count that is none is refused in words.
 pub(crate) const WORD_COUNT_RANGE: WholeRange = WholeRange::new(12, 24);
 
@@ -226,14 +229,45 @@ pub(crate) fn phrase_words(parsed: &Parsed) -> Result<Option<usize>, Stop> {
 
 /// The encoded seed phrase of --input, --input-file or --qr-file.
 pub(crate) fn encoded_input(parsed: &Parsed) -> Result<SecretText, Stop> {
-    let text = encoded_text(parsed)?;
+    encoded_input_at(parsed, false)
+}
+
+/// A replacement source typed at a question admits regular files only.
+pub(crate) fn encoded_input_from_question(parsed: &Parsed) -> Result<SecretText, Stop> {
+    encoded_input_at(parsed, true)
+}
+
+fn encoded_input_at(parsed: &Parsed, regular_only: bool) -> Result<SecretText, Stop> {
+    let text = encoded_text(parsed, regular_only)?;
     // A SeedStitch legend stands for the record of the masked phrase it holds.
     Ok(super::stitch::record_of_legend(text.as_str())?.unwrap_or(text))
 }
 
 /// The text of --input, --input-file or --qr-file, as given.
-fn encoded_text(parsed: &Parsed) -> Result<SecretText, Stop> {
+fn encoded_text(parsed: &Parsed, regular_only: bool) -> Result<SecretText, Stop> {
+    // A pattern's PDF gives the legend line it keeps; with a QR image as well, it is refused below
+    // as any second source is.
+    if let (None, Some(path), None) = (
+        value(parsed, "input"),
+        value(parsed, "input-file"),
+        value(parsed, "qr-file"),
+    ) && path != "-"
+        && let Some(line) = pattern_legend(Path::new(path))?
+    {
+        return Ok(line);
+    }
     let Some(path) = value(parsed, "qr-file") else {
+        if regular_only
+            && value(parsed, "input").is_none()
+            && let Some(path) = value(parsed, "input-file")
+        {
+            return Ok(read_input_path(
+                Path::new(path),
+                ENCODED_INPUT_FILE,
+                SHARE_SET_LIMIT,
+                true,
+            )?);
+        }
         return text_input(
             parsed,
             "input",
@@ -248,7 +282,7 @@ fn encoded_text(parsed: &Parsed) -> Result<SecretText, Stop> {
     if value(parsed, "input").is_some() || value(parsed, "input-file").is_some() {
         return Err(GivenError::OneEncodedSource.into());
     }
-    read_qr_path(Path::new(path), false)
+    read_qr_path(Path::new(path), regular_only)
 }
 
 /// The encoded seed phrase given with the options, read as the screen reads typed codes: a share,
@@ -340,10 +374,12 @@ pub(crate) fn assert_one_encoded_source(parsed: &Parsed) -> Result<(), Stop> {
 /// The text of the QR code in the PNG file at `path`, read by the library's strict reader;
 /// `regular_only` for a name typed at a question (read_qr_bytes).
 pub(crate) fn read_qr_path(path: &Path, regular_only: bool) -> Result<SecretText, Stop> {
-    Ok(mnemocode::qr::read_png(&read_qr_bytes(
-        path,
-        regular_only,
-    )?)?)
+    let bytes = read_qr_bytes(path, regular_only)?;
+    match mnemocode::qr::hidden::read_png(&bytes) {
+        Ok(record) => Ok(record),
+        Err(mnemocode::qr::QrError::NoHiddenRecord) => Ok(mnemocode::qr::read_png(&bytes)?),
+        Err(error) => Err(error.into()),
+    }
 }
 
 /// The dates or date patterns of --date or --dates-file, as one answer.
@@ -377,22 +413,26 @@ pub(crate) fn text_input(
 }
 
 /// The dates of --date, each read as a date, or of --dates-file, read as typed dates.
-pub(crate) fn dates(parsed: &Parsed) -> Result<Vec<Date>, Stop> {
+pub(crate) fn dates(parsed: &Parsed) -> Result<SecretVec<Date>, Stop> {
     let direct = values(parsed, "date");
     let Some(path) = value(parsed, "dates-file") else {
-        return Ok(direct
-            .iter()
-            .map(|text| parse_date(text))
-            .collect::<Result<_, _>>()?);
+        return Ok(SecretVec::new(
+            direct
+                .iter()
+                .map(|text| parse_date(text))
+                .collect::<Result<Vec<_>, _>>()?,
+        ));
     };
     if !direct.is_empty() {
         return Err(GivenError::BothSources("the dates").into());
     }
     let text = read_input_text(path, "The dates file", DATES_LIMIT)?;
-    Ok(DatesAnswer::parse(&text, None, false)?
-        .known()
-        .iter()
-        .collect())
+    Ok(SecretVec::new(
+        DatesAnswer::parse(&text, None, false)?
+            .known()
+            .iter()
+            .collect(),
+    ))
 }
 
 /// Refuses a count of dates `mode` does not take, unless they are asked later; a dates file counts
@@ -444,11 +484,28 @@ pub(crate) fn ask_phrase() -> Result<Asked<Phrase>, Stop> {
 }
 
 /// Asks the dates of a phrase of `word_count` words on the private screen.
-fn ask_known_dates(word_count: Option<usize>) -> Result<Asked<Vec<Date>>, Stop> {
+fn ask_known_dates(word_count: Option<usize>) -> Result<Asked<SecretVec<Date>>, Stop> {
     let ask = secret_ask(&dates_prompt(word_count), "the dates", DATES_LIMIT);
     Ok(ask_until(&ask, true, |line| {
-        DatesAnswer::parse(line, word_count, false).map(|answer| answer.known().iter().collect())
+        DatesAnswer::parse(line, word_count, false)
+            .map(|answer| SecretVec::new(answer.known().iter().collect()))
     })?)
+}
+
+/// Asks dates immediately after a protected Seedshift choice; direct mode needs none.
+pub(crate) fn ask_encoding_dates(mode: Mode) -> Result<SecretVec<Date>, Stop> {
+    if !mode.masked() {
+        return Ok(SecretVec::new(Vec::new()));
+    }
+    loop {
+        let dates = ask_known_dates(None)?.map_err(|_| Stop::Cancelled)?;
+        match mode.check_date_count(dates.len(), false, DateWords::Codes) {
+            Ok(()) => return Ok(dates),
+            Err(error) => {
+                crate::terminal::notice(&error.to_string(), crate::terminal::NoticeKind::Warning)
+            }
+        }
+    }
 }
 
 /// The phrase and the dates to encode: asked with --ask-secrets, from the options otherwise; the
@@ -459,7 +516,8 @@ pub(crate) fn phrase_and_dates(
     mode: Mode,
     words: DateWords,
     known: Option<&Phrase>,
-) -> Result<Asked<(Phrase, Vec<Date>)>, Stop> {
+    known_dates: Option<&[Date]>,
+) -> Result<Asked<(Phrase, SecretVec<Date>)>, Stop> {
     let (phrase, dates) = if is_on(parsed, "ask-secrets") {
         assert_asked_not_given(parsed, &["mnemonic", "mnemonic-file", "date", "dates-file"])?;
         let phrase = match known
@@ -469,13 +527,23 @@ pub(crate) fn phrase_and_dates(
             Ok(phrase) => phrase,
             Err(left) => return Ok(Err(left)),
         };
-        let dates = if mode.masked() {
+        let dates = if let Some(dates) =
+            known_dates.filter(|dates| dates.len() <= maximum_dates(phrase.len()))
+        {
+            SecretVec::new(dates.to_vec())
+        } else if mode.masked() {
+            if known_dates.is_some() {
+                crate::terminal::notice(
+                    "Too many dates for this seed phrase. Enter fewer dates.",
+                    crate::terminal::NoticeKind::Warning,
+                );
+            }
             match ask_known_dates(Some(phrase.len()))? {
                 Ok(dates) => dates,
                 Err(left) => return Ok(Err(left)),
             }
         } else {
-            Vec::new()
+            SecretVec::new(Vec::new())
         };
         (phrase, dates)
     } else {
@@ -500,6 +568,34 @@ pub(crate) fn phrase_and_dates(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn early_dates_are_reused_without_a_terminal_or_a_second_question() {
+        let phrase = Phrase::parse("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about").unwrap();
+        let date = parse_date("23-09-2026").unwrap();
+        let mut parsed = Parsed::new();
+        parsed.insert("ask-secrets".to_owned(), crate::args::Given::On);
+        let (_, dates) = phrase_and_dates(
+            &parsed,
+            Mode::Seedshift,
+            DateWords::Codes,
+            Some(&phrase),
+            Some(&[date]),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(&*dates, &[date]);
+        let (_, dates) = phrase_and_dates(
+            &parsed,
+            Mode::Direct,
+            DateWords::Codes,
+            Some(&phrase),
+            Some(&[]),
+        )
+        .unwrap()
+        .unwrap();
+        assert!(dates.is_empty());
+    }
 
     #[test]
     fn forms_go_by_number_or_name() {

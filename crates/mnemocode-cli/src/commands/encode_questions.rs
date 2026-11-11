@@ -1,26 +1,25 @@
 //! The questions of a new backup, as Encode asks them (MnemoCode TS 0.1.0's
 //! `cli/encode-questions.ts`): its form, Seedshift, Shamir shares, where it goes, its cards and the
 //! sheet for heirs, each answer checked at once and recorded as the command line takes it. The
-//! start menu asks them for Encode and for its other entries that write a backup; re-encode asks
-//! them on its private screen once the phrase of the old backup is confirmed. The menu's Encode also
-//! offers embroidery, whose questions build stitch's command line. None of them is a secret.
+//! start menu selects the form, then its protected child asks Seedshift and dates before the other
+//! settings. Re-encode uses the same questions on its private screen. Dates stay in a secret owner
+//! beside the non-secret command arguments. Embroidery uses the same protected setup.
 
 use mnemocode::bip39::phrase::Phrase;
+use mnemocode::dates::Date;
 use mnemocode::forms::Form;
 use mnemocode::modes::Mode;
+use mnemocode::secret::SecretVec;
 use mnemocode::sskr::forms::ShareFormat;
 use mnemocode::sskr::split::{MAX_SHARES, MIN_THRESHOLD, ShareSetChoice};
-use mnemocode::text::numbers::typed_whole_number;
-use mnemocode::text::words::list_in_words;
 use mnemocode_embroidery::legend::EXAMPLE as LEGEND_EXAMPLE;
-use mnemocode_embroidery::picture::{self, DEFAULT_WIDTH, WIDTHS};
 
-use super::asking::ask_list;
+use super::asking::{ask_checks, ask_list};
 use super::card_questions::ask_cards;
 use super::cards::color_cards_fit_of;
 use super::encode::ORIGINAL_COPY_FORM;
 use super::given::{PATH_LIMIT, format_number};
-use super::output_questions::{ask_new_folder, ask_output_file, claim_read, input_file};
+use super::output_questions::{ask_new_folder, ask_output_file};
 use super::share_output::share_cards_fit_of;
 use crate::gate::Stop;
 use crate::terminal::{
@@ -37,8 +36,6 @@ pub(crate) const RECORD_FILE: &str = "mnemocode-record.txt";
 pub(crate) const QR_FILE: &str = "mnemocode-qr.png";
 /// The sheet for heirs by default.
 pub(crate) const HEIR_SHEET_FILE: &str = "mnemocode-heirs.pdf";
-/// A cross-stitch pattern by default, its name saying nothing of what it holds.
-const PATTERN_FILE: &str = "cross-stitch-pattern.pdf";
 /// The first question of a new backup.
 const FORM_QUESTION: &str = "Which form should the seed phrase take?";
 /// The notes of the sheet's sizes, as the menu offers them.
@@ -52,7 +49,7 @@ pub(crate) mod file_questions {
     pub(crate) const TEXT: &str = "Text file name";
     pub(crate) const RECORD: &str = "Record file name";
     pub(crate) const QR: &str = "QR code file name";
-    pub(crate) const PICTURE: &str = "Picture file name (PNG or JPEG)";
+    pub(crate) const PICTURE: &str = "Picture file name (PNG, JPEG or WebP)";
 }
 
 /// `form` written out for the example phrase, in groups that read well.
@@ -139,12 +136,18 @@ fn form_choices() -> Result<Vec<Choice<Form>>, Stop> {
     Ok(choices)
 }
 
+/// What Seedshift does, as its questions say it.
+const MASKS: &str = "Masks the seed phrase with dates you remember; only they turn it back.";
+/// Why a form that would show the phrase itself is always masked.
+const ALWAYS_MASKED: &str = "Always masked: unmasked, this form shows the seed phrase itself.";
+/// How the two Seedshift transformations differ.
+const CHECKSUMS: &str =
+    "MnemoCode's result keeps a valid checksum; the original's usually fails it.";
+
 /// What Seedshift is, shown with the first question about it; the README explains it.
 pub(crate) fn seedshift_explanation() -> Explanation {
     Explanation {
-        lines: vec![
-            "Masks the seed phrase with dates you remember; only they turn it back.".to_owned(),
-        ],
+        lines: vec![MASKS.to_owned()],
         more: vec![readme_link("transformation-modes")],
     }
 }
@@ -153,55 +156,69 @@ pub(crate) fn seedshift_explanation() -> Explanation {
 pub(crate) fn variant_explanation(always_masked: bool) -> Explanation {
     let mut lines = Vec::new();
     if always_masked {
-        lines.push("Always masked: unmasked, this form shows the seed phrase itself.".to_owned());
+        lines.push(ALWAYS_MASKED.to_owned());
     }
-    lines.push(
-        "MnemoCode's result keeps a valid checksum; the original's usually fails it.".to_owned(),
-    );
+    lines.push(CHECKSUMS.to_owned());
     Explanation {
         lines,
         more: vec![readme_link("how-checksum-valid-seedshift-works")],
     }
 }
 
-/// Whether Seedshift is used and which; none means back. A form that is always masked is asked only
-/// which (`required`). Standard shares take only MnemoCode Seedshift (`shares`), so there is nothing
-/// to choose between, and without it the shares themselves still protect the phrase.
+/// What No Seedshift leaves of a backup, where nothing else protects it.
+pub(crate) const WEAK: &str = "weak: only disguised, anyone with MnemoCode reads it";
+
+/// Which Seedshift a backup takes, and so which answers its question offers.
+#[derive(Clone, Copy)]
+pub(crate) enum Takes {
+    /// Either transformation.
+    Either,
+    /// Only MnemoCode Seedshift, whose result is a valid phrase again, as standard shares and the
+    /// legend of a pattern need. `unmasked` says what no Seedshift leaves.
+    MnemoCodeOnly { unmasked: &'static str },
+}
+
+/// Whether Seedshift is used and which, on one screen (the owner's request of 2026-11-04): MnemoCode
+/// Seedshift, the original where the backup `takes` it, and none unless the form is always masked
+/// (`required`); none means back. Where only MnemoCode Seedshift is left, nothing is asked.
 pub(crate) fn ask_seedshift(
     question: &str,
     required: bool,
-    shares: bool,
+    takes: Takes,
 ) -> Result<Option<Mode>, Stop> {
-    if !required {
-        let unmasked = if shares {
-            "the shares alone restore it"
-        } else {
-            "weak: only disguised, anyone with MnemoCode reads it"
-        };
-        let used = ask_list(
-            question,
-            "Seedshift",
-            &[
-                Choice::noted("Yes", "the same dates are needed to get it back", true),
-                Choice::noted("No", unmasked, false),
-            ],
-            Some(&seedshift_explanation()),
-        )?;
-        match used {
-            None => return Ok(None),
-            Some(false) => return Ok(Some(Mode::Direct)),
-            Some(true) => {}
+    let mut choices = super::backup_questions::seedshift_choices();
+    let mut lines = Vec::new();
+    lines.push(if required { ALWAYS_MASKED } else { MASKS }.to_owned());
+    let unmasked = match takes {
+        Takes::Either => {
+            lines.push(CHECKSUMS.to_owned());
+            WEAK
         }
+        Takes::MnemoCodeOnly { unmasked } => {
+            choices.retain(|choice| choice.value == Mode::Seedshift);
+            lines.push(
+                "Only MnemoCode Seedshift here: the original's result usually fails the checksum."
+                    .to_owned(),
+            );
+            unmasked
+        }
+    };
+    if !required {
+        choices.push(Choice::noted("No Seedshift", unmasked, Mode::Direct));
     }
-    if shares {
-        return Ok(Some(Mode::Seedshift));
+    if let [only] = choices.as_slice() {
+        return Ok(Some(only.value));
     }
-    ask_list(
-        "Which Seedshift?",
-        "Variant",
-        &super::backup_questions::seedshift_choices(),
-        Some(&variant_explanation(required)),
-    )
+    let question = if required {
+        "Which Seedshift?"
+    } else {
+        question
+    };
+    let explanation = Explanation {
+        lines,
+        more: vec![readme_link("transformation-modes")],
+    };
+    ask_list(question, "Seedshift", &choices, Some(&explanation))
 }
 
 /// A place a result may go, besides the screen.
@@ -274,21 +291,23 @@ impl Place {
                 });
             }
         };
-        Ok(path.map(|path| vec![option.to_owned(), path]))
+        let Some(path) = path else {
+            return Ok(None);
+        };
+        let mut options = vec![option.to_owned(), path];
+        if self.is_qr() {
+            let Some(chosen) = super::hidden_qr::ask_options()? else {
+                return Ok(None);
+            };
+            options.extend(chosen);
+        }
+        Ok(Some(options))
     }
 }
 
-/// Where a result goes.
-#[derive(Clone, Copy)]
-enum Destination {
-    Screen,
-    One(Place),
-    All,
-}
-
-/// One extra destination, or all of them: the result is shown on the screen in any case.
+/// Asks where the result goes besides the screen, as a checklist: every ticked place, then
+/// its own questions; none ticked keeps the result on the screen only.
 fn ask_destination(question: &str, places: &[Place]) -> Result<Option<Vec<String>>, Stop> {
-    // Card questions own QR output when cards are offered.
     let offered: Vec<Place> = if places.iter().any(|place| place.is_cards()) {
         places
             .iter()
@@ -298,29 +317,12 @@ fn ask_destination(question: &str, places: &[Place]) -> Result<Option<Vec<String
     } else {
         places.to_vec()
     };
-    let places = offered.as_slice();
-    let mut choices = vec![Choice::new("Only on this screen", Destination::Screen)];
-    for place in places {
-        choices.push(Choice::noted(
-            &format!("Screen and {}", place.name()),
-            place.note(),
-            Destination::One(*place),
-        ));
-    }
-    let mut named = vec!["the screen"];
-    named.extend(places.iter().map(|place| place.name()));
-    choices.push(Choice::noted(
-        "All of these",
-        &list_in_words(&named, "and"),
-        Destination::All,
-    ));
-    let Some(destination) = ask_list(question, "Output", &choices, None)? else {
+    let choices: Vec<Choice<Place>> = offered
+        .iter()
+        .map(|place| Choice::noted(&upper_first(place.name()), place.note(), *place))
+        .collect();
+    let Some(asks) = ask_checks(question, "Output", &choices, &[])? else {
         return Ok(None);
-    };
-    let asks: Vec<Place> = match destination {
-        Destination::Screen => Vec::new(),
-        Destination::One(place) => vec![place],
-        Destination::All => places.to_vec(),
     };
     let mut options = Vec::new();
     for place in asks {
@@ -332,13 +334,24 @@ fn ask_destination(question: &str, places: &[Place]) -> Result<Option<Vec<String
     Ok(Some(options))
 }
 
-/// One copy in the chosen form, and where it goes.
+/// `text` with its first letter in upper case: "A record file".
+fn upper_first(text: &str) -> String {
+    let mut letters = text.chars();
+    letters.next().map_or_else(String::new, |first| {
+        first.to_uppercase().chain(letters).collect()
+    })
+}
+
 fn ask_copy_destination(form: Form, mode: Mode) -> Result<Option<Vec<String>>, Stop> {
     let mut places = vec![Place::Record, Place::QrImage];
     if form.has_cards() {
         places.push(Place::Cards(form));
     }
-    let Some(destination) = ask_destination("Where should the result go?", &places)? else {
+    let Some(destination) = ask_destination(
+        "Where should the result be saved? The screen shows it in any case.",
+        &places,
+    )?
+    else {
         return Ok(None);
     };
     let mut run: Vec<String> = ["encode", "--ask-secrets", "--format"]
@@ -360,7 +373,11 @@ pub(crate) fn ask_shares(
     if format.has_cards() {
         places.push(Place::ShareCards(format));
     }
-    let Some(outputs) = ask_destination("Where should the shares go?", &places)? else {
+    let Some(outputs) = ask_destination(
+        "Where should the shares be saved? The screen shows them in any case.",
+        &places,
+    )?
+    else {
         return Ok(None);
     };
     let mut options = vec![
@@ -578,8 +595,9 @@ pub(crate) fn ask_encoding() -> Result<Option<Vec<String>>, Stop> {
             label: choice.label,
             note: choice.note,
             example: choice.example,
-            digit: choice.digit,
+            shortcut: choice.shortcut,
             value: Made::Form(choice.value),
+            enabled: choice.enabled,
         })
         .collect();
     // Its label is shorter than the longest form's, so it leaves the room of their samples as it is.
@@ -594,8 +612,18 @@ pub(crate) fn ask_encoding() -> Result<Option<Vec<String>>, Stop> {
     });
     match ask_list(FORM_QUESTION, "Form", &choices, None)? {
         None => Ok(None),
-        Some(Made::Form(form)) => ask_encoding_in(form),
-        Some(Made::Embroidery) => ask_pattern(),
+        Some(Made::Form(form)) => Ok(Some(vec![
+            "encode".to_owned(),
+            "--configure".to_owned(),
+            "--ask-secrets".to_owned(),
+            "--format".to_owned(),
+            format_number(form).to_string(),
+        ])),
+        Some(Made::Embroidery) => Ok(Some(
+            ["stitch", "--configure", "--ask-secrets"]
+                .map(str::to_owned)
+                .to_vec(),
+        )),
     }
 }
 
@@ -604,60 +632,15 @@ pub(crate) fn ask_form() -> Result<Option<Form>, Stop> {
     ask_list(FORM_QUESTION, "Form", &form_choices()?, None)
 }
 
-/// The questions of a cross-stitch pattern: the picture it shows, its stitches across and the PDF it
-/// is saved in; stitch's command line, or none for back. The phrase and the dates are asked on
-/// stitch's private screen.
-fn ask_pattern() -> Result<Option<Vec<String>>, Stop> {
-    let how = LineQuestion {
-        what: Some("the name of a PNG or JPEG file"),
-        limit: PATH_LIMIT,
-        ..LineQuestion::default()
-    };
-    let picture = match ask_line(file_questions::PICTURE, "Picture", how, |answer: &str| {
-        input_file(answer, picture::MAX_FILE_BYTES)
-    })? {
-        Chosen::One(path) => path,
-        Chosen::Back => return Ok(None),
-        Chosen::Cancelled => return Err(Stop::Cancelled),
-    };
-    // The pattern may not be saved over its own picture.
-    claim_read(&picture);
-    let fallback = DEFAULT_WIDTH.to_string();
-    let what = format!("a number from {}", WIDTHS.to());
-    let how = LineQuestion {
-        fallback: Some(&fallback),
-        what: Some(&what),
-        limit: PATH_LIMIT,
-        ..LineQuestion::default()
-    };
-    let question = format!("How many stitches across? ({})", WIDTHS.to());
-    let width = match ask_line(&question, "Across", how, |answer: &str| {
-        typed_whole_number(answer, WIDTHS, None).map(|width| width.to_string())
-    })? {
-        Chosen::One(width) => width,
-        Chosen::Back => return Ok(None),
-        Chosen::Cancelled => return Err(Stop::Cancelled),
-    };
-    let Some(pdf) = ask_output_file(file_questions::PDF, PATTERN_FILE)? else {
-        return Ok(None);
-    };
-    Ok(Some(vec![
-        "stitch".to_owned(),
-        "--ask-secrets".to_owned(),
-        "--picture".to_owned(),
-        picture,
-        "--stitches-across".to_owned(),
-        width,
-        "--pdf".to_owned(),
-        pdf,
-    ]))
-}
+/// Non-secret command arguments and separately owned dates from the private screen.
+pub(crate) type EncodingAnswers = (Vec<String>, SecretVec<Date>);
 
-/// The questions of a new backup after its `form`.
-pub(crate) fn ask_encoding_in(form: Form) -> Result<Option<Vec<String>>, Stop> {
-    let Some(mode) = ask_seedshift("Use Seedshift?", form.always_masked(), false)? else {
+/// Asks the new backup's settings and keeps its dates outside the command arguments.
+pub(crate) fn ask_encoding_in(form: Form) -> Result<Option<EncodingAnswers>, Stop> {
+    let Some(mode) = ask_seedshift("Use Seedshift?", form.always_masked(), Takes::Either)? else {
         return Ok(None);
     };
+    let dates = super::given::ask_encoding_dates(mode)?;
     // The Original Seedshift cannot be split into shares (mnemocode encode --help).
     let set = if mode.capabilities().split {
         match ask_share_set("Split it into Shamir shares?", &shares_explanation(), true)? {
@@ -711,5 +694,64 @@ pub(crate) fn ask_encoding_in(form: Form) -> Result<Option<Vec<String>>, Stop> {
         return Ok(None);
     };
     run.extend(heirs);
-    Ok(Some(run))
+    Ok(Some((run, dates)))
+}
+
+/// Protected setup for the menu entry that creates standard SSKR shares.
+pub(crate) fn ask_splitting() -> Result<Option<EncodingAnswers>, Stop> {
+    let shares = Takes::MnemoCodeOnly {
+        unmasked: "the shares alone restore it",
+    };
+    let Some(mode) = ask_seedshift("Use Seedshift before splitting?", false, shares)? else {
+        return Ok(None);
+    };
+    let dates = super::given::ask_encoding_dates(mode)?;
+    let explanation = Explanation {
+        lines: vec![
+            "Standard SSKR shares of the seed phrase itself, which other SSKR tools read."
+                .to_owned(),
+        ],
+        more: vec![readme_link("splitting-a-mnemonic-into-shares")],
+    };
+    let set = ask_share_set(
+        "How many shares, and how many of them restore the seed phrase?",
+        &explanation,
+        false,
+    )?;
+    let Some(Some(set)) = set else {
+        return Ok(None);
+    };
+    let choices = [
+        Choice::noted(
+            "Words",
+            "Bytewords, such as tuna next keep gyro ...",
+            ShareFormat::Words,
+        ),
+        Choice::noted(
+            "Short code",
+            "ur:sskr/..., the standard short form",
+            ShareFormat::Ur,
+        ),
+    ];
+    let Some(format) = ask_list(
+        "How should each share be written?",
+        "Shares as",
+        &choices,
+        None,
+    )?
+    else {
+        return Ok(None);
+    };
+    let Some(shares) = ask_shares(set, format)? else {
+        return Ok(None);
+    };
+    let Some(heirs) = ask_heir_sheet(mode)? else {
+        return Ok(None);
+    };
+    let mut run = ["encode", "--sskr", "--ask-secrets", "--mode", mode.id()]
+        .map(str::to_owned)
+        .to_vec();
+    run.extend(shares);
+    run.extend(heirs);
+    Ok(Some((run, dates)))
 }

@@ -41,6 +41,18 @@ impl Thread {
     }
 }
 
+/// The place in [`THREADS`] of the thread a person typed as `number`: a number by its value, so that
+/// `06` and `6` are one thread, a named one whatever its letters' case; none where no thread has it.
+#[must_use]
+pub fn find(number: &str) -> Option<usize> {
+    let typed = number.trim();
+    let value = typed.parse::<u32>().ok();
+    THREADS.iter().position(|thread| match value {
+        Some(value) => thread.number.parse::<u32>().ok() == Some(value),
+        None => thread.number.eq_ignore_ascii_case(typed),
+    })
+}
+
 const fn thread(number: &'static str, name: &'static str, rgb: [u8; 3]) -> Thread {
     Thread { number, name, rgb }
 }

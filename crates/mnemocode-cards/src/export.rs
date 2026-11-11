@@ -79,6 +79,8 @@ pub enum ExportError {
     Empty,
     /// A place of no share.
     NoShare,
+    /// A document index outside its share's published descriptor.
+    NoDocument,
     /// Separate cards of a QR card.
     QrCards,
     /// Share cards that cannot be printed for every seed phrase; the refusal's own text.
@@ -124,6 +126,7 @@ impl fmt::Display for ExportError {
             Self::NoIndividualCards => f.write_str(NO_INDIVIDUAL_CARDS),
             Self::Empty => f.write_str(EMPTY_CARD_COLLECTION),
             Self::NoShare => f.write_str("There is no share at that place in the set."),
+            Self::NoDocument => f.write_str("There is no document at that index for the share."),
             Self::QrCards => f.write_str(
                 "A whole-share QR card cannot become individual fragments. Start with a collection sheet.",
             ),
@@ -166,6 +169,7 @@ impl Refusal for ExportError {
             Self::NoIndividualCards => "export.render.no-individual-cards",
             Self::Empty => "export.render.empty-card-collection",
             Self::NoShare => "export.sskr-render.there-no-share-at-place-set",
+            Self::NoDocument => "export.sskr-render.no-document-at-index",
             Self::QrCards => "export.sskr-render.qr-cards-cannot-become-fragments",
             Self::NotPrintable(_) => {
                 "export.sskr-render.share-cards-cannot-printed-every-seed-phrase-longest"
@@ -649,6 +653,8 @@ pub struct ShareQrCode {
     pub name: String,
     /// The text the code holds: the share in its written form.
     pub payload: String,
+    /// The public vCard where the record is stored in filler bytes.
+    pub contact: Option<String>,
 }
 
 /// One share's place in a set of cards.
@@ -682,19 +688,11 @@ pub fn share_card_codes(share: &Share, format: ShareFormat) -> Result<CardCodes,
     if format.is_color() {
         let colors = ShareFormat::Colors.write(share);
         let colors = colors.as_str().split(' ').map(str::to_owned).collect();
-        return Ok(CardCodes {
-            colors,
-            labels: None,
-            payload,
-        });
+        return Ok(CardCodes::new(colors, None, payload));
     }
     let labels: Vec<String> = payload.split(' ').map(str::to_owned).collect();
     let colors = code_colors(&labels).map_err(ContentError::from)?;
-    Ok(CardCodes {
-        colors,
-        labels: Some(labels),
-        payload,
-    })
+    Ok(CardCodes::new(colors, Some(labels), payload))
 }
 
 /// How many cards of the share `record` print its own codes in `format`, before the decoys: what
@@ -853,7 +851,12 @@ impl ShareCardSet {
             .map(|member| ShareQrCode {
                 reference: member.share.reference.clone(),
                 name: member.share.name.clone(),
-                payload: member.cards.codes.payload.clone(),
+                payload: member.cards.codes.payload.as_str().to_owned(),
+                contact: member
+                    .cards
+                    .settings
+                    .hidden_qr
+                    .then(|| member.cards.settings.profile.qr_contact()),
             })
             .collect()
     }
@@ -904,6 +907,9 @@ impl ShareCardSet {
         index: usize,
     ) -> Result<NamedDocument, ExportError> {
         let member = self.member(place)?;
+        if index >= member.share.documents {
+            return Err(ExportError::NoDocument);
+        }
         let name = if member.share.folder.is_some() {
             separate_card_name(index)
         } else {

@@ -20,8 +20,9 @@ use super::resolved;
 use crate::args::{Parsed, integer_option, is_on, value};
 use crate::gate::Stop;
 use crate::os::SystemRandom;
+use crate::output::shown_path;
 use crate::terminal::result::result_header;
-use crate::terminal::{self, Channel, TEXT_WIDTH, paint, printable, saved, style, wrap_text};
+use crate::terminal::{self, Channel, TEXT_WIDTH, paint, saved, style, wrap_text};
 
 /// The options `preview` takes.
 pub(crate) const OPTIONS: [&str; 24] = [
@@ -204,7 +205,7 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
         let count = export_card_files(&drawing, cards, directory, format)?;
         saved(&format!(
             "Saved {count} individual card preview files to: {}",
-            printable(directory)
+            shown_path(directory)
         ));
     }
     if let Some(path) = path {
@@ -218,7 +219,7 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
         saved(&format!(
             "Saved preview PDF ({} {templates}): {}",
             jobs.len(),
-            printable(path)
+            shown_path(path)
         ));
     }
     if let Some(images) = images {

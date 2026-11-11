@@ -269,7 +269,7 @@
     {
       "id": "CAP-CLI-EXECUTABLE-VERIFICATION",
       "crate": "tooling",
-      "module": "xtask/src/verify_executable.rs",
+      "module": "xtask/src/release.rs",
       "status": "port",
       "reason": "Same checks of a built executable, sandbox marks included."
     },
@@ -521,7 +521,7 @@
     {
       "id": "CAP-CLI-RELEASE-SIGNING",
       "crate": "tooling",
-      "module": "xtask/src/sign.rs",
+      "module": "xtask/src/release.rs",
       "status": "port",
       "reason": "Same procedure and key."
     },
@@ -710,7 +710,7 @@
     {
       "id": "CAP-PHRASE-FORMATS-DATE-PATTERNS",
       "crate": "mnemocode",
-      "module": "dates::patterns",
+      "module": "dates",
       "status": "port",
       "reason": "Same patterns and counts; counts use the search module's bounded counts (CORE-50)."
     },
@@ -773,7 +773,7 @@
     {
       "id": "CAP-PHRASE-FORMATS-FORM-COLOR-UNICODE",
       "crate": "mnemocode",
-      "module": "forms::color_unicode",
+      "module": "forms::colors",
       "status": "port",
       "reason": "Form 4 as one registry entry."
     },
@@ -794,14 +794,14 @@
     {
       "id": "CAP-PHRASE-FORMATS-FORM-ENGLISH",
       "crate": "mnemocode",
-      "module": "forms::english",
+      "module": "forms",
       "status": "port",
       "reason": "Form 1 as one registry entry."
     },
     {
       "id": "CAP-PHRASE-FORMATS-FORM-INDEXES",
       "crate": "mnemocode",
-      "module": "forms::indexes",
+      "module": "forms",
       "status": "port",
       "reason": "Form 2 as one registry entry."
     },
@@ -815,7 +815,7 @@
     {
       "id": "CAP-PHRASE-FORMATS-FORM-UNICODE",
       "crate": "mnemocode",
-      "module": "forms::unicode",
+      "module": "forms",
       "status": "port",
       "reason": "Form 3 as one registry entry over the bip39 crate's Traditional Chinese list."
     },
@@ -836,7 +836,7 @@
     {
       "id": "CAP-PHRASE-FORMATS-LEGACY-VALID-LAST-WORD",
       "crate": "mnemocode",
-      "module": "modes::legacy_valid",
+      "module": "modes::seedshift",
       "status": "port",
       "reason": "Same search of checksum-valid last words, through the bip39 crate: the known words' entropy, each value of its free last bits through from_entropy_in; the mode is read-only (not encodable) by type."
     },
@@ -850,14 +850,14 @@
     {
       "id": "CAP-PHRASE-FORMATS-MODE-DIRECT",
       "crate": "mnemocode",
-      "module": "modes::direct",
+      "module": "modes::seedshift",
       "status": "port",
       "reason": "One registry entry."
     },
     {
       "id": "CAP-PHRASE-FORMATS-MODE-LEGACY",
       "crate": "mnemocode",
-      "module": "modes::legacy",
+      "module": "modes::seedshift",
       "status": "port",
       "reason": "One registry entry."
     },
@@ -871,7 +871,7 @@
     {
       "id": "CAP-PHRASE-FORMATS-NUMBERED-DICTIONARIES",
       "crate": "mnemocode",
-      "module": "bip39::dictionaries",
+      "module": "bip39::table",
       "status": "port",
       "reason": "Text of the numbered dictionaries in the library; the table command and the binding save or show it."
     },
@@ -955,7 +955,7 @@
     {
       "id": "CAP-PHRASE-FORMATS-SHIFT-SCHEDULE",
       "crate": "mnemocode",
-      "module": "dates::schedule",
+      "module": "dates",
       "status": "port",
       "reason": "Same shifts from dates."
     },
@@ -1214,7 +1214,7 @@
     {
       "id": "CAP-SSKR-ENGINE-REPRODUCIBLE-BUILD",
       "crate": "tooling",
-      "module": "xtask/src/reproducible.rs",
+      "module": "xtask/src/release.rs",
       "status": "redesign",
       "reason": "The engine is linked, so the artifacts carry it: the Linux x86-64 and aarch64 and Windows executables and every page's WASM file are rebuilt in the pinned container and compared byte for byte; macOS executables are built on a pinned runner and checked by executable verification and SHA256SUMS; the vendored crates keep UPSTREAM.json and their local-change list."
     },
@@ -1487,7 +1487,7 @@
     {
       "id": "CAP-WALLET-ADDRESS-LOCATION",
       "crate": "mnemocode",
-      "module": "wallet::location",
+      "module": "wallet::coins",
       "status": "port",
       "reason": "Same account, branch and index rules."
     },

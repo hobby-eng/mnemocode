@@ -5,7 +5,41 @@
 use mnemocode::forms::hints::{WordHint, WordHints};
 
 use super::answer::Hints;
-use super::{Channel, paint, style};
+use super::{Channel, escape_hint, paint, style};
+
+/// Existing input feedback followed by the same separate keyboard hint for every question.
+pub(crate) struct InputHints<'a> {
+    inner: Option<&'a dyn Hints>,
+    secret: bool,
+}
+
+impl<'a> InputHints<'a> {
+    pub(crate) const fn new(inner: Option<&'a dyn Hints>, secret: bool) -> Self {
+        Self { inner, secret }
+    }
+}
+
+impl Hints for InputHints<'_> {
+    fn rows(&self, typed: &str, length: usize, columns: usize) -> Vec<String> {
+        let mut rows = self
+            .inner
+            .filter(|hint| length > 0 || hint.shown_at_once())
+            .map_or_else(Vec::new, |hint| hint.rows(typed, length, columns));
+        let action = if self.secret { "cancel" } else { "go back" };
+        if columns > "Press Esc to ".len() + action.len() {
+            rows.push(escape_hint(action));
+        }
+        rows
+    }
+
+    fn completion(&self, typed: &str) -> Option<(String, bool)> {
+        self.inner.and_then(|hint| hint.completion(typed))
+    }
+
+    fn shown_at_once(&self) -> bool {
+        true
+    }
+}
 
 /// Rows of words shown at most.
 const HINT_ROWS: usize = 3;
@@ -17,13 +51,13 @@ const NARROWEST_FOR_HINTS: usize = 24;
 const INDENT: &str = "  ";
 
 impl<T: WordHints> Hints for T {
-    fn rows(&self, typed: &str, columns: usize) -> Vec<String> {
+    fn rows(&self, typed: &str, _length: usize, columns: usize) -> Vec<String> {
         hint_rows(&self.hint(typed), columns)
     }
 
-    fn completion(&self, typed: &str) -> (String, bool) {
+    fn completion(&self, typed: &str) -> Option<(String, bool)> {
         let completion = WordHints::completion(self, typed);
-        (completion.letters, completion.word_ends)
+        Some((completion.letters, completion.word_ends))
     }
 }
 

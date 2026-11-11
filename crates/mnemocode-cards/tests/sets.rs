@@ -60,7 +60,13 @@ const OWN_SHARE_CODES: [(ShareFormat, usize); 3] = [
 const CARD_FORMS: [Form; 3] = [Form::ColorsUnicode, Form::Colors, Form::Unicode];
 
 /// The codes that `cards` print and what their QR code holds.
-fn codes_of(cards: &ColorCards) -> (&[String], Option<&[String]>, &str) {
+fn codes_of(
+    cards: &ColorCards,
+) -> (
+    &[mnemocode::secret::SecretText],
+    Option<&[mnemocode::secret::SecretText]>,
+    &str,
+) {
     let codes = &cards.codes;
     (&codes.colors, codes.labels.as_deref(), &codes.payload)
 }
@@ -176,7 +182,11 @@ fn decoys_look_like_the_codes_of_a_phrase_or_a_share_and_keep_the_codes_before_t
         let value = u32::from_str_radix(&decoy[1..], 16).expect("a color");
         let digits = format!("{value:08}");
         let (first, second) = (digits.as_bytes()[0], digits.as_bytes()[1]);
-        assert!(matches!(first, b'0' | b'1') && second % 2 == 0, "{decoy}");
+        assert!(
+            matches!(first, b'0' | b'1') && second % 2 == 0,
+            "{}",
+            decoy.as_str()
+        );
     }
     let share = share_cards(&["#41C47E"])
         .with_decoy_pool(&mut last_choices())
@@ -184,13 +194,18 @@ fn decoys_look_like_the_codes_of_a_phrase_or_a_share_and_keep_the_codes_before_t
     assert_eq!(share.codes.colors[1..], ["#FFFFFF"; MAX_DECOYS]);
     let abandon = unicode_code(0);
     let mut codes = phrase_cards(&code_colors(&[&abandon]).expect("a color"));
-    codes.codes.labels = Some(vec![abandon]);
+    codes.codes.labels = Some(mnemocode::secret::SecretVec::new(vec![
+        mnemocode::secret::SecretText::take("Card code", abandon),
+    ]));
     let codes = codes
         .with_decoy_pool(&mut last_choices())
         .expect("the decoys");
     let labels = codes.codes.labels.clone().expect("the codes");
     assert_eq!(labels[1..], vec![unicode_code(2047); MAX_DECOYS]);
-    assert_eq!(codes.codes.colors, code_colors(&labels).expect("colors"));
+    assert_eq!(
+        codes.codes.colors[..],
+        code_colors(&labels).expect("colors")
+    );
 }
 
 #[test]
@@ -456,6 +471,7 @@ fn a_retained_share_sheet_keeps_each_forms_codes_and_first_decoy_as_separate_car
     let settings = CardSettings {
         orientation: Some(Orientation::Portrait),
         card_qr: true,
+        hidden_qr: false,
         ..CardSettings::default()
     };
     for (format, own) in OWN_SHARE_CODES {
@@ -555,7 +571,7 @@ fn separate_cards_keep_one_decoy_for_every_printable_form_of_every_length() {
             };
             assert_eq!(planned.decoys, Some(1));
             assert_eq!(planned.codes.colors.len(), own + 1);
-            assert_eq!(planned.codes.colors[..own], original.codes.colors);
+            assert_eq!(planned.codes.colors[..own], original.codes.colors[..]);
             assert_eq!(
                 planned.codes.labels.as_ref().map(|labels| &labels[..own]),
                 original.codes.labels.as_deref()
@@ -587,7 +603,7 @@ fn a_sheet_of_28_cards_gives_25_separate_cards_and_stays_as_it_was() {
         separate.codes.labels.as_deref(),
         sheet.codes.labels.as_ref().map(|all| &all[..25])
     );
-    assert_eq!(separate.codes.colors, sheet.codes.colors[..25]);
+    assert_eq!(separate.codes.colors[..], sheet.codes.colors[..25]);
     assert_eq!(separate.codes.payload, sheet.codes.payload);
     assert_eq!(sheet.codes.colors.len(), 28);
     let same = with_planned_decoys(it, &drawing, &mut NoChoices, &sheet, false);
@@ -655,8 +671,11 @@ fn unicode_codes_print_in_colors_that_decorate_them_and_a_form_without_cards_is_
         .iter()
         .map(|index| unicode_code(usize::from(*index)))
         .collect();
-    assert_eq!(labels, codes);
-    assert_eq!(cards.codes.colors, code_colors(&labels).expect("colors"));
+    assert_eq!(labels[..], codes);
+    assert_eq!(
+        cards.codes.colors[..],
+        code_colors(&labels).expect("colors")
+    );
     assert_eq!(
         cards.codes.payload,
         unicode.text().expect("the text").as_str()
@@ -691,4 +710,85 @@ fn every_output_of_an_export_shows_the_real_codes_and_decoys_of_its_one_plan() {
         let again = planned_card_job(&drawing, &mut NoChoices, &planned).expect("the plan");
         assert_eq!(numbered(&again.cards), sheet);
     }
+}
+
+#[test]
+fn a_retained_share_refuses_document_indexes_outside_its_descriptor_in_every_layout() {
+    let drawing = CardDrawing::new();
+    for layout in SskrLayout::ALL {
+        let options = share_options(ShareFormat::Colors, Some(layout), CardSettings::default());
+        let set = ShareCardSet::create(
+            &drawing,
+            &mut first_choices(),
+            &[OFFICIAL_SHARES[0]],
+            &options,
+        )
+        .unwrap();
+        let count = set.shares().next().unwrap().documents;
+        assert!(count > 0);
+        assert!(
+            set.document(&drawing, &mut first_choices(), 0, count - 1)
+                .is_ok()
+        );
+        for index in [count, usize::MAX] {
+            let error = set
+                .document(&drawing, &mut first_choices(), 0, index)
+                .err()
+                .unwrap();
+            assert_eq!(
+                mnemocode::refusal::Refusal::code(&error),
+                "export.sskr-render.no-document-at-index"
+            );
+        }
+    }
+}
+
+#[test]
+fn direct_card_index_checks_refuse_the_largest_integer_without_overflow() {
+    let cards = phrase_cards(&colors_of([0; 12]));
+    assert!(cards.check_index(0).is_ok());
+    assert!(cards.check_index(cards.codes.colors.len()).is_err());
+    let refused = cards.check_index(usize::MAX).unwrap_err();
+    assert!(refused.to_string().contains(&usize::MAX.to_string()));
+}
+
+#[test]
+fn retained_card_codes_protect_text_and_owner_arrays_without_changing_the_backup() {
+    use mnemocode::secret::probe_lock;
+    use mnemocode_cards::content::CardCodes;
+    let colors = vec!["#000000".to_owned(), "#FFFFFF".to_owned()];
+    let labels = vec!["public one".to_owned(), "public two".to_owned()];
+    let codes = CardCodes::new(
+        colors.clone(),
+        Some(labels.clone()),
+        "public payload".to_owned(),
+    );
+    let cloned = codes.clone();
+    for set in [&codes, &cloned] {
+        assert_eq!(
+            set.colors.iter().map(|v| v.as_str()).collect::<Vec<_>>(),
+            colors
+        );
+        let held_labels = set.labels.as_ref().unwrap();
+        assert_eq!(
+            held_labels.iter().map(|v| v.as_str()).collect::<Vec<_>>(),
+            labels
+        );
+        assert_eq!(set.payload.as_str(), "public payload");
+        assert_eq!(set.printed(1), "public two");
+        if probe_lock(4096) {
+            assert!(set.colors.is_locked());
+            assert!(held_labels.is_locked());
+            assert!(set.payload.is_locked());
+            assert!(
+                set.colors
+                    .iter()
+                    .chain(held_labels.iter())
+                    .all(|v| v.is_locked())
+            );
+        }
+        assert_eq!(format!("{set:?}"), "[CardCodes: redacted]");
+    }
+    assert_ne!(codes.payload.as_ptr(), cloned.payload.as_ptr());
+    assert_ne!(codes.colors[0].as_ptr(), cloned.colors[0].as_ptr());
 }

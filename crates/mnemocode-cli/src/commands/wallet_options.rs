@@ -275,11 +275,7 @@ fn scan_gap_of(parsed: &Parsed) -> Result<Option<u64>, Stop> {
 fn first_receiving(addresses: Option<u64>) -> Place {
     Place {
         network: KeyNetwork::Mainnet,
-        location: AddressLocation {
-            account: 0,
-            branch: 0,
-            index: 0,
-        },
+        location: AddressLocation::FIRST,
         addresses,
     }
 }
@@ -322,7 +318,7 @@ fn evidence_of(
         return Err(WalletOptionError::ScanGapKind.into());
     }
     let location = location_of(parsed)?;
-    let counted = counted.or(Some(u64::from(default_address_count(location.index))));
+    let counted = counted.or(Some(u64::from(default_address_count(location.index()))));
     if option == "coin-address" {
         if let Some(key) = given_of(parsed, &BITCOIN_ONLY_OPTIONS) {
             return Err(WalletOptionError::BitcoinOnly(key).into());
@@ -361,7 +357,7 @@ fn evidence_of(
         return Ok(Some(Evidence::account_key(
             text,
             network,
-            u64::from(location.account),
+            u64::from(location.account()),
         )?));
     }
     let place = Place {

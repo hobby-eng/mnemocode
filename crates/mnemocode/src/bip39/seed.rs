@@ -3,11 +3,10 @@
 //! checked [`Phrase`], so that unchecked text cannot reach it, and gives the seed in a locked buffer
 //! that is wiped when it is dropped.
 
-use unicode_normalization::UnicodeNormalization;
 use zeroize::Zeroize;
 
 use super::phrase::{Phrase, PhraseError};
-use crate::secret::{SecretBytes, SecretText};
+use crate::secret::{Nfkd, SecretBytes};
 
 /// The bytes of a seed.
 pub const SEED_BYTES: usize = 64;
@@ -15,17 +14,7 @@ pub const SEED_BYTES: usize = 64;
 /// The seed of `phrase` with `passphrase`, which is normalized to NFKD here.
 pub fn seed(phrase: &Phrase, passphrase: &str) -> Result<SecretBytes, PhraseError> {
     let mnemonic = phrase.mnemonic()?;
-    // NFKD can make a character many times longer (U+FDFA, 3 bytes, gives 33): the buffer is
-    // reserved at the normalized length, counted first.
-    let length = passphrase.nfkd().map(char::len_utf8).sum();
-    let normalized = SecretText::build("a passphrase", length, |filler| {
-        for character in passphrase.nfkd() {
-            filler.push(character)?;
-        }
-        Ok::<_, crate::secret::CapacityExceeded>(())
-    })
-    // Reserved at the counted length, the buffer holds it: no refusal comes from here.
-    .map_err(|_| PhraseError::WordCount)?;
+    let normalized = Nfkd::of(passphrase).text("a passphrase");
     let mut bytes = mnemonic.to_seed_normalized(&normalized);
     let seed = SecretBytes::copy_of("a seed", &bytes);
     bytes.zeroize();
@@ -35,6 +24,7 @@ pub fn seed(phrase: &Phrase, passphrase: &str) -> Result<SecretBytes, PhraseErro
 #[cfg(test)]
 mod tests {
     use super::*;
+    use unicode_normalization::UnicodeNormalization;
 
     #[test]
     fn the_seed_is_bip39s_published_one() {

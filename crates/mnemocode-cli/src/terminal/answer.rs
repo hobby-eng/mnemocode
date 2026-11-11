@@ -1,5 +1,5 @@
 //! An answer as the line editor edits it (MnemoCode TS 0.1.0's `typed-answer.ts`): its bytes in a
-//! locked buffer reserved at the question's limit and never grown, wiped when done; the cursor,
+//! fixed locked buffers replaced as input grows, each wiped when released; the cursor,
 //! always at the start of a character; and, for a visible answer, what the terminal shows, which
 //! wraps a long answer onto further rows, a wide character whole onto the next, and the hint for the
 //! word being typed below it.
@@ -13,12 +13,18 @@ use super::{ERASE_BELOW, cursor_down, cursor_right, cursor_up, error_raw};
 
 /// Hints for the word being typed, shown below a visible answer, and Tab's completion.
 pub(crate) trait Hints {
-    /// The rows of the hint for `typed`, the words before the cursor, on a terminal `columns` wide;
-    /// none for no hint.
-    fn rows(&self, typed: &str, columns: usize) -> Vec<String>;
-    /// The letters that every word beginning like the typed one has next, and whether one word is
-    /// left, after which a space goes.
-    fn completion(&self, typed: &str) -> (String, bool);
+    /// The rows of the hint for `typed`, the words before the cursor, of an answer `length` bytes
+    /// long, on a terminal `columns` wide; none for no hint.
+    fn rows(&self, typed: &str, length: usize, columns: usize) -> Vec<String>;
+    /// Optional Tab completion; without one Tab inserts a space.
+    fn completion(&self, _typed: &str) -> Option<(String, bool)> {
+        None
+    }
+    /// Whether the hint is drawn before the first key, as the bytes a message may take are; a
+    /// word's hint waits for its letters.
+    fn shown_at_once(&self) -> bool {
+        false
+    }
 }
 
 /// Why a question cannot use an answer: longer than its limit, or not UTF-8.
@@ -28,6 +34,8 @@ pub(crate) enum Unusable {
     TooLong(usize),
     /// Bytes of no UTF-8 character.
     NotUtf8,
+    /// The allocator refused a legal input before changing the existing answer.
+    Memory,
 }
 
 impl Unusable {
@@ -38,12 +46,15 @@ impl Unusable {
                 format!("An answer is longer than {limit} bytes; no valid answer is that long.")
             }
             Self::NotUtf8 => mnemocode::text::utf8::not_utf8_text("The answer"),
+            Self::Memory => "Not enough memory to read this input.".to_owned(),
         }
     }
 }
 
 /// The words that a hint is given: the word being typed and three before it.
 const HINT_CONTEXT_WORDS: usize = 4;
+/// Initial storage for ordinary short answers, not an acceptance limit.
+const INITIAL_ANSWER_BYTES: usize = 256;
 
 /// Whether `byte` continues a UTF-8 character rather than starting one.
 const fn is_continuation(byte: u8) -> bool {
@@ -164,6 +175,7 @@ fn is_character_end(line: &[u8], length: usize) -> bool {
 /// An answer as it is typed.
 pub(crate) struct TypedAnswer<'h> {
     line: SecretBytes,
+    limit: usize,
     length: usize,
     cursor: usize,
     shown: Option<ShownLine>,
@@ -181,12 +193,13 @@ impl<'h> TypedAnswer<'h> {
         hints: Option<&'h dyn Hints>,
     ) -> Self {
         Self {
-            line: SecretBytes::zeroed("an answer", limit),
+            line: SecretBytes::zeroed("an answer", 0),
+            limit,
             length: 0,
             cursor: 0,
             shown: echo.then(|| ShownLine::new(prompt_width)),
             hints: if echo { hints } else { None },
-            hint_due: false,
+            hint_due: echo && hints.is_some_and(Hints::shown_at_once),
         }
     }
 
@@ -216,8 +229,21 @@ impl<'h> TypedAnswer<'h> {
 
     /// Inserts `byte` at the cursor; refused past the limit.
     pub(crate) fn insert(&mut self, byte: u8) -> Result<(), Unusable> {
+        if self.length == self.limit {
+            return Err(Unusable::TooLong(self.limit));
+        }
         if self.length == self.line.len() {
-            return Err(Unusable::TooLong(self.line.len()));
+            let capacity = self
+                .line
+                .len()
+                .saturating_mul(2)
+                .max(INITIAL_ANSWER_BYTES)
+                .min(self.limit);
+            let mut larger =
+                SecretBytes::try_zeroed("an answer", capacity).map_err(|_| Unusable::Memory)?;
+            // Keep both holds until copying finishes; replacing drops/wipes the old owner.
+            larger[..self.length].copy_from_slice(&self.line[..self.length]);
+            self.line = larger;
         }
         self.line
             .copy_within(self.cursor..self.length, self.cursor + 1);
@@ -320,10 +346,10 @@ impl<'h> TypedAnswer<'h> {
     }
 
     /// The words before the cursor that the hint and Tab are about, while the cursor ends a word;
-    /// otherwise none. No more of the answer, which may be a secret, becomes a string.
-    fn typed_before(&self) -> String {
+    /// otherwise none. Borrow directly from the locked owner; never copy secret text into a String.
+    fn typed_before(&self) -> &str {
         if self.cursor < self.length && self.line.get(self.cursor) != Some(&key::SPACE) {
-            return String::new();
+            return "";
         }
         let mut start = self.cursor;
         for _ in 0..HINT_CONTEXT_WORDS {
@@ -335,13 +361,14 @@ impl<'h> TypedAnswer<'h> {
         self.line
             .get(start..self.cursor)
             .and_then(|bytes| std::str::from_utf8(bytes).ok())
-            .map(str::to_owned)
             .unwrap_or_default()
     }
 
     /// Tab: completes the word being typed as far as the words beginning like it agree.
     pub(crate) fn complete(&mut self, hints: &dyn Hints) -> Result<(), Unusable> {
-        let (letters, word_ends) = hints.completion(&self.typed_before());
+        let Some((letters, word_ends)) = hints.completion(self.typed_before()) else {
+            return self.insert(key::SPACE);
+        };
         for byte in letters.bytes() {
             self.insert(byte)?;
         }
@@ -361,9 +388,11 @@ impl<'h> TypedAnswer<'h> {
         if !self.hint_due || !quiet() {
             return;
         }
-        let typed = self.typed_before();
-        if let (Some(hints), Some(shown)) = (self.hints, &mut self.shown) {
-            let rows = hints.rows(&typed, shown.columns);
+        let rows = self
+            .hints
+            .zip(self.shown.as_ref())
+            .map(|(hints, shown)| hints.rows(self.typed_before(), self.length, shown.columns));
+        if let (Some(rows), Some(shown)) = (rows, &mut self.shown) {
             shown.show_hint(&self.line, &rows, self.length, self.cursor);
         }
         self.hint_due = false;
@@ -373,7 +402,7 @@ impl<'h> TypedAnswer<'h> {
     pub(crate) fn take(&self) -> Result<SecretBytes, Unusable> {
         let bytes = self.line.get(..self.length).unwrap_or_default();
         strict_utf8(bytes, "The answer").map_err(|_| Unusable::NotUtf8)?;
-        Ok(SecretBytes::copy_of("an answer", bytes))
+        SecretBytes::try_copy_of("an answer", bytes).map_err(|_| Unusable::Memory)
     }
 }
 
@@ -612,6 +641,59 @@ mod tests {
             let _inserted = answer.insert(*byte);
         }
         assert_eq!(answer.insert(b'x'), Err(Unusable::TooLong(8)));
+    }
+
+    #[test]
+    fn hint_context_borrows_the_owned_secret_buffer() {
+        let mut answer = TypedAnswer::new(64, false, 0, None);
+        for byte in b"alpha beta gamma" {
+            answer.insert(*byte).unwrap();
+        }
+        let context = answer.typed_before();
+        assert_eq!(context, "alpha beta gamma");
+        assert_eq!(context.as_ptr(), answer.line.as_ptr());
+        answer.edit(EditKey::Left);
+        assert!(answer.typed_before().is_empty());
+    }
+
+    #[test]
+    fn short_input_under_a_large_limit_keeps_a_small_protected_allocation() {
+        let mut answer = TypedAnswer::new(124 * 1024 * 1024, false, 0, None);
+        assert_eq!(answer.line.reserved_bytes(), 0);
+        for byte in b"public editor probe" {
+            answer.insert(*byte).unwrap();
+        }
+        assert!(answer.line.reserved_bytes() < 1024 * 1024);
+        assert_eq!(&*answer.take().unwrap(), b"public editor probe");
+        if mnemocode::secret::probe_lock(INITIAL_ANSWER_BYTES) {
+            assert!(answer.line.is_locked());
+        }
+    }
+
+    #[test]
+    fn growth_preserves_utf8_middle_insertion_and_the_original_logical_limit() {
+        let mut answer = TypedAnswer::new(259, false, 0, None);
+        for _ in 0..255 {
+            answer.insert(b'a').unwrap();
+        }
+        for byte in "€".bytes() {
+            answer.insert(byte).unwrap();
+        }
+        assert_eq!(answer.len(), 258);
+        answer.edit(EditKey::Home);
+        answer.insert(b'Z').unwrap();
+        let taken = answer.take().unwrap();
+        assert_eq!(taken[0], b'Z');
+        assert_eq!(&taken[256..], "€".as_bytes());
+        assert_eq!(answer.insert(b'!'), Err(Unusable::TooLong(259)));
+        answer.edit(EditKey::End);
+        assert!(answer.control(key::BACKSPACE));
+        assert_eq!(answer.len(), 256);
+        assert!(answer.line[256..259].iter().all(|byte| *byte == 0));
+        assert!(answer.take().is_ok());
+        let mut empty = TypedAnswer::new(0, false, 0, None);
+        assert_eq!(empty.insert(b'x'), Err(Unusable::TooLong(0)));
+        assert_eq!(empty.line.reserved_bytes(), 0);
     }
 
     #[test]

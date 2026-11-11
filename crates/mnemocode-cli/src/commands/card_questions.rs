@@ -4,7 +4,7 @@
 
 use mnemocode::random::{Random, RandomError};
 use mnemocode_cards::details::{CardCopy, resolve_presentation};
-use mnemocode_cards::settings::{CardProfile, Orientation, PageSize, ProfileField, SHEET_QR_HOLDS};
+use mnemocode_cards::settings::{CardProfile, Orientation, PageSize, ProfileField};
 use mnemocode_cards::sheet::SHEET_PLAN_TEXT;
 use mnemocode_cards::templates::CARD_TEMPLATES;
 use mnemocode_cards::text_rules::{HIDE_MARKER, MAX_CARD_TEXT_LENGTH};
@@ -410,21 +410,32 @@ pub(crate) fn ask_cards(
     };
     let qr = if files.sheets {
         let choices = [
-            Choice::noted("Yes", "also saved as a PNG image", true),
-            Choice::noted("No", "the cards alone", false),
+            Choice::noted(
+                "Ordinary QR",
+                "shows the backup codes; also saved as PNG",
+                1_u8,
+            ),
+            Choice::noted(
+                "QR with hidden data",
+                "shows the printed contact; MnemoCode reads the codes",
+                2,
+            ),
+            Choice::noted("No QR", "the cards alone", 0),
         ];
-        let question = format!("Add a QR code with {SHEET_QR_HOLDS}?");
-        match ask_list(&question, "QR code", &choices, None)? {
+        match ask_list("Add a QR code?", "QR code", &choices, None)? {
             Some(qr) => qr,
             None => return Ok(None),
         }
     } else {
-        false
+        0
     };
     let mut chosen = vec!["--template".to_owned(), design];
     chosen.extend(files.options);
-    if qr {
+    if qr != 0 {
         chosen.push("--card-qr".to_owned());
+    }
+    if qr == 2 {
+        chosen.push("--qr-hidden".to_owned());
     }
     let Some(details) = ask_card_details(files.sheets, &chosen, fit)? else {
         return Ok(None);

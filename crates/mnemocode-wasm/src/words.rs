@@ -39,11 +39,7 @@ impl WordRow {
 #[wasm_bindgen(js_name = wordLookup)]
 pub fn word_lookup(kind: JsValue, value: JsValue) -> Result<WordRow, JsValue> {
     after_secret(|| {
-        let by = match name(&kind).as_str() {
-            "index" => Lookup::Index,
-            "unicode" => Lookup::Unicode,
-            _ => Lookup::Word,
-        };
+        let by = Lookup::named(&name(&kind)).map_err(|refusal| refused(&refusal))?;
         table::lookup(by, &text(&value)?)
             .map(WordRow)
             .map_err(|refusal| refused(&refusal))

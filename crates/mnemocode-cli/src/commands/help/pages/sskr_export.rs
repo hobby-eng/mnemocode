@@ -3,7 +3,7 @@
 use super::super::{CommandHelp, HelpGroup, HelpOption};
 use super::options::{
     CARD_LAYOUT, CARD_QR_2, CARDS_DIR_2, DATES, DATES_FILE, IMAGE_FORMAT_2, MAX_CANDIDATES,
-    MAX_TRIES, ORIENTATION, PAGE_SIZE, QR_DIR, RUN_1, RUN_2, RUN_9,
+    MAX_TRIES, ORIENTATION, PAGE_SIZE, QR_DIR, QR_HIDDEN, QR_TEXT, RUN_1, RUN_2, RUN_9,
 };
 
 const OWN_1_0: HelpOption = HelpOption {
@@ -24,7 +24,7 @@ const OWN_1_2: HelpOption = HelpOption {
     flag: "--pdf",
     value: Some("PATH"),
     summary: "Save all shares in one multi-page PDF",
-    details: &["A taken name is numbered, as shares-1.pdf, never replaced."],
+    details: &["A taken name is numbered, as shares_1.pdf, never replaced."],
 };
 const OWN_1_5: HelpOption = HelpOption {
     flag: "--images-dir",
@@ -74,6 +74,8 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
                 &PAGE_SIZE,
                 &ORIENTATION,
                 &CARD_QR_2,
+                &QR_HIDDEN,
+                &QR_TEXT,
             ]],
         },
         HelpGroup {

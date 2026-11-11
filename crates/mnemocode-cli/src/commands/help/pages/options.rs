@@ -14,6 +14,15 @@ pub(super) const ASK_SECRETS: HelpOption = HelpOption {
     ],
 };
 
+pub(super) const CONFIGURE: HelpOption = HelpOption {
+    flag: "--configure",
+    value: None,
+    summary: "Choose Seedshift and enter its dates before the other settings on the private screen",
+    details: &[
+        "Requires --ask-secrets. Encode also accepts --format, or --sskr for share setup; all remaining settings are asked. The start menu uses this order too.",
+    ],
+};
+
 pub(super) const MNEMONIC_FILE: HelpOption = HelpOption {
     flag: "--mnemonic-file",
     value: Some("PATH"),
@@ -80,7 +89,7 @@ pub(super) const OUTPUT: HelpOption = HelpOption {
     value: Some("PATH"),
     summary: "Also save a versioned MNC1 record file",
     details: &[
-        "The record starts with MNC1:<mode>:<format>:, so decode needs only the file and the dates. Dates are never stored. A taken name is numbered, as record-1.txt, never replaced.",
+        "The record starts with MNC1:<mode>:<format>:, so decode needs only the file and the dates. Dates are never stored. A taken name is numbered, as record_1.txt, never replaced.",
     ],
 };
 
@@ -96,7 +105,24 @@ pub(super) const QR: HelpOption = HelpOption {
     value: Some("PATH"),
     summary: "Save the result as a QR code in a PNG file",
     details: &[
-        "The QR code holds only the encoded data in the selected format: no header, mode, dates or fingerprints. decode --qr-file reads it back.",
+        "Without --qr-hidden, the QR code holds only the encoded data in the selected format: no header, mode, dates or fingerprints. decode --qr-file reads it back.",
+    ],
+};
+
+pub(super) const QR_HIDDEN: HelpOption = HelpOption {
+    flag: "--qr-hidden",
+    value: None,
+    summary: "Store the codes after the QR terminator; ordinary scanners show a contact or --qr-text",
+    details: &[
+        "This hides the record from ordinary scanning, not from raw-byte analysis. It adds no encryption. Hidden bytes require the original code: re-encoding the visible text loses them.",
+    ],
+};
+pub(super) const QR_TEXT: HelpOption = HelpOption {
+    flag: "--qr-text",
+    value: Some("TEXT"),
+    summary: "Public text for a separate hidden QR PNG",
+    details: &[
+        "Do not put masking dates or private material here. PDF codes use the printed contact. Without this option a separate PNG shows a generic contact.",
     ],
 };
 
@@ -205,7 +231,7 @@ pub(super) const CARD_QR: HelpOption = HelpOption {
     value: None,
     summary: "Add one QR code with the whole encoded phrase to a collection sheet",
     details: &[
-        "Off by default. The QR code holds only the encoded data in the selected format: no header, mode, dates, names or fingerprints. Separate cards never carry a QR code.",
+        "Off by default. Without --qr-hidden, the QR code holds only the encoded data in the selected format: no header, mode, dates, names or fingerprints. Separate cards never carry a QR code.",
         "encode and the commands of shares also save the QR code as a PNG image where the sheets go: beside the PDF (cards.pdf gives cards-qr.png), or in their folder; one image per share for Shamir shares. Decode reads it back with --qr-file, Restore with --share-qr. With encode alone, --qr names the image instead. preview only draws it.",
     ],
 };
@@ -360,7 +386,7 @@ pub(super) const INPUT_FILE: HelpOption = HelpOption {
     value: Some("PATH"),
     summary: "Read the encoded record from a file; - reads standard input",
     details: &[
-        "The file may be up to 64 KiB.",
+        "The file may be up to 64 KiB, or a cross-stitch pattern's PDF, which keeps its legend, up to 64 MiB.",
         "Any of the five formats, with or without an MNC1 header. A file saved with encode --output names its mode and format, so only the dates are needed with it.",
     ],
 };
@@ -556,7 +582,7 @@ pub(super) const CANDIDATES_PASSPHRASE_FILE: HelpOption = HelpOption {
 pub(super) const PLAINTEXT_CANDIDATES: HelpOption = HelpOption {
     flag: "--plaintext-candidates",
     value: None,
-    summary: "Save the list without encryption; it then holds the seed phrases in the open",
+    summary: "Save the list without encryption; anyone with access to it can read the seed phrases",
     details: &[],
 };
 
@@ -673,6 +699,8 @@ pub(super) const RUN_3: &[&HelpOption] = &[
     &PAGE_SIZE,
     &ORIENTATION,
     &CARD_QR,
+    &QR_HIDDEN,
+    &QR_TEXT,
     &TITLE,
 ];
 

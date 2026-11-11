@@ -42,6 +42,8 @@ pub(crate) enum InputError {
     Signal,
     /// The terminal failed.
     Terminal(String),
+    /// A PDF that keeps no legend line, such as one another program rewrote.
+    PdfWithoutLegend,
 }
 
 impl std::fmt::Display for InputError {
@@ -61,6 +63,9 @@ impl std::fmt::Display for InputError {
             }
             Self::NotUtf8(message) | Self::Terminal(message) => f.write_str(message),
             Self::Signal => f.write_str("Cancelled."),
+            Self::PdfWithoutLegend => f.write_str(
+                "This PDF keeps no legend that MnemoCode can read, as when another program saved it again: type the rows of its floss key instead.",
+            ),
         }
     }
 }
@@ -77,6 +82,7 @@ impl Refusal for InputError {
             Self::NotUtf8(_) => "not-utf8",
             Self::Signal => "cli.signal",
             Self::Terminal(_) => "cli.terminal",
+            Self::PdfWithoutLegend => "cli.input.pdf-without-legend",
         }
     }
 }
@@ -135,6 +141,28 @@ pub(crate) fn read_input_path(
         os::read_secret_file(&resolved, limit, what, regular_only)?,
         what,
     )
+}
+
+/// The most bytes of a pattern's PDF read for its legend: a chart of 500 by 800 stitches is about
+/// 20 MiB.
+pub(crate) const MAX_PATTERN_PDF_BYTES: usize = 64 * 1024 * 1024;
+
+/// The legend line kept in the pattern's PDF at `path`, where the file is a PDF (it starts with
+/// `%PDF-`); none where it is not one, to be read as text. A PDF is read whole within
+/// [`MAX_PATTERN_PDF_BYTES`], held as a secret too large to lock.
+///
+/// # Errors
+///
+/// The file's refusals, and [`InputError::PdfWithoutLegend`] for a PDF that keeps no legend.
+pub(crate) fn pattern_legend(path: &Path) -> Result<Option<SecretText>, InputError> {
+    let resolved = os::resolve(path, terminal::environment().current.as_deref());
+    if !os::file_starts_with(&resolved, b"%PDF-") {
+        return Ok(None);
+    }
+    let pdf = os::read_large_secret_file(&resolved, MAX_PATTERN_PDF_BYTES, "The pattern's PDF")?;
+    mnemocode_embroidery::chart::legend_of_pdf(&pdf)
+        .map(Some)
+        .ok_or(InputError::PdfWithoutLegend)
 }
 
 /// Refuses, without reading it, a file at `path` that the program cannot read, as the read would.
@@ -241,10 +269,11 @@ fn path_of_answer(answer: &str) -> Result<Option<PathBuf>, InputError> {
     if answer.contains(['\r', '\n']) {
         return Ok(None);
     }
-    let path = dropped_path(answer);
-    let text = path.to_string_lossy();
+    // The answer may be the secret itself. Normalize inside a locked owner until
+    // classification proves that an ordinary filesystem path is needed.
+    let text = dropped_text(answer);
     if let Some(link) = file_link(&text) {
-        return local_file_of(link).map(Some);
+        return local_file_of(link).and_then(local_path).map(Some);
     }
     let scheme = text.split_once(':').is_some_and(|(scheme, _)| {
         let mut letters = scheme.chars();
@@ -258,9 +287,6 @@ fn path_of_answer(answer: &str) -> Result<Option<PathBuf>, InputError> {
     if scheme && !drive {
         return Ok(None);
     }
-    if text.starts_with("//") || text.starts_with("\\\\") {
-        return Err(InputError::LocalFileRequired);
-    }
     let extension = text
         .rsplit_once('.')
         .is_some_and(|(_, end)| !end.is_empty() && !end.contains(char::is_whitespace));
@@ -271,8 +297,18 @@ fn path_of_answer(answer: &str) -> Result<Option<PathBuf>, InputError> {
                 .iter()
                 .any(|quote| trimmed.starts_with(quote) && trimmed.ends_with(quote))
     };
-    let named = text.contains(['/', '\\']) || extension || quoted;
-    Ok(named.then_some(path))
+    let home = text.as_str() == "~" && terminal::environment().home.is_some();
+    let named = text.contains(['/', '\\']) || extension || quoted || home;
+    named.then(|| local_path(expanded_path(&text))).transpose()
+}
+
+/// Check the final path after home expansion or URI decoding as well as typed separators.
+fn local_path(path: PathBuf) -> Result<PathBuf, InputError> {
+    let text = path.to_string_lossy();
+    if text.starts_with("//") || text.starts_with("\\\\") {
+        return Err(InputError::LocalFileRequired);
+    }
+    Ok(path)
 }
 
 /// `text` with its %XX escapes undone.
@@ -313,25 +349,28 @@ pub(crate) fn answered_text(
     text_of(os::read_secret_file(&resolved, limit, what, true)?, what)
 }
 
+/// The legend line of the pattern's PDF that `answer` names as a path, where `pattern_pdf` lets an
+/// answer name one; none for any other answer.
+fn pattern_answer(answer: &str, pattern_pdf: bool) -> Result<Option<SecretText>, InputError> {
+    if !pattern_pdf {
+        return Ok(None);
+    }
+    match path_of_answer(answer)? {
+        Some(path) => pattern_legend(&path),
+        None => Ok(None),
+    }
+}
+
 /// A file dragged into a terminal as its path: the quotes or backslashes a terminal adds removed,
 /// and a leading ~ expanded. Backslashes on Windows separate folders and stay as typed.
 pub(crate) fn dropped_path(answer: &str) -> PathBuf {
-    let text = trim(answer);
-    let quoted = ["'", "\""].iter().find_map(|quote| {
-        text.strip_prefix(quote)
-            .and_then(|rest| rest.strip_suffix(quote))
-            .filter(|_| text.len() >= 2)
-            .map(|inner| (*quote, inner))
-    });
-    let path = match quoted {
-        Some(("'", inner)) if cfg!(not(windows)) => inner.replace("'\\''", "'"),
-        Some((_, inner)) => inner.to_owned(),
-        None if cfg!(windows) => text.to_owned(),
-        None => unescape(text),
-    };
-    let home = terminal::environment().home.clone();
-    match (path.as_str(), home) {
-        ("~", Some(home)) => home,
+    expanded_path(&dropped_text(answer))
+}
+
+fn expanded_path(path: &str) -> PathBuf {
+    let home = terminal::environment().home.as_ref();
+    match (path, home) {
+        ("~", Some(home)) => home.clone(),
         (path, Some(home))
             if path.starts_with("~/") || (cfg!(windows) && path.starts_with("~\\")) =>
         {
@@ -341,20 +380,48 @@ pub(crate) fn dropped_path(answer: &str) -> PathBuf {
     }
 }
 
-/// A shell's backslash escapes undone: each backslash keeps the character after it.
-fn unescape(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut characters = text.chars();
-    while let Some(character) = characters.next() {
-        if character == '\\'
-            && let Some(next) = characters.next()
-        {
-            out.push(next);
-            continue;
+/// Remove terminal quoting without ever copying an unclassified answer into a String.
+#[expect(
+    clippy::expect_used,
+    reason = "unquoting and unescaping never add UTF-8 bytes beyond the reserved input length"
+)]
+fn dropped_text(answer: &str) -> SecretText {
+    let text = trim(answer);
+    let quoted = ["'", "\""].iter().find_map(|quote| {
+        text.strip_prefix(quote)
+            .and_then(|rest| rest.strip_suffix(quote))
+            .filter(|_| text.len() >= 2)
+            .map(|inner| (*quote, inner))
+    });
+    SecretText::build("an unclassified answer", text.len(), |out| {
+        match quoted {
+            Some(("'", inner)) if cfg!(not(windows)) => {
+                let mut parts = inner.split("'\\''");
+                if let Some(first) = parts.next() {
+                    out.push_str(first)?;
+                }
+                for part in parts {
+                    out.push('\'')?;
+                    out.push_str(part)?;
+                }
+            }
+            Some((_, inner)) => out.push_str(inner)?,
+            None if cfg!(windows) => out.push_str(text)?,
+            None => {
+                let mut characters = text.chars();
+                while let Some(character) = characters.next() {
+                    let character = if character == '\\' {
+                        characters.next().unwrap_or(character)
+                    } else {
+                        character
+                    };
+                    out.push(character)?;
+                }
+            }
         }
-        out.push(character);
-    }
-    out
+        Ok::<_, mnemocode::secret::CapacityExceeded>(())
+    })
+    .expect("unquoting fits within the original byte length")
 }
 
 /// Refuses a question without a terminal, before the terminal is touched.
@@ -380,6 +447,8 @@ enum Reading {
 
 /// How a question is read.
 pub(crate) struct Ask<'h> {
+    /// Keep a confirmation below its first entry on the same private screen.
+    pub(crate) continue_screen: bool,
     /// The prompt.
     pub(crate) prompt: String,
     /// What to type, for the line after an empty answer: "Type <what>, or press Ctrl+C to stop."
@@ -394,13 +463,16 @@ pub(crate) struct Ask<'h> {
     pub(crate) echo: bool,
     /// Accept a local text file path too; this name, never the path, appears in file refusals.
     pub(crate) text_file: Option<&'static str>,
+    /// Take a pattern's PDF at such a path as the legend line it keeps.
+    pub(crate) pattern_pdf: bool,
     /// The answer that Enter alone gives, which the prompt names.
     pub(crate) fallback: Option<String>,
 }
 
 /// Asks once and reads the answer, trimmed.
-fn read_answer(ask: &Ask<'_>) -> Result<Reading, InputError> {
+fn read_answer(ask: &Ask<'_>, secret: bool) -> Result<Reading, InputError> {
     let mut keys = Keys::open();
+    let hints = terminal::InputHints::new(ask.hints, secret);
     let shown = format!("{} ", ask.prompt);
     write_prompt(&shown);
     let outcome = read_line(
@@ -411,7 +483,7 @@ fn read_answer(ask: &Ask<'_>) -> Result<Reading, InputError> {
             escape_goes_back: true,
             prompt_width: text_width(&shown),
             pasted_line_break: ask.pasted_line_break,
-            hints: ask.hints,
+            hints: Some(&hints),
         },
     );
     // The terminal did not show the Enter key either.
@@ -456,7 +528,7 @@ pub(crate) fn ask_until<T, E: std::fmt::Display>(
         if let Some(text) = &warning {
             remember_warning(text);
         }
-        let redrawn = step_begin();
+        let redrawn = !ask.continue_screen && step_begin();
         if let Some(text) = &warning
             && !redrawn
         {
@@ -464,7 +536,7 @@ pub(crate) fn ask_until<T, E: std::fmt::Display>(
                 terminal::error_line(&line);
             }
         }
-        let reading = read_answer(ask)?;
+        let reading = read_answer(ask, secret)?;
         let leave = if secret { "stop" } else { "go back" };
         match reading {
             Reading::Ended | Reading::Cancelled => return Ok(Err(Left::Cancelled)),
@@ -481,7 +553,11 @@ pub(crate) fn ask_until<T, E: std::fmt::Display>(
             },
             Reading::Answer(text) => {
                 let read = match ask.text_file {
-                    Some(name) => answered_text(&text, name, ask.limit),
+                    Some(name) => match pattern_answer(&text, ask.pattern_pdf) {
+                        Ok(Some(line)) => Ok(line),
+                        Ok(None) => answered_text(&text, name, ask.limit),
+                        Err(refused) => Err(refused),
+                    },
                     None => Ok(text),
                 };
                 match read.map(|text| parse(&text).map_err(|error| error.to_string())) {
@@ -497,17 +573,18 @@ pub(crate) fn ask_until<T, E: std::fmt::Display>(
     }
 }
 
-/// A secret question as `ask_until` asks it: shown as typed on the private screen only, "(Esc
-/// cancels)" after its prompt.
+/// A secret question, shown as typed on the private screen only.
 pub(crate) fn secret_ask<'h>(prompt: &str, what: &str, limit: usize) -> Ask<'h> {
     Ask {
-        prompt: format!("{prompt} (Esc cancels)"),
+        continue_screen: false,
+        prompt: prompt.to_owned(),
         what: Some(what.to_owned()),
         limit,
         pasted_line_break: Some(b' '),
         hints: None,
         echo: on_private_screen(),
         text_file: None,
+        pattern_pdf: false,
         fallback: None,
     }
 }
@@ -515,14 +592,9 @@ pub(crate) fn secret_ask<'h>(prompt: &str, what: &str, limit: usize) -> Ask<'h> 
 /// A question for a visible value that is no secret.
 pub(crate) fn value_ask<'h>(prompt: &str, what: &str, limit: usize) -> Ask<'h> {
     Ask {
-        prompt: prompt.to_owned(),
-        what: Some(what.to_owned()),
-        limit,
         pasted_line_break: None,
-        hints: None,
         echo: true,
-        text_file: None,
-        fallback: None,
+        ..secret_ask(prompt, what, limit)
     }
 }
 
@@ -544,6 +616,38 @@ mod tests {
     }
 
     #[test]
+    fn inline_secrets_stay_in_protected_storage_until_path_classification() {
+        for answer in [
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+            "MNC1:direct:indexes:1 1 1 1 1 1 1 1 1 1 1 4",
+            "ur:sskr/public-fixture",
+            "a public message without a file suffix",
+        ] {
+            let protected = dropped_text(answer);
+            assert_eq!(protected.as_str(), answer);
+            assert_eq!(
+                format!("{protected:?}"),
+                "[an unclassified answer: redacted]"
+            );
+            if mnemocode::secret::probe_lock(4096) {
+                assert!(protected.is_locked());
+            }
+            assert!(path_of_answer(answer).unwrap().is_none());
+            assert_eq!(
+                answered_text(answer, "The public fixture", 4096)
+                    .unwrap()
+                    .as_str(),
+                answer
+            );
+        }
+        assert_eq!(
+            path_of_answer("'backup file.txt'").unwrap(),
+            Some(PathBuf::from("backup file.txt"))
+        );
+        assert!(path_of_answer("one\ntwo.txt").unwrap().is_none());
+    }
+
+    #[test]
     fn a_file_link_is_read_as_a_url_reads_it() {
         let path = |answer: &str| path_of_answer(answer).ok().flatten();
         assert_eq!(path("file:/x/a.txt"), Some(PathBuf::from("/x/a.txt")));
@@ -556,6 +660,9 @@ mod tests {
             Some(PathBuf::from("/x.txt"))
         );
         assert!(path_of_answer("file://example.invalid/x.txt").is_err());
+        assert!(path_of_answer("file:////example.invalid/x.txt").is_err());
+        assert!(local_path(PathBuf::from("//example.invalid/home/backup.txt")).is_err());
+        assert!(local_path(PathBuf::from(r"\\example.invalid\home\backup.txt")).is_err());
     }
 
     #[test]

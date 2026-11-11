@@ -3,6 +3,7 @@
 
 mod decode;
 mod encode;
+mod hidden_qr;
 mod options;
 mod preview;
 mod re_encode;
@@ -19,8 +20,10 @@ mod topics;
 use super::{CommandHelp, TopicHelp};
 
 /// Every command's page, in the order the overview lists them.
-pub(super) const COMMAND_HELP: [(&str, CommandHelp); 12] = [
+pub(super) const COMMAND_HELP: [(&str, CommandHelp); 14] = [
     ("encode", encode::PAGE),
+    ("qr-hide", hidden_qr::PAGE),
+    ("qr-open", hidden_qr::OPEN),
     ("decode", decode::PAGE),
     ("re-encode", re_encode::PAGE),
     ("recover-date", recover_date::PAGE),

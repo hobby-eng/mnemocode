@@ -19,7 +19,7 @@ use crate::Failure;
 
 /// The public phrases that the entries take as a page's strings, of 16 and 32 bytes that rise from
 /// 0xA0 by 3: occurring nowhere else.
-const ENTRY_PHRASES: [&str; 2] = [
+pub(super) const ENTRY_PHRASES: [&str; 2] = [
     "pass brush price flock will food title jelly scrub change verify old",
     "pass brush price flock will food title jelly scrub change verify option artwork twin guess orbit title consider depend target butter know typical phone",
 ];
@@ -188,22 +188,23 @@ impl Parts {
 
     /// Adds to `left` the places of the secrets of which `memory` holds a part.
     fn find(&self, memory: &[u8], left: &mut Vec<usize>) {
-        for window in memory.windows(WINDOW_LETTERS) {
+        for (at, window) in memory.windows(WINDOW_BYTES).enumerate() {
             let Some(start) = window.first_chunk::<WINDOW_BYTES>() else {
                 continue;
             };
             if *start == [0; WINDOW_BYTES] || *start == [PAINT; WINDOW_BYTES] {
                 continue;
             }
-            let found = self.bytes.get(start).or_else(|| {
-                window
-                    .first_chunk::<WINDOW_LETTERS>()
-                    .and_then(|part| self.letters.get(part))
-            });
-            if let Some(&place) = found
-                && !left.contains(&place)
-            {
-                left.push(place);
+            // A byte marker and a text marker can share a prefix. Neither kind
+            // may mask the other, and the final short binary tail still counts.
+            let letters = memory
+                .get(at..at + WINDOW_LETTERS)
+                .and_then(|part| part.first_chunk::<WINDOW_LETTERS>())
+                .and_then(|part| self.letters.get(part));
+            for &place in self.bytes.get(start).into_iter().chain(letters) {
+                if !left.contains(&place) {
+                    left.push(place);
+                }
             }
         }
     }
@@ -227,6 +228,21 @@ pub(super) struct Watch {
     deepest: usize,
     /// The places of the secrets found on the stack.
     left: Vec<usize>,
+}
+
+impl Watch {
+    fn new(parts: Parts, stack: std::ops::Range<usize>, scrub: usize) -> Self {
+        Self {
+            parts,
+            bottom: stack.start,
+            entries: 0,
+            scrub,
+            left_by: Vec::new(),
+            misplaced: Vec::new(),
+            deepest: 0,
+            left: Vec::new(),
+        }
+    }
 }
 
 /// Whether a scrub ran over `stack`, painted before the entry: what it reaches holds only zeros,
@@ -374,16 +390,7 @@ pub(super) fn entry_problems(
     let parts = Parts::of(&secrets, memory.data(&store));
     let scrub = number_of(&mut store, &instance, "probeScrubBytes")?;
     let stack = painted_stack(&mut store, &instance, &memory)?;
-    store.data_mut().watch = Some(Watch {
-        parts,
-        bottom: stack.start,
-        entries: 0,
-        scrub,
-        left_by: Vec::new(),
-        misplaced: Vec::new(),
-        deepest: 0,
-        left: Vec::new(),
-    });
+    store.data_mut().watch = Some(Watch::new(parts, stack.clone(), scrub));
     let lists = told.lists.join("\n");
     let (text, _, _) = called_entries(
         &mut store,
@@ -421,8 +428,23 @@ pub(super) fn entry_problems(
     let mut left = Vec::new();
     watch.parts.find(memory.data(&store), &mut left);
     if !left.is_empty() {
+        // Positions distinguish a binding residue from the probe caller's own
+        // fixture bookkeeping; neither region is excluded from the assertion.
+        let positions: Vec<_> = memory
+            .data(&store)
+            .windows(WINDOW_BYTES)
+            .enumerate()
+            .filter_map(|(at, bytes)| {
+                watch
+                    .parts
+                    .bytes
+                    .get(bytes)
+                    .and_then(|place| left.contains(place).then_some((at, *place)))
+            })
+            .take(8)
+            .collect();
         problems.push(format!(
-            "the entries left {} of {} secrets in the memory: {}",
+            "the entries left {} of {} secrets in the memory: {}; byte positions {positions:?}, painted stack {stack:?}",
             left.len(),
             secrets.len(),
             starts_of(&left, &secrets)
@@ -474,5 +496,34 @@ mod tests {
         let mut memory = vec![0_u8; 64];
         memory[20..35].copy_from_slice(&b"a phrase of many public words"[4..19]);
         assert!(left_in(&memory).is_empty());
+    }
+    #[test]
+    fn byte_and_text_marker_prefixes_cannot_hide_each_other() {
+        let text = "public overlapping marker material";
+        let secrets = [
+            Secret::Bytes(text.as_bytes().to_vec()),
+            Secret::Text(text.to_owned()),
+        ];
+        let parts = Parts::of(&secrets, &[]);
+        let mut found = Vec::new();
+        parts.find(text.as_bytes(), &mut found);
+        assert!(found.contains(&0), "the binary marker must be seen");
+        assert!(
+            found.contains(&1),
+            "the overlapping text marker must also be seen"
+        );
+    }
+
+    #[test]
+    fn an_eight_byte_marker_is_found_at_the_end_of_every_short_tail() {
+        let marker = [13, 37, 88, 144, 166, 212, 233, 251];
+        let parts = Parts::of(&[Secret::Bytes(marker.to_vec())], &[]);
+        for padding in 0..8 {
+            let mut memory = vec![0; 16 + padding];
+            memory.extend_from_slice(&marker);
+            let mut found = Vec::new();
+            parts.find(&memory, &mut found);
+            assert_eq!(found, [0], "padding {padding}");
+        }
     }
 }

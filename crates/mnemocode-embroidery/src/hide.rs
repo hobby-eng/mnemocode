@@ -13,16 +13,33 @@ use std::fmt;
 
 use mnemocode::random::{Random, RandomError};
 use mnemocode::refusal::Refusal;
-use mnemocode::secret::SecretBytes;
+use mnemocode::secret::{SecretBytes, redacted};
+use zeroize::Zeroizing;
 
 use crate::color::Lab;
-use crate::legend::{self, ENTROPY_LENGTHS, ONE_DIGIT_FROM, Row, TWO_DIGITS_FROM};
+use crate::dmc::{THREADS, Thread};
+use crate::legend::{self, ENTROPY_LENGTHS, Masking, ONE_DIGIT_FROM, Row, TWO_DIGITS_FROM};
 use crate::pattern::Pattern;
-use crate::phrase::MaskedEntropy;
+use crate::phrase::LegendEntropy;
 use crate::picture::Grid;
 
-/// The fewest threads tried.
+/// The fewest threads tried in a small pattern.
 const FEWEST_THREADS: usize = 12;
+/// The fewest threads tried in a large one: as many as a pattern of a photograph usually has, so that
+/// it keeps its shades where fewer would hold the phrase (the owner's look at 29 and 50 threads in
+/// 200 stitches across, 2026-11-04); a picture that needs fewer gets fewer.
+const SHADED_THREADS: usize = 40;
+/// The stitches for each thread tried at least, between those two: a small pattern given many
+/// threads leaves each too few stitches to carry its digits.
+const STITCHES_PER_THREAD: usize = 1000;
+/// How many numbers of threads that hold the phrase are compared, the one nearest the picture
+/// tried first: a palette of one number may lose a small object's colour that another keeps.
+const CANDIDATES: usize = 4;
+/// How much the worst places count beside the mean when patterns are compared.
+const WORST_WEIGHT: f64 = 0.25;
+/// How much further from the picture than the nearest a pattern of fewer threads may look and still
+/// be tried first: fewer threads look cleaner, as the owner saw at 78 stitches (2026-11-05).
+const FEWER_THREADS_SLACK: f64 = 0.05;
 /// The most threads tried.
 pub const MOST_THREADS: usize = 60;
 /// The bits of free choice kept above what the rows that cannot move take, so that legends can be
@@ -90,18 +107,21 @@ impl Refusal for HideError {
     }
 }
 
-/// A pattern that holds a phrase: the pattern, its legend's rows in order, and what the hiding
-/// changed. Its rows hold the phrase, so they are wiped when it is dropped.
-#[derive(Debug)]
+/// A pattern that holds a phrase: the pattern, its legend's rows in order with the pattern's thread
+/// of each, and what the hiding changed. Its rows and their order hold the phrase, so they are
+/// kept in fixed page-locked-where-available owners, wiped when dropped, and its `Debug`
+/// tells nothing of them (RUST-13).
 pub struct Hidden {
     pattern: Pattern,
-    rows: Vec<Row>,
+    rows: mnemocode::secret::SecretVec<Row>,
+    /// For each row of the legend, its thread's place in the pattern's threads.
+    order: mnemocode::secret::SecretVec<usize>,
     moved: usize,
 }
 
-impl Drop for Hidden {
-    fn drop(&mut self) {
-        legend::wipe_rows(&mut self.rows);
+impl fmt::Debug for Hidden {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        redacted(f, "Hidden")
     }
 }
 
@@ -112,10 +132,29 @@ impl Hidden {
         &self.pattern
     }
 
-    /// The legend's rows, in the pattern's thread order.
+    /// The legend's rows, in the legend's order: the pattern's thread order in format 1, an order
+    /// that holds part of the phrase in format 2.
     #[must_use]
     pub fn rows(&self) -> &[Row] {
         &self.rows
+    }
+
+    /// The thread of each row of the legend, in the legend's order.
+    pub fn row_threads(&self) -> impl Iterator<Item = &'static Thread> + '_ {
+        self.order
+            .iter()
+            .map(|&t| &THREADS[self.pattern.thread_place(t)])
+    }
+
+    /// The symbol (places in [`legend::SYMBOLS`], from 0) of each of the pattern's threads. They
+    /// hold the phrase, so they are wiped when dropped.
+    #[must_use]
+    pub fn symbols_by_thread(&self) -> Zeroizing<Vec<usize>> {
+        let mut symbols = Zeroizing::new(vec![0; self.order.len()]);
+        for (row, &thread) in self.rows.iter().zip(self.order.iter()) {
+            symbols[thread] = row.symbol() - 1;
+        }
+        symbols
     }
 
     /// How many stitches moved to another thread.
@@ -134,35 +173,26 @@ impl Hidden {
 /// `embroidery.hide.no-legend`, or the randomness's `core.random.unavailable`.
 pub fn hide(
     grid: &Grid,
-    entropy: &MaskedEntropy,
+    entropy: &LegendEntropy,
     random: &mut dyn Random,
 ) -> Result<Hidden, HideError> {
+    let masking = entropy.masking();
     let entropy = entropy.bytes();
     if !ENTROPY_LENGTHS.contains(&entropy.len()) {
         return Err(HideError::NotAnEntropy);
     }
     let needed = legend::payload_bits(entropy.len()) as f64;
     let mut tried_one = false;
-    for colours in FEWEST_THREADS..=MOST_THREADS {
-        let pattern = Pattern::of_picture(grid, colours);
-        let counts = pattern.counts();
-        let Some(moduli) = legend::moduli(&counts) else {
-            continue;
-        };
-        let plan = Plan::new(&pattern, grid);
-        let fixed_bits: f64 = plan
-            .fixed
-            .iter()
-            .map(|&t| libm::log2(f64::from(moduli[t])))
-            .sum();
-        if fixed_bits > MOST_FIXED_BITS
-            || legend::room_bits(&moduli) < needed + SPARE_BITS + fixed_bits
-        {
-            continue;
-        }
-        match place(pattern, &plan, &moduli, entropy, random) {
-            Err(HideError::NoLegend) => tried_one = true,
-            done => return done,
+    let fewest =
+        (grid.width() * grid.height() / STITCHES_PER_THREAD).clamp(FEWEST_THREADS, SHADED_THREADS);
+    // Format 1, whose legend lists the threads by number as any chart does, wherever it holds the
+    // phrase; else format 2, whose order of rows holds more.
+    for ordered in [false, true] {
+        for (pattern, plan, moduli) in candidates(grid, (fewest, needed), ordered) {
+            match place(pattern, &plan, &moduli, (entropy, masking), ordered, random) {
+                Err(HideError::NoLegend) => tried_one = true,
+                done => return done,
+            }
         }
     }
     Err(if tried_one {
@@ -172,24 +202,94 @@ pub fn hide(
     })
 }
 
+/// The patterns of the first [`CANDIDATES`] numbers of threads, from `fewest`, whose legend has
+/// room for `needed` bits in format 1, or 2 where `ordered`, in the order to try them: by how near
+/// the picture each looks, its mean seen difference plus a share of that of its worst places, but
+/// first the one of fewest threads that looks within [`FEWER_THREADS_SLACK`] of the nearest.
+fn candidates(
+    grid: &Grid,
+    (fewest, needed): (usize, f64),
+    ordered: bool,
+) -> Vec<(Pattern, Plan, Vec<u32>)> {
+    let mut found: Vec<(f64, Pattern, Plan, Vec<u32>)> = Vec::new();
+    for colours in fewest..=MOST_THREADS {
+        if found.len() == CANDIDATES {
+            break;
+        }
+        let pattern = Pattern::of_picture(grid, colours);
+        let Some(moduli) = legend::moduli(&pattern.counts()) else {
+            continue;
+        };
+        let plan = Plan::new(&pattern, grid);
+        let fixed_bits: f64 = plan
+            .fixed
+            .iter()
+            .map(|&t| libm::log2(f64::from(moduli[t])))
+            .sum();
+        if fixed_bits > MOST_FIXED_BITS
+            || legend::room_bits(&moduli, ordered) < needed + SPARE_BITS + fixed_bits
+        {
+            continue;
+        }
+        let looks = pattern.seen_difference(grid) + WORST_WEIGHT * pattern.worst_difference(grid);
+        found.push((looks, pattern, plan, moduli));
+    }
+    found.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let nearest = found.first().map_or(0.0, |f| f.0);
+    if let Some(fewer) = found
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| f.0 <= nearest * (1.0 + FEWER_THREADS_SLACK))
+        .min_by_key(|(_, f)| f.1.thread_count())
+        .map(|(i, _)| i)
+    {
+        let first = found.remove(fewer);
+        found.insert(0, first);
+    }
+    found
+        .into_iter()
+        .map(|(_, pattern, plan, moduli)| (pattern, plan, moduli))
+        .collect()
+}
+
+/// The cheapest legend drawn so far: what its changes cost, the pattern with them, each thread's
+/// symbol, the threads in the legend's order, and how many stitches moved. Its symbols and order
+/// hold part of the phrase, so they are wiped when it is dropped, as a cheaper one replaces it.
+struct Drawn {
+    cost: f64,
+    pattern: Pattern,
+    symbols: Vec<usize>,
+    order: Vec<usize>,
+    moved: usize,
+}
+
+impl Drop for Drawn {
+    fn drop(&mut self) {
+        zeroize::Zeroize::zeroize(&mut self.symbols);
+        zeroize::Zeroize::zeroize(&mut self.order);
+    }
+}
+
 /// Draws legends, keeps the cheapest one that the stitches can reach, and checks it reads back.
 fn place(
     pattern: Pattern,
     plan: &Plan,
     moduli: &[u32],
-    entropy: &SecretBytes,
+    (entropy, masking): (&SecretBytes, Masking),
+    ordered: bool,
     random: &mut dyn Random,
 ) -> Result<Hidden, HideError> {
-    let free = legend::free_values(entropy.len(), moduli);
+    let free = legend::free_values(entropy.len(), moduli, ordered);
     let counts = pattern.counts();
-    let mut best: Option<(f64, Pattern, Vec<usize>, usize)> = None;
+    let mut best: Option<Drawn> = None;
     let mut compared = 0;
-    for _ in 0..MOST_DRAWN {
-        if compared == COMPARED || free == 0 {
+    for attempt in 0..MOST_DRAWN {
+        if compared == COMPARED || free.is_zero() {
             break;
         }
-        let choice = below(random, free).map_err(HideError::Random)?;
-        let assignment = legend::assign(entropy, moduli, choice);
+        let attempt = u32::try_from(attempt).unwrap_or(u32::MAX);
+        let choice = legend::draw_free(random, &free, attempt).map_err(HideError::Random)?;
+        let assignment = legend::assign(entropy, masking, moduli, &choice, ordered);
         if plan
             .fixed
             .iter()
@@ -206,51 +306,53 @@ fn place(
         if legend::moduli(&candidate.counts()).as_deref() != Some(moduli) {
             continue;
         }
-        if best.as_ref().is_none_or(|b| cost < b.0) {
+        if best.as_ref().is_none_or(|b| cost < b.cost) {
             let mut assignment = assignment;
-            best = Some((
+            best = Some(Drawn {
                 cost,
-                candidate,
-                std::mem::take(&mut assignment.symbols),
+                pattern: candidate,
+                symbols: std::mem::take(&mut assignment.symbols),
+                order: std::mem::take(&mut assignment.order),
                 moved,
-            ));
+            });
         }
     }
-    let (_, pattern, mut symbols, moved) = best.ok_or(HideError::NoLegend)?;
-    let rows = pattern
-        .counts()
-        .iter()
-        .zip(&symbols)
-        .enumerate()
-        .map(|(i, (&n, &s))| Row::new(i + 1, s + 1, n))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| HideError::NoLegend);
-    zeroize::Zeroize::zeroize(&mut symbols);
-    let rows = rows?;
-    match legend::read(&rows) {
-        legend::Reading::Read(read) if mnemocode::secret::equal_bytes(&read, entropy) => {
-            Ok(Hidden {
-                pattern,
-                rows,
-                moved,
-            })
-        }
+    let mut best = best.ok_or(HideError::NoLegend)?;
+    let symbols = Zeroizing::new(std::mem::take(&mut best.symbols));
+    // Lock row storage before filling it. Typed owners wipe partial rows and
+    // the adopted order on every ordinary exit, including failed readback.
+    let mut hidden = Hidden {
+        pattern: best.pattern.clone(),
+        rows: mnemocode::secret::SecretVec::with_capacity(best.order.len()),
+        order: mnemocode::secret::SecretVec::new(std::mem::take(&mut best.order)),
+        moved: best.moved,
+    };
+    drop(best);
+    let counts = hidden.pattern.counts();
+    for (place, &thread) in hidden.order.iter().enumerate() {
+        let (symbol, stitches) = (symbols[thread] + 1, counts[thread]);
+        let row = if ordered {
+            Row::naming(
+                place + 1,
+                symbol,
+                hidden.pattern.thread_place(thread),
+                stitches,
+            )
+        } else {
+            Row::new(place + 1, symbol, stitches)
+        };
+        hidden
+            .rows
+            .push(row.map_err(|_| HideError::NoLegend)?)
+            .map_err(|_| HideError::NoLegend)?;
+    }
+    drop(symbols);
+    match legend::read(&hidden.rows) {
+        legend::Reading::Read {
+            entropy: read,
+            masking: as_read,
+        } if as_read == masking && mnemocode::secret::equal_bytes(&read, entropy) => Ok(hidden),
         _ => Err(HideError::NoLegend),
-    }
-}
-
-/// A uniform choice below `upper`, at least 1, from `random`: 64 bits drawn again while they fall in
-/// the incomplete last range.
-fn below(random: &mut dyn Random, upper: u64) -> Result<u64, RandomError> {
-    let limit = u64::MAX - u64::MAX % upper;
-    loop {
-        let mut bytes = [0_u8; 8];
-        random.fill(&mut bytes)?;
-        let value = u64::from_le_bytes(bytes);
-        zeroize::Zeroize::zeroize(&mut bytes);
-        if value < limit {
-            return Ok(value % upper);
-        }
     }
 }
 
@@ -583,9 +685,34 @@ mod tests {
     }
 
     #[test]
+    fn a_phrase_hidden_unmasked_reads_back_as_its_direct_record() {
+        let grid = picture::grid(&gradient_png(), 120).unwrap();
+        let phrase = mnemocode::bip39::phrase::Phrase::parse(
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon \
+             abandon about",
+        )
+        .unwrap();
+        let entropy = crate::phrase::unmasked_entropy(&phrase).unwrap();
+        let hidden = hide(&grid, &entropy, &mut Repeating(0)).unwrap();
+        if mnemocode::secret::probe_lock(4096) {
+            assert!(hidden.rows.is_locked());
+            assert!(hidden.order.is_locked());
+        }
+        let line = legend::line(hidden.rows()).unwrap();
+        let read = crate::phrase::record_of_legend(line.as_str())
+            .unwrap()
+            .unwrap();
+        // Word numbers from 1: abandon is 1, about 4.
+        assert_eq!(
+            read.record().as_str(),
+            format!("MNC1:direct:indexes:{} 4", ["1"; 11].join(" "))
+        );
+    }
+
+    #[test]
     fn a_flat_picture_of_two_colours_is_refused_as_too_few_colours() {
         let grid = picture::grid(&two_colours_png(), 100).unwrap();
-        let entropy = MaskedEntropy::known(&[0x7f; 16]);
+        let entropy = LegendEntropy::known(&[0x7f; 16]);
         let refused = hide(&grid, &entropy, &mut First).unwrap_err();
         assert_eq!(refused.code(), "embroidery.hide.too-few-colours");
     }
@@ -594,28 +721,10 @@ mod tests {
     fn an_entropy_of_no_phrase_length_is_refused() {
         let file = png_file(200, 100, |x, y| [x as u8, y as u8, 99]);
         let grid = picture::grid(&file, 100).unwrap();
-        let entropy = MaskedEntropy::known(&[1; 17]);
+        let entropy = LegendEntropy::known(&[1; 17]);
         assert_eq!(
             hide(&grid, &entropy, &mut First).unwrap_err().code(),
             "embroidery.hide.not-an-entropy"
         );
-    }
-
-    #[test]
-    fn a_draw_below_a_bound_is_uniform_over_it_and_never_reaches_it() {
-        struct Counting(u64);
-        impl Random for Counting {
-            fn fill(&mut self, bytes: &mut [u8]) -> Result<(), RandomError> {
-                self.0 += 1;
-                bytes.copy_from_slice(&self.0.to_le_bytes()[..bytes.len()]);
-                Ok(())
-            }
-        }
-        let mut source = Counting(0);
-        let drawn: Vec<u64> = (0..1000)
-            .map(|_| below(&mut source, 1 << 40).unwrap())
-            .collect();
-        assert!(drawn.iter().all(|&d| d < 1 << 40));
-        assert_eq!(below(&mut First, 1).unwrap(), 0);
     }
 }

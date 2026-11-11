@@ -5,9 +5,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for helping improve MnemoCode. Never include a real mnemonic, passphrase, private key, WIF, SSKR share, recovery date, or private wallet export. Use a public test vector or synthetic data.
+        Thank you for helping improve MnemoCode. Never include a real mnemonic, passphrase, private key, WIF, SSKR share, recovery date, private wallet export, cross-stitch pattern or legend line, or hidden-QR image. Use a public test vector or synthetic data.
 
-        If the problem could expose, alter, or incorrectly recover secret material, report it privately through [GitHub private vulnerability reporting](https://github.com/hobby-eng/mnemocode/security/advisories/new) instead of opening a public issue.
+        Use this form for bugs and suspected security vulnerabilities. Reports are visible to everyone who can access the repository; include only public test vectors or synthetic data.
   - type: input
     id: version
     attributes:
@@ -25,6 +25,8 @@ body:
         - Rust library or WebAssembly page files
         - PDF or image export
         - SSKR
+        - Cross-stitch pattern
+        - Hidden QR
         - Documentation
         - Other
     validations:
@@ -58,7 +60,7 @@ body:
     id: actual
     attributes:
       label: Actual behavior
-      description: Include exact non-secret error text when useful. Do not attach secret-bearing screenshots, records, QR codes, cards, or logs.
+      description: Include exact non-secret error text when useful. Do not attach secret-bearing screenshots, records, QR codes, cards, patterns, or logs.
     validations:
       required: true
   - type: textarea
@@ -82,5 +84,5 @@ body:
           required: true
         - label: This report contains no real wallet secret or private recovery material.
           required: true
-        - label: This is suitable for a public issue and does not describe an unpatched vulnerability.
+        - label: I understand that this issue and its attachments are visible to everyone who can access the repository.
           required: true

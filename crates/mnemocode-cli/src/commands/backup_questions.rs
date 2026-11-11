@@ -19,11 +19,11 @@ use super::asking::{AfterFailure, WHAT_NOW, after_failure, or_back_or_cancel, va
 use super::found::report_fingerprint;
 use super::given::{
     ENCODED_INPUT_FILE, PATH_LIMIT, SHARE_READER, SHARE_SET_LIMIT, detected_form, encoded_input,
-    given_form, given_mode, phrase_words, read_qr_path,
+    encoded_input_from_question, given_form, given_mode, phrase_words,
 };
-use crate::args::{Parsed, choice_option, value};
+use crate::args::{Given, Parsed, choice_option};
 use crate::gate::Stop;
-use crate::input::{Ask, dropped_path, read_input_path, secret_ask};
+use crate::input::{Ask, dropped_path, secret_ask};
 use crate::terminal::result::plain_fingerprint_line;
 use crate::terminal::{
     Channel, Choice, Chosen, Lifetime, ListQuestion, NoticeKind, choose, hint_lines, keep_context,
@@ -145,17 +145,49 @@ pub(crate) enum ReadBackup {
     Share(SecretText, bool),
 }
 
-/// The options for typing the encoded seed phrase after it was read: without its file.
+/// The file source and its retry prompt; file dispatch remains in `encoded_input`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SourceKind {
+    Typed,
+    Qr,
+    Record,
+}
+const FILE_SOURCES: [(&str, SourceKind); 2] = [
+    ("qr-file", SourceKind::Qr),
+    ("input-file", SourceKind::Record),
+];
+impl SourceKind {
+    fn of(parsed: &Parsed) -> Self {
+        FILE_SOURCES
+            .iter()
+            .find_map(|(key, kind)| parsed.contains_key(*key).then_some(*kind))
+            .unwrap_or(Self::Typed)
+    }
+    const fn question(self) -> &'static str {
+        match self {
+            Self::Qr => "QR code file name:",
+            Self::Record | Self::Typed => "Record file name:",
+        }
+    }
+    fn file_option(self) -> Option<&'static str> {
+        FILE_SOURCES
+            .iter()
+            .find_map(|(key, kind)| (*kind == self).then_some(*key))
+    }
+}
+
+/// The options for typing after a file: remove every file-source selector.
 pub(crate) fn typed_after_file(parsed: &Parsed) -> Parsed {
     let mut typed = parsed.clone();
-    typed.remove("input-file");
-    typed.remove("qr-file");
+    for (key, _) in FILE_SOURCES {
+        typed.remove(key);
+    }
     typed
 }
 
-/// Whether the options name a file of the encoded seed phrase.
+/// Whether the options name a record or QR source.
 pub(crate) fn from_file(parsed: &Parsed) -> bool {
-    value(parsed, "input-file").is_some() || value(parsed, "qr-file").is_some()
+    SourceKind::of(parsed) != SourceKind::Typed
 }
 
 /// The encoded fingerprint of the codes, kept on the screen of the next question: so that a
@@ -173,8 +205,7 @@ pub(crate) fn show_encoded_fingerprint(fingerprint: Option<&str>) {
 
 /// Where the encoded seed phrase comes from: typed, or a file read again after a problem.
 struct BackupSource<'a> {
-    typed: bool,
-    qr: bool,
+    kind: SourceKind,
     shares: bool,
     show_share_hint: bool,
     reads: u32,
@@ -184,12 +215,12 @@ struct BackupSource<'a> {
 impl BackupSource<'_> {
     /// Whether the text read last came from a QR code image.
     const fn reads_qr(&self) -> bool {
-        !self.typed && self.qr
+        matches!(self.kind, SourceKind::Qr)
     }
 
     /// The choice that asks for the phrase again.
     fn again_choice<T>(&self, again: T) -> Choice<T> {
-        if self.typed {
+        if self.kind == SourceKind::Typed {
             Choice::new(TYPE_ENCODED_AGAIN_LABEL, again)
         } else {
             Choice::noted(READ_ANOTHER_FILE, "or type the encoded seed phrase", again)
@@ -198,16 +229,14 @@ impl BackupSource<'_> {
 
     /// The text of the next attempt; `problem`, shown first, is why the last could not be used.
     fn next(&mut self, problem: Option<String>) -> Result<SecretText, Stop> {
-        if self.typed {
+        if self.kind == SourceKind::Typed {
             return self.ask_typed(problem);
         }
         let mut problem = problem;
         if self.reads == 0 {
             self.reads += 1;
-            match encoded_input(self.parsed) {
-                Ok(text) => return Ok(text),
-                Err(stop @ Stop::Refused(_)) => problem = Some(stop.message()),
-                Err(stop) => return Err(stop),
+            if let Some(text) = retryable_file(encoded_input(self.parsed), &mut problem)? {
+                return Ok(text);
             }
         }
         self.other_source(problem)
@@ -241,6 +270,7 @@ impl BackupSource<'_> {
         let ask = Ask {
             hints: Some(&hints),
             text_file: Some(ENCODED_INPUT_FILE),
+            pattern_pdf: true,
             pasted_line_break: Some(if self.shares {
                 SHARE_SEPARATOR_BYTE
             } else {
@@ -281,34 +311,49 @@ impl BackupSource<'_> {
                 false,
             )?;
             if typed == Some(true) {
-                self.typed = true;
+                self.kind = SourceKind::Typed;
                 return self.ask_typed(None);
             }
-            let qr = self.qr;
-            let prompt = if qr {
-                "QR code file name:"
-            } else {
-                "Record file name:"
-            };
-            let read = value_until(
-                prompt,
+            let kind = self.kind;
+            let Some(path) = value_until(
+                kind.question(),
                 "the name of the file",
                 PATH_LIMIT,
                 None,
-                |answer: &str| {
-                    let path = dropped_path(answer);
-                    let text = if qr {
-                        read_qr_path(&path, true)
-                    } else {
-                        read_input_path(&path, "The file", self.limit(), true).map_err(Stop::from)
-                    };
-                    text.map_err(|stop| stop.message())
-                },
-            )?;
-            if let Some(text) = read {
+                |answer: &str| Ok::<_, std::convert::Infallible>(dropped_path(answer)),
+            )?
+            else {
+                continue;
+            };
+            let Some(key) = kind.file_option() else {
+                return self.ask_typed(None);
+            };
+            let mut parsed = typed_after_file(self.parsed);
+            parsed.insert(
+                key.to_owned(),
+                Given::One(path.to_string_lossy().into_owned()),
+            );
+            // File validation may retry; cancellation from a nested password question must leave.
+            if let Some(text) = retryable_file(encoded_input_from_question(&parsed), &mut problem)?
+            {
                 return Ok(text);
             }
         }
+    }
+}
+
+/// Only a validation refusal retries; nested cancellation and signals leave unchanged.
+fn retryable_file(
+    read: Result<SecretText, Stop>,
+    problem: &mut Option<String>,
+) -> Result<Option<SecretText>, Stop> {
+    match read {
+        Ok(text) => Ok(Some(text)),
+        Err(stop @ Stop::Refused(_)) => {
+            *problem = Some(stop.message());
+            Ok(None)
+        }
+        Err(stop) => Err(stop),
     }
 }
 
@@ -318,10 +363,8 @@ struct Again(Option<String>);
 /// Asks for the encoded seed phrase on the private screen, or reads the file given, and checks it,
 /// until it passes.
 pub(crate) fn ask_encoded_backup(question: BackupQuestion<'_>) -> Result<ReadBackup, Stop> {
-    let qr = value(question.parsed, "qr-file").is_some();
     let mut source = BackupSource {
-        typed: !qr && value(question.parsed, "input-file").is_none(),
-        qr,
+        kind: SourceKind::of(question.parsed),
         shares: question.shares,
         show_share_hint: question.shares && question.input_kind != Some(InputKind::Codes),
         reads: 0,
@@ -636,4 +679,22 @@ fn settled_form(
         return Ok(Ok(fitting[0]));
     }
     Ok(detected_form(&fitting, "asks for the codes again")?.ok_or(Again(None)))
+}
+
+#[cfg(test)]
+mod source_tests {
+    use super::*;
+
+    #[test]
+    fn every_file_kind_is_read_before_falling_back_to_typed_codes() {
+        for (key, expected) in FILE_SOURCES {
+            let mut parsed = Parsed::new();
+            parsed.insert(key.to_owned(), Given::One("public-fixture".to_owned()));
+            assert_eq!(SourceKind::of(&parsed), expected);
+            assert!(from_file(&parsed));
+            let typed = typed_after_file(&parsed);
+            assert_eq!(SourceKind::of(&typed), SourceKind::Typed);
+            assert!(!from_file(&typed));
+        }
+    }
 }

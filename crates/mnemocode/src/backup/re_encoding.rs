@@ -11,7 +11,7 @@ use crate::dates::Date;
 use crate::forms::Form;
 use crate::modes::seedshift::Unmasked;
 use crate::refusal::Refusal;
-use crate::text::words::capitalized;
+use crate::text::words::{capitalized, list_in_words};
 use crate::wallet::evidence::{MASTER_KEY_PATH, WalletMatch};
 
 /// The words of the confirmations.
@@ -39,6 +39,8 @@ pub enum ReEncodingError {
     NoSuchLastWord,
     /// Given out before it was confirmed.
     NotConfirmed,
+    /// A way of a wallet match that is not address, key or fingerprint.
+    MatchedBy,
     /// The backup's refusal.
     Backup(BackupError),
 }
@@ -51,6 +53,11 @@ impl fmt::Display for ReEncodingError {
             Self::LastWordNeeded => f.write_str("This backup was made with the Original Seedshift with a valid last word, which keeps nothing of the original last word: give the last word of the original seed phrase."),
             Self::NoSuchLastWord => f.write_str("No seed phrase of this backup ends with that word: check the last word and the dates."),
             Self::NotConfirmed => f.write_str("The seed phrase of the old backup is not confirmed: it is encoded again only once the person recognised it or the wallet has the address given."),
+            Self::MatchedBy => write!(
+                f,
+                "Name how the wallet matched: {}.",
+                list_in_words(&MatchedBy::ALL.map(MatchedBy::word), "or")
+            ),
             Self::Backup(error) => error.fmt(f),
         }
     }
@@ -66,6 +73,7 @@ impl Refusal for ReEncodingError {
             Self::LastWordNeeded => "core.re-encoding.last-word-needed",
             Self::NoSuchLastWord => "core.re-encoding.no-such-last-word",
             Self::NotConfirmed => "core.re-encoding.not-confirmed",
+            Self::MatchedBy => "core.re-encoding.matched-by",
             Self::Backup(error) => error.code(),
         }
     }
@@ -89,12 +97,30 @@ pub enum MatchedBy {
 }
 
 impl MatchedBy {
-    const fn word(self) -> &'static str {
+    /// Every way, in the order the refusal of another name lists them.
+    pub const ALL: [Self; 3] = [Self::Address, Self::Key, Self::Fingerprint];
+
+    /// The way's name, as a page gives it: "address", "key" or "fingerprint".
+    #[must_use]
+    pub const fn word(self) -> &'static str {
         match self {
             Self::Address => "address",
             Self::Key => "key",
             Self::Fingerprint => "fingerprint",
         }
+    }
+
+    /// The way that `name` names, exactly as [`MatchedBy::word`] writes it.
+    ///
+    /// # Errors
+    ///
+    /// [`ReEncodingError::MatchedBy`] for any other text, so that no misspelt or missing way is
+    /// taken for an address.
+    pub fn named(name: &str) -> Result<Self, ReEncodingError> {
+        Self::ALL
+            .into_iter()
+            .find(|by| by.word() == name)
+            .ok_or(ReEncodingError::MatchedBy)
     }
 }
 
@@ -238,6 +264,30 @@ mod tests {
     use super::*;
     use crate::modes::Mode;
     use crate::self_check::vectors::{MASKED_DATE, MASKED_ENGLISH, PUBLIC_MNEMONIC};
+
+    /// AUD-006 follow-up: an unknown way was taken for an address.
+    #[test]
+    fn only_the_three_ways_of_a_match_are_named() {
+        for by in MatchedBy::ALL {
+            assert_eq!(MatchedBy::named(by.word()), Ok(by));
+        }
+        for wrong in ["", "typo", "Key", "address ", "Address", "fingerprnt"] {
+            assert_eq!(
+                MatchedBy::named(wrong),
+                Err(ReEncodingError::MatchedBy),
+                "{wrong:?}"
+            );
+        }
+        assert_eq!(
+            ReEncodingError::MatchedBy.code(),
+            "core.re-encoding.matched-by"
+        );
+        assert!(!ReEncodingError::MatchedBy.to_string().contains("typo"));
+        assert_eq!(
+            ReEncodingError::MatchedBy.to_string(),
+            "Name how the wallet matched: address, key or fingerprint."
+        );
+    }
 
     #[test]
     fn the_old_phrase_is_given_out_once_confirmed() {

@@ -115,11 +115,7 @@ pub(crate) fn colors_of(indexes: impl IntoIterator<Item = u16>) -> Vec<String> {
 pub(crate) fn phrase_cards(colors: &[String]) -> ColorCards {
     ColorCards {
         kind: ContentKind::Colors,
-        codes: CardCodes {
-            colors: colors.to_vec(),
-            labels: None,
-            payload: colors.join(" "),
-        },
+        codes: CardCodes::new(colors.to_vec(), None, colors.join(" ")),
         decoys: None,
         title: None,
         reference: None,
@@ -244,6 +240,15 @@ pub(crate) fn read_drawn_qr(page: &Page) -> String {
 /// What the QR code that `page` draws reads as: the rectangles of its modules, as they are drawn,
 /// painted at `dpi` on its plate, the step before them, and read back by the library's reader.
 pub(crate) fn read_drawn_qr_at(page: &Page, dpi: f64) -> String {
+    read_drawn_layer_at(page, dpi, false)
+}
+
+/// The hidden record recovered from the actual vector modules painted by a sheet.
+pub(crate) fn read_drawn_hidden_qr(page: &Page) -> String {
+    read_drawn_layer_at(page, IMAGE_DPI, true)
+}
+
+fn read_drawn_layer_at(page: &Page, dpi: f64, hidden: bool) -> String {
     let first = page
         .steps
         .iter()
@@ -266,7 +271,12 @@ pub(crate) fn read_drawn_qr_at(page: &Page, dpi: f64) -> String {
         }
     }
     let file = png_of(width as u32, height as u32, &pixels).expect("an image");
-    let text = mnemocode::qr::read_png(&file).expect("a readable QR code");
+    let text = if hidden {
+        mnemocode::qr::hidden::read_png(&file)
+    } else {
+        mnemocode::qr::read_png(&file)
+    }
+    .expect("a readable QR layer");
     text.as_str().to_owned()
 }
 

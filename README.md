@@ -62,9 +62,9 @@ Run `mnemocode` without arguments in a terminal. The sections below follow the m
 | 6    | [Recovery](#6-recovery)                       | Find missing words, codes, date digits or share elements            |
 | 7    | [Preview cards](#7-preview-cards)             | Try designs with sample data                                        |
 | 8    | [Word lookup](#8-word-lookup)                 | Look up a word or export dictionaries and a recovery guide          |
-| 9    | [Self-test](#9-self-test)                     | Check the installation                                              |
-| 0    | [Help](#0-help)                               | Read commands and options                                           |
-| —    | [Quit](#quit)                                 | Leave the program                                                   |
+| 0    | [Self-test](#0-self-test)                     | Check the installation                                              |
+| s    | [Help](#s-help)                               | Read commands and options                                           |
+| q    | [Quit](#quit)                                 | Leave the program                                                   |
 
 <a id="secret-input-styles"></a>
 
@@ -116,7 +116,7 @@ MnemoCode Seedshift shifts the entropy represented by each word and calculates a
 
 <a id="complete-encode-and-decode-examples"></a>
 
-Each pair below decodes the file made by the preceding command. `--ask-secrets` asks privately for the phrase and any dates needed. Run the pairs separately; keep the dates apart from the backup.
+In the menu, where to save the result is a checklist: Space ticks each place, Enter confirms, and nothing ticked keeps the result on the screen. Each pair below decodes the file made by the preceding command. `--ask-secrets` asks privately for the phrase and any dates needed. Run the pairs separately; keep the dates apart from the backup.
 
 ```bash
 # Seedshift as colors: save a record, then restore it with the same dates.
@@ -193,6 +193,10 @@ A6, A5 and A4 produce collection sheets. `--page-size business` produces 90 × 5
 
 `--studio-name` names the design studio; `--card-company` names the employer on business cards. Material sheets use `--card-name` for the recipient. See [card designs](docs/card-designs.md), [identity defaults](docs/card-identities.md) and [custom text fields](docs/CLI.md#card-options).
 
+#### QR codes with hidden records
+
+The QR export choice shows a public contact or text to compatible ordinary scanners while retaining selected backup codes in its filler bytes. MnemoCode reads the hidden record; an ordinary reader only returns the visible text, and some strict readers may reject the QR. PDF exports use the printed contact; standalone PNGs accept `--qr-text`. Add `--qr-hidden` to select this mode. `qr-hide` wraps an existing record and `qr-open` extracts it unchanged. This is camouflage, not encryption; raw-byte tools can detect it. See [Hidden QR records](docs/HIDDEN_QR.md) for examples, limits and the public format.
+
 ### Instructions for heirs
 
 `--heir-sheet heirs.pdf` adds a double-sided A5 guide; `--heir-sheet-size a6` makes a smaller one. It records the backup type, phrase length, share threshold and number of dates, but no recovery material, fingerprints or storage locations.
@@ -201,7 +205,7 @@ Keep it apart from the backup. A handwritten hint should help heirs remember dat
 
 ### Embroidery
 
-Choose **Embroidery** among the forms, or run `stitch`, to hide the phrase in a cross-stitch pattern made from your own picture. MnemoCode masks the phrase with your dates, as Seedshift does, and turns the picture into a chart in DMC threads. The masked phrase is in the legend: in each row's symbol and in the last one or two digits of its stitch count. Nothing on the pattern names MnemoCode.
+Choose **Embroidery** among the forms, or run `stitch`, to hide the phrase in a cross-stitch pattern made from your own picture: a PNG, JPEG or WebP file. MnemoCode masks the phrase with your dates, as Seedshift does, and turns the picture into a chart in DMC threads. The menu first offers "MnemoCode Seedshift" or "No Seedshift". With MnemoCode Seedshift, dates are asked immediately, before the picture and output settings; choose "No Seedshift" only for a phrase already protected some other way, since anyone who knows MnemoCode reads it from the legend. The masked phrase is in the legend: in each row's symbol and in the last one or two digits of its stitch count. Nothing on the pattern names MnemoCode.
 
 ```bash
 mnemocode stitch --ask-secrets --picture cat.jpg --stitches-across 200 \
@@ -209,11 +213,13 @@ mnemocode stitch --ask-secrets --picture cat.jpg --stitches-across 200 \
 mnemocode decode --input-file legend.txt --ask-secrets
 ```
 
-The PDF has a cover with a preview, the legend and the chart pages, with a bold line every ten stitches. 200 stitches across make about 36 cm on 14-count Aida; the width can be 40 to 500, and a pattern is at most 800 stitches high. A photograph with smooth shades works best. A flat picture with a few colors cannot hold a phrase: MnemoCode says so and asks for another picture or width, keeping what you typed.
+The PDF looks like a pattern bought from a designer, in three pages: a cover with the picture as it looks stitched, the design size, the finished size on Aida 11 to 18 and on linen 28 and how to start; the floss key, every thread on one page; and the whole chart in colour with its symbols, a bold line every ten stitches and arrows at the centre.
 
-Decode needs the legend and the dates, not the picture. Type each row from the top as the symbol's number, a colon and its stitches: `28:1725 25:2163 57:3275 …`. The PDF shows the symbols; [the SeedStitch format](docs/SEEDSTITCH.md#the-symbols) numbers them 1 to 70, and `--output` saves the legend already typed out. A single mistyped row is corrected, and Decode names the row to check on paper.
+The menu asks for the fabric: Aida 14 unless you choose 11, 16 or 18, or linen of 28 threads an inch stitched over one thread, whose stitches are half the size of those on Aida 14 and take one strand, for detail in a small piece. Then it asks how large the embroidery is: a paper size from A6 to A2, each shown with the stitches your picture takes in it and their size in centimetres, or a width in centimetres or in stitches. The picture is fitted into the sheet inside a 1 cm margin, turned whichever way holds it larger, and the chart is drawn on a sheet of that size: on Aida 14, A4 holds up to 104 by 152 stitches. `stitch` takes `--stitches-across` and `--fabric`, such as `14` or `linen-28`; 200 stitches across make about 36 cm on Aida 14 and 18 cm on linen 28. The width can be 40 to 500, and a pattern is at most 800 stitches high. A photograph with smooth shades works best. A flat picture with a few colors cannot hold a phrase: MnemoCode says so and asks for another picture or size, offering the sheets again, and keeps what you typed.
 
-Treat the legend like an encoded backup: with the dates, it gives the phrase. Keep the legend page or the legend line. A finished embroidery holds the same counts, but counting thousands of stitches by hand is no practical way back.
+Decode needs the legend and, for a masked phrase, the dates, not the picture. Give it the pattern's PDF (In a cross-stitch pattern, or `--input-file` with the PDF): the PDF keeps the legend line, compressed where no viewer shows it. Or type the legend. Type each row from the top as the symbol's number, a colon and its stitches: `28:1725 25:2163 57:3275 …`. A small pattern, too small for the phrase otherwise, also uses the order of its rows, and its line names each row's DMC number between them: `15:407:38 23:703:169 …`. The PDF shows the symbols; [the SeedStitch format](docs/SEEDSTITCH.md#the-symbols) numbers them 1 to 70, and `--output` saves the legend already typed out. A single mistyped row is corrected, and Decode names the row to check on paper.
+
+Treat the legend like an encoded backup: with the dates, or alone where the phrase is not masked, it gives the phrase. Keep the legend page or the legend line. A finished embroidery holds the same counts, but counting thousands of stitches by hand is no practical way back.
 
 <a id="re-encoding-a-backup"></a>
 
@@ -428,7 +434,7 @@ In the menu, Enter after a lookup asks for another value of the same kind; Escap
 
 <a id="self-tests-and-public-vectors"></a>
 
-## 9. Self-test
+## 0. Self-test
 
 Run the full installation self-test, including PDF and QR rendering:
 
@@ -436,9 +442,9 @@ Run the full installation self-test, including PDF and QR rendering:
 mnemocode self-test
 ```
 
-Secret operations also run a quicker startup self-test; share operations check the SSKR engine against published answers. If startup checks fail, the menu offers only Self-test, Help and Quit. These checks cannot replace verifying a download or checking the backup you stored. See [check coverage](docs/CLI.md#installation-checks) and the [public vectors](vectors/mnemocode-v1.json).
+Secret operations also run a quicker startup self-test, including SSKR engine checks against published answers. If startup checks fail, the menu offers only Self-test, Help and Quit. These checks cannot replace verifying a download or checking the backup you stored. See [check coverage](docs/CLI.md#installation-checks) and the [public vectors](vectors/mnemocode-v1.json).
 
-## 0. Help
+## s. Help
 
 Read the command list or the options for a particular task:
 
@@ -450,19 +456,22 @@ mnemocode sskr-combine --help
 
 These are the actual commands, grouped in menu order:
 
-| Command        | Purpose                                                |
-| -------------- | ------------------------------------------------------ |
-| `encode`       | Write a backup, optionally with date masking or shares |
-| `re-encode`    | Restore a backup and create its replacement            |
-| `decode`       | Read a backup and recover the phrase                   |
-| `sskr-split`   | Make standard Shamir shares                            |
-| `sskr-combine` | Restore from shares                                    |
-| `sskr-export`  | Repair or print existing shares                        |
-| `recover-word` | Search missing words                                   |
-| `recover-date` | Search missing date digits                             |
-| `preview`      | Render sample card designs                             |
-| `table`        | Look up words or export dictionaries                   |
-| `self-test`    | Check the installation                                 |
+| Command        | Purpose                                                          |
+| -------------- | ---------------------------------------------------------------- |
+| `encode`       | Write a backup, optionally with date masking or shares           |
+| `stitch`       | Write a cross-stitch pattern that holds the phrase in its legend |
+| `qr-hide`      | Put an existing record into a QR code with public text           |
+| `qr-open`      | Read the record kept in such a QR code                           |
+| `re-encode`    | Restore a backup and create its replacement                      |
+| `decode`       | Read a backup and recover the phrase                             |
+| `sskr-split`   | Make standard Shamir shares                                      |
+| `sskr-combine` | Restore from shares                                              |
+| `sskr-export`  | Repair or print existing shares                                  |
+| `recover-word` | Search missing words                                             |
+| `recover-date` | Search missing date digits                                       |
+| `preview`      | Render sample card designs                                       |
+| `table`        | Look up words or export dictionaries                             |
+| `self-test`    | Check the installation                                           |
 
 Damaged backup codes use `decode`; damaged share codes use `sskr-combine` or `sskr-export`. [The command-line reference](docs/CLI.md) covers file limits, detailed options and public examples.
 

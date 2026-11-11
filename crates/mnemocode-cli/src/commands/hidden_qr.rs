@@ -1,0 +1,125 @@
+//! The hidden QR export choice, shared by phrase, share and arbitrary-record exports.
+use super::resolved;
+use super::saving::{ResultName, save_output};
+use crate::args::{ArgsError, Parsed, is_on, value};
+use crate::gate::Stop;
+use crate::input::read_input_text;
+use crate::os;
+use mnemocode::qr::{self, QrError};
+use mnemocode::secret::SecretBytes;
+
+const DEFAULT_VISIBLE: &str = "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Design collection\r\nEND:VCARD";
+/// The options for wrapping an existing exact record without changing its encoding.
+pub(crate) const OPEN_OPTIONS: [&str; 2] = ["qr-file", "output"];
+
+pub(crate) const OPTIONS: [&str; 4] = ["input-file", "qr-text", "qr", "qr-hidden"];
+
+/// A plain QR, or an exact hidden record with the chosen public text.
+pub(crate) fn image(parsed: &Parsed, record: &str) -> Result<SecretBytes, QrError> {
+    if is_on(parsed, "qr-hidden") {
+        qr::hidden::png(value(parsed, "qr-text").unwrap_or(DEFAULT_VISIBLE), record)
+    } else {
+        qr::png(record)
+    }
+}
+
+/// Wrap an already protected record or a SeedStitch legend in a separate QR image.
+pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
+    let input = value(parsed, "input-file")
+        .ok_or_else(|| ArgsError::Required("--input-file PATH".to_owned()))?;
+    if value(parsed, "qr").is_none() {
+        return Err(ArgsError::Required("--qr PATH".to_owned()).into());
+    }
+    let record = read_input_text(input, "The hidden record", 4096)?;
+    let shown = value(parsed, "qr-text").unwrap_or(DEFAULT_VISIBLE);
+    let image = qr::hidden::png(shown, record.as_str())?;
+    if save_output(
+        &mut parsed.clone(),
+        "qr",
+        ResultName::one("The QR code"),
+        |path| os::publish_new_file(&resolved(path), &image),
+    )?
+    .is_some()
+    {
+        super::share_output::report_qr_verified(1);
+    }
+    Ok(())
+}
+
+/// Choose the ordinary or hidden PNG format, and the public text for a hidden record.
+pub(crate) fn ask_options() -> Result<Option<Vec<String>>, Stop> {
+    use crate::terminal::{Choice, Chosen, LineQuestion, ask_line};
+    let choices = [
+        Choice::noted("Ordinary QR", "the scanner shows the backup codes", false),
+        Choice::noted(
+            "QR with hidden data",
+            "the scanner shows your text; MnemoCode reads the codes",
+            true,
+        ),
+    ];
+    let Some(hidden) =
+        super::asking::ask_list("What should the QR code show?", "QR format", &choices, None)?
+    else {
+        return Ok(None);
+    };
+    if !hidden {
+        return Ok(Some(Vec::new()));
+    }
+    let answer = ask_line(
+        "Public text (do not use masking dates or private information):",
+        "visible QR text",
+        LineQuestion {
+            limit: 2300,
+            ..LineQuestion::default()
+        },
+        |s: &str| {
+            if s.trim().is_empty() {
+                Err("Enter the public text.".to_owned())
+            } else {
+                Ok(s.to_owned())
+            }
+        },
+    )?;
+    match answer {
+        Chosen::One(text) => Ok(Some(vec![
+            "--qr-hidden".to_owned(),
+            "--qr-text".to_owned(),
+            text,
+        ])),
+        Chosen::Back => Ok(None),
+        Chosen::Cancelled => Err(Stop::Cancelled),
+    }
+}
+
+/// Extract an exact record to a private file without interpreting its chosen representation.
+pub(crate) fn open(parsed: &Parsed) -> Result<(), Stop> {
+    let path =
+        value(parsed, "qr-file").ok_or_else(|| ArgsError::Required("--qr-file PATH".to_owned()))?;
+    if value(parsed, "output").is_none() {
+        return Err(ArgsError::Required("--output PATH".to_owned()).into());
+    }
+    let file = crate::input::read_qr_bytes(&resolved(path), false)?;
+    let record = qr::hidden::read_png(&file)?;
+    save_output(
+        &mut parsed.clone(),
+        "output",
+        ResultName::one("The recovered record"),
+        |path| os::publish_new_file(&resolved(path), record.as_bytes()),
+    )?;
+    Ok(())
+}
+
+/// Reject public-text options that would otherwise be silently ignored.
+pub(crate) fn validate(parsed: &Parsed) -> Result<(), Stop> {
+    if value(parsed, "qr-text").is_some() && !is_on(parsed, "qr-hidden") {
+        return Err(ArgsError::Required("--qr-hidden with --qr-text".to_owned()).into());
+    }
+    if is_on(parsed, "qr-hidden")
+        && !["qr", "qr-dir", "pdf", "images-dir", "cards-dir"]
+            .iter()
+            .any(|key| value(parsed, key).is_some())
+    {
+        return Err(ArgsError::Required("a QR output destination".to_owned()).into());
+    }
+    Ok(())
+}

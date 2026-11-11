@@ -65,6 +65,7 @@ fn png_admission(_tier: Tier) -> Result<(), CheckFailure> {
 
 /// A QR image drawn and read back takes longer than a start may: the full self-test runs it.
 fn qr_adapter(tier: Tier) -> Result<(), CheckFailure> {
+    ok(crate::qr::hidden::check_format())?;
     if tier == Tier::Startup {
         return Ok(());
     }
@@ -83,5 +84,16 @@ fn qr_adapter(tier: Tier) -> Result<(), CheckFailure> {
         ok(read_png(&written))?.as_str(),
         payload.as_str(),
         "QR write and read back",
+    )?;
+    let hidden = ok(crate::qr::hidden::png("Public design study", &payload))?;
+    expect_same(
+        ok(crate::qr::hidden::read_png(&hidden))?.as_str(),
+        payload.as_str(),
+        "Hidden QR record",
+    )?;
+    expect_same(
+        ok(read_png(&hidden))?.as_str(),
+        "Public design study",
+        "Visible QR text",
     )
 }

@@ -8,17 +8,18 @@ use mnemocode::checks::Row;
 use mnemocode::random::{Random, RandomError};
 use mnemocode::self_check::{Check, CheckFailure, Tier, expect_same, ok};
 
-use crate::chart::chart;
+use crate::chart::{chart, legend_of_pdf};
+use crate::fabric::DEFAULT_FABRIC;
 use crate::hide::hide;
-use crate::legend::{self, EXAMPLE, Reading};
-use crate::phrase::MaskedEntropy;
+use crate::legend::{self, EXAMPLE, EXAMPLE_ORDERED, Masking, Reading};
+use crate::phrase::LegendEntropy;
 use crate::picture;
 use crate::sample::gradient_png;
 
 /// The row in the report.
 pub const ROW: Row = Row::new(
     "SeedStitch legend",
-    "the specification's legend; one row corrected, two refused; a picture's legend read back",
+    "the specification's legends of both formats; one row corrected, two refused; a picture's legend read back from its PDF",
     seedstitch,
 );
 
@@ -27,6 +28,22 @@ pub const ROW: Row = Row::new(
 const EXAMPLE_ENTROPY: [u8; 32] = [
     0xf5, 0x85, 0xc1, 0x1a, 0xec, 0x52, 0x0d, 0xb5, 0x7d, 0xd3, 0x53, 0xc6, 0x95, 0x54, 0xb2, 0x1a,
     0x89, 0xb2, 0x0f, 0xb0, 0x65, 0x09, 0x66, 0xfa, 0x0a, 0x9d, 0x6f, 0x74, 0xfd, 0x98, 0x9d, 0x8f,
+];
+
+/// The entropy that [`EXAMPLE_ORDERED`] holds, masked: the words 2001 2 2 … 2001 2 322, as the
+/// manual recovery guide's own helper reads the line.
+const EXAMPLE_ORDERED_ENTROPY: [u8; 32] = [
+    0xfa, 0x00, 0x04, 0x00, 0xfd, 0x00, 0x02, 0x00, 0x7e, 0x80, 0x01, 0x00, 0x3f, 0x40, 0x00, 0x80,
+    0x1f, 0xa0, 0x00, 0x40, 0x0f, 0xd0, 0x00, 0x20, 0x07, 0xe8, 0x00, 0x10, 0x03, 0xf4, 0x00, 0x09,
+];
+
+/// The check of 16 zero bytes in each format and masking: format 1 and 2, masked and not, computed
+/// with Python's hashlib.
+const DOMAIN_CHECKS: [(Masking, bool, [u8; 4]); 4] = [
+    (Masking::Seedshift, false, [0x22, 0xbe, 0xc2, 0x2d]),
+    (Masking::Unmasked, false, [0x4b, 0x0a, 0x75, 0xea]),
+    (Masking::Seedshift, true, [0xb9, 0xc6, 0xe3, 0xb7]),
+    (Masking::Unmasked, true, [0xaa, 0xb9, 0x27, 0xfb]),
 ];
 
 /// The startup case of the row, before any secret is asked.
@@ -42,12 +59,24 @@ fn seedstitch(tier: Tier) -> Result<(), CheckFailure> {
     let rows = ok(legend::parse(EXAMPLE))?;
     expect_same(
         &read_entropy(&rows),
-        &Some(EXAMPLE_ENTROPY.to_vec()),
+        &Some((EXAMPLE_ENTROPY.to_vec(), Masking::Seedshift)),
         "The specification's legend",
     )?;
     if tier != Tier::Full {
         return Ok(());
     }
+    for (masking, ordered, expected) in DOMAIN_CHECKS {
+        expect_same(
+            &legend::check(&[0; 16], masking, ordered),
+            &expected,
+            "The check of each format and masking",
+        )?;
+    }
+    expect_same(
+        &read_entropy(&ok(legend::parse(EXAMPLE_ORDERED))?),
+        &Some((EXAMPLE_ORDERED_ENTROPY.to_vec(), Masking::Seedshift)),
+        "The specification's legend that names its threads",
+    )?;
     let mut one = rows.clone();
     one[0] = ok(legend::Row::new(1, one[0].symbol(), 1752))?;
     let corrected = matches!(legend::read(&one), Reading::Corrected { row: 1, .. });
@@ -61,21 +90,23 @@ fn seedstitch(tier: Tier) -> Result<(), CheckFailure> {
     let refused = matches!(legend::read(&two), Reading::NotRead);
     expect_same(&refused, &true, "A legend with two rows swapped")?;
     let grid = ok(picture::grid(&gradient_png(), 120))?;
-    let entropy = MaskedEntropy::known(&EXAMPLE_ENTROPY);
+    let entropy = LegendEntropy::known(&EXAMPLE_ENTROPY);
     let hidden = ok(hide(&grid, &entropy, &mut Counting(0)))?;
+    let read = Some((EXAMPLE_ENTROPY.to_vec(), Masking::Seedshift));
+    expect_same(&read_entropy(hidden.rows()), &read, "A picture's legend")?;
+    let pdf = ok(chart(&hidden, DEFAULT_FABRIC))?;
+    let kept = legend_of_pdf(&pdf).and_then(|line| legend::parse(line.as_str()).ok());
     expect_same(
-        &read_entropy(hidden.rows()),
-        &Some(EXAMPLE_ENTROPY.to_vec()),
-        "A picture's legend",
-    )?;
-    let pdf = ok(chart(&hidden))?;
-    expect_same(&pdf.starts_with(b"%PDF-"), &true, "The pattern's PDF")
+        &kept.and_then(|rows| read_entropy(&rows)),
+        &read,
+        "The legend kept in the pattern's PDF",
+    )
 }
 
-/// The entropy `rows` read as, without a correction.
-fn read_entropy(rows: &[legend::Row]) -> Option<Vec<u8>> {
+/// The entropy `rows` read as, without a correction, and how it is masked.
+fn read_entropy(rows: &[legend::Row]) -> Option<(Vec<u8>, Masking)> {
     match legend::read(rows) {
-        Reading::Read(entropy) => Some(entropy.to_vec()),
+        Reading::Read { entropy, masking } => Some((entropy.to_vec(), masking)),
         _ => None,
     }
 }

@@ -145,6 +145,8 @@
       "QrMatrix",
       "qrPng",
       "readQrPng",
+      "hiddenQrPng",
+      "readHiddenQrPng",
       "selfCheckQr"
     ],
     "sskr": [
@@ -198,7 +200,9 @@
     "embroidery": [
       "StitchPattern",
       "StitchLegend",
+      "StitchSizes",
       "readStitchLegend",
+      "readStitchPdf",
       "selfCheckEmbroidery"
     ]
   }

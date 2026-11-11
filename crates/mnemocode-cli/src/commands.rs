@@ -8,6 +8,7 @@ pub(crate) mod backup_questions;
 pub(crate) mod candidates_file;
 pub(crate) mod card_questions;
 mod cards;
+mod configure;
 pub(crate) mod date_search;
 pub(crate) mod decode;
 pub(crate) mod encode;
@@ -16,9 +17,11 @@ mod found;
 pub(crate) mod given;
 mod heir_sheet;
 pub(crate) mod help;
+pub(crate) mod hidden_qr;
 mod marked_search;
 pub(crate) mod menu_entries;
 pub(crate) mod output_questions;
+pub(crate) mod pattern_questions;
 pub(crate) mod preview;
 pub(crate) mod re_encode;
 pub(crate) mod recover_date;
@@ -64,26 +67,44 @@ pub(crate) struct Command {
 pub(crate) enum Run {
     /// A command that goes by its options.
     Options(fn(&Parsed) -> Result<(), Stop>),
-    /// A command whose answers name the files it saves, which rules its writes before the secret.
+    /// A command whose answers name the files it saves, which rules its writes before the seed
+    /// phrase.
     Ruling(fn(&Parsed, &mut Protection) -> Result<(), Stop>),
     /// The self-test, which writes in a temporary folder and reports what protects the process.
     SelfTest(fn(&Protection) -> Result<(), Stop>),
 }
 
+/// Settings shared by creating a backup and creating a replacement backup.
+const BACKUP_OPTIONS: &[&[&str]] = &[
+    &encode::SHARED_OPTIONS,
+    &encode::SSKR_ONLY_OPTIONS,
+    &encode::OWN_OPTIONS,
+    &sskr_split::ENCODE_PLAIN_ONLY_OPTIONS,
+    &cards::CARD_OPTIONS,
+];
+
 /// Every command, in the order the help lists them.
-pub(crate) const COMMANDS: [Command; 12] = [
+pub(crate) const COMMANDS: [Command; 14] = [
+    Command {
+        name: "qr-open",
+        options: &[&hidden_qr::OPEN_OPTIONS],
+        secret: true,
+        run: Run::Options(hidden_qr::open),
+        asks_outputs: None,
+    },
+    Command {
+        name: "qr-hide",
+        options: &[&hidden_qr::OPTIONS],
+        secret: true,
+        run: Run::Options(hidden_qr::run),
+        asks_outputs: None,
+    },
     Command {
         name: "encode",
-        options: &[
-            &encode::SHARED_OPTIONS,
-            &encode::SSKR_ONLY_OPTIONS,
-            &encode::OWN_OPTIONS,
-            &sskr_split::ENCODE_PLAIN_ONLY_OPTIONS,
-            &cards::CARD_OPTIONS,
-        ],
+        options: &[&configure::OPTIONS],
         secret: true,
-        run: Run::Options(encode::run),
-        asks_outputs: None,
+        run: Run::Ruling(encode::run),
+        asks_outputs: Some(configure::asks_options),
     },
     Command {
         name: "decode",
@@ -97,11 +118,6 @@ pub(crate) const COMMANDS: [Command; 12] = [
         options: &[
             &re_encode::OLD_OPTIONS,
             &wallet_options::WALLET_EVIDENCE_OPTIONS,
-            &encode::SHARED_OPTIONS,
-            &encode::SSKR_ONLY_OPTIONS,
-            &encode::OWN_OPTIONS,
-            &sskr_split::ENCODE_PLAIN_ONLY_OPTIONS,
-            &cards::CARD_OPTIONS,
         ],
         secret: true,
         run: Run::Ruling(re_encode::run),
@@ -149,10 +165,10 @@ pub(crate) const COMMANDS: [Command; 12] = [
     },
     Command {
         name: "stitch",
-        options: &[&stitch::OPTIONS],
+        options: &[&configure::OPTIONS, &stitch::OPTIONS],
         secret: true,
-        run: Run::Options(stitch::run),
-        asks_outputs: None,
+        run: Run::Ruling(stitch::run),
+        asks_outputs: Some(configure::asks_options),
     },
     Command {
         name: "preview",
@@ -184,8 +200,14 @@ pub(crate) fn named(name: &str) -> Option<&'static Command> {
 
 /// Checks `parsed` against `command`'s options and its file sources.
 pub(crate) fn check_options(command: &Command, parsed: &Parsed) -> Result<(), Stop> {
-    let options: Vec<&str> = command.options.iter().copied().flatten().copied().collect();
+    let mut options: Vec<&str> = command.options.iter().copied().flatten().copied().collect();
+    if matches!(command.name, "encode" | "re-encode") {
+        options.extend(BACKUP_OPTIONS.iter().copied().flatten().copied());
+    }
     args::assert_allowed(parsed, command.name, &options)?;
+    if matches!(command.name, "encode" | "stitch") {
+        configure::check_options(parsed)?;
+    }
     args::assert_private_file_sources(parsed)?;
     Ok(())
 }

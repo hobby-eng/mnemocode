@@ -20,7 +20,8 @@ use std::rc::Rc;
 use common::{
     DATES, LONG_PHRASE, MOST_DATES, NEVER, PDF_START, PHRASE, PNG_START, PUBLIC_SHARES, SHARE,
     SHARES, assert_no_metadata, assert_private, assert_refused, assert_same_cards,
-    assert_same_pictures, folder, names, numbered, outputs, page_sizes, printed_pages, read, saved,
+    assert_same_pictures, folder, full, names, numbered, outputs, page_sizes, printed_pages, read,
+    saved,
 };
 use mnemocode::recovery::shares::flow::PhrasesFound;
 use mnemocode::recovery::shares::repair::{ShareExportDecision, export_decision};
@@ -107,11 +108,14 @@ fn every_output_of_one_encode_shows_the_same_cards_under_their_numbers() {
     );
     // The eight codes of the phrase, then the one decoy of separate cards.
     let notices = [
-        "Saved PDF: public.pdf",
-        "Saved 9 PNG pages to: images",
-        "Saved 9 individual card files to: cards",
+        format!("Saved PDF: {}", full(&folder, "public.pdf")),
+        format!("Saved 9 PNG pages to: {}", full(&folder, "images")),
+        format!(
+            "Saved 9 individual card files to: {}",
+            full(&folder, "cards")
+        ),
     ];
-    let places = notices.map(|notice| errors.find(notice).expect("each output says so"));
+    let places = notices.map(|notice| errors.find(&notice).expect("each output says so"));
     assert!(places.is_sorted(), "{errors}");
     assert_eq!(outputs(&folder), ["cards", "images", "public.pdf"]);
     let sheet = read(&folder, "public.pdf");
@@ -198,7 +202,13 @@ fn the_cards_of_a_share_are_saved_by_number_in_the_folder_of_the_share() {
             "cards",
         ],
     );
-    assert!(errors.contains("Saved 11 PDF files to: cards"), "{errors}");
+    assert!(
+        errors.contains(&format!(
+            "Saved 11 PDF files to: {}",
+            full(&folder, "cards")
+        )),
+        "{errors}"
+    );
     assert_eq!(outputs(&folder), ["cards"]);
     let cards = folder.join("cards");
     assert_eq!(names(&cards), ["collection-376C-1-1"]);
@@ -230,7 +240,10 @@ fn a_sheet_with_a_qr_code_saves_its_image_beside_it_and_without_one_its_pdf_alon
     };
     let errors = encode("public.pdf", &["--card-qr"]);
     assert!(
-        errors.contains("Saved the QR code of the sheet as an image: public-qr.png"),
+        errors.contains(&format!(
+            "Saved the QR code of the sheet as an image: {}",
+            full(&folder, "public-qr.png")
+        )),
         "{errors}"
     );
     assert_eq!(outputs(&folder), ["public-qr.png", "public.pdf"]);
@@ -432,7 +445,10 @@ fn the_sheet_for_heirs_is_saved_beside_the_shares_in_a5_or_a6_and_never_over_a_f
     let pages = |path: &str| page_sizes(&read(&folder, path));
     let errors = split("heirs.pdf", &[]);
     assert!(
-        errors.contains("Saved instructions for heirs: heirs.pdf"),
+        errors.contains(&format!(
+            "Saved instructions for heirs: {}",
+            full(&folder, "heirs.pdf")
+        )),
         "{errors}"
     );
     // A5 unless --heir-sheet-size says otherwise, on both sides of one sheet.
@@ -462,11 +478,15 @@ fn the_sheet_for_heirs_is_saved_beside_the_shares_in_a5_or_a6_and_never_over_a_f
     let before = read(&folder, "heirs.pdf");
     let errors = split("heirs.pdf", &[]);
     assert!(
-        errors.contains("heirs.pdf already exists: saved as heirs-1.pdf instead."),
+        errors.contains(&format!(
+            "{} already exists: saved as {} instead.",
+            full(&folder, "heirs.pdf"),
+            full(&folder, "heirs_1.pdf")
+        )),
         "{errors}"
     );
     assert_eq!(read(&folder, "heirs.pdf"), before);
-    assert_eq!(pages("heirs-1.pdf"), [A5; 2]);
+    assert_eq!(pages("heirs_1.pdf"), [A5; 2]);
 }
 
 #[test]
@@ -519,7 +539,7 @@ fn the_sheet_for_heirs_leads_through_the_menu_in_its_own_words() {
     ];
     let codes = sheet(&unicode, "unicode.pdf").expect("Poppler reads every file");
     for words in [
-        "Choose \"3 Decode numbers, codes or colors back into a seed phrase\", then \"Type or paste it\".",
+        "Choose \"3 Recover a seed phrase from a backup\", then \"Type or paste it\".",
         "To \"How many words does the seed phrase have?\" answer \"24 words\"",
         "On printed cards its backup is the first 24 codes",
     ] {

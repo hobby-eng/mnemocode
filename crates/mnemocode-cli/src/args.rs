@@ -148,13 +148,15 @@ pub(crate) fn assert_safe_material_argv(argv: &[String]) -> Result<(), ArgsError
 }
 
 /// The on-or-off options, for every command.
-const BOOLEAN_OPTIONS: [&str; 13] = [
+const BOOLEAN_OPTIONS: [&str; 15] = [
     "card-qr",
+    "qr-hidden",
     "sskr",
     "show-masked-words",
     "all",
     "recovery-guide",
     "ask-secrets",
+    "configure",
     "cards",
     "legacy-valid-last-word",
     "list",
@@ -417,7 +419,7 @@ pub(crate) fn option_value(key: &str) -> String {
 }
 
 /// How each option is named in a sentence (TS 0.1.0's OPTION_LABELS).
-const OPTION_LABELS: [(&str, &str); 97] = [
+const OPTION_LABELS: [(&str, &str); 100] = [
     ("card-name", "card name"),
     ("card-role", "card role"),
     ("card-company", "card company"),
@@ -444,6 +446,8 @@ const OPTION_LABELS: [(&str, &str); 97] = [
     ("coin-address", "coin address"),
     ("card-layout", "card layout"),
     ("card-qr", "card QR code"),
+    ("qr-hidden", "hidden QR record"),
+    ("qr-text", "visible QR text"),
     ("candidates-file", "candidates file"),
     ("candidates-key", "Scanner key"),
     ("candidates-key-file", "Scanner key file"),
@@ -490,6 +494,7 @@ const OPTION_LABELS: [(&str, &str); 97] = [
     ("orientation", "page orientation"),
     ("output", "output record file"),
     ("stitches-across", "stitches across"),
+    ("fabric", "fabric count"),
     ("page-size", "page size"),
     ("pdf", "PDF output file"),
     ("picture", "picture file"),

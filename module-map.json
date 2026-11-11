@@ -190,6 +190,7 @@
         "all": [
           "mnemocode",
           "mnemocode-cards",
+          "image-webp",
           "libm",
           "png",
           "sha2",
@@ -206,6 +207,7 @@
         "color",
         "dmc",
         "picture",
+        "fabric",
         "pattern",
         "legend",
         "phrase",
@@ -412,6 +414,11 @@
     ]
   },
   "ownRefusalCodes": {
+    "cli.configure.options": "Protected menu configuration refuses conflicting command-line settings instead of ignoring them.",
+    "wasm.recovery.work": "Reject malformed or out-of-u32 public work without expanding a bounded search turn to u32::MAX.",
+    "core.bip32.depth-exceeded": "BIP32 public library admission: a child beyond the one-byte depth cannot be serialized truthfully.",
+    "export.qr-image.capacity": "Hidden QR records (ADR 0012): the visible and hidden UTF-8 texts exceed level-M version-40 capacity.",
+    "export.qr-image.no-hidden-record": "Hidden QR records (ADR 0012): no valid checked hidden envelope was found.",
     "export.pdf-documents.font-not-embedded": "the writer of a PDF: TS's pdf-lib has no such refusal",
     "export.pdf-documents.not-written": "a sink of a PDF that refuses a write: TS keeps a PDF in memory",
     "export.image-export.page-not-drawn": "the drawing of a page image: TS's Poppler has its own failures",
@@ -457,14 +464,21 @@
     "embroidery.legend.not-a-row": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
     "embroidery.legend.unknown-symbol": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
     "embroidery.legend.count-out-of-range": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.legend.unknown-thread": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.fabric.unknown": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
+    "embroidery.phrase.mode": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
     "embroidery.hide.not-an-entropy": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
     "embroidery.hide.too-few-colours": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
     "embroidery.hide.no-legend": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
     "cli.stitch.no-picture": "the port's own SeedStitch command (crates/mnemocode-cli/src/commands/stitch.rs): TS has no such command",
     "cli.stitch.no-pdf": "the port's own SeedStitch command (crates/mnemocode-cli/src/commands/stitch.rs): TS has no such command",
+    "cli.input.pdf-without-legend": "the port's own SeedStitch command (crates/mnemocode-cli/src/input.rs): Decode reads a pattern's PDF, which TS does not have",
     "embroidery.phrase.legend-not-read": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
     "embroidery.phrase.legend-ambiguous": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
     "cli.bounded-read.not-a-file": "the port's own SeedStitch command (crates/mnemocode-cli/src/os/files.rs): a picture, which holds no text, is read only from a regular file",
-    "core.coins.coin.address-of-no-coin": "the port's own reading of an address as every coin (crates/mnemocode/src/wallet/coins.rs), the owner's request of 2026-11-03: TS asks which coin first"
+    "core.coins.coin.address-of-no-coin": "the port's own reading of an address as every coin (crates/mnemocode/src/wallet/coins.rs), the owner's request of 2026-11-03: TS asks which coin first",
+    "core.re-encoding.matched-by": "TS 0.1.0 types MatchedBy and has no runtime refusal; the WASM binding takes it untyped from a page, so an unknown way is refused rather than taken for an address.",
+    "cli.bounded-read.file-changed": "A regular input file, such as a pattern's PDF, changed length during its fixed-allocation read; refuse it before a growing buffer can exceed the admitted host budget.",
+    "export.sskr-render.no-document-at-index": "A retained share document index must be below the descriptor count for every layout."
   }
 }

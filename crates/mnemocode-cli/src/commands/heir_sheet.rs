@@ -26,7 +26,8 @@ use super::saving::{ResultName, save_output};
 use crate::args::{Parsed, value};
 use crate::gate::Stop;
 use crate::os;
-use crate::terminal::{README_URL, printable, saved};
+use crate::output::shown_path;
+use crate::terminal::{README_URL, saved};
 
 /// A size without a sheet.
 #[derive(Debug)]
@@ -103,8 +104,8 @@ impl HeirRoute for MenuRoute {
     }
 
     fn date_digit_help(&self) -> Option<String> {
-        RECOVER.digit.map(|digit| {
-            format!("If a digit of a date is unclear, menu entry {digit} tries every possibility.")
+        RECOVER.key.map(|key| {
+            format!("If a digit of a date is unclear, menu entry {key} tries every possibility.")
         })
     }
 }
@@ -140,7 +141,7 @@ pub(crate) fn save_heir_sheet(parsed: &mut Parsed, facts: &HeirSheetFacts) -> Re
     if let Some(path) = path {
         saved(&format!(
             "Saved instructions for heirs: {}",
-            printable(&path)
+            shown_path(&path)
         ));
     }
     Ok(())

@@ -26,13 +26,13 @@ use mnemocode_cards::templates::{
 
 use super::cards::{
     BUSINESS_OPTIONS, card_file_format, card_settings, check_card_output, export_page_images,
-    export_share_files, format_name, image_format, publish_pdf, save_qr_beside, save_qr_inside,
-    saved_pages_notice,
+    export_share_files, format_name, image_format, publish_pdf, saved_pages_notice,
 };
 use crate::os::SystemRandom;
+use crate::output::shown_path;
 use crate::terminal::result::{backup_code_lines, code_lines, print};
 use crate::terminal::{
-    self, Channel, NoticeKind, can_redraw, notice, printable, result_lines, saved, show_result,
+    self, Channel, NoticeKind, can_redraw, notice, result_lines, saved, show_result,
 };
 
 /// Reports only images already verified and successfully published.
@@ -295,10 +295,15 @@ fn save_share_cards(
             saved(&format!(
                 "Saved {files} {} files to: {}",
                 format_name(format),
-                printable(&directory)
+                shown_path(&directory)
             ));
             save_share_qrs(set, &|code| {
-                save_qr_inside(&code.payload, &directory, &code.name)
+                super::cards::save_qr_inside_with(
+                    &code.payload,
+                    &directory,
+                    &code.name,
+                    code.contact.as_deref(),
+                )
             })?;
             keep(if set.layout().separate_cards() {
                 Packaging::Folders
@@ -316,10 +321,15 @@ fn save_share_cards(
         |path| publish_pdf(drawing, set.pages(drawing, &mut random), &resolved(path)),
     )?;
     if let Some(pdf) = pdf {
-        saved(&format!("Saved SSKR collection PDF: {}", printable(&pdf)));
+        saved(&format!("Saved SSKR collection PDF: {}", shown_path(&pdf)));
         keep(Packaging::File)?;
         save_share_qrs(set, &|code| {
-            save_qr_beside(&code.payload, &pdf, &format!("-{}", code.reference))
+            super::cards::save_qr_beside_with(
+                &code.payload,
+                &pdf,
+                &format!("-{}", code.reference),
+                code.contact.as_deref(),
+            )
         })?;
     }
     let (format, mut count) = (image_format(parsed)?, 0);
@@ -337,7 +347,12 @@ fn save_share_cards(
         saved_pages_notice(parsed, count, &images, Some("SSKR"))?;
         keep(Packaging::Folder)?;
         save_share_qrs(set, &|code| {
-            save_qr_inside(&code.payload, &images, &code.name)
+            super::cards::save_qr_inside_with(
+                &code.payload,
+                &images,
+                &code.name,
+                code.contact.as_deref(),
+            )
         })?;
     }
     Ok(())
@@ -370,6 +385,7 @@ pub(crate) fn save_shares(
             ShareCardSet::create(&cards.drawing, &mut SystemRandom, &records, &cards.options)?;
         save_share_cards(&set, parsed, cards, &keep)?;
     }
+    let qr_settings = parsed.clone();
     let qr_folder = save_output(
         parsed,
         "qr-dir",
@@ -387,7 +403,8 @@ pub(crate) fn save_shares(
             folder.publish(".mnemocode-share-qr-", |staging| {
                 for written in shown {
                     let text = written.format.write(&written.share);
-                    let image = mnemocode::qr::png(&text).map_err(step_failed)?;
+                    let image =
+                        super::hidden_qr::image(&qr_settings, &text).map_err(step_failed)?;
                     let name = format!("share-{}-qr.png", written.number);
                     os::write_new_private_file(&staging.join(name), &image)?;
                 }
@@ -400,7 +417,7 @@ pub(crate) fn save_shares(
         saved(&format!(
             "Saved {} share QR images to: {}",
             shown.len(),
-            printable(&folder)
+            shown_path(&folder)
         ));
         keep(Packaging::Folder)?;
     }
@@ -419,7 +436,7 @@ pub(crate) fn save_shares(
     if let Some(output) = output {
         saved(&format!(
             "Saved SSKR records: {} (one complete share per line).",
-            printable(&output)
+            shown_path(&output)
         ));
         keep(Packaging::File)?;
     }

@@ -33,16 +33,14 @@ fn with_picture(name: &str) -> PathBuf {
 }
 
 /// What Decode says on standard error of the legend saved in `folder`, which must give the public
-/// phrase back with the public dates.
+/// phrase back, with the public dates where `dated`: the legend line, or the pattern's PDF that
+/// keeps it.
 #[track_caller]
-fn decoded_legend(folder: &Path) -> String {
-    let decode = [
-        "decode",
-        "--input-file",
-        "legend.txt",
-        "--dates-file",
-        DATES,
-    ];
+fn decoded_legend(folder: &Path, (file, dated): (&str, bool)) -> String {
+    let mut decode = vec!["decode", "--input-file", file];
+    if dated {
+        decode.extend(["--dates-file", DATES]);
+    }
     let output = run(folder, &decode);
     let errors = String::from_utf8_lossy(&output.stderr).into_owned();
     assert_eq!(output.status.code(), Some(0), "{errors}");
@@ -75,8 +73,13 @@ fn the_options_and_the_picture_are_refused_before_the_phrase_is_read() {
     );
     assert_refused(
         &folder,
+        &stitch(&[&narrow[..], &["120", "--fabric", "linen-41"]].concat()),
+        "linen-N for linen of N threads an inch",
+    );
+    assert_refused(
+        &folder,
         &stitch(&["--picture", PHRASE, "--pdf", "p.pdf"]),
-        "no PNG or JPEG",
+        "no PNG, JPEG or WebP",
     );
     fs::create_dir(folder.join("photos")).expect("a folder");
     assert_refused(
@@ -84,6 +87,39 @@ fn the_options_and_the_picture_are_refused_before_the_phrase_is_read() {
         &stitch(&["--picture", "photos", "--pdf", "p.pdf"]),
         "must be a regular file",
     );
+    // The original Seedshift's result is no valid phrase, which a legend holds.
+    let original = ["--mode", "seedshift-legacy", "--picture", PICTURE];
+    assert_refused(
+        &folder,
+        &stitch(&[&original[..], &["--pdf", "p.pdf"]].concat()),
+        "masked with MnemoCode Seedshift, or the phrase itself",
+    );
+}
+
+/// The pattern here is for linen stitched over one thread, which only the cover and the skeins
+/// tell from Aida.
+#[test]
+fn a_phrase_hidden_without_seedshift_reads_back_with_no_dates() {
+    let folder = with_picture("stitch-direct");
+    let args = [
+        "stitch",
+        "--mode",
+        "direct",
+        "--mnemonic-file",
+        PHRASE,
+        "--picture",
+        PICTURE,
+        "--stitches-across",
+        "120",
+        "--fabric",
+        "linen-28",
+        "--pdf",
+        "pattern.pdf",
+        "--output",
+        "legend.txt",
+    ];
+    saved(&folder, &args);
+    decoded_legend(&folder, ("legend.txt", false));
 }
 
 #[test]
@@ -104,8 +140,29 @@ fn the_legend_saved_reads_back_as_the_phrase_and_a_mistyped_row_is_named() {
     );
     assert!(read(&folder, "pattern.pdf").starts_with(PDF_START));
     let legend = String::from_utf8(read(&folder, "legend.txt")).expect("a line");
+    // The PDF keeps the line where Decode finds it; a PDF without one is refused in its own words.
+    decoded_legend(&folder, ("pattern.pdf", true));
+    fs::write(folder.join("other.pdf"), b"%PDF-1.7\n%%EOF\n").expect("a file");
+    assert_refused(
+        &folder,
+        &["decode", "--input-file", "other.pdf", "--dates-file", DATES],
+        "keeps no legend",
+    );
+    // A pattern's PDF with a QR image too is two sources, refused as any two are.
+    let two = ["--input-file", "pattern.pdf", "--qr-file", PICTURE];
+    for command in [
+        &["decode"][..],
+        &["recover-date"],
+        &["re-encode", "--format", "5", "--recognised"],
+    ] {
+        assert_refused(
+            &folder,
+            &[command, &two[..]].concat(),
+            "Choose one encoded input source",
+        );
+    }
     assert!(mnemocode_embroidery::legend::is_line(&legend), "{legend}");
-    decoded_legend(&folder);
+    decoded_legend(&folder, ("legend.txt", true));
     // The last digit of the least row that carries one, changed, is found and named: a row of
     // 100 stitches or more, other than the biggest, which carries none.
     let rows: Vec<&str> = legend.split_whitespace().collect();
@@ -132,7 +189,7 @@ fn the_legend_saved_reads_back_as_the_phrase_and_a_mistyped_row_is_named() {
     let mut changed = rows.clone();
     changed[place] = mistyped.as_str();
     fs::write(folder.join("legend.txt"), changed.join(" ")).expect("a line");
-    let errors = decoded_legend(&folder);
+    let errors = decoded_legend(&folder, ("legend.txt", true));
     let named = format!("Row {} of the legend did not fit", place + 1);
     assert!(errors.contains(&named), "{errors}");
 }

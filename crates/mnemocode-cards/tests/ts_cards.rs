@@ -175,6 +175,7 @@ fn planned(drawing: &CardDrawing, random: &mut dyn Random, given: &Value) -> Car
         profile: profile_of(&given["profile"]),
         presentation: None,
         card_qr: given["cardQr"] == true,
+        hidden_qr: false,
     };
     let cards = backup_card_content(&encoding.backup, settings, given["title"].as_str())
         .expect("the content");

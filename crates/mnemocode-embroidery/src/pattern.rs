@@ -1,5 +1,6 @@
-//! A picture in DMC threads: the colours it needs found by median cut and k-means in CIELAB, each
-//! matched to the nearest unused thread, then every stitch chosen by serpentine Floyd-Steinberg
+//! A picture in DMC threads: the colours it needs found by median cut and k-means in CIELAB, rare
+//! colours weighted up so that a small bright object, such as a carrot on a lawn, keeps a thread of
+//! its own (the owner's look at a rabbit, 2026-11-05), each matched to the nearest unused thread, then every stitch chosen by serpentine Floyd-Steinberg
 //! dithering, as patterns made from photographs are, so that crosses of neighbouring threads blend
 //! into the shades between them seen from a little distance. A thread left with fewer than
 //! [`MIN_STITCHES`] is dropped and the picture dithered again.
@@ -21,6 +22,11 @@ const ERROR_LIMIT: f64 = 12.0;
 const ROUNDS: usize = 12;
 /// The most colours the k-means looks at: an even sample of a larger picture.
 const SAMPLE: usize = 120_000;
+/// The coarse cells of CIELAB in which colours are counted, so that rare ones weigh more.
+const RARITY_CELL: f64 = 8.0;
+/// The share of the stitches whose seen difference counts as the worst places of a pattern: about
+/// what a small object takes, which the mean alone overlooks.
+const WORST_SHARE: f64 = 0.01;
 /// The most times threads are dropped and the picture dithered again.
 const PRUNE_ROUNDS: usize = 8;
 
@@ -114,6 +120,11 @@ impl Pattern {
         self.threads.iter().map(|&t| &THREADS[t])
     }
 
+    /// The place in [`THREADS`] of its thread `index`.
+    pub(crate) fn thread_place(&self, index: usize) -> usize {
+        self.threads[index]
+    }
+
     /// How many threads it has.
     #[must_use]
     pub fn thread_count(&self) -> usize {
@@ -146,6 +157,22 @@ impl Pattern {
     /// then the mean CIE76 distance. Below 2 the two look alike; above 5 they differ plainly.
     #[must_use]
     pub fn seen_difference(&self, grid: &Grid) -> f64 {
+        let differences = self.seen_differences(grid);
+        differences.iter().sum::<f64>() / differences.len().max(1) as f64
+    }
+
+    /// How far this pattern is from `grid` where it is furthest: the mean seen difference of its
+    /// worst 1% of stitches, where a small object that lost its colour shows.
+    #[must_use]
+    pub fn worst_difference(&self, grid: &Grid) -> f64 {
+        let mut differences = self.seen_differences(grid);
+        differences.sort_by(|a, b| b.total_cmp(a));
+        let worst = ((differences.len() as f64 * WORST_SHARE).ceil() as usize).max(1);
+        differences.iter().take(worst).sum::<f64>() / worst as f64
+    }
+
+    /// The difference of every stitch from `grid`, both blurred by about a stitch.
+    fn seen_differences(&self, grid: &Grid) -> Vec<f64> {
         let stitched: Vec<Lab> = self
             .cells
             .iter()
@@ -155,8 +182,7 @@ impl Pattern {
             blur(grid.colors(), self.width, self.height),
             blur(&stitched, self.width, self.height),
         );
-        let total: f64 = a.iter().zip(&b).map(|(x, y)| x.distance(*y)).sum();
-        total / a.len().max(1) as f64
+        a.iter().zip(&b).map(|(x, y)| x.distance(*y)).collect()
     }
 }
 
@@ -192,21 +218,40 @@ pub(crate) fn nearest(colors: &[Lab], target: Lab) -> usize {
 fn kmeans(colors: &[Lab], k: usize) -> Vec<Lab> {
     let step = colors.len().div_ceil(SAMPLE).max(1);
     let sample: Vec<Lab> = colors.iter().step_by(step).copied().collect();
+    let weights = rarity_weights(&sample);
     let mut centers = median_cut(&sample, k);
     for _ in 0..ROUNDS {
-        let mut sums = vec![(Lab::default(), 0_usize); centers.len()];
-        for &c in &sample {
-            let (sum, n) = &mut sums[nearest(&centers, c)];
-            *sum = sum.plus(c, 1.0);
-            *n += 1;
+        let mut sums = vec![(Lab::default(), 0.0_f64); centers.len()];
+        for (&c, &weight) in sample.iter().zip(&weights) {
+            let (sum, total) = &mut sums[nearest(&centers, c)];
+            *sum = sum.plus(c, weight);
+            *total += weight;
         }
-        for (center, (sum, n)) in centers.iter_mut().zip(sums) {
-            if n > 0 {
-                *center = mean(sum, n);
+        for (center, (sum, total)) in centers.iter_mut().zip(sums) {
+            if total > 0.0 {
+                *center = Lab {
+                    l: sum.l / total,
+                    a: sum.a / total,
+                    b: sum.b / total,
+                };
             }
         }
     }
     centers
+}
+
+/// Each colour's weight in the k-means: one over the square root of how many colours share its
+/// coarse cell of CIELAB, so that a large lawn does not take every thread from a small carrot.
+fn rarity_weights(colors: &[Lab]) -> Vec<f64> {
+    let cell = |c: &Lab| [c.l, c.a, c.b].map(|channel| (channel / RARITY_CELL).floor() as i64);
+    let mut counts: std::collections::HashMap<[i64; 3], u32> = std::collections::HashMap::new();
+    for c in colors {
+        *counts.entry(cell(c)).or_insert(0) += 1;
+    }
+    colors
+        .iter()
+        .map(|c| 1.0 / f64::from(counts[&cell(c)]).sqrt())
+        .collect()
 }
 
 /// `sum` divided by `n`.

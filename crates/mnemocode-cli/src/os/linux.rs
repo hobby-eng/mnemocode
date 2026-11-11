@@ -292,10 +292,10 @@ mod seccomp {
 }
 
 /// Landlock (`L-LANDLOCK-WRITES`): every right to change the file system that the kernel's ABI
-/// knows is handled, and granted only beneath the outputs' folders, opened before the secret; TCP
-/// bind and connect are handled too where the kernel knows them (ABI 4). A command that saves
-/// needs ABI 2 (REFER, for the rename and the link of a publication); on ABI 1 it gets no Landlock
-/// and the report says so.
+/// knows is handled, and granted only beneath the outputs' folders, opened before the seed phrase
+/// is read; TCP bind and connect are handled too where the kernel knows them (ABI 4). A command
+/// that saves needs ABI 2 (REFER, for the rename and the link of a publication); on ABI 1 it gets
+/// no Landlock and the report says so.
 mod landlock {
     use super::{CString, OsStrExt, ptr, size_of};
     use std::path::PathBuf;

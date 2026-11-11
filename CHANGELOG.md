@@ -6,10 +6,16 @@ MnemoCode is now written in Rust. Each system gets one executable with nothing e
 
 ### Cross-stitch patterns
 
-- `stitch`, and Embroidery among the forms of the menu's Encode, hide a phrase in a cross-stitch pattern made from a picture. The phrase is masked with dates, as Seedshift does, and kept in the legend: in each row's symbol and in the last digits of its stitch count. The pattern is a PDF in DMC threads, with a cover, the legend and the chart. [SeedStitch](docs/SEEDSTITCH.md) describes the format.
-- Decode reads a legend back with the dates, typed or from a file, and corrects one mistyped row, naming it.
+- `stitch`, and Embroidery among the forms of the menu's Encode, hide a phrase in a cross-stitch pattern made from a picture in PNG, JPEG or WebP. The phrase is masked with dates, as MnemoCode Seedshift does, unless No Seedshift is chosen (`--mode direct`), as in Encode, and kept in the legend: in each row's symbol and in the last digits of its stitch count. The pattern is a PDF in DMC threads that looks like one bought from a designer: a cover with the picture stitched, the floss key on one page, and the chart in colour with its symbols on the sheet the pattern was fitted into. The menu asks for the fabric, Aida 11, 14, 16 or 18 or linen 28 stitched over one thread, and offers sizes from A6 to A2, each with the stitches of the picture in it and their centimetres, or a width in centimetres or stitches; `--fabric`, as `14` or `linen-28`, gives the fabric that the finished size and the skeins are given for. [SeedStitch](docs/SEEDSTITCH.md) describes the format.
+- Decode reads a legend back, typed or from a file, asks for the dates where its check says the phrase is masked, and corrects one mistyped row, naming it.
+- A pattern too small or too plain for the legend's usual form uses the order of its rows as well (format 2): fewer threads hold the phrase, so a 24-word phrase fits 60 stitches across. Its legend line names each row's DMC number, as `15:407:38`. MnemoCode uses it only where the usual form cannot hold the phrase.
+- Decode reads a pattern's PDF: the PDF keeps its legend line compressed in the floss key page's private data, which no viewer shows and which holds nothing the page does not print. The menu offers In a cross-stitch pattern among the places of the encoded phrase. A PDF another program saved again may lose it; then the legend is typed from the key.
 - The self-test reads the format's example legend at every start; the full self-test also makes a pattern and reads its legend back.
-- The WebAssembly files of the Deriver pages hold it too, as the `browser-embroidery` module.
+- The WebAssembly files of the Deriver pages hold it too, as the `browser-embroidery` module: a pattern with or without Seedshift, the sizes the menu offers for a picture, its PDF for any of the fabrics, and its legend read back, typed or from the PDF.
+
+### Hidden QR records
+
+- PDF and PNG exports can carry a hidden QR record (`--qr-hidden`): ordinary scanners show the printed contact or a chosen text (`--qr-text`), and MnemoCode reads back the exact backup codes or share. `qr-hide` wraps an existing record, `qr-open` extracts it unchanged, and the browser binding does both. [Hidden QR records](docs/HIDDEN_QR.md) describes the format and its limits.
 
 ### Wallet checks
 
@@ -27,8 +33,11 @@ MnemoCode is now written in Rust. Each system gets one executable with nothing e
 ### Menu and help
 
 - The README follows the order of the menu, with paired command examples and an index of the documentation. Each menu task and recovery choice shows its own explanation and a link to its section.
-- Re-encode asks for the new backup before the old one, so that its outputs are checked before any secret is typed.
+- Re-encode asks for the new backup before the old one: the new backup's dates first, then its outputs, which are checked and write-restricted before the old phrase is typed.
+- The menu numbers the self-test 0, the command list s and Quit q, and asks where to save Encode's result as a checklist.
+- A new backup asks whether to use Seedshift and which on one screen: MnemoCode Seedshift, Original Seedshift or No Seedshift. Where only MnemoCode Seedshift fits, as for shares, the original is not offered; a form that is always masked offers the two Seedshifts.
 - The help of `--ask-secrets` says that standard error must be the terminal too, as its refusal does.
+- A message about a saved file or folder names it by its full path, from the root, so that it can be found wherever the program was started. 0.1.0 named it as it was typed.
 
 ### Limits and refusals
 
@@ -41,8 +50,9 @@ MnemoCode is now written in Rust. Each system gets one executable with nothing e
 
 ### Output
 
-- A missing parent folder of an output file is made before any secret is read. Output paths are checked before the command's own options: of a wrong path and a wrong option, the path is named first, and a folder made for a refused command stays.
+- A missing parent folder of an output file is made before the seed phrase is read; in the menu's Encode, Embroidery and share split, the Seedshift dates are asked before it. Output paths are checked before the command's own options: of a wrong path and a wrong option, the path is named first, and a folder made for a refused command stays.
 - On Linux with Landlock, a failed save may take another name only in the folders of its outputs.
+- A taken file name is numbered with an underscore, as `shares_1.txt`; a taken folder keeps `-1`.
 - If standard output does not take the result, as on a full disk, the command says so and ends with exit code 1. A closed pipe, as with `| head`, ends it as done.
 - A line of a secret result that 0.1.0 wrote to standard error goes to standard output when standard error is a terminal and no private screen is open.
 
@@ -50,8 +60,8 @@ MnemoCode is now written in Rust. Each system gets one executable with nothing e
 
 - A command with a secret result is refused on a terminal without a private screen. Files and pipes get the result as before.
 - On Linux, a tracer attached to the process refuses secrets.
-- Secrets live in types that wipe them, every freed block of memory is wiped, and the memory of a secret is kept out of swap where the system allows it. SECURITY.md lists what is wiped but not locked: drawn pages, the codes on cards, a command's dates and a step's working copies.
-- No secret stays in the memory of a page's WebAssembly file once a call returns; the gates check this on every commit.
+- Secrets live in types that wipe them, every freed block of memory is wiped, and the memory of a secret is kept out of swap where the system allows it. SECURITY.md describes the best-effort lock requests for retained secrets and the exceptions for rendered pages, search working state and temporary or third-party working copies.
+- Secret WebAssembly calls scrub temporary working state, and freed allocations are wiped. Objects deliberately retained by the host keep their contents until the host frees or wipes them; the gates check the recorded entry and ownership paths.
 - Random numbers come only from the operating system, or in a browser from `crypto.getRandomValues`.
 
 ### Same results, other bytes

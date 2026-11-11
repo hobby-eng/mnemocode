@@ -17,6 +17,9 @@ mod entries;
 
 use wasmi::{Caller, Engine, Instance, Linker, Memory, Module, Store};
 
+mod backup;
+pub(super) use backup::backup_abi_problems;
+
 use self::entries::{Watch, entry_problems, entry_returned};
 use crate::Failure;
 
@@ -59,8 +62,14 @@ enum Operation {
     StringGet,
     /// `const ret = getStringFromWasm0(…)`: a string object made.
     StringNew,
+    /// A numeric page value, with no coercion of BigInt or other JS types.
+    NumberGet,
+    /// A number made by the Rust lifetime probe.
+    NumberNew,
     /// `getObject(index) === undefined`.
     IsUndefined,
+    /// Strict equality of primitive option values, without copying them to WASM.
+    PrimitiveEqual,
     /// `crypto.getRandomValues(…)`: public bytes written where they are asked for.
     Random,
     /// `throw new Error(…)`.
@@ -82,6 +91,7 @@ enum Object {
     Json(String),
     /// A page's string.
     Text(String),
+    Number(f64),
 }
 
 /// The emulated page: its objects by index, and what it watches.
@@ -116,12 +126,21 @@ fn imports_of(glue: &str) -> Vec<(String, Operation)> {
         }
         let body = lines.get(index + 1).copied().unwrap_or_default();
         let after = lines.get(index + 2).copied().unwrap_or_default();
-        let operation = if name.contains("__wbindgen_string_get") {
+        let operation = if name.contains("__wbindgen_number_get") {
+            Operation::NumberGet
+        } else if name.contains("__wbindgen_number_new")
+            || (body.contains("Cast intrinsic for `F64 -> Externref`")
+                && after.trim() == "const ret = arg0;")
+        {
+            Operation::NumberNew
+        } else if name.contains("__wbindgen_string_get") {
             Operation::StringGet
         } else if body.contains("probeEntryReturned(") {
             Operation::EntryReturned
         } else if body.contains("throw new Error(") {
             Operation::Throw
+        } else if body.trim() == "const ret = getObject(arg0) === getObject(arg1);" {
+            Operation::PrimitiveEqual
         } else if body.contains("=== undefined") {
             Operation::IsUndefined
         } else if body.contains("getRandomValues(") {
@@ -150,6 +169,37 @@ fn imports_of(glue: &str) -> Vec<(String, Operation)> {
         imports.push((name.to_owned(), operation));
     }
     imports
+}
+
+/// The pinned glue's primitive strict equality for closed option names. Object
+/// identity is not modeled here; trap rather than guess if a probe starts using it.
+fn primitive_equal(page: &Page, a: i32, b: i32) -> Result<bool, wasmi::Error> {
+    match (page.get(a), page.get(b)) {
+        (Some(Object::Text(a)), Some(Object::Text(b))) => Ok(a == b),
+        (Some(Object::Number(a)), Some(Object::Number(b))) => Ok(a == b),
+        (Some(Object::Text(_) | Object::Number(_)), Some(Object::Text(_) | Object::Number(_))) => {
+            Ok(false)
+        }
+        (Some(Object::Text(_) | Object::Number(_)), None)
+            if (UNDEFINED_SLOT..HEAP_START as i32).contains(&b) =>
+        {
+            Ok(false)
+        }
+        (None, Some(Object::Text(_) | Object::Number(_)))
+            if (UNDEFINED_SLOT..HEAP_START as i32).contains(&a) =>
+        {
+            Ok(false)
+        }
+        (None, None)
+            if (UNDEFINED_SLOT..HEAP_START as i32).contains(&a)
+                && (UNDEFINED_SLOT..HEAP_START as i32).contains(&b) =>
+        {
+            Ok(a == b)
+        }
+        _ => Err(wasmi::Error::new(
+            "probe primitive equality received an unsupported object",
+        )),
+    }
 }
 
 /// wasmi's error as the check's failure.
@@ -215,6 +265,24 @@ fn string_get(
     Ok(())
 }
 
+/// The pinned glue's Option<f64> result: presence at offset zero, value at eight.
+fn number_get(mut caller: Caller<'_, Page>, out: i32, index: i32) -> Result<(), wasmi::Error> {
+    let number = match caller.data().get(index) {
+        Some(Object::Number(value)) => Some(*value),
+        _ => None,
+    };
+    let memory = caller
+        .get_export("memory")
+        .and_then(wasmi::Extern::into_memory)
+        .ok_or_else(|| wasmi::Error::new("the probe file exports no memory"))?;
+    let at = usize::try_from(out)
+        .map_err(|_| wasmi::Error::new("a numeric result has an invalid address"))?;
+    let data = memory.data_mut(&mut caller);
+    data[at..at + 4].copy_from_slice(&i32::from(number.is_some()).to_le_bytes());
+    data[at + 8..at + 16].copy_from_slice(&number.unwrap_or(0.).to_le_bytes());
+    Ok(())
+}
+
 /// The object that `make` makes of the string at `pointer`, added to the emulated page.
 fn made_of_text(
     caller: &mut Caller<'_, Page>,
@@ -258,6 +326,10 @@ fn random_values(
 
 /// A linker that gives every import of `module` the operation the glue gives it, `malloc` the
 /// instance's allocator; one the probes need not run traps.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one dispatch keeps every pinned JS import beside its wasmi signature; the conversion logic lives in separate helpers"
+)]
 fn linker(
     engine: &Engine,
     module: &Module,
@@ -330,6 +402,22 @@ fn linker(
                     .func_wrap(&namespace, &name, |_: Caller<'_, Page>, _index: i32| {})
                     .map_err(fail)?;
             }
+            Some(Operation::NumberNew) => {
+                linker
+                    .func_wrap(
+                        &namespace,
+                        &name,
+                        |mut caller: Caller<'_, Page>, value: f64| {
+                            caller.data_mut().add(Object::Number(value))
+                        },
+                    )
+                    .map_err(fail)?;
+            }
+            Some(Operation::NumberGet) => {
+                linker
+                    .func_wrap(&namespace, &name, number_get)
+                    .map_err(fail)?;
+            }
             Some(Operation::StringGet) => {
                 let malloc = malloc.to_owned();
                 linker
@@ -343,10 +431,21 @@ fn linker(
                     .map_err(fail)?;
             }
             Some(Operation::StringNew) => {
-                let made = |mut caller: Caller<'_, Page>, pointer: i32, length: i32| {
+                let made = |mut caller: Caller<'_, Page>, pointer: i32, length: i32| -> i32 {
                     made_of_text(&mut caller, pointer, length, Object::Text)
                 };
                 linker.func_wrap(&namespace, &name, made).map_err(fail)?;
+            }
+            Some(Operation::PrimitiveEqual) => {
+                linker
+                    .func_wrap(
+                        &namespace,
+                        &name,
+                        |caller: Caller<'_, Page>, a: i32, b: i32| {
+                            primitive_equal(caller.data(), a, b).map(i32::from)
+                        },
+                    )
+                    .map_err(fail)?;
             }
             Some(Operation::IsUndefined) => {
                 linker
@@ -431,16 +530,25 @@ fn started(
     Ok((store, instance, memory))
 }
 
+fn allocator_name(glue: &str) -> Result<&str, Failure> {
+    glue.lines()
+        .find_map(|line| {
+            line.split_once("passArray8ToWasm0(")?
+                .1
+                .split_once(", wasm.")?
+                .1
+                .split(')')
+                .next()
+        })
+        .ok_or_else(|| Failure("the glue names no array allocator for the probes".to_owned()))
+}
+
 /// The probe file's problems: a marker left after an entry, a secret left by the entries, or a
 /// refusal that reaches the page otherwise than TS's does.
 pub(super) fn problems(bytes: &[u8], glue: &str) -> Result<Vec<String>, Failure> {
     let engine = Engine::default();
     let module = Module::new(&engine, bytes).map_err(wasm_error)?;
-    let malloc_name = glue
-        .split("passArray8ToWasm0(marker, wasm.")
-        .nth(1)
-        .and_then(|rest| rest.split(')').next())
-        .ok_or_else(|| Failure("the glue names no allocator for the probes".to_owned()))?;
+    let malloc_name = allocator_name(glue)?;
     let mut problems = entry_problems(&engine, &module, glue, malloc_name)?;
     let (mut store, instance, memory) = started(&engine, &module, glue, malloc_name)?;
     let malloc = instance
@@ -575,20 +683,30 @@ fn row_problems(
     Ok(problems)
 }
 
-/// probeRefusal's error as a page receives it.
-fn refusal_problems(
+/// What `entry` throws, called with its return slot and then `case` when it takes one: the handle
+/// of what it threw, or none when it returned.
+fn thrown(
     store: &mut Store<Page>,
     instance: &Instance,
     memory: &Memory,
-) -> Result<Vec<String>, Failure> {
+    entry: &str,
+    case: Option<i32>,
+) -> Result<Option<i32>, Failure> {
     let stack = instance
         .get_typed_func::<i32, i32>(&*store, "__wbindgen_add_to_stack_pointer")
         .map_err(wasm_error)?;
-    let refusal = instance
-        .get_typed_func::<i32, ()>(&*store, "probeRefusal")
-        .map_err(wasm_error)?;
     let pointer = stack.call(&mut *store, -16).map_err(wasm_error)?;
-    refusal.call(&mut *store, pointer).map_err(wasm_error)?;
+    match case {
+        None => instance
+            .get_typed_func::<i32, ()>(&*store, entry)
+            .map_err(wasm_error)?
+            .call(&mut *store, pointer),
+        Some(case) => instance
+            .get_typed_func::<(i32, i32), ()>(&*store, entry)
+            .map_err(wasm_error)?
+            .call(&mut *store, (pointer, case)),
+    }
+    .map_err(wasm_error)?;
     let start = usize::try_from(pointer).unwrap_or(0);
     let word = |at: usize| {
         let bytes = memory
@@ -597,35 +715,60 @@ fn refusal_problems(
             .and_then(|slice| <[u8; 4]>::try_from(slice).ok());
         bytes.map_or(0, i32::from_le_bytes)
     };
-    let (object, thrown) = (word(start), word(start + 4));
+    let (object, threw) = (word(start), word(start + 4));
     stack.call(&mut *store, 16).map_err(wasm_error)?;
+    Ok((threw != 0).then_some(object))
+}
+
+/// The problems of `object`, which `what` threw, against an error of `kind` with `code` as the
+/// read-only enumerable property a page reads, and `message` when one is given.
+fn error_problems(
+    store: &Store<Page>,
+    what: &str,
+    object: Option<i32>,
+    (kind, code, message): (&str, &str, Option<&str>),
+) -> Vec<String> {
+    let Some(object) = object else {
+        return vec![format!("{what} threw nothing")];
+    };
+    let expected = format!("{{\"value\":\"{code}\",\"enumerable\":true}}");
     let mut problems = Vec::new();
-    if thrown == 0 {
-        problems.push("probeRefusal threw nothing".to_owned());
-        return Ok(problems);
-    }
-    let expected = format!("{{\"value\":\"{REFUSAL_CODE}\",\"enumerable\":true}}");
     match store.data().get(object) {
         Some(Object::Error {
-            kind,
-            message,
+            kind: thrown,
+            message: said,
             properties,
         }) => {
-            if *kind != "RangeError" {
-                problems.push(format!("probeRefusal threw a {kind}, not a RangeError"));
+            if *thrown != kind {
+                problems.push(format!("{what} threw a {thrown}, not a {kind}"));
             }
-            if message != REFUSAL_MESSAGE {
-                problems.push("probeRefusal's message differs".to_owned());
+            if message.is_some_and(|message| message != said) {
+                problems.push(format!("{what}'s message differs"));
             }
             if properties.as_slice() != [("code".to_owned(), expected)] {
                 problems.push(format!(
-                    "probeRefusal's code is defined as {properties:?}, not enumerable and read-only"
+                    "{what}'s code is defined as {properties:?}, not {code}, enumerable and read-only"
                 ));
             }
         }
-        _ => problems.push("probeRefusal threw no error object".to_owned()),
+        _ => problems.push(format!("{what} threw no error object")),
     }
-    Ok(problems)
+    problems
+}
+
+/// probeRefusal's error as a page receives it.
+fn refusal_problems(
+    store: &mut Store<Page>,
+    instance: &Instance,
+    memory: &Memory,
+) -> Result<Vec<String>, Failure> {
+    let object = thrown(store, instance, memory, "probeRefusal", None)?;
+    Ok(error_problems(
+        store,
+        "probeRefusal",
+        object,
+        ("RangeError", REFUSAL_CODE, Some(REFUSAL_MESSAGE)),
+    ))
 }
 
 #[cfg(test)]
@@ -648,5 +791,48 @@ mod tests {
                 ("__wbg_parse_2".to_owned(), Operation::Parse)
             ]
         );
+    }
+}
+
+#[cfg(test)]
+mod numeric_import_tests {
+    use super::{Operation, imports_of};
+    #[test]
+    fn numeric_imports_follow_the_pinned_glues_actual_cast_intrinsic() {
+        let glue = "__wbindgen_generic_0000000000000001: function(arg0) {\n    // Cast intrinsic for `F64 -> Externref`.\n    const ret = arg0;\n    return addHeapObject(ret);\n},\n__wbg___wbindgen_number_get_example: function(arg0, arg1) {\n    const obj = getObject(arg1);\n    const ret = typeof(obj) === 'number' ? obj : undefined;\n}";
+        let imports = imports_of(glue);
+        assert_eq!(imports.len(), 2);
+        assert_eq!(imports[0].1, Operation::NumberNew);
+        assert_eq!(imports[1].1, Operation::NumberGet);
+        let wrong_cast = glue.replace("F64 -> Externref", "I64 -> Externref");
+        assert_eq!(imports_of(&wrong_cast).len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod primitive_equality_tests {
+    use super::*;
+    #[test]
+    fn primitive_equality_does_not_coerce_strings_numbers_or_undefined() {
+        let mut page = Page::default();
+        let a = page.add(Object::Text("balanced".to_owned()));
+        let b = page.add(Object::Text("balanced".to_owned()));
+        let c = page.add(Object::Text("minimum".to_owned()));
+        let number_text = page.add(Object::Text("0".to_owned()));
+        let zero = page.add(Object::Number(0.));
+        let negative_zero = page.add(Object::Number(-0.));
+        let nan = page.add(Object::Number(f64::NAN));
+        assert!(primitive_equal(&page, a, b).unwrap());
+        assert!(!primitive_equal(&page, a, c).unwrap());
+        assert!(!primitive_equal(&page, number_text, zero).unwrap());
+        assert!(primitive_equal(&page, zero, negative_zero).unwrap());
+        assert!(!primitive_equal(&page, nan, nan).unwrap());
+        assert!(!primitive_equal(&page, zero, UNDEFINED_SLOT).unwrap());
+        assert!(primitive_equal(&page, UNDEFINED_SLOT, UNDEFINED_SLOT).unwrap());
+        let object = page.add(Object::Json("{}".to_owned()));
+        assert!(primitive_equal(&page, object, object).is_err());
+        let glue = "__wbg___wbindgen_jsval_eq_example: function(arg0, arg1) {\n    const ret = getObject(arg0) === getObject(arg1);\n}";
+        assert_eq!(imports_of(glue)[0].1, Operation::PrimitiveEqual);
+        assert!(imports_of(&glue.replace("===", "==")).is_empty());
     }
 }

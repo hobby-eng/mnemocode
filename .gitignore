@@ -5,3 +5,4 @@
 /dist/
 docs/audits/*-evidence/
 /release-signing-*/
+/tmp/

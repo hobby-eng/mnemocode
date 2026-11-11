@@ -177,22 +177,13 @@ mod bitcoin {
     /// A constructor of located evidence.
     type Located = fn(&str, Place) -> Result<Evidence, EvidenceError>;
 
-    /// The first place of the first account.
-    fn first() -> AddressLocation {
-        AddressLocation {
-            account: 0,
-            branch: 0,
-            index: 0,
-        }
-    }
-
     /// A located piece of evidence on the main network.
     fn located(kind: Located, value: &str) -> Result<Evidence, EvidenceError> {
         kind(
             value,
             Place {
                 network: KeyNetwork::Mainnet,
-                location: first(),
+                location: AddressLocation::FIRST,
                 addresses: None,
             },
         )
@@ -200,7 +191,7 @@ mod bitcoin {
 
     /// The second native SegWit address, scanned `addresses` from `index`.
     fn scanned(addresses: Option<u64>, index: u32) -> Result<Evidence, EvidenceError> {
-        let location = AddressLocation { index, ..first() };
+        let location = AddressLocation::new(0, 0, u64::from(index))?;
         Evidence::bitcoin_address(
             SECOND_84,
             Place {
@@ -257,7 +248,7 @@ mod bitcoin {
         ),
         (
             "An address read as every coin of its form",
-            || Evidence::address(None, ADDRESS_44, first(), None),
+            || Evidence::address(None, ADDRESS_44, AddressLocation::FIRST, None),
             "matched at m/44'/0'/0'/0/0",
             "",
         ),
@@ -344,7 +335,7 @@ mod bitcoin {
                 Evidence::address(
                     None,
                     "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyv",
-                    first(),
+                    AddressLocation::FIRST,
                     None,
                 )
             },

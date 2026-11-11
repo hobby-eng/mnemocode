@@ -8,14 +8,20 @@
 //! no `Display`. Domain owners (a phrase, entropy, a seed, a share) wrap these two and lend slices.
 
 mod allocator;
+mod normalization;
 mod pages;
+mod storage;
 
 use std::fmt;
 use std::ops::{Deref, DerefMut};
-
 use zeroize::Zeroize;
 
+pub(crate) use storage::SecretU16s;
+pub use storage::SecretVec;
+use storage::Storage;
+
 pub use allocator::ZeroingAllocator;
+pub(crate) use normalization::Nfkd;
 pub use pages::any_lock_refused;
 
 use crate::refusal::Refusal;
@@ -81,9 +87,7 @@ impl Filler<'_> {
 /// reserved at its final size and locked before anything is written into it; the bytes may change
 /// in place but never grow; on drop they are wiped, then the pages are unlocked.
 pub struct SecretBytes {
-    bytes: Vec<u8>,
-    // Declared after `bytes`, so that the pages are unlocked only once the bytes are wiped and freed.
-    locked: pages::LockedPages,
+    bytes: Storage<u8>,
     label: &'static str,
 }
 
@@ -95,15 +99,12 @@ impl SecretBytes {
         capacity: usize,
         fill: impl FnOnce(&mut Filler<'_>) -> Result<(), E>,
     ) -> Result<Self, E> {
-        let bytes = Vec::with_capacity(capacity);
-        let locked = pages::LockedPages::of(bytes.as_ptr(), bytes.capacity());
         let mut built = Self {
-            bytes,
-            locked,
+            bytes: Storage::new(Vec::with_capacity(capacity)),
             label,
         };
         fill(&mut Filler {
-            bytes: &mut built.bytes,
+            bytes: &mut built.bytes.values,
         })?;
         Ok(built)
     }
@@ -115,32 +116,52 @@ impl SecretBytes {
         copy
     }
 
+    /// Fallibly reserves a wiped owner before filling a potentially large buffer.
+    /// Allocation failure returns the allocator error without exposing contents.
+    pub fn try_zeroed(
+        label: &'static str,
+        length: usize,
+    ) -> Result<Self, std::collections::TryReserveError> {
+        let mut bytes = Vec::new();
+        bytes.try_reserve_exact(length)?;
+        let mut bytes = Storage::new(bytes);
+        bytes.values.resize(length, 0);
+        Ok(Self { bytes, label })
+    }
+    /// Fallibly copies bytes into a locked-where-available wiped owner.
+    pub fn try_copy_of(
+        label: &'static str,
+        bytes: &[u8],
+    ) -> Result<Self, std::collections::TryReserveError> {
+        let mut owner = Self::try_zeroed(label, bytes.len())?;
+        owner.copy_from_slice(bytes);
+        Ok(owner)
+    }
     /// Bytes too large for the lock budget, such as a drawn page: kept where they are and wiped on
     /// drop, never locked, so that the lock warning does not speak of them.
     pub fn large(label: &'static str, bytes: Vec<u8>) -> Self {
-        let locked = pages::LockedPages::of(bytes.as_ptr(), 0);
         Self {
-            bytes,
-            locked,
+            bytes: Storage::large(bytes),
             label,
         }
     }
 
     /// `length` zero bytes in a locked buffer, for a secret written in place afterwards.
     pub fn zeroed(label: &'static str, length: usize) -> Self {
-        let mut bytes = Vec::with_capacity(length);
-        let locked = pages::LockedPages::of(bytes.as_ptr(), bytes.capacity());
-        bytes.resize(length, 0);
-        Self {
-            bytes,
-            locked,
-            label,
-        }
+        let mut bytes = Storage::new(Vec::with_capacity(length));
+        bytes.values.resize(length, 0);
+        Self { bytes, label }
+    }
+
+    /// Bytes reserved by this allocation, for a host's live-buffer budget.
+    /// This may exceed the slice length for a large buffer supplied by a host.
+    pub fn reserved_bytes(&self) -> usize {
+        self.bytes.values.capacity()
     }
 
     /// Whether the operating system keeps these bytes out of swap.
     pub fn is_locked(&self) -> bool {
-        self.locked.is_locked()
+        self.bytes.is_locked()
     }
 
     /// The label the owner prints instead of its bytes.
@@ -153,21 +174,14 @@ impl Deref for SecretBytes {
     type Target = [u8];
 
     fn deref(&self) -> &[u8] {
-        &self.bytes
+        &self.bytes.values
     }
 }
 
 impl DerefMut for SecretBytes {
     /// The bytes to change in place; as a slice they cannot grow out of their locked buffer.
     fn deref_mut(&mut self) -> &mut [u8] {
-        &mut self.bytes
-    }
-}
-
-impl Drop for SecretBytes {
-    fn drop(&mut self) {
-        // The whole capacity, the bytes past the length included.
-        self.bytes.zeroize();
+        &mut self.bytes.values
     }
 }
 
@@ -201,6 +215,17 @@ impl SecretText {
         }
     }
 
+    /// Adopt UTF-8 text without copying and request its allocation's page hold.
+    /// The caller's earlier preparation is not retroactively protected.
+    pub fn take(label: &'static str, text: String) -> Self {
+        Self {
+            bytes: SecretBytes {
+                label,
+                bytes: Storage::new(text.into_bytes()),
+            },
+        }
+    }
+
     /// The bytes as text, in the same buffer and under the same lock; bytes that are not UTF-8 come
     /// back as they are, to be wiped when dropped.
     pub fn from_bytes(bytes: SecretBytes) -> Result<Self, SecretBytes> {
@@ -225,6 +250,33 @@ impl SecretText {
         self.bytes.is_locked()
     }
 }
+
+impl Clone for SecretText {
+    fn clone(&self) -> Self {
+        Self::copy_of(self.bytes.label, self.as_str())
+    }
+}
+impl Zeroize for SecretText {
+    fn zeroize(&mut self) {
+        self.bytes.bytes.values.zeroize();
+    }
+}
+impl AsRef<str> for SecretText {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+impl std::borrow::Borrow<str> for SecretText {
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
+}
+impl<T: AsRef<str> + ?Sized> PartialEq<T> for SecretText {
+    fn eq(&self, other: &T) -> bool {
+        equal_bytes(self.as_bytes(), other.as_ref().as_bytes())
+    }
+}
+impl Eq for SecretText {}
 
 impl Deref for SecretText {
     type Target = str;
@@ -350,6 +402,27 @@ mod tests {
         assert_eq!(SecretText::from_bytes(bytes).unwrap().as_str(), "word");
         let invalid = SecretBytes::copy_of("Line", &[0xff, 0xfe]);
         assert_eq!(&*SecretText::from_bytes(invalid).unwrap_err(), [0xff, 0xfe]);
+    }
+
+    #[test]
+    fn adopted_text_keeps_its_allocation_and_clones_into_a_separate_owner() {
+        let mut prepared = String::with_capacity(128);
+        prepared.push_str("public fixture é");
+        let pointer = prepared.as_ptr();
+        let mut adopted = SecretText::take("Fixture", prepared);
+        assert_eq!(adopted.as_bytes().as_ptr(), pointer);
+        let cloned = adopted.clone();
+        assert_eq!(cloned.as_str(), "public fixture é");
+        assert_ne!(cloned.as_bytes().as_ptr(), pointer);
+        if probe_lock(128) {
+            assert!(adopted.is_locked());
+            assert!(cloned.is_locked());
+        }
+        adopted.zeroize();
+        assert_eq!(adopted.as_str(), "");
+        assert_eq!(adopted.as_bytes().as_ptr(), pointer);
+        assert_eq!(cloned.as_str(), "public fixture é");
+        assert_eq!(format!("{adopted:?}"), "[Fixture: redacted]");
     }
 
     #[test]

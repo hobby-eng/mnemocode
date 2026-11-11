@@ -32,7 +32,7 @@ fn a_changed_answer_of_the_share_engine_stops_a_share_command_before_it_reads_a_
     let changed = folder.join("changed-mnemocode");
     fs::copy(program, &changed).expect("a copy");
     fs::write(&changed, build).expect("the change");
-    let output = Command::new(&changed)
+    let output = common::colour::plain(&mut Command::new(&changed))
         .args(["sskr-combine", "--share-file", SHARES])
         .current_dir(&folder)
         .stdin(Stdio::null())

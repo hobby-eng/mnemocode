@@ -1,6 +1,6 @@
 //! `mnemocode stitch` (docs/SEEDSTITCH.md, ADR 0010): the phrase, masked with MnemoCode's
-//! Seedshift, hidden in the legend of a cross-stitch pattern of a picture, the pattern saved as a
-//! PDF. The picture is read before the phrase is asked; where it cannot be used, at the terminal,
+//! Seedshift unless --mode direct hides the phrase itself, in the legend of a cross-stitch pattern
+//! of a picture, the pattern saved as a PDF. The picture is read before the phrase is asked; where it cannot be used, at the terminal,
 //! another picture or width is asked instead of ending (CORE-42). Where Decode takes codes, a
 //! SeedStitch legend typed or read is turned back into the record of the masked phrase, so that
 //! Decode, and the menu's Decode, go on as for any record.
@@ -11,30 +11,33 @@ use std::path::Path;
 use mnemocode::modes::{DateWords, Mode};
 use mnemocode::refusal::Refusal;
 use mnemocode::secret::SecretText;
-use mnemocode::text::numbers::typed_whole_number;
+use mnemocode_embroidery::fabric::{self, DEFAULT_FABRIC, Fabric};
 use mnemocode_embroidery::hide::{HideError, hide};
 use mnemocode_embroidery::picture::{self, DEFAULT_WIDTH, Grid, MAX_FILE_BYTES, WIDTHS};
 use mnemocode_embroidery::{chart, legend, phrase};
 
 use super::asking::{AfterFailure, after_failure, value_until};
+use super::configure::asked_options;
 use super::encode_questions::file_questions;
-use super::given::{PATH_LIMIT, check_date_input, phrase_and_dates};
+use super::given::{PATH_LIMIT, check_date_input, given_mode, phrase_and_dates};
 use super::output_questions::input_file;
+use super::pattern_questions::ask_size;
 use super::resolved;
 use super::saving::{ResultName, save_output};
 use crate::args::{Parsed, integer_option, is_on, value};
 use crate::gate::Stop;
 use crate::input::read_picture;
 use crate::os::{self, SystemRandom};
-use crate::output::report_renamed;
+use crate::output::{report_renamed, shown_path};
 use crate::terminal::result::{print, result_header};
 use crate::terminal::{
-    self, Choice, NoticeKind, TEXT_WIDTH, clear_private_screen, lasting_warning, notice, printable,
-    saved, wrap_text,
+    self, Choice, NoticeKind, TEXT_WIDTH, clear_private_screen, lasting_warning, notice, saved,
+    wrap_text,
 };
 
 /// The options `stitch` takes.
-pub(crate) const OPTIONS: [&str; 9] = [
+pub(crate) const OPTIONS: [&str; 11] = [
+    "mode",
     "mnemonic",
     "mnemonic-file",
     "ask-secrets",
@@ -42,6 +45,7 @@ pub(crate) const OPTIONS: [&str; 9] = [
     "dates-file",
     "picture",
     "stitches-across",
+    "fabric",
     "pdf",
     "output",
 ];
@@ -88,6 +92,8 @@ enum Next {
 struct Source {
     path: String,
     width: usize,
+    /// The fabric the sizes offered again are worked out for.
+    fabric: Fabric,
     /// Whether the person is at the terminal to choose another picture or width.
     asking: bool,
 }
@@ -115,25 +121,32 @@ impl Source {
         }
     }
 
-    /// Asks after `failure` for another picture or another width; false where the person stops.
+    /// Asks after `failure` for another picture or another size, offered as the menu offers it
+    /// first (the owner's request of 2026-11-05); false where the person stops. Another size is not
+    /// offered for a picture that no size can make a pattern of.
     fn change(&mut self, failure: &str) -> Result<bool, Stop> {
-        let now = format!("now {}", self.width);
-        let choices = [
-            Choice::noted(
-                "Another picture",
-                "a photograph with smooth shades works best",
-                Next::Picture,
-            ),
-            Choice::noted("Other stitches across", &now, Next::Width),
-            Choice::new("Stop", Next::Stop),
-        ];
+        // The picture's size and the widths it allows; none where it is no picture that a size helps.
+        let sized = read_picture(Path::new(&self.path))
+            .ok()
+            .and_then(|file| picture::upright_size(&file).ok())
+            .and_then(|size| Some((size, fabric::widths(size).ok()?)));
+        let now = format!("now {} stitches across", self.width);
+        let mut choices = vec![Choice::noted(
+            "Another picture",
+            "a photograph with smooth shades works best",
+            Next::Picture,
+        )];
+        if sized.is_some() {
+            choices.push(Choice::noted("Another size", &now, Next::Width));
+        }
+        choices.push(Choice::new("Stop", Next::Stop));
         loop {
             match after_failure(failure, &choices, AfterFailure::default())? {
                 Next::Stop => return Ok(false),
                 Next::Picture => {
                     let typed = value_until(
                         file_questions::PICTURE,
-                        "the name of a PNG or JPEG file",
+                        "the name of a PNG, JPEG or WebP file",
                         PATH_LIMIT,
                         None,
                         |answer| input_file(answer, MAX_FILE_BYTES),
@@ -144,16 +157,11 @@ impl Source {
                     }
                 }
                 Next::Width => {
-                    let what = format!("a number from {}", WIDTHS.to());
-                    let typed = value_until(
-                        &format!("Stitches across ({})", WIDTHS.to()),
-                        &what,
-                        PATH_LIMIT,
-                        None,
-                        |answer| typed_whole_number(answer, WIDTHS, None),
-                    )?;
-                    if let Some(width) = typed {
-                        self.width = width as usize;
+                    let Some((size, widths)) = sized else {
+                        continue;
+                    };
+                    if let Some(width) = ask_size(size, widths, self.fabric)? {
+                        self.width = width;
                         return Ok(true);
                     }
                 }
@@ -164,7 +172,12 @@ impl Source {
 
 /// Runs the command: every option checked and the picture read before the phrase is asked or read,
 /// `cli.stitch.no-picture` and `cli.stitch.no-pdf` among them.
-pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
+pub(crate) fn run(parsed: &Parsed, protection: &mut crate::os::Protection) -> Result<(), Stop> {
+    let (fresh, dates) = asked_options(parsed, protection, super::pattern_questions::ask_pattern)?;
+    run_with_dates(&fresh, dates.as_deref())
+}
+
+fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> Result<(), Stop> {
     let path = value(parsed, "picture").ok_or(StitchError::NoPicture)?;
     if value(parsed, "pdf").is_none() {
         return Err(StitchError::NoPdf.into());
@@ -176,18 +189,25 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
         Some(DEFAULT_WIDTH as u64),
         None,
     )? as usize;
-    check_date_input(parsed, Mode::Seedshift, DateWords::Codes)?;
+    let fabric = match value(parsed, "fabric") {
+        None => DEFAULT_FABRIC,
+        Some(text) => Fabric::named(text)?,
+    };
+    // Masked unless the person says otherwise, as before --mode was there.
+    let mode = phrase::legend_mode(given_mode(parsed)?.unwrap_or(Mode::Seedshift))?;
+    check_date_input(parsed, mode, DateWords::Codes)?;
     let mut source = Source {
         path: path.to_owned(),
         width,
+        fabric,
         asking: is_on(parsed, "ask-secrets"),
     };
     let mut grid = source.usable_grid()?;
-    let (phrase, dates) = match phrase_and_dates(parsed, Mode::Seedshift, DateWords::Codes, None)? {
+    let (phrase, dates) = match phrase_and_dates(parsed, mode, DateWords::Codes, None, dates)? {
         Ok(given) => given,
         Err(_) => return Err(Stop::Cancelled),
     };
-    let entropy = phrase::masked_entropy(&phrase, &dates)?;
+    let entropy = phrase::legend_entropy(&phrase, mode, &dates)?;
     let hidden = loop {
         terminal::work("Making the pattern…");
         match hide(&grid, &entropy, &mut SystemRandom) {
@@ -201,7 +221,7 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
             Err(error) => return Err(error.into()),
         }
     };
-    let pdf = chart::chart(&hidden)?;
+    let pdf = chart::chart(&hidden, fabric)?;
     // The result is a step of its own: the questions are cleared away (CORE-39).
     clear_private_screen();
     let line = legend::line(hidden.rows())?;
@@ -226,9 +246,23 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
         ),
     ];
     result_header("SeedStitch legend", &facts, channel);
+    let heading = "Legend line: keep it, in this exact order, or the PDF that holds it";
+    print(
+        channel,
+        &[terminal::paint(channel, terminal::style::STRONG, heading)],
+    );
     print(channel, &wrap_text(line.as_str(), TEXT_WIDTH));
+    // Format 2, whose rows' order holds part of the phrase, names each row's thread.
+    let named = hidden.rows().iter().any(|row| row.thread().is_some());
+    let row = if named {
+        "Each word is a row of the floss key from the top: its symbol's number, its DMC number and its stitches, colons between them."
+    } else {
+        "Each pair is a row of the floss key from the top: its symbol's number, a colon and its stitches."
+    };
     notice(
-        "Decode reads this line back: each row's symbol number, a colon and its stitches, from the top of the legend.",
+        &format!(
+            "{row} Decode reads the line back, with the dates where Seedshift masked the phrase."
+        ),
         NoticeKind::Info,
     );
     let mut outputs = parsed.clone();
@@ -239,7 +273,7 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
         |path| os::publish_new_file(&resolved(path), &pdf),
     )?;
     if let Some(path) = saved_pdf {
-        saved(&format!("Saved pattern: {}", printable(&path)));
+        saved(&format!("Saved pattern: {}", shown_path(&path)));
     }
     let text = SecretText::build("a SeedStitch legend", line.len() + 1, |filler| {
         filler.push_str(line.as_str())?;
@@ -254,7 +288,7 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
     if let Some(path) = saved_line {
         saved(&format!(
             "Saved the legend as typed back: {}",
-            printable(&path)
+            shown_path(&path)
         ));
     }
     report_renamed();

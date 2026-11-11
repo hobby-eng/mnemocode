@@ -1,6 +1,8 @@
 //! The phrase of a pattern as every front end handles it (ADR 0010): masked with MnemoCode
-//! Seedshift before it is hidden, since the format is public, and a legend line read back as the
-//! record of the masked phrase, which Decode turns back into the phrase with the dates.
+//! Seedshift before it is hidden, since the format is public, unless the person chooses the phrase
+//! itself, as for one protected some other way (the owner's request of 2026-11-04, as Encode
+//! offers it); and a legend line read back as the record of its phrase, which Decode turns back
+//! into the phrase, with the dates where it is masked.
 
 use std::fmt;
 
@@ -8,12 +10,12 @@ use mnemocode::backup::{Backup, BackupError};
 use mnemocode::bip39::phrase::{Phrase, PhraseError};
 use mnemocode::dates::Date;
 use mnemocode::forms::Form;
-use mnemocode::modes::Mode;
+use mnemocode::modes::{DateWords, Mode};
 use mnemocode::refusal::{Refusal, RefusalKind};
 use mnemocode::secret::{SecretBytes, SecretText};
 use zeroize::Zeroize;
 
-use crate::legend::{self, LegendError, Reading};
+use crate::legend::{self, LegendError, Masking, Reading};
 
 /// Why a phrase cannot be masked for a pattern, or a legend line read back.
 #[derive(Debug)]
@@ -28,6 +30,8 @@ pub enum SeedStitchError {
     NotRead,
     /// Changes of different rows read as different phrases.
     Ambiguous,
+    /// The mode is the original Seedshift, whose result a legend cannot hold.
+    Mode,
 }
 
 impl fmt::Display for SeedStitchError {
@@ -41,6 +45,9 @@ impl fmt::Display for SeedStitchError {
             ),
             Self::Ambiguous => f.write_str(
                 "The legend reads in more than one way: more than one row may be wrong. Check each row against the paper.",
+            ),
+            Self::Mode => f.write_str(
+                "A pattern holds a phrase masked with MnemoCode Seedshift, or the phrase itself: the original Seedshift's result usually fails the checksum, and a legend holds only a valid phrase.",
             ),
         }
     }
@@ -56,6 +63,7 @@ impl Refusal for SeedStitchError {
             Self::Legend(error) => error.code(),
             Self::NotRead => "embroidery.phrase.legend-not-read",
             Self::Ambiguous => "embroidery.phrase.legend-ambiguous",
+            Self::Mode => "embroidery.phrase.mode",
         }
     }
 
@@ -64,27 +72,38 @@ impl Refusal for SeedStitchError {
             Self::Backup(error) => error.kind(),
             Self::Phrase(error) => error.kind(),
             Self::Legend(error) => error.kind(),
-            Self::NotRead | Self::Ambiguous => RefusalKind::Error,
+            Self::NotRead | Self::Ambiguous | Self::Mode => RefusalKind::Error,
         }
     }
 }
 
-/// The entropy of a phrase masked with Seedshift dates: what a pattern's legend may hold. Only
-/// [`masked_entropy`] makes one for a front end, so that none hides a phrase that is not masked in
-/// the legend of a public format ([`crate::hide::hide`]).
+/// The entropy a pattern's legend holds and whether its phrase is masked: made only by
+/// [`masked_entropy`] or, where the person chooses it, [`unmasked_entropy`] ([`crate::hide::hide`]).
 #[derive(Debug)]
-pub struct MaskedEntropy(SecretBytes);
+pub struct LegendEntropy {
+    entropy: SecretBytes,
+    masking: Masking,
+}
 
-impl MaskedEntropy {
+impl LegendEntropy {
     /// A known answer's entropy, taken as masked: for the self-test and the tests, on public data.
     pub(crate) fn known(entropy: &[u8]) -> Self {
-        Self(SecretBytes::copy_of("a known answer's entropy", entropy))
+        Self {
+            entropy: SecretBytes::copy_of("a known answer's entropy", entropy),
+            masking: Masking::Seedshift,
+        }
     }
 
     /// Its bytes.
     #[must_use]
-    pub fn bytes(&self) -> &SecretBytes {
-        &self.0
+    pub const fn bytes(&self) -> &SecretBytes {
+        &self.entropy
+    }
+
+    /// Whether its phrase is masked.
+    #[must_use]
+    pub const fn masking(&self) -> Masking {
+        self.masking
     }
 }
 
@@ -93,7 +112,7 @@ impl MaskedEntropy {
 /// # Errors
 ///
 /// [`SeedStitchError::Backup`] for the dates Seedshift refuses, as Encode refuses them.
-pub fn masked_entropy(phrase: &Phrase, dates: &[Date]) -> Result<MaskedEntropy, SeedStitchError> {
+pub fn masked_entropy(phrase: &Phrase, dates: &[Date]) -> Result<LegendEntropy, SeedStitchError> {
     let encoding = Backup::encode(phrase, dates, Form::Indexes, Mode::Seedshift, false)
         .map_err(SeedStitchError::Backup)?;
     let mut indexes: Vec<usize> = encoding
@@ -106,8 +125,61 @@ pub fn masked_entropy(phrase: &Phrase, dates: &[Date]) -> Result<MaskedEntropy, 
     indexes.zeroize();
     masked
         .and_then(|masked| masked.entropy())
-        .map(MaskedEntropy)
+        .map(|entropy| LegendEntropy {
+            entropy,
+            masking: Masking::Seedshift,
+        })
         .map_err(SeedStitchError::Phrase)
+}
+
+/// The entropy of `phrase` itself, not masked: for a phrase protected some other way, since anyone
+/// who knows the public format reads it from the legend.
+///
+/// # Errors
+///
+/// [`SeedStitchError::Phrase`] for a phrase whose entropy cannot be taken.
+pub fn unmasked_entropy(phrase: &Phrase) -> Result<LegendEntropy, SeedStitchError> {
+    phrase
+        .entropy()
+        .map(|entropy| LegendEntropy {
+            entropy,
+            masking: Masking::Unmasked,
+        })
+        .map_err(SeedStitchError::Phrase)
+}
+
+/// `mode` where a pattern can hold its result: MnemoCode Seedshift, or none.
+///
+/// # Errors
+///
+/// [`SeedStitchError::Mode`] for the original Seedshift.
+pub const fn legend_mode(mode: Mode) -> Result<Mode, SeedStitchError> {
+    match mode {
+        Mode::Seedshift | Mode::Direct => Ok(mode),
+        _ => Err(SeedStitchError::Mode),
+    }
+}
+
+/// What a pattern's legend holds of `phrase` in `mode`: its entropy masked with `dates` by MnemoCode
+/// Seedshift, or its own, which takes no dates.
+///
+/// # Errors
+///
+/// [`SeedStitchError::Mode`] for the original Seedshift, [`SeedStitchError::Backup`] for dates the
+/// mode does not take or lacks, as Encode refuses them, and the refusals of [`masked_entropy`] and
+/// [`unmasked_entropy`].
+pub fn legend_entropy(
+    phrase: &Phrase,
+    mode: Mode,
+    dates: &[Date],
+) -> Result<LegendEntropy, SeedStitchError> {
+    let mode = legend_mode(mode)?;
+    mode.check_date_count(dates.len(), false, DateWords::Codes)
+        .map_err(|refusal| SeedStitchError::Backup(refusal.into()))?;
+    match mode {
+        Mode::Direct => unmasked_entropy(phrase),
+        _ => masked_entropy(phrase, dates),
+    }
 }
 
 /// A legend line read back.
@@ -118,8 +190,8 @@ pub struct LineRecord {
 }
 
 impl LineRecord {
-    /// The record of the masked phrase, `MNC1:seedshift:indexes:…`, which Decode turns back into
-    /// the phrase with the dates.
+    /// The record of the phrase: `MNC1:seedshift:indexes:…` for a masked one, which Decode turns
+    /// back into the phrase with the dates, or `MNC1:direct:indexes:…`.
     #[must_use]
     pub const fn record(&self) -> &SecretText {
         &self.record
@@ -139,7 +211,7 @@ impl LineRecord {
     }
 }
 
-/// The record of the masked phrase that `text` holds where it is written as a legend line
+/// The record of the phrase that `text` holds where it is written as a legend line
 /// ([`legend::is_line`]), as Decode reads one in place of codes; none where it is not one, such as
 /// codes or a record.
 ///
@@ -155,14 +227,18 @@ pub fn record_of_legend(text: &str) -> Result<Option<LineRecord>, SeedStitchErro
     }
 }
 
-/// The legend line `text` read back as the record of its masked phrase.
+/// The legend line `text` read back as the record of its phrase, masked or not.
 fn record_of_line(text: &str) -> Result<LineRecord, SeedStitchError> {
     let mut rows = legend::parse(text).map_err(SeedStitchError::Legend)?;
     let reading = legend::read(&rows);
     legend::wipe_rows(&mut rows);
-    let (entropy, corrected) = match reading {
-        Reading::Read(entropy) => (entropy, None),
-        Reading::Corrected { entropy, row } => (entropy, Some(row)),
+    let (entropy, masking, corrected) = match reading {
+        Reading::Read { entropy, masking } => (entropy, masking, None),
+        Reading::Corrected {
+            entropy,
+            masking,
+            row,
+        } => (entropy, masking, Some(row)),
         Reading::NotRead => return Err(SeedStitchError::NotRead),
         Reading::Ambiguous => return Err(SeedStitchError::Ambiguous),
     };
@@ -170,7 +246,11 @@ fn record_of_line(text: &str) -> Result<LineRecord, SeedStitchError> {
     let mut indexes: Vec<u16> = (0..masked.len())
         .map(|place| masked.index(place).map_or(0, |index| index as u16))
         .collect();
-    let backup = Backup::of(&indexes, Form::Indexes, Mode::Seedshift);
+    let mode = match masking {
+        Masking::Seedshift => Mode::Seedshift,
+        Masking::Unmasked => Mode::Direct,
+    };
+    let backup = Backup::of(&indexes, Form::Indexes, mode);
     indexes.zeroize();
     let record = backup
         .and_then(|backup| backup.record())
@@ -199,6 +279,37 @@ mod tests {
             format!("MNC1:seedshift:indexes:{}", numbers.join(" "))
         );
         assert_eq!(read.corrected_row(), None);
+    }
+
+    #[test]
+    fn a_legend_holds_the_phrase_masked_by_mnemocode_seedshift_or_itself_and_no_other() {
+        let void = Phrase::parse(VOID).unwrap();
+        let date = [mnemocode::dates::parse_date("23-09-2026").unwrap()];
+        let own = legend_entropy(&void, Mode::Direct, &[]).unwrap();
+        // Dates the mode does not take, or lacks, are refused as Encode refuses them.
+        assert_eq!(
+            legend_entropy(&void, Mode::Direct, &date)
+                .unwrap_err()
+                .code(),
+            "core.masking.assert-takes-dates-refused"
+        );
+        assert_eq!(
+            legend_entropy(&void, Mode::Seedshift, &[])
+                .unwrap_err()
+                .code(),
+            "core.masking.assert-date-count-refused"
+        );
+        assert_eq!(own.masking(), Masking::Unmasked);
+        assert_eq!(&**own.bytes(), &*void.entropy().unwrap());
+        let masked = legend_entropy(&void, Mode::Seedshift, &date).unwrap();
+        assert_eq!(masked.masking(), Masking::Seedshift);
+        assert_ne!(&**masked.bytes(), &**own.bytes());
+        for original in [Mode::SeedshiftLegacy, Mode::SeedshiftLegacyValid] {
+            assert_eq!(
+                legend_entropy(&void, original, &date).unwrap_err().code(),
+                "embroidery.phrase.mode"
+            );
+        }
     }
 
     #[test]

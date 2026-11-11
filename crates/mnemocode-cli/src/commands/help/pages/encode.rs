@@ -15,7 +15,15 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
     groups: &[
         HelpGroup {
             heading: "The phrase and the transformation:",
-            options: &[&[&ASK_SECRETS, &MNEMONIC_FILE, &MNEMONIC], RUN_6],
+            options: &[
+                &[
+                    &ASK_SECRETS,
+                    &super::options::CONFIGURE,
+                    &MNEMONIC_FILE,
+                    &MNEMONIC,
+                ],
+                RUN_6,
+            ],
         },
         RESULT_GROUP,
         CARDS_GROUP,

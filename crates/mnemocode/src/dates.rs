@@ -25,6 +25,20 @@ pub struct Date {
     day: u8,
 }
 
+impl zeroize::Zeroize for Date {
+    fn zeroize(&mut self) {
+        self.year.zeroize();
+        self.month.zeroize();
+        self.day.zeroize();
+        // Keep Date's checked-calendar invariant after clearing the old value.
+        *self = Self {
+            year: 1,
+            month: 1,
+            day: 1,
+        };
+    }
+}
+
 /// Redacted: a date is part of the secret.
 impl fmt::Debug for Date {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -642,6 +656,19 @@ pub fn same_key_predecessors(patterns: &[DatePattern]) -> Vec<Option<usize>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retained_dates_have_a_typed_owner_and_wiping_keeps_a_valid_date() {
+        use crate::secret::{SecretVec, probe_lock};
+        use zeroize::Zeroize;
+        let mut dates = SecretVec::new(vec![Date::new(2026, 9, 23).unwrap()]);
+        if probe_lock(std::mem::size_of::<Date>()) {
+            assert!(dates.is_locked());
+        }
+        dates[0].zeroize();
+        assert_eq!(dates[0], Date::new(1, 1, 1).unwrap());
+        assert_eq!(format!("{dates:?}"), "[Secret values: redacted]");
+    }
 
     #[test]
     fn dates_are_read_in_both_orders_with_four_digit_years() {

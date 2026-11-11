@@ -20,6 +20,7 @@ use mnemocode::forms::colors::{RGB_MAX_VALUE, rgb_hex};
 use mnemocode::forms::{Form, FormError};
 use mnemocode::random::{Random, RandomError};
 use mnemocode::refusal::Refusal;
+use mnemocode::secret::{SecretText, SecretVec};
 use mnemocode::text::space::{tokens, trim};
 
 use crate::palette::{TooManyColours, code_colors};
@@ -214,9 +215,9 @@ impl ContentKind {
     /// their `colors`, or, where the cards print `labels` in place of the colours, those codes.
     fn check_qr(
         self,
-        colors: &[String],
+        colors: &[SecretText],
         payload: &str,
-        labels: Option<&[String]>,
+        labels: Option<&[SecretText]>,
     ) -> Result<(), ContentError> {
         match self {
             Self::Colors => check_phrase_qr(colors, payload, labels),
@@ -277,7 +278,7 @@ impl ContentKind {
 
 /// Whether `payload`, the text of a QR code, holds `colors`: written as the colors themselves, or
 /// as Color Unicode codes that decode to them.
-fn payload_holds_colors(colors: &[String], payload: &str) -> Result<bool, ColorsError> {
+fn payload_holds_colors(colors: &[SecretText], payload: &str) -> Result<bool, ColorsError> {
     let written = colors.join(" ");
     if payload == written {
         return Ok(true);
@@ -290,9 +291,9 @@ fn payload_holds_colors(colors: &[String], payload: &str) -> Result<bool, Colors
 
 /// Refuses a seed phrase's QR code that holds another phrase than its cards print.
 fn check_phrase_qr(
-    colors: &[String],
+    colors: &[SecretText],
     payload: &str,
-    labels: Option<&[String]>,
+    labels: Option<&[SecretText]>,
 ) -> Result<(), ContentError> {
     if let Some(labels) = labels {
         let indexes = Form::Unicode.read(&labels.join(" "))?;
@@ -311,16 +312,15 @@ fn check_phrase_qr(
 }
 
 /// The colours of cards, the codes they print in their place where those only decorate, and what
-/// their QR code holds. A backup in text: its `Debug` tells nothing, and the zeroing allocator wipes
-/// it when it is dropped.
-#[derive(Clone)]
+/// their QR code holds. Both the text allocations and their fixed owner arrays request page
+/// locks and wipe on drop. Browser and operating-system lock limitations still apply.
 pub struct CardCodes {
     /// The color of each card as # and six hexadecimal digits: the backup's own, then the decoys.
-    pub colors: Vec<String>,
+    pub colors: SecretVec<SecretText>,
     /// The codes printed in place of the colors, one per color.
-    pub labels: Option<Vec<String>>,
+    pub labels: Option<SecretVec<SecretText>>,
     /// The text of the QR code: the backup alone, without the decoys.
-    pub payload: String,
+    pub payload: SecretText,
 }
 
 impl fmt::Debug for CardCodes {
@@ -329,12 +329,58 @@ impl fmt::Debug for CardCodes {
     }
 }
 
+fn held_codes(values: impl ExactSizeIterator<Item = SecretText>) -> SecretVec<SecretText> {
+    let mut held = SecretVec::with_capacity(values.len() + MAX_DECOYS);
+    for value in values {
+        // Every caller passes an exact standard-library iterator; the extra capacity
+        // belongs to the bounded decoy pool appended by ColorCards.
+        #[expect(
+            clippy::expect_used,
+            reason = "exact iterator count plus the decoy reserve"
+        )]
+        held.push(value).expect("reserved card codes");
+    }
+    held
+}
+
+fn adopt_codes(values: Vec<String>) -> SecretVec<SecretText> {
+    held_codes(
+        values
+            .into_iter()
+            .map(|text| SecretText::take("Card code", text)),
+    )
+}
+
+impl Clone for CardCodes {
+    fn clone(&self) -> Self {
+        Self {
+            colors: held_codes(self.colors.iter().cloned()),
+            labels: self
+                .labels
+                .as_ref()
+                .map(|labels| held_codes(labels.iter().cloned())),
+            payload: self.payload.clone(),
+        }
+    }
+}
+
 impl CardCodes {
+    /// Adopt prepared codes without copying their text. Each allocation is protected
+    /// from adoption onward; callers remain responsible for earlier preparation.
+    #[must_use]
+    pub fn new(colors: Vec<String>, labels: Option<Vec<String>>, payload: String) -> Self {
+        Self {
+            colors: adopt_codes(colors),
+            labels: labels.map(adopt_codes),
+            payload: SecretText::take("Card QR payload", payload),
+        }
+    }
+
     /// The code that the card of the element at `index` prints, without a #.
     #[must_use]
     pub fn printed(&self, index: usize) -> String {
         match &self.labels {
-            Some(labels) => labels[index].clone(),
+            Some(labels) => labels[index].as_str().to_owned(),
             None => self.colors[index][1..].to_uppercase(),
         }
     }
@@ -441,7 +487,9 @@ impl ColorCards {
     pub fn check_index(&self, index: usize) -> Result<(), ContentError> {
         let count = self.codes.colors.len();
         if index >= count {
-            return Err(ContentError::NoCard(index + 1, count));
+            // Only the diagnostic label is saturated: an unrepresentable one-based
+            // number must not panic or wrap to zero. The index is still refused.
+            return Err(ContentError::NoCard(index.saturating_add(1), count));
         }
         Ok(())
     }
@@ -457,13 +505,28 @@ impl ColorCards {
         let own = self.codes.colors.len();
         if let Some(labels) = &mut cards.codes.labels {
             for _ in 0..MAX_DECOYS {
-                labels.push(unicode_code(random.below(DICTIONARY_SIZE as u32)? as usize));
+                let code = unicode_code(random.below(DICTIONARY_SIZE as u32)? as usize);
+                #[expect(
+                    clippy::expect_used,
+                    reason = "CardCodes clone reserves MAX_DECOYS slots"
+                )]
+                labels
+                    .push(SecretText::take("Card code", code))
+                    .expect("reserved decoy codes");
             }
-            cards.codes.colors = code_colors(labels)?;
+            cards.codes.colors = adopt_codes(code_colors(labels)?);
         } else {
             for _ in 0..MAX_DECOYS {
                 let color = self.kind.decoy_color(random, own)?;
-                cards.codes.colors.push(color);
+                #[expect(
+                    clippy::expect_used,
+                    reason = "CardCodes clone reserves MAX_DECOYS slots"
+                )]
+                cards
+                    .codes
+                    .colors
+                    .push(SecretText::take("Card code", color))
+                    .expect("reserved decoy colors");
             }
         }
         cards.decoys = Some(MAX_DECOYS);
@@ -533,11 +596,7 @@ pub fn backup_card_content(
         .to_owned();
     Ok(ColorCards {
         kind: ContentKind::Colors,
-        codes: CardCodes {
-            colors,
-            labels,
-            payload,
-        },
+        codes: CardCodes::new(colors, labels, payload),
         decoys: None,
         title: title.map(card_title).transpose()?,
         reference: None,

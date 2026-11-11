@@ -1,0 +1,233 @@
+//! Protected cross-stitch setup: Seedshift and its dates first, then the picture, fabric, size
+//! and output. The selected folders are restricted before the seed phrase is read.
+//! How large is offered as paper sizes, each with its centimetres and the stitches the picture takes
+//! in it on the chosen fabric, or as a width in centimetres or in stitches (the owner's request of
+//! 2026-11-04). The answers make stitch's command line; the phrase and the dates are asked on
+//! stitch's private screen.
+
+use std::path::Path;
+
+use mnemocode::text::numbers::{WholeRange, typed_whole_number};
+use mnemocode_embroidery::fabric::{self, DEFAULT_FABRIC, DETAILED_ACROSS, FABRICS, Fabric};
+use mnemocode_embroidery::picture::{self, DEFAULT_WIDTH};
+
+use super::asking::{ask_list, ask_list_at};
+use super::encode_questions::{Takes, WEAK, ask_seedshift, file_questions};
+use super::given::PATH_LIMIT;
+use super::output_questions::{ask_output_file, claim_read, input_file};
+use crate::gate::Stop;
+use crate::input::read_picture;
+use crate::terminal::{Choice, Chosen, Explanation, LineQuestion, ask_line};
+
+/// A cross-stitch pattern by default, its name saying nothing of what it holds.
+pub(crate) const PATTERN_FILE: &str = "cross-stitch-pattern.pdf";
+
+/// How large the person makes the pattern.
+#[derive(Clone, Copy)]
+enum Size {
+    /// A paper size's stitches across.
+    Across(usize),
+    /// A width typed in centimetres.
+    Centimetres,
+    /// A width typed in stitches.
+    Stitches,
+}
+
+/// The questions of a cross-stitch pattern; stitch's command line, or none for back.
+pub(crate) fn ask_pattern() -> Result<Option<super::encode_questions::EncodingAnswers>, Stop> {
+    let masked = Takes::MnemoCodeOnly { unmasked: WEAK };
+    let Some(mode) = ask_seedshift("Use Seedshift?", false, masked)? else {
+        return Ok(None);
+    };
+    let dates = super::given::ask_encoding_dates(mode)?;
+    let Some((picture, widths)) = ask_picture()? else {
+        return Ok(None);
+    };
+    // The pattern may not be saved over its own picture.
+    claim_read(&picture.path);
+    let fabrics: Vec<Choice<Fabric>> = FABRICS
+        .iter()
+        .map(|&fabric| {
+            let usual = match fabric {
+                DEFAULT_FABRIC => ", the most usual",
+                Fabric::LinenOverOne(_) => ", fine: for detail in a small piece",
+                Fabric::Aida(_) => "",
+            };
+            let note = format!(
+                "{:.1} stitches a centimetre{usual}",
+                fabric.per_centimetre()
+            );
+            Choice::noted(&fabric.short_name(), &note, fabric)
+        })
+        .collect();
+    let Some(fabric) = ask_list("Which fabric?", "Fabric", &fabrics, None)? else {
+        return Ok(None);
+    };
+    let Some(across) = ask_size(picture.size, widths, fabric)? else {
+        return Ok(None);
+    };
+    let Some(pdf) = ask_output_file(file_questions::PDF, PATTERN_FILE)? else {
+        return Ok(None);
+    };
+    let mut run: Vec<String> = ["stitch", "--ask-secrets", "--mode", mode.id()]
+        .map(str::to_owned)
+        .to_vec();
+    run.extend(["--picture".to_owned(), picture.path]);
+    run.extend(["--stitches-across".to_owned(), across.to_string()]);
+    if fabric != DEFAULT_FABRIC {
+        run.extend(["--fabric".to_owned(), fabric.option()]);
+    }
+    run.extend(["--pdf".to_owned(), pdf]);
+    Ok(Some((run, dates)))
+}
+
+/// A picture as the menu read it: its path and its upright size in pixels.
+struct Picture {
+    path: String,
+    size: (usize, usize),
+}
+
+/// Asks for the picture, read at once, so that a file that cannot be one is asked again; with the
+/// stitches across it may have.
+fn ask_picture() -> Result<Option<(Picture, WholeRange)>, Stop> {
+    let how = LineQuestion {
+        what: Some("the name of a PNG, JPEG or WebP file"),
+        limit: PATH_LIMIT,
+        ..LineQuestion::default()
+    };
+    let mut read = None;
+    let typed = ask_line(file_questions::PICTURE, "Picture", how, |answer: &str| {
+        let path =
+            input_file(answer, picture::MAX_FILE_BYTES).map_err(|error| error.to_string())?;
+        let file = read_picture(Path::new(&path)).map_err(|error| error.to_string())?;
+        let size = picture::upright_size(&file).map_err(|error| error.to_string())?;
+        let widths = fabric::widths(size).map_err(|refusal| refusal.to_string())?;
+        read = Some((size, widths));
+        Ok::<_, String>(path)
+    })?;
+    match (typed, read) {
+        (Chosen::One(path), Some((size, widths))) => Ok(Some((Picture { path, size }, widths))),
+        (Chosen::Cancelled, _) => Err(Stop::Cancelled),
+        _ => Ok(None),
+    }
+}
+
+/// Asks how large the pattern is on `fabric`: a paper size, A4 first, or a width in
+/// centimetres or stitches within `widths`; the stitches across, or none for back. Stitch asks it
+/// again where the size chosen cannot hold the phrase.
+pub(crate) fn ask_size(
+    size: (usize, usize),
+    widths: WholeRange,
+    fabric: Fabric,
+) -> Result<Option<usize>, Stop> {
+    let count = fabric.count();
+    // Each sheet with the stitches the picture takes in it inside the print margin, and their size
+    // on the fabric; the chart is drawn on that sheet.
+    let offered = fabric::offered_sizes(size, fabric);
+    let first = fabric::first_offered(&offered).unwrap_or(0);
+    let mut choices: Vec<Choice<Size>> = Vec::new();
+    for &fabric::OfferedSize {
+        format,
+        across,
+        down,
+    } in &offered
+    {
+        let label = format!(
+            "{}, {} x {} cm",
+            format.name,
+            format.short / 10.0,
+            format.long / 10.0
+        );
+        let note = format!(
+            "{across} x {down} stitches, {:.1} x {:.1} cm",
+            fabric::centimetres(across, count),
+            fabric::centimetres(down, count)
+        );
+        choices.push(Choice::noted(&label, &note, Size::Across(across)));
+    }
+    let (least, most) = fabric::centimetre_range(widths, count);
+    let range = format!("{least:.1} to {most:.1}");
+    choices.push(Choice::noted(
+        "Width in centimetres",
+        &range,
+        Size::Centimetres,
+    ));
+    choices.push(Choice::noted(
+        "Stitches across",
+        &widths.to(),
+        Size::Stitches,
+    ));
+    let question = format!("How large, on {}?", fabric.short_name());
+    let explanation = Explanation {
+        lines: vec![format!(
+            "More stitches give more detail: a photograph looks real from about {DETAILED_ACROSS} across."
+        )],
+        more: Vec::new(),
+    };
+    match ask_list_at(&question, "Size", &choices, (first, Some(&explanation)))? {
+        None => Ok(None),
+        Some(Size::Across(across)) => Ok(Some(across)),
+        Some(Size::Centimetres) => {
+            let what = format!("a number of centimetres from {range}");
+            let how = LineQuestion {
+                what: Some(&what),
+                limit: PATH_LIMIT,
+                ..LineQuestion::default()
+            };
+            let question = format!("Width in centimetres ({range})");
+            let typed = ask_line(&question, "Width", how, |answer: &str| {
+                typed_centimetres(answer, widths, count)
+                    .map(|across| across.to_string())
+                    .ok_or_else(|| format!("Type {what}."))
+            })?;
+            chosen_width(typed)
+        }
+        Some(Size::Stitches) => {
+            let fallback = DEFAULT_WIDTH.clamp(widths.min as usize, widths.max as usize);
+            let fallback = fallback.to_string();
+            let what = format!("a number from {}", widths.to());
+            let how = LineQuestion {
+                fallback: Some(&fallback),
+                what: Some(&what),
+                limit: PATH_LIMIT,
+                ..LineQuestion::default()
+            };
+            let question = format!("How many stitches across? ({})", widths.to());
+            let typed = ask_line(&question, "Across", how, |answer: &str| {
+                typed_whole_number(answer, widths, None).map(|across| across.to_string())
+            })?;
+            chosen_width(typed)
+        }
+    }
+}
+
+/// The stitches across of `answer` in centimetres, a comma or a point before its decimals, on
+/// fabric of `count`, as [`fabric::typed_width`] takes them.
+fn typed_centimetres(answer: &str, widths: WholeRange, count: u64) -> Option<usize> {
+    let typed: f64 = answer.trim().replace(',', ".").parse().ok()?;
+    fabric::typed_width(typed, widths, count)
+}
+
+/// The width typed, as stitches across; none for back.
+fn chosen_width(typed: Chosen<String>) -> Result<Option<usize>, Stop> {
+    match typed {
+        Chosen::One(across) => Ok(across.parse().ok()),
+        Chosen::Back => Ok(None),
+        Chosen::Cancelled => Err(Stop::Cancelled),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_width_typed_with_a_comma_or_a_point_reads_as_the_library_takes_it() {
+        // The width's own rule is fabric::typed_width's, tested there; this is the typed text.
+        let widths = WholeRange::new(40, 500);
+        assert_eq!(typed_centimetres("21", widths, 14), Some(115));
+        assert_eq!(typed_centimetres(" 21,0 ", widths, 14), Some(115));
+        assert_eq!(typed_centimetres("21 cm", widths, 14), None);
+        assert_eq!(typed_centimetres("NaN", widths, 14), None);
+    }
+}

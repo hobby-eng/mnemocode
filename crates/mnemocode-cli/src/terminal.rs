@@ -25,11 +25,12 @@ use crate::os::{self, Environment, Stream};
 
 pub(crate) use answer::Hints;
 pub(crate) use choice::{
-    Choice, Chosen, Digit, Explanation, LineQuestion, ListQuestion, answer_mark, ask_line, choose,
-    choose_from, list_rows, notes_room, redraw_answer_record, rows_of, start_answer_record,
-    type_hint, wait_for_enter, wait_for_enter_or_escape, write_prompt,
+    Choice, Chosen, Explanation, LineQuestion, ListQuestion, Shortcut, answer_mark, ask_line,
+    choose, choose_from, choose_many, list_rows, notes_room, redraw_answer_record, rows_of,
+    start_answer_record, type_hint, wait_for_enter, wait_for_enter_or_escape, write_prompt,
 };
-pub(crate) use keys::{Interrupted, Keys, key};
+pub(crate) use hints::InputHints;
+pub(crate) use keys::{Interrupted, Keys};
 pub(crate) use line::{LineOptions, LineOutcome, read_line};
 pub(crate) use private::{
     ANSWER_LABEL_WIDTH, CLOSING_ROWS, Lifetime, PrivateScreen, answer_accepted,
@@ -358,7 +359,7 @@ pub(crate) enum NoticeKind {
 
 /// Running text as `channel` shows it: on a terminal wrapped to TEXT_WIDTH; for a file, a pipe or
 /// TERM=dumb as it is, on one line.
-fn running_lines(channel: Channel, text: &str) -> Vec<String> {
+pub(crate) fn running_lines(channel: Channel, text: &str) -> Vec<String> {
     if can_redraw(channel) {
         wrap_text(text, TEXT_WIDTH)
     } else {
@@ -575,6 +576,16 @@ pub(crate) fn work(message: &str) {
         step_begin();
         hint(message);
     }
+}
+
+/// A separate keyboard hint; only the key is highlighted.
+pub(crate) fn escape_hint(action: &str) -> String {
+    format!(
+        "{}{}{}",
+        paint(Channel::Error, style::MUTED, "Press "),
+        paint(Channel::Error, style::WARNING, "Esc"),
+        paint(Channel::Error, style::MUTED, &format!(" to {action}"))
+    )
 }
 
 /// Says that the command was cancelled.

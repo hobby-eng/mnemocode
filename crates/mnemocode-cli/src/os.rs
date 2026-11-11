@@ -26,10 +26,11 @@ pub(crate) use console::{
 };
 pub(crate) use env::{Environment, arguments};
 pub(crate) use files::{
-    Entry, FileError, FileLook, Folder, entry_at, in_temporary_folder, look_at_file, make_folders,
-    may_write, new_private_file as write_new_private_file, private_folder as make_private_folder,
-    publish_new_file, publish_written_file, read_bounded, read_public_file, read_secret_file,
-    real_path, remove_left, resolve, stop_if_signalled, temporary_folder,
+    Entry, FileError, FileLook, Folder, entry_at, file_starts_with, in_temporary_folder,
+    look_at_file, make_folders, may_write, new_private_file as write_new_private_file,
+    private_folder as make_private_folder, publish_new_file, publish_written_file, read_bounded,
+    read_large_secret_file, read_public_file, read_secret_file, real_path, remove_left, resolve,
+    stop_if_signalled, temporary_folder,
 };
 pub(crate) use protect::{Needs, Protection, ruled_folders};
 pub(crate) use random::SystemRandom;

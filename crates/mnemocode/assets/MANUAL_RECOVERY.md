@@ -116,6 +116,50 @@ independently tested implementation as part of the recovery pack. Keep the mode
 and dates separately: shares do not store them. The combined phrase may be the
 masked phrase, and must then go through the remaining steps of this guide.
 
+### Cross-stitch pattern (SeedStitch)
+
+A pattern made by MnemoCode keeps the phrase in its legend, the floss key: in the
+symbol of each row and in the last digits of its stitch count. Read the rows from
+the top of the key down and write each as its symbol's number from the table
+below, a colon and its stitches: `28:1725 25:2163 57:3275 …`. A small pattern
+also uses the order of the rows: there MnemoCode's line names each row's DMC
+thread too, `15:407:38 23:703:169 …`; type every row that way, the DMC number from
+the key between. MnemoCode's result screen and its `--output` file give this line
+already, and the pattern's PDF keeps it, compressed where no viewer shows it: the
+helper of section 7 reads it from the PDF.
+
+| Numbers | Symbols                                  |
+| ------- | ---------------------------------------- |
+| 1–10    | `■` `□` `▣` `⊞` `⊠` `◧` `◩` `▤` `▦` `●`  |
+| 11–20   | `○` `⊙` `⊕` `⊗` `◐` `▲` `△` `▼` `◆` `◇`  |
+| 21–30   | `◈` `◢` `◤` `+` `×` `★` `✱` `♥` `♡` `♠`  |
+| 31–40   | `♣` `↑` `→` `↔` `\|` `—` `/` `\` `⬢` `⬡` |
+| 41–50   | `A` `B` `C` `D` `E` `F` `G` `H` `J` `K`  |
+| 51–60   | `L` `M` `N` `P` `R` `S` `T` `U` `V` `W`  |
+| 61–70   | `Y` `Z` `3` `4` `7` `9` `a` `e` `h` `r`  |
+
+Turning the line into word numbers takes arithmetic on numbers of about 90 digits
+and SHA-256, so use the helper `manual_seedstitch.py` of section 7 on a trusted
+offline computer. It prints the word numbers and says whether the phrase is
+masked. A masked phrase is then reversed with its dates as mode `seedshift`
+(sections 2 to 4, or `manual_seedshift.py`); an unmasked one is the phrase itself.
+If the line does not read, a row was misread: check each symbol and count against
+the key. MnemoCode itself corrects one misread row.
+
+The legend of the format's own example, a public test phrase masked with
+Seedshift, is
+
+```text
+28:1725 25:2163 57:3275 34:3917 9:480 54:1505 17:5063 63:372 46:328 7:2818 62:1114 53:1997
+37:2496 40:1945 3:882 58:7130 41:180 59:336 22:1634 36:778 64:1147 10:3804 24:1214 69:479
+56:931 30:2066 23:3224 29:797
+```
+
+and reads as the word numbers `1965 369 566 1734 263 1750 1979 852 1589 1366 357
+425 1242 63 1549 1290 824 1667 1339 1784 639 1635 946 1898`, "void come effort …
+involve unfold", marked as masked with Seedshift. The example was written for the
+format, so no dates belong to it: it shows the reading only.
+
 ## 2. Build the date-shift sequence
 
 Skip this step for `direct` mode: look up the stored numbers to get the original
@@ -310,6 +354,123 @@ print("BIP39 checksum:", "valid" if entropy_and_checksum(y)[1] else "INVALID")
 
 For the worked example, choose `seedshift`, `decode`, date `23-09-2026` and the
 masked numbers above. The output is eleven 1s followed by 4 and `valid`.
+
+### Cross-stitch legend helper
+
+Save the following code as `manual_seedstitch.py` and run it the same way. It
+takes the legend line, each row as `symbol:stitches` or `symbol:DMC:stitches` from
+the top of the key down, on one line or several, ended by an empty line; or the
+path of the pattern's PDF, which keeps the line. It prints the word numbers and
+whether they are masked with Seedshift. It does
+not correct a misread row; check the rows instead. Its output is recovery
+material, so clear it when finished.
+
+```python
+import hashlib
+import os
+import re
+import zlib
+
+LENGTHS = {16: 12, 20: 15, 24: 18, 28: 21, 32: 24}
+
+
+def line_of_pdf(path):
+    """The legend line that MnemoCode keeps in its pattern's PDF (the key page's FlossKey data)."""
+    pdf = open(path, "rb").read()
+    entry = pdf.index(b"/FlossKey")
+    ref = int(re.search(rb"/Private\s+(\d+)\s+0\s+R", pdf[entry:]).group(1))
+    obj = pdf.index(b"\n%d 0 obj" % ref)
+    length = int(re.search(rb"/Length\s+(\d+)", pdf[obj:]).group(1))
+    start = pdf.index(b"stream", obj) + 6
+    start += 2 if pdf[start:start + 2] == b"\r\n" else 1
+    return zlib.decompress(pdf[start:start + length]).decode()
+
+
+print("Legend rows from the top down (symbol:stitches or symbol:DMC:stitches), "
+      "or the path of the pattern's PDF; then an empty line:")
+lines = []
+while True:
+    try:
+        typed = input()
+    except EOFError:
+        break
+    if not typed.strip():
+        break
+    lines.append(typed)
+line = " ".join(lines).strip()
+# A path dropped into a terminal: in quotes, as 'My pattern.pdf' or 'Sam'\''s pattern.pdf', or
+# with its spaces and brackets escaped, as My\ pattern\ \(1\).pdf.
+if len(line) >= 2 and line[0] in "'\"" and line[-1] == line[0]:
+    path = line[1:-1]
+    if line[0] == "'" and os.sep == "/":
+        path = path.replace("'\\''", "'")
+elif os.sep == "/":
+    path = re.sub(r"\\(.)", r"\1", line)
+else:
+    path = line
+path = os.path.expanduser(path)
+if path.lower().endswith(".pdf"):
+    line = line_of_pdf(path)
+rows = [word.split(":") for word in re.split(r"[\s,;]+", line) if word]
+ordered = len(rows[0]) == 3
+if any(len(row) != len(rows[0]) or len(row) not in (2, 3) for row in rows):
+    raise ValueError("Every row is symbol:stitches, or every row symbol:DMC:stitches.")
+symbols = [int(row[0]) for row in rows]
+counts = [int(row[-1]) for row in rows]
+if len(set(symbols)) != len(symbols) or not all(1 <= s <= 70 for s in symbols):
+    raise ValueError("Each symbol number appears once, from 1 through 70.")
+biggest = max(counts)
+if counts.count(biggest) != 1:
+    raise ValueError("Two rows share the most stitches: check the counts.")
+moduli = [1 if c == biggest or c < 100 else 10 if c < 1000 else 100 for c in counts]
+left = list(range(1, 71))
+ranks = []
+for symbol in symbols:
+    ranks.append(left.index(symbol))
+    left.remove(symbol)
+places = []
+if ordered:
+    # DMC numbers by their value, then the named threads: B5200, Blanc, Ecru.
+    keys = [(0, int(row[1]), "") if row[1].isdigit() else (1, 0, row[1].upper()) for row in rows]
+    if len(set(keys)) != len(keys):
+        raise ValueError("Each DMC thread appears once.")
+    remaining = sorted(keys)
+    for key in keys:
+        places.append(remaining.index(key))
+        remaining.remove(key)
+n = 0
+for i in reversed(range(len(rows))):
+    if moduli[i] > 1:
+        n = n * moduli[i] + counts[i] % moduli[i]
+    n = n * (70 - i) + ranks[i]
+    if ordered:
+        n = n * (len(rows) - i) + places[i]
+version = b"2" if ordered else b"1"
+domains = {
+    b"MnemoCode embroidery " + version: "masked with Seedshift: undo it with the dates",
+    b"MnemoCode embroidery " + version + b" unmasked": "not masked: these are the phrase's own words",
+}
+found = []
+for length, words in LENGTHS.items():
+    payload = n % (1 << (8 * length + 32))
+    entropy = (payload >> 32).to_bytes(length, "big")
+    check = (payload & 0xFFFFFFFF).to_bytes(4, "big")
+    for domain, meaning in domains.items():
+        if hashlib.sha256(domain + bytes([length]) + entropy).digest()[:4] == check:
+            found.append((entropy, words, meaning))
+if len(found) != 1:
+    raise ValueError("The legend does not read: check each row's symbol, thread and stitches.")
+entropy, words, meaning = found[0]
+checksum_bits = words // 3
+bits = f"{int.from_bytes(entropy, 'big'):0{len(entropy) * 8}b}"
+bits += f"{hashlib.sha256(entropy).digest()[0] >> (8 - checksum_bits):0{checksum_bits}b}"
+numbers = [int(bits[k:k + 11], 2) + 1 for k in range(0, len(bits), 11)]
+print("Word numbers:", " ".join(str(number) for number in numbers))
+print("The phrase is", meaning)
+```
+
+For the example of section 1, it prints the numbers above and says that the phrase
+is masked with Seedshift.
 
 ## 8. Confirm the wallet
 

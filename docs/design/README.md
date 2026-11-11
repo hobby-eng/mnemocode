@@ -16,3 +16,7 @@ The reports cite their evidence as paths of the design's working folder (`work/`
 `probe-netns/` and others under `tmp/rust-arch/` of the owner's workspace): probes, build logs and
 downloaded sources that stay outside the repository. Paths of other repositories (`mhfe/…`,
 `multi-chain-wallet-tools/…`, `mnemocode/…` for TS 0.1.0) are relative to that workspace.
+
+## Subsequent decisions
+
+[Hidden QR records](architect/adr/0012-hidden-qr-records.md) describes the optional filler-byte format and its front-end boundaries.

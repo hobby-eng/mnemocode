@@ -708,6 +708,11 @@ fn verify_profile(
     for problem in instance_problems(&bytes, &glue)? {
         problems.push(format!("{name}: {problem}"));
     }
+    if profile.modules.iter().any(|module| module == "phrase") {
+        for problem in probe::backup_abi_problems(&bytes, &glue)? {
+            problems.push(format!("{name}: {problem}"));
+        }
+    }
     if probe {
         for problem in probe::problems(&bytes, &glue)? {
             problems.push(format!("{name}: {problem}"));
@@ -741,9 +746,50 @@ pub(crate) fn verify(root: &Path) -> Result<(), Failure> {
     )
 }
 
+/// Direct actual-ABI control for an already built profile with the phrase module.
+pub(crate) fn diagnose_backup_abi(root: &Path, name: &str) -> Result<(), Failure> {
+    let folder = if Path::new(name).is_absolute() {
+        PathBuf::from(name)
+    } else {
+        let all = profiles(root)?;
+        if !all.iter().any(|(known, profile)| {
+            known == name && profile.modules.iter().any(|module| module == "phrase")
+        }) {
+            return Err(Failure(
+                "the ABI check needs a profile with the phrase module".to_owned(),
+            ));
+        }
+        root.join("dist/wasm").join(name)
+    };
+    let bytes = std::fs::read(folder.join("mnemocode.wasm"))?;
+    let glue = std::fs::read_to_string(folder.join("mnemocode.js"))?;
+    let problems = probe::backup_abi_problems(&bytes, &glue)?;
+    report(
+        &problems,
+        "exported ABI retains entropy",
+        "ABI controls passed; full verification was not run",
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "Requires the current test/probe build; runs the secret-lifetime acceptance scan."]
+    fn secret_probe_artifact_matches_its_declared_exports_and_starts() {
+        check_profile_artifact("test/probe");
+    }
+
+    fn check_profile_artifact(name: &str) {
+        let root = crate::root();
+        let all = profiles(&root).unwrap();
+        let (_, profile) = all.iter().find(|(found, _)| found == name).unwrap();
+        let exports = crate::repository::json(&root, "wasm-profiles.json").unwrap();
+        let mut problems = Vec::new();
+        verify_profile(&root, name, profile, &exports["exports"], &mut problems).unwrap();
+        assert!(problems.is_empty(), "{problems:#?}");
+    }
 
     #[test]
     fn page_names_are_an_edition_and_a_page() {

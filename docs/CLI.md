@@ -38,6 +38,8 @@ Other target names and the canonical build are described in [Releasing](RELEASIN
 
 `mnemocode --help` lists commands. `mnemocode <command> --help` describes the options and examples; `-h` gives a short summary. In a source checkout, replace `mnemocode` with `target/release/mnemocode`.
 
+The Encode menu (including Embroidery) asks for the Seedshift version and immediately asks for its dates, before the remaining settings. Choosing no Seedshift skips dates. Dates stay on the private screen and are never added to the command preview. The equivalent `encode --configure --ask-secrets` (optionally `--format`) or `stitch --configure --ask-secrets` asks the same settings. Plain `--ask-secrets` with explicit settings keeps its existing phrase-then-dates order. On Linux, the socket filter is active while paths are being selected; file writes stay open until output preflight, then are restricted to the selected folders before the seed phrase is read. Available protections differ by platform and are reported on the private screen.
+
 ## Input files and limits
 
 On the private screen, the fields for Shamir shares, forgotten words and encoded backups also accept a local text file path. Enter the path directly or drag the file into the terminal; no source selection is needed. MnemoCode reads its exported share files and MNC1 records unchanged. Paths with spaces may be quoted, and local `file:///` links work. Prefix a filename without an extension with `./`.
@@ -62,7 +64,7 @@ Refusal cannot remove text already entered in shell history or process arguments
 
 For headless operations, `--dates-file PATH` reads whitespace-separated dates; `recover-date` also accepts its `?` patterns there. Re-encode uses `--old-dates-file PATH` for the old backup and `--dates-file PATH` for the new one; a legacy-valid backup takes its original final word from `--last-word-file PATH`. These three options also accept `-`. Only one material source may read standard input in a command. Do not combine these date/final-word files with `--ask-secrets`, which asks for those answers itself. Protect and keep date files yourself: dates are not added to encoded records.
 
-Each text input has its own limit, which `--help` names: 256 bytes for a seed phrase, 128 for dates, 4 KiB for a passphrase or a date pattern, 32 KiB for a `recover-word` pattern, 64 KiB for encoded input or a set of shares, as an answer or a file. A QR image may be up to 16 MiB, 4096 pixels on either side and 2 megapixels (2,097,152 pixels), with up to 8 bits per sample: a screen of 1920 × 1080 fits, and the QR images that MnemoCode saves are 720 px; crop a photograph or a page image to the code. The picture of a cross-stitch pattern may be a PNG or JPEG file of up to 40 MiB and 60 megapixels. Larger inputs are refused. An image is read whole, and Ctrl+C acts when that reading ends: an image of noise can keep it for seconds. A multiline paste is one answer: words, codes and dates may be on separate lines; separate shares become semicolon-separated.
+Each text input has its own limit, which `--help` names: 256 bytes for a seed phrase, 128 for dates, 4 KiB for a passphrase or a date pattern, 32 KiB for a `recover-word` pattern, 64 KiB for encoded input or a set of shares, as an answer or a file. A QR image may be up to 16 MiB, 4096 pixels on either side and 2 megapixels (2,097,152 pixels), with up to 8 bits per sample: a screen of 1920 × 1080 fits, and the QR images that MnemoCode saves are 720 px; crop a photograph or a page image to the code. The picture of a cross-stitch pattern may be a PNG, JPEG or WebP file of up to 40 MiB and 60 megapixels. Larger inputs are refused. An image is read whole, and Ctrl+C acts when that reading ends: an image of noise can keep it for seconds. A multiline paste is one answer: words, codes and dates may be on separate lines; separate shares become semicolon-separated.
 
 ## Public command examples
 
@@ -124,7 +126,7 @@ mnemocode stitch --mnemonic-file output/public-mnemonic.txt \
 mnemocode decode --input-file output/public-legend.txt --dates-file output/public-dates.txt
 ```
 
-The legend is drawn at random within the counts the picture allows, so the same phrase gives a different legend each time. A legend line is a row's symbol number (1 to 70, as [SeedStitch](SEEDSTITCH.md#the-symbols) lists them), a colon and its stitches, rows in the legend's order. Decode takes it typed, pasted or from a file, and corrects one mistyped row, naming it.
+`--fabric` names the fabric that the cover gives the finished size for and the floss key the skeins: Aida by its count, 6 to 28 stitches an inch, or `linen-N`, linen of N threads an inch from 20 to 40 stitched over one thread with one strand; 14, for Aida 14, unless given. The menu asks for the fabric, Aida 11, 14, 16 or 18 or linen 28, and offers paper sizes from A6 to A2 with the stitches of the picture in each. The legend is drawn at random within the counts the picture allows, so the same phrase gives a different legend each time. A legend line is a row's symbol number (1 to 70, as [SeedStitch](SEEDSTITCH.md#the-symbols) lists them), a colon and its stitches, rows in the legend's order. A pattern too small or too plain for that form also uses the order of its rows, and each row names its DMC thread too, as `15:407:38` (format 2). `--mode direct` hides the phrase itself, with no dates, for a phrase protected some other way: anyone who knows the format reads it from the legend. Decode takes the line typed, pasted, from a file or from the pattern's PDF, asks for dates only where the legend's check says they were used, and corrects one mistyped row, naming it.
 
 ### Re-encode
 
@@ -296,7 +298,7 @@ For `decode` and `recover-date`, `--format` is usually optional. MnemoCode picks
 
 Replace random identity fields with `--card-name`, `--card-role`, `--card-company`, `--card-email`, `--card-phone`, `--card-website` and `--card-location`. Names accept Latin letters, spaces, apostrophes and hyphens. Characters missing from the font and text that does not fit are refused before any secret is asked or read. `--studio-name` names the collection studio; material sheets print `--card-name` as the recipient. [Identity defaults](card-identities.md) describes the generated values.
 
-`--card-slogan`, `--card-subtitle`, `--card-footer` and `--card-reference-label` replace the text on the sheet. The value `-` hides a field. The default reference label is `Ref.`.
+`--card-slogan`, `--card-subtitle` and `--card-footer` replace the sheet text. `--card-reference-label` sets the label on separate business cards; it does not add a label to a collection sheet. The value `-` hides a field. The default reference label is `Ref.`.
 
 Images are drawn by MnemoCode itself at 300 dpi. PNG keeps text and QR codes sharp; JPEG uses quality 90. Separate-card corners are transparent in PNG and white in JPEG.
 
@@ -405,7 +407,7 @@ A WIF can spend the funds. Never put it in a shell command or an issue report.
 
 ## Installation checks
 
-Before processing data, MnemoCode runs its startup self-test: quick checks without files, renderers or a share engine. Known answers come from published vectors or an independent implementation that first reproduces one. They cover:
+Before processing data, MnemoCode runs its startup self-test: quick checks without files or renderers, including SSKR engine checks. Known answers come from published vectors or an independent implementation that first reproduces one. They cover:
 
 - Both BIP39 word lists' lengths and SHA-256 hashes, the BIP39 seed and master fingerprint.
 - Every transformation mode; exact 12- and 24-word answers in all five representations, 15-, 18- and 21-word answers with MnemoCode Seedshift, and independent legacy-valid answers for all five lengths, with numbering, checksum and Color Unicode refusals.
@@ -422,7 +424,7 @@ No mnemonic data was processed.
 
 In the menu, a failed self-test leaves only Run the self-test, the help and Quit; the other entries stay closed.
 
-Before it splits or combines shares, MnemoCode also restores an official grouped set and a set holding the 32-byte secret of a 24-word phrase, creates a test set from a fixed seed and restores it from every two of its shares, makes sure that another seed gives other shares, and checks that the engine refuses an incomplete quorum and a damaged share value even when its transport checksum is correct. The fixed creation seeds are public test data and are never used for a person's shares.
+The startup self-test also restores an official grouped set and a set holding the 32-byte secret of a 24-word phrase, creates a test set from a fixed seed and restores it from every two of its shares, makes sure that another seed gives other shares, and checks that the engine refuses an incomplete quorum and a damaged share value even when its transport checksum is correct. The fixed creation seeds are public test data and are never used for a person's shares.
 
 For the full self-test, including PDF rendering:
 
@@ -440,9 +442,9 @@ The [library guide](LIBRARY.md) contains a Rust example, WebAssembly entry point
 
 ## Output destinations in the menu
 
-Each choice includes the screen and the destination it names. `Screen and printable cards`
-saves the cards without a record file. Choices do not include earlier entries; `All of these`
-is the choice that adds every offered destination.
+The question is a checklist: Space ticks a destination, Enter confirms, and the screen shows the
+result in any case. Nothing ticked keeps it on the screen only; ticking printable cards alone
+saves the cards without a record file.
 
 Unicode codes, colors as text and colors offer printable cards. Their card questions also ask
 whether to include QR output, so the destination menu omits a separate QR choice. English words,

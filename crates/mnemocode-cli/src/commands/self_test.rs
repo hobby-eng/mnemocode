@@ -119,7 +119,7 @@ fn qr_beside_sheets() -> Result<(), CheckFailure> {
         expect_same(beside.as_str(), in_folder("cards-qr.png").as_str(), name)?;
         let name = "QR image beside a PDF under a taken name";
         let next = saved(save_qr_beside(FIRST_SHARE_COLORS, &sheet, ""), name)?;
-        expect_same(next.as_str(), in_folder("cards-qr-1.png").as_str(), name)?;
+        expect_same(next.as_str(), in_folder("cards-qr_1.png").as_str(), name)?;
         let name = "QR image inside a folder of cards";
         let folder_text = folder.to_string_lossy();
         let inside = saved(

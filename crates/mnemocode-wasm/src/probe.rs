@@ -38,7 +38,7 @@ use crate::candidates::{
 };
 use crate::host::{after_secret, refused, text};
 use crate::phrase::{EncodedBackup, likely_form, master_fingerprint};
-use crate::qr::{QrMatrix, qr_png, read_qr_png};
+use crate::qr::{QrMatrix, hidden_qr_png, qr_png, read_hidden_qr_png, read_qr_png};
 use crate::recovery::{
     MarkedCodes, ReEncoding, ReadBackup, Recovery, RecoverySearch, SearchResult, check_backup,
     check_share_backup, is_codes, share_kind,
@@ -444,6 +444,12 @@ fn qr_entries(phrase: &str, met: &mut Met) {
         met.ok("read qr png", read_qr_png(&image));
     }
     met.refused("read no png", read_qr_png(phrase.as_bytes()));
+    if let Some(image) = met.ok(
+        "hidden qr png",
+        hidden_qr_png(js("Public study"), js(phrase)),
+    ) {
+        met.ok("read hidden qr", read_hidden_qr_png(&image));
+    }
 }
 
 /// A list opened, candidate by candidate.
@@ -600,6 +606,38 @@ fn marked_entries(phrase: &str, met: &mut Met) -> Option<Vec<String>> {
 
 /// What `search` found, stepped to its end.
 fn ran(mut search: RecoverySearch, step: &str, met: &mut Met) -> Option<SearchResult> {
+    let before = met.ok(step, search.step(0.0))?;
+    for invalid in [
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        -1.0,
+        0.5,
+        f64::from(u32::MAX) + 1.0,
+    ] {
+        // This checks the exported entry's numeric refusal without executing an enlarged
+        // budget. The following zero-work return is the memory gate's scrub observation.
+        if search.step(invalid).is_ok() {
+            met.failed("invalid search work");
+            return None;
+        }
+    }
+    let after = met.ok(step, search.step(0.0))?;
+    if (
+        before.checked(),
+        before.found(),
+        before.matched(),
+        before.running(),
+    ) != (
+        after.checked(),
+        after.found(),
+        after.matched(),
+        after.running(),
+    ) {
+        met.failed("invalid work changed search progress");
+        return None;
+    }
+    met.ok(step, search.step(1.0))?;
     while met.ok(step, search.step(SEARCH_WORK))?.running() {}
     met.ok(step, search.finish())
 }

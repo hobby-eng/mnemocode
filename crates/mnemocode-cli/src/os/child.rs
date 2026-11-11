@@ -10,6 +10,7 @@
 )]
 
 use std::io;
+use std::path::PathBuf;
 use std::process::{Command, ExitStatus};
 
 /// What a shell reports for a process that a signal stopped: 128 plus the signal's number.
@@ -28,11 +29,25 @@ pub(crate) struct CommandEnd {
 
 /// Runs this program again with `arguments`.
 pub(crate) fn run_own_process(arguments: &[String]) -> io::Result<CommandEnd> {
-    let program = std::env::current_exe()?;
-    Command::new(program)
+    Command::new(own_program()?)
         .args(arguments)
         .status()
         .map(command_end)
+}
+
+/// This program's file. On Linux the kernel's link to the running executable, which starts it
+/// even once a newer build has replaced its file, as happens when it is rebuilt while the menu is
+/// open: by its path the command would not start (ENOENT), and the command is the menu's own
+/// program in any case.
+fn own_program() -> io::Result<PathBuf> {
+    #[cfg(target_os = "linux")]
+    {
+        let running = PathBuf::from("/proc/self/exe");
+        if running.exists() {
+            return Ok(running);
+        }
+    }
+    std::env::current_exe()
 }
 
 /// How the command of `status` ended.

@@ -4,12 +4,11 @@
 //! allows; separate cards take one decoy without laying out a sheet. Every output of the same
 //! layout keeps the same planned cards.
 
-use mnemocode::qr::matrix;
 use mnemocode::random::Random;
 
 use crate::content::ColorCards;
 use crate::settings::PageSize;
-use crate::sheet::frame::collection_payload;
+use crate::sheet::frame::collection_matrix;
 use crate::sheet::{SheetError, plan_collection_sheet};
 use crate::templates::{CardDrawing, CardTemplate, TemplateError};
 
@@ -38,10 +37,7 @@ pub fn with_planned_decoys(
     }
     let settings = &cards.settings;
     let page_size = PageSize::resolve(settings.page_size, false);
-    let code = collection_payload(&pool)
-        .map(matrix)
-        .transpose()
-        .map_err(SheetError::from)?;
+    let code = collection_matrix(&pool).map_err(SheetError::from)?;
     template.with_sheet_shape(drawing, &pool, page_size, |shape| {
         let plan = plan_collection_sheet(
             (page_size, settings.orientation),

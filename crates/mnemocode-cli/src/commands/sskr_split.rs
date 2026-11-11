@@ -110,7 +110,8 @@ pub(crate) struct CheckedSplit {
     cards: Option<ShareCards>,
 }
 
-/// Checks every option of the split, the destinations included, before any secret is asked or read.
+/// Checks every option of the split, the destinations included, before the seed phrase is asked or
+/// read; the menu's split asks the Seedshift dates first.
 /// Encode --sskr is `integrated`.
 pub(crate) fn prepare_split(parsed: &Parsed, integrated: bool) -> Result<CheckedSplit, Stop> {
     assert_single_values(parsed, &["date"])?;
@@ -251,11 +252,13 @@ pub(crate) fn split_checked(
     parsed: &Parsed,
     checked: &CheckedSplit,
     known: Option<&Phrase>,
+    dates: Option<&[mnemocode::dates::Date]>,
 ) -> Result<(), Stop> {
-    let (phrase, dates) = match phrase_and_dates(parsed, checked.mode, DateWords::Split, known)? {
-        Ok(given) => given,
-        Err(_) => return Err(Stop::Cancelled),
-    };
+    let (phrase, dates) =
+        match phrase_and_dates(parsed, checked.mode, DateWords::Split, known, dates)? {
+            Ok(given) => given,
+            Err(_) => return Err(Stop::Cancelled),
+        };
     let split = split_backup(
         &phrase,
         checked.mode,
@@ -316,5 +319,5 @@ pub(crate) fn split_checked(
 /// Runs the command.
 pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
     let checked = prepare_split(parsed, false)?;
-    split_checked(parsed, &checked, None)
+    split_checked(parsed, &checked, None, None)
 }

@@ -9,22 +9,26 @@ use wasm_bindgen::JsValue;
 use super::{Met, js};
 use crate::cards::CardExport;
 use crate::cards::shares::own_cards;
+use crate::host::after_secret;
 
 /// The designs that the probe's file holds: for sheets, and for separate cards.
 const DESIGN: &str = "material-tile";
 const SEPARATE_DESIGN: &str = "business-it";
 
 /// `phrase` written in colors.
-fn colors_of(phrase: &str) -> Option<String> {
-    let phrase = Phrase::parse(phrase).ok()?;
-    let indexes: Vec<u16> = (0..phrase.len())
-        .filter_map(|place| phrase.index(place))
-        .map(|index| index as u16)
-        .collect();
-    Form::Colors
-        .codes(&indexes)
-        .ok()
-        .map(|codes| codes.as_str().to_owned())
+pub(super) fn colors_of(phrase: &str) -> Option<String> {
+    // This prepares secret fixture data outside a binding; it needs its own stack boundary.
+    after_secret(|| {
+        let phrase = Phrase::parse(phrase).ok()?;
+        let indexes: Vec<u16> = (0..phrase.len())
+            .filter_map(|place| phrase.index(place))
+            .map(|index| index as u16)
+            .collect();
+        Form::Colors
+            .codes(&indexes)
+            .ok()
+            .map(|codes| codes.as_str().to_owned())
+    })
 }
 
 /// Calls the secret entries of the cards on the colors of `phrase`.

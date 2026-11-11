@@ -170,7 +170,7 @@ impl Evidence {
             Some(coin) => vec![coin.parse(text)?],
             None => parse_any(text)?,
         };
-        let count = address_count(addresses, u64::from(location.index))?;
+        let count = address_count(addresses, u64::from(location.index()))?;
         Ok(Self(Kind::Coin {
             addresses: read,
             location,
@@ -233,7 +233,7 @@ impl Evidence {
                             .map(|address| address.text.clone())
                     };
                     if let Some(found) =
-                        scan_branch(root, branch, (location.index, *count), &mut matched)?
+                        scan_branch(root, branch, (location.index(), *count), &mut matched)?
                     {
                         return Ok(found_match(found.derived, &found.path));
                     }

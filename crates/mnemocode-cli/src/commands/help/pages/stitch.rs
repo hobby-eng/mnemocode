@@ -3,10 +3,18 @@
 use super::super::{CommandHelp, HelpGroup, HelpOption};
 use super::options::{ASK_SECRETS, DATES, DATES_FILE, MNEMONIC, MNEMONIC_FILE};
 
+const MODE: HelpOption = HelpOption {
+    flag: "--mode",
+    value: Some("NAME"),
+    summary: "seedshift (default) or direct",
+    details: &[
+        "seedshift masks the phrase with the dates, as Encode does; Decode asks for them. direct hides the phrase itself, for one protected some other way: anyone who knows MnemoCode reads it from the legend. The original Seedshift does not fit: its result usually fails the checksum.",
+    ],
+};
 const PICTURE: HelpOption = HelpOption {
     flag: "--picture",
     value: Some("PATH"),
-    summary: "The picture of the pattern: a PNG or JPEG file, such as a photograph",
+    summary: "The picture of the pattern: a PNG, JPEG or WebP file, such as a photograph",
     details: &[
         "A photograph or a painting with smooth shades works best; a flat picture of a few colours cannot hold a phrase. The file may be up to 40 MiB and 60 megapixels, and the pattern at most 800 stitches high. At a terminal, a picture that cannot be used is asked again.",
     ],
@@ -17,10 +25,18 @@ const STITCHES_ACROSS: HelpOption = HelpOption {
     summary: "The width of the pattern in stitches, 40 to 500; 200 unless given",
     details: &[],
 };
+const FABRIC: HelpOption = HelpOption {
+    flag: "--fabric",
+    value: Some("FABRIC"),
+    summary: "Aida's stitches an inch, 6 to 28, or linen-N, linen of N threads an inch stitched over one, N from 20 to 40; 14 (Aida 14) unless given",
+    details: &[
+        "The cover gives the finished size on it and the floss key the skeins: 200 stitches across make 36.3 cm on Aida 14 and 18.1 cm on linen-28, which is stitched with one strand. The menu offers Aida 11, 14, 16 or 18 and linen 28 over one thread, then paper sizes from A6 to A2, and works out the stitches.",
+    ],
+};
 const PDF: HelpOption = HelpOption {
     flag: "--pdf",
     value: Some("PATH"),
-    summary: "Save the pattern: cover, legend and chart pages",
+    summary: "Save the pattern: a cover, the floss key and the chart in colour",
     details: &["A folder of its path that is missing is made."],
 };
 const OUTPUT: HelpOption = HelpOption {
@@ -33,18 +49,26 @@ const OUTPUT: HelpOption = HelpOption {
 pub(in super::super) const PAGE: CommandHelp = CommandHelp {
     summary: "Hide a phrase in the legend of a cross-stitch pattern",
     about: &[
-        "Masks an English BIP39 phrase with dates, as seedshift mode does, and hides the masked phrase in the legend of a cross-stitch pattern made from a picture: the symbol of each thread and the last digits of its count of stitches (SeedStitch). The pattern is an ordinary chart in DMC threads; nothing on it names MnemoCode.",
-        "Decode reads the legend back without the picture: type its rows as each symbol's number, a colon and the stitches, from the top, then give the dates.",
+        "Masks an English BIP39 phrase with dates, as seedshift mode does, unless --mode direct, and hides it in the legend of a cross-stitch pattern made from a picture: the symbol of each thread and the last digits of its count of stitches (SeedStitch). The pattern is an ordinary chart in DMC threads; nothing on it names MnemoCode.",
+        "Decode reads the legend back without the picture: type its rows as each symbol's number, a colon and the stitches, from the top, then give the dates if it asks for them. A pattern too small for the phrase otherwise uses the rows' order too, and each row names its DMC number between them, as 15:407:38. Decode also reads the pattern's PDF itself, which keeps the legend line where no viewer shows it: decode --input-file pattern.pdf.",
     ],
-    usage: "--picture <PATH> --pdf <PATH> [OPTIONS] (--ask-secrets | --mnemonic-file <PATH>)",
+    usage: "(--configure --ask-secrets | --picture <PATH> --pdf <PATH> [OPTIONS] (--ask-secrets | --mnemonic-file <PATH>))",
     groups: &[
         HelpGroup {
             heading: "The phrase and the dates:",
-            options: &[&[&ASK_SECRETS, &MNEMONIC_FILE, &MNEMONIC, &DATES, &DATES_FILE]],
+            options: &[&[
+                &ASK_SECRETS,
+                &super::options::CONFIGURE,
+                &MODE,
+                &MNEMONIC_FILE,
+                &MNEMONIC,
+                &DATES,
+                &DATES_FILE,
+            ]],
         },
         HelpGroup {
             heading: "The pattern:",
-            options: &[&[&PICTURE, &STITCHES_ACROSS, &PDF, &OUTPUT]],
+            options: &[&[&PICTURE, &STITCHES_ACROSS, &FABRIC, &PDF, &OUTPUT]],
         },
     ],
     asks: Some(&[

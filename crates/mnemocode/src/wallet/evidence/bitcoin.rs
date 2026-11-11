@@ -267,15 +267,19 @@ impl Kind {
                         derived_from(expected, profile, *network, node, key)
                     };
                     let found = if let Expected::Account(_) = expected {
-                        account_paths(profile, *network, location.account)
+                        account_paths(profile, *network, *location)
                             .iter()
                             .find_map(|path| match_at_path(root, path, &mut matched).transpose())
                             .transpose()?
                     } else {
                         let mut found = None;
                         for branch in branch_paths(profile, *network, *location) {
-                            found =
-                                scan_branch(root, &branch, (location.index, *count), &mut matched)?;
+                            found = scan_branch(
+                                root,
+                                &branch,
+                                (location.index(), *count),
+                                &mut matched,
+                            )?;
                             if found.is_some() {
                                 break;
                             }
@@ -369,7 +373,7 @@ impl Evidence {
             location,
             addresses,
         } = place;
-        let count = address_count(addresses, u64::from(location.index))?;
+        let count = address_count(addresses, u64::from(location.index()))?;
         let (expected, profiles) = read(text)?;
         Ok(Self(EvidenceKind::Bitcoin(Kind::Located {
             expected,
@@ -382,8 +386,12 @@ impl Evidence {
 }
 
 /// Bitcoin's account paths of `profile` on `network`.
-fn account_paths(profile: BitcoinProfile, network: KeyNetwork, account: u32) -> Vec<KeyPath> {
-    bitcoin_paths(|coin| coin.account_paths(profile.kind(), network.testnet(), account))
+fn account_paths(
+    profile: BitcoinProfile,
+    network: KeyNetwork,
+    location: AddressLocation,
+) -> Vec<KeyPath> {
+    bitcoin_paths(|coin| coin.account_paths(profile.kind(), network.testnet(), location))
 }
 
 /// Bitcoin's branch paths of `profile` on `network` at `location`.
@@ -431,7 +439,7 @@ mod tests {
     fn first(addresses: Option<u64>) -> Place {
         Place {
             network: KeyNetwork::Mainnet,
-            location: AddressLocation::new(0, 0, 0).unwrap(),
+            location: AddressLocation::FIRST,
             addresses,
         }
     }
@@ -454,6 +462,33 @@ mod tests {
     fn the_place_is_checked_before_the_value_as_ts_checks_it() {
         let refusal = Evidence::bitcoin_address("garbage", first(Some(0))).unwrap_err();
         assert_eq!(refusal.code(), "core.address-scan.address-count-refused");
+        let coin = Coin::named("bitcoin").unwrap();
+        // AUD-006-API002: a location outside the normal indexes cannot be made, so that no part
+        // can alias a hardened index at any evidence boundary.
+        for high in [1_u64 << 31, u64::from(u32::MAX), u64::from(u32::MAX) + 1] {
+            for (account, branch, index) in [(high, 0, 0), (0, high, 0), (0, 0, high)] {
+                let refusal =
+                    EvidenceError::from(AddressLocation::new(account, branch, index).unwrap_err());
+                assert_eq!(
+                    refusal.code(),
+                    "core.coins.coin.assert-address-location-refused"
+                );
+            }
+        }
+        for normal in [0, crate::bip32::LAST_NORMAL_INDEX] {
+            let location =
+                AddressLocation::new(u64::from(normal), u64::from(normal), u64::from(normal))
+                    .unwrap();
+            assert!(
+                Evidence::address(
+                    Some(coin),
+                    "1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA",
+                    location,
+                    Some(1)
+                )
+                .is_ok()
+            );
+        }
     }
 
     #[test]

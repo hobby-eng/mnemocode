@@ -20,7 +20,7 @@ mnemocode sskr-combine --ask-secrets
 
 `--threshold` is N and `--shares` is M. Both need `--sskr`. The phrase is entered as in every `encode` command; see [Secret input styles](../README.md#secret-input-styles).
 
-The shares are shown on the result screen. `--output NEW_FILE` also saves them, one share per line. The file holds **all shares**. An existing file is never replaced: when the name is taken, the shares are saved under a numbered name such as `shares-1.txt`, and MnemoCode says so. When a file cannot be saved on the private screen, for example because the disk is full, the shares are still shown, and MnemoCode offers to try again, to use another name, or to skip that file.
+The shares are shown on the result screen. `--output NEW_FILE` also saves them, one share per line. The file holds **all shares**. An existing file is never replaced: when the name is taken, the shares are saved under a numbered name such as `shares_1.txt`, and MnemoCode says so. When a file cannot be saved on the private screen, for example because the disk is full, the shares are still shown, and MnemoCode offers to try again, to use another name, or to skip that file.
 
 | Option                   | Selects                                                                                                        |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------- |

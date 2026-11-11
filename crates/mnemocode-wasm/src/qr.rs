@@ -63,6 +63,26 @@ pub fn read_qr_png(bytes: &[u8]) -> Result<String, JsValue> {
     })
 }
 
+/// A PNG with visible text for ordinary scanners and an exact hidden UTF-8 record.
+#[wasm_bindgen(js_name = hiddenQrPng)]
+pub fn hidden_qr_png(visible: JsValue, record: JsValue) -> Result<Vec<u8>, JsValue> {
+    after_secret(|| {
+        mnemocode::qr::hidden::png(&text(&visible)?, &text(&record)?)
+            .map(|image| image.to_vec())
+            .map_err(|e| refused(&e))
+    })
+}
+
+/// A hidden record from a PNG, refused when its format or check is invalid.
+#[wasm_bindgen(js_name = readHiddenQrPng)]
+pub fn read_hidden_qr_png(bytes: &[u8]) -> Result<String, JsValue> {
+    after_secret(|| {
+        mnemocode::qr::hidden::read_png(bytes)
+            .map(|value| value.as_str().to_owned())
+            .map_err(|e| refused(&e))
+    })
+}
+
 /// The QR part's known answers: the startup cases, or with `full` every case.
 #[wasm_bindgen(js_name = selfCheckQr)]
 pub fn self_check_qr(full: bool) -> Result<(), JsValue> {

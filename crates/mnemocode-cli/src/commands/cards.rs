@@ -29,8 +29,8 @@ use super::share_output::{report_qr_verified, step_failed};
 use crate::args::{Given, Parsed, assert_text_values, is_on, parse_arguments, value};
 use crate::gate::Stop;
 use crate::os::{self, FileError, Folder, SystemRandom};
-use crate::output::first_free_name;
-use crate::terminal::{self, printable, saved};
+use crate::output::{first_free_name, shown_path};
+use crate::terminal::{self, saved};
 
 /// The options of each detail of the person on the cards, by the detail.
 pub(crate) const PROFILE_OPTIONS: [(ProfileField, &str); 7] = [
@@ -51,7 +51,9 @@ pub(crate) const COPY_OPTIONS: [&str; 5] = [
     "card-reference-label",
 ];
 /// What a command that saves cards takes beside its own.
-pub(crate) const CARD_OPTIONS: [&str; 19] = [
+pub(crate) const CARD_OPTIONS: [&str; 21] = [
+    "qr-hidden",
+    "qr-text",
     "cards-dir",
     "template",
     "images-dir",
@@ -201,7 +203,8 @@ pub(crate) fn card_settings(
         orientation: Orientation::parse(value(parsed, "orientation"))?,
         profile: details.profile,
         presentation: Some(details.presentation),
-        card_qr: is_on(parsed, "card-qr"),
+        card_qr: is_on(parsed, "card-qr") || is_on(parsed, "qr-hidden"),
+        hidden_qr: is_on(parsed, "qr-hidden"),
     })
 }
 
@@ -286,7 +289,7 @@ pub(crate) fn saved_pages_notice(
     saved(&format!(
         "Saved {count} {} {kind}pages to: {}",
         image_format(parsed)?.extension().to_uppercase(),
-        printable(folder)
+        shown_path(folder)
     ));
     Ok(())
 }
@@ -564,7 +567,32 @@ pub(crate) fn save_qr_beside(
     sheet: &str,
     suffix: &str,
 ) -> Result<Option<String>, Stop> {
-    save_qr_at(payload, &beside(sheet, suffix))
+    save_qr_beside_with(payload, sheet, suffix, None)
+}
+
+/// Saves the same hidden QR as the PDF, using its already selected contact.
+pub(crate) fn save_qr_beside_with(
+    payload: &str,
+    sheet: &str,
+    suffix: &str,
+    contact: Option<&str>,
+) -> Result<Option<String>, Stop> {
+    save_qr_at(payload, &beside(sheet, suffix), contact)
+}
+
+/// Saves a hidden QR in the images folder, using its already selected contact.
+pub(crate) fn save_qr_inside_with(
+    payload: &str,
+    folder: &str,
+    name: &str,
+    contact: Option<&str>,
+) -> Result<Option<String>, Stop> {
+    let file = if name.is_empty() {
+        "qr.png".to_owned()
+    } else {
+        format!("{name}-qr.png")
+    };
+    save_qr_at(payload, &Path::new(folder).join(file), contact)
 }
 
 /// The same inside the sheets' folder, as "qr.png" or "<name>-qr.png".
@@ -573,12 +601,7 @@ pub(crate) fn save_qr_inside(
     folder: &str,
     name: &str,
 ) -> Result<Option<String>, Stop> {
-    let file = if name.is_empty() {
-        "qr.png".to_owned()
-    } else {
-        format!("{name}-qr.png")
-    };
-    save_qr_at(payload, &Path::new(folder).join(file))
+    save_qr_inside_with(payload, folder, name, None)
 }
 
 /// `path` without its "." and the folders that a ".." goes back from, as a saved name is shown.
@@ -599,9 +622,12 @@ fn normalised(path: &Path) -> PathBuf {
 }
 
 /// Saves the QR image of `payload` at the first free name from `path`, as every result is saved.
-fn save_qr_at(payload: &str, path: &Path) -> Result<Option<String>, Stop> {
+fn save_qr_at(payload: &str, path: &Path, contact: Option<&str>) -> Result<Option<String>, Stop> {
     let free = first_free_name(&normalised(path).to_string_lossy())?;
-    let image = mnemocode::qr::png(payload)?;
+    let image = match contact {
+        Some(text) => mnemocode::qr::hidden::png(text, payload)?,
+        None => mnemocode::qr::png(payload)?,
+    };
     let mut output = Parsed::new();
     output.insert("qr".to_owned(), Given::One(free));
     let saved_at = save_output(

@@ -110,6 +110,7 @@ pub struct CardExport {
     copy: CardCopy,
     title: Option<String>,
     card_qr: bool,
+    hidden_qr: bool,
     session: Option<Rc<RefCell<Details>>>,
 }
 
@@ -136,6 +137,7 @@ impl CardExport {
             copy: CardCopy::default(),
             title: None,
             card_qr,
+            hidden_qr: false,
             session: None,
         })
     }
@@ -184,6 +186,15 @@ impl CardExport {
         self.session = Some(Rc::clone(&session.0));
     }
 
+    /// Choose a contact in the sheet QR and the exact backup record in its filler bytes.
+    #[wasm_bindgen(js_name = setHiddenQr)]
+    pub fn set_hidden_qr(&mut self, enabled: bool) {
+        self.hidden_qr = enabled;
+        if enabled {
+            self.card_qr = true;
+        }
+    }
+
     /// The settings of its cards, with the details that were left out invented, for `design`.
     fn settings(&self, design: Option<&CardTemplate>) -> Result<CardSettings, JsValue> {
         let profile = thrown(self.profile.validated())?;
@@ -202,6 +213,7 @@ impl CardExport {
             profile: details.profile,
             presentation: Some(details.presentation),
             card_qr: self.card_qr,
+            hidden_qr: self.hidden_qr,
         })
     }
 
@@ -678,7 +690,7 @@ mod tests {
             job,
             orientation: Some(Orientation::Portrait),
         };
-        let documents = plan.separate().ok().expect("separate cards");
+        let documents = plan.separate().expect("separate cards");
         let page = &documents.documents[0].pages[0];
         assert!(page.width < page.height);
     }

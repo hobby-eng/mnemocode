@@ -14,15 +14,6 @@ use crate::host::{after_secret, dates_of, name, optional_text, text};
 #[wasm_bindgen]
 pub struct ReEncoding(Confirmation);
 
-/// How a match of the wallet was reached, as `confirmationLine` names it.
-fn matched_by(by: &str) -> MatchedBy {
-    match by {
-        "fingerprint" => MatchedBy::Fingerprint,
-        "key" => MatchedBy::Key,
-        _ => MatchedBy::Address,
-    }
-}
-
 #[wasm_bindgen]
 impl ReEncoding {
     /// The phrase that `codes`, written in `form` and masked in `mode`, give with `dates`; for the
@@ -71,12 +62,14 @@ impl ReEncoding {
         })
     }
 
-    /// What is said of the confirmation, by the way it came: fingerprint, key or address.
+    /// What is said of the confirmation, by the way it came: "address", "key" or "fingerprint";
+    /// any other value, or none, is refused.
     #[wasm_bindgen(js_name = confirmationLine)]
     pub fn confirmation_line(&self, by: JsValue) -> Result<String, JsValue> {
-        self.0
-            .confirmation_line(matched_by(&name(&by)))
-            .map_err(fail)
+        // An unconfirmed phrase is refused as such first, as TS 0.1.0 does.
+        self.0.confirmed_phrase().map_err(fail)?;
+        let by = MatchedBy::named(&name(&by)).map_err(fail)?;
+        self.0.confirmation_line(by).map_err(fail)
     }
 
     /// The phrase, once it is confirmed; refused before.

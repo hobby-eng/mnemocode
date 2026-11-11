@@ -2,18 +2,18 @@
 
 This page explains what MnemoCode protects, what it cannot protect, and how to report a vulnerability. For backup and recovery steps, use the [README](README.md) or [command-line reference](docs/CLI.md).
 
-## Reporting a vulnerability
+## Reporting bugs and vulnerabilities
 
-Report a suspected vulnerability through this repository's [private vulnerability reporting form](https://github.com/hobby-eng/mnemocode/security/advisories/new). It reaches the owner and maintainers. Keep an unfixed security problem out of public issues, discussions, pull requests, screenshots and logs.
+Report bugs and suspected vulnerabilities through [GitHub Issues](https://github.com/hobby-eng/mnemocode/issues/new/choose). Reports are visible to everyone who can access the repository.
 
-Use a published test phrase or invented data. Never include a real phrase, BIP39 passphrase, private key, WIF, Shamir share, date, encoded record, QR code, card or wallet export. Include:
+Use a published test phrase or invented data. Never include a real phrase, BIP39 passphrase, private key, WIF, Shamir share, date, encoded record, QR code, card or wallet export, nor a cross-stitch pattern or its legend line, or a hidden-QR image. Include:
 
 - the affected release or full commit SHA;
 - the operating system and, for a source build, Rust version;
 - exact steps using only test data;
 - the expected result, actual result and security impact.
 
-Ordinary bugs and feature requests belong in the [public issue forms](https://github.com/hobby-eng/mnemocode/issues/new/choose). If a report could reveal recovery material or help an attacker, send it privately.
+Feature requests use the same issue forms.
 
 Security fixes are made in the current source and release. Installed copies do not update themselves. Check which version you run, replace affected installations, and retain what you need to read existing backups.
 
@@ -25,7 +25,7 @@ Use a trusted computer disconnected from every network, preferably a freshly sta
 
 ### Command-line protections
 
-Each menu task runs in a fresh process of the same executable. Before reading a secret, the CLI applies the protections available on that system and reads them back. It reports unavailable protections rather than assuming they worked; `self-test` lists the limits.
+Each menu task runs in a fresh process of the same executable. Before reading a secret, the CLI applies the protections available on that system and reads them back. Where a task's own answers name its outputs, the file-write restriction follows those answers, and the Protection line says so. It reports unavailable protections rather than assuming they worked; `self-test` lists the limits.
 
 | Platform | Protections                                                                                                                                                                                                                                    |
 | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -35,7 +35,7 @@ Each menu task runs in a fresh process of the same executable. Before reading a 
 
 On Linux and macOS, failure to disable core dumps prevents secret input. Other unavailable measures are reported. Windows has no unprivileged network or file-write sandbox here. macOS leaves file writes open. The program does not restrict child-process creation; image rendering runs in process and needs no converter.
 
-On Linux with Landlock, output folders are checked and made before secrets are read. A failed save can choose another name only within the permitted folders. Re-encode asks for the replacement's destinations before the old backup. `recover-word` can retain file writes so it can offer a candidate list after the search, when its destination is not known at startup. Missing parent folders can remain after cancellation.
+On Linux with Landlock, output folders are checked, made and write-restricted before the seed phrase is read. In the menu's Encode, Embroidery and share split, and for Re-encode's new backup, the Seedshift dates are asked first: the socket filter is already active, but file writes stay open until the output settings are answered. A failed save can choose another name only within the permitted folders. Re-encode asks for the replacement's destinations before the old backup. `recover-word` can retain file writes so it can offer a candidate list after the search, when its destination is not known at startup. Missing parent folders can remain after cancellation.
 
 Descriptors opened before restrictions, including the terminal, remain usable. “Offline” describes the program's behaviour; restrictions against a compromised process depend on the operating system and version. [Platform design](docs/design/platform/protections.md) records the decisions and system calls.
 
@@ -51,7 +51,7 @@ The command-line executable and WebAssembly binding register a zeroing allocator
 
 Use [`--ask-secrets`](README.md#secret-input-styles) or the [menu](README.md#menu) for real recovery material. The private screen shows input and results for checking, then clears them when you leave it. The main screen keeps only a summary of saved paths and warnings. Anyone watching the private screen can read the secrets; a logging or compromised terminal can retain them.
 
-MnemoCode does not collect, transmit or log your phrase. Secret owner types wipe their buffers on drop, including ordinary error and cancellation paths. The executable's allocator wipes freed blocks. Small secret buffers reserve their final capacity and request page locks before being filled: `mlock` on Linux and macOS, `VirtualLock` on Windows. Locks are counted per page and are best effort; a refused lock warns once. Rendered pages can exceed the lock budget and are wiped without being locked. Card codes, a command's date list and temporary stack copies are not all locked. A step's working copy may remain until that memory is reused; forced process termination does not run Rust destructors.
+MnemoCode does not collect, transmit or log your phrase. Secret owner types wipe their buffers on drop, including ordinary error and cancellation paths. The executable's allocator wipes freed blocks. Small secret buffers reserve fixed capacity and request page locks before being filled: `mlock` on Linux and macOS, `VirtualLock` on Windows. Word-index owners, retained command dates, card-code text and arrays, and the retained embroidery legend and row order also request locks; an adopted vector is locked only from the moment it is adopted, so its earlier preparation is not covered, and cloning locks before copying. The terminal editor grows by replacing small protected owners rather than reserving the entire input limit in advance. Locks are counted per page and are best effort; a refused lock warns once. Rendered pages can exceed the lock budget and are wiped without being locked. Temporary stack copies and drawing buffers are not all locked. Search working state, such as the date patterns of `recover-date` and the vectors of a share repair, is wiped on release but not locked. Working copies inside third-party libraries are not covered by a promise of complete erasure. A step's working copy may remain until that memory is reused; forced process termination does not run Rust destructors.
 
 WebAssembly has no page-locking API. Rust owners and freed allocations can be wiped, and secret binding calls scrub their working stack. A host must still release objects it retains. JavaScript strings, DOM values and copies made by the browser cannot be guaranteed erased. Screenshots, clipboard history, accessibility tools, extensions and malware remain outside MnemoCode's control.
 

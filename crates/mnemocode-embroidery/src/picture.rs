@@ -1,5 +1,7 @@
-//! The picture a pattern is made from: a PNG or JPEG file read within limits, turned upright by its
-//! EXIF orientation, and averaged down to one colour per stitch in linear light.
+//! The picture a pattern is made from: a PNG, JPEG or WebP file read within limits, turned upright by
+//! its EXIF orientation, brightened as a designer of patterns brightens a photograph (more
+//! saturated and more contrasted, so that a small object keeps its shades in threads), and averaged
+//! down to one colour per stitch in linear light.
 
 use std::fmt;
 use std::io::Cursor;
@@ -23,13 +25,17 @@ pub const WIDTHS: WholeRange = WholeRange::new(MIN_WIDTH as u64, MAX_WIDTH as u6
 pub const DEFAULT_WIDTH: usize = 200;
 /// The most stitches down a pattern.
 pub const MAX_HEIGHT: usize = 800;
+/// How much more saturated the picture is made: its colours moved away from their own grey.
+const SATURATION: f64 = 1.2;
+/// How much more contrasted the picture is made: its colours moved away from its mean grey.
+const CONTRAST: f64 = 1.1;
 
 /// Why a picture cannot be made into a pattern.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PictureError {
     /// The file is larger than [`MAX_FILE_BYTES`].
     FileTooLarge,
-    /// The file is no PNG or JPEG picture this program reads.
+    /// The file is no PNG, JPEG or WebP picture this program reads.
     NotAPicture,
     /// The picture has more than [`MAX_PIXELS`] pixels.
     TooManyPixels,
@@ -53,7 +59,7 @@ impl fmt::Display for PictureError {
                 MAX_FILE_BYTES / 1024 / 1024
             ),
             Self::NotAPicture => {
-                f.write_str("The picture is no PNG or JPEG file that can be read.")
+                f.write_str("The picture is no PNG, JPEG or WebP file that can be read.")
             }
             Self::TooManyPixels => write!(
                 f,
@@ -137,6 +143,25 @@ impl Pixels {
         }
     }
 
+    /// Brightens every pixel as a designer brightens a photograph for a pattern (the owner's choice
+    /// of 2026-11-04 among the ways shown at 200 stitches): each colour moved away from its own grey
+    /// by [`SATURATION`], then away from the picture's mean grey by [`CONTRAST`], each step kept
+    /// within a byte, as an image editor's colour and contrast controls do.
+    fn brighten(&mut self) {
+        let grey = |[r, g, b]: [u8; 3]| {
+            (f64::from(r) * 299.0 + f64::from(g) * 587.0 + f64::from(b) * 114.0) / 1000.0
+        };
+        let byte = |value: f64| value.round().clamp(0.0, 255.0) as u8;
+        let (pixels, _) = self.rgb.as_chunks_mut::<3>();
+        let total: f64 = pixels.iter().map(|&pixel| grey(pixel)).sum();
+        let mean = (total / pixels.len().max(1) as f64).round();
+        for pixel in pixels {
+            let own = grey(*pixel);
+            let saturated = pixel.map(|c| byte(own + (f64::from(c) - own) * SATURATION));
+            *pixel = saturated.map(|c| byte(mean + (f64::from(c) - mean) * CONTRAST));
+        }
+    }
+
     /// The stored pixel shown at `(x, y)` of the upright picture (EXIF 2.32, tag 0x0112).
     fn upright(&self, x: usize, y: usize) -> [u8; 3] {
         let (w, h) = (self.width, self.height);
@@ -160,31 +185,22 @@ impl Pixels {
 ///
 /// # Errors
 ///
-/// [`PictureError`]: a file too large, no PNG or JPEG, too many pixels, a width outside the
+/// [`PictureError`]: a file too large, no PNG, JPEG or WebP, too many pixels, a width outside the
 /// limits, a picture narrower than the pattern or too tall for it.
 pub fn grid(file: &[u8], width: usize) -> Result<Grid, PictureError> {
-    if file.len() > MAX_FILE_BYTES {
-        return Err(PictureError::FileTooLarge);
-    }
     if !(MIN_WIDTH..=MAX_WIDTH).contains(&width) {
         return Err(PictureError::WidthOutOfRange);
     }
-    let pixels = if file.starts_with(b"\x89PNG\r\n\x1a\n") {
-        png_pixels(file)?
-    } else if file.starts_with(&[0xFF, 0xD8, 0xFF]) {
-        jpeg_pixels(file)?
-    } else {
-        return Err(PictureError::NotAPicture);
-    };
+    let mut pixels = pixels(file)?;
     let (source_width, source_height) = pixels.upright_size();
     if source_width < width {
         return Err(PictureError::NarrowerThanPattern { needed: width });
     }
-    let height = (source_height * width + source_width / 2) / source_width;
+    let height = height_of((source_width, source_height), width);
     if height > MAX_HEIGHT {
         return Err(PictureError::TooTall);
     }
-    let height = height.max(1);
+    pixels.brighten();
     let linear: Vec<f64> = (0..=u8::MAX).map(color::linear).collect();
     let mut colors = Vec::with_capacity(width * height);
     for row in 0..height {
@@ -208,6 +224,39 @@ pub fn grid(file: &[u8], width: usize) -> Result<Grid, PictureError> {
         height,
         colors,
     })
+}
+
+/// The upright size in pixels of the picture in `file`, read within the limits of [`grid`], so that
+/// a front end can offer sizes of a pattern before it is made.
+///
+/// # Errors
+///
+/// [`PictureError`]: a file too large, no PNG, JPEG or WebP, or too many pixels.
+pub fn upright_size(file: &[u8]) -> Result<(usize, usize), PictureError> {
+    Ok(pixels(file)?.upright_size())
+}
+
+/// The stitches down a pattern `width` stitches across of a picture of `size` upright pixels, as
+/// [`grid`] makes it: the picture's shape kept, at least one.
+#[must_use]
+pub fn height_of((source_width, source_height): (usize, usize), width: usize) -> usize {
+    ((source_height * width + source_width / 2) / source_width.max(1)).max(1)
+}
+
+/// The pixels of `file`, by the form its first bytes name.
+fn pixels(file: &[u8]) -> Result<Pixels, PictureError> {
+    if file.len() > MAX_FILE_BYTES {
+        return Err(PictureError::FileTooLarge);
+    }
+    if file.starts_with(b"\x89PNG\r\n\x1a\n") {
+        png_pixels(file)
+    } else if file.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        jpeg_pixels(file)
+    } else if file.starts_with(b"RIFF") && file.get(8..12) == Some(b"WEBP".as_slice()) {
+        webp_pixels(file)
+    } else {
+        Err(PictureError::NotAPicture)
+    }
 }
 
 /// The source pixels `[start, end)` that stitch `index` of `stitches` covers, at least one.
@@ -248,10 +297,7 @@ fn png_pixels(file: &[u8]) -> Result<Pixels, PictureError> {
                 3 => ([sample(0), sample(1), sample(2)], 255),
                 _ => ([sample(0), sample(1), sample(2)], sample(3)),
             };
-            for channel in color {
-                let over_white = (channel * alpha + 255 * (255 - alpha)) / 255;
-                rgb.push(u8::try_from(over_white).unwrap_or(u8::MAX));
-            }
+            rgb.extend(color.map(|channel| over_white(channel, alpha)));
         }
     }
     Ok(Pixels {
@@ -259,6 +305,55 @@ fn png_pixels(file: &[u8]) -> Result<Pixels, PictureError> {
         height,
         rgb,
         orientation: 1,
+    })
+}
+
+/// `channel` of a pixel whose opacity is `alpha`, laid over white.
+fn over_white(channel: u32, alpha: u32) -> u8 {
+    let laid = (channel * alpha + 255 * (255 - alpha)) / 255;
+    u8::try_from(laid).unwrap_or(u8::MAX)
+}
+
+/// The pixels of a WebP file, lossy or lossless, transparency laid over white, and its EXIF
+/// orientation; an animated one gives its first frame. The decoder may hold no more than the
+/// largest picture at four bytes a pixel.
+fn webp_pixels(file: &[u8]) -> Result<Pixels, PictureError> {
+    let mut decoder =
+        image_webp::WebPDecoder::new(Cursor::new(file)).map_err(|_| PictureError::NotAPicture)?;
+    let (width, height) = decoder.dimensions();
+    let (width, height) = (width as usize, height as usize);
+    if width.saturating_mul(height) > MAX_PIXELS {
+        return Err(PictureError::TooManyPixels);
+    }
+    decoder.set_memory_limit(MAX_PIXELS * 4);
+    let orientation = decoder
+        .exif_metadata()
+        .ok()
+        .flatten()
+        .map_or(1, |exif| exif_orientation(&exif));
+    let size = decoder
+        .output_buffer_size()
+        .ok_or(PictureError::NotAPicture)?;
+    let mut buffer = vec![0; size];
+    decoder
+        .read_image(&mut buffer)
+        .map_err(|_| PictureError::NotAPicture)?;
+    let rgb = if decoder.has_alpha() {
+        let (pixels, _) = buffer.as_chunks::<4>();
+        pixels
+            .iter()
+            .flat_map(|&[red, green, blue, alpha]| {
+                [red, green, blue].map(|channel| over_white(channel.into(), alpha.into()))
+            })
+            .collect()
+    } else {
+        buffer
+    };
+    Ok(Pixels {
+        width,
+        height,
+        rgb,
+        orientation,
     })
 }
 
@@ -357,6 +452,27 @@ mod tests {
     }
 
     #[test]
+    fn a_picture_is_brightened_and_its_greys_kept() {
+        // A grey of its own mean stays as it is; a dull red is made more saturated.
+        let mut grey = Pixels {
+            width: 1,
+            height: 1,
+            rgb: vec![120, 120, 120],
+            orientation: 1,
+        };
+        grey.brighten();
+        assert_eq!(grey.rgb, [120, 120, 120]);
+        let mut red = Pixels {
+            width: 1,
+            height: 1,
+            rgb: vec![160, 100, 100],
+            orientation: 1,
+        };
+        red.brighten();
+        assert!(red.rgb[0] > 160 && red.rgb[1] < 100, "{:?}", red.rgb);
+    }
+
+    #[test]
     fn limits_and_wrong_files_are_refused() {
         let small = png_file(30, 30, |_, _| [128; 3]);
         assert_eq!(
@@ -367,6 +483,45 @@ mod tests {
         assert_eq!(grid(b"GIF89a", 40), Err(PictureError::NotAPicture));
         let tall = png_file(40, 900, |_, _| [128; 3]);
         assert_eq!(grid(&tall, 40), Err(PictureError::TooTall));
+    }
+
+    /// A WebP file, lossless, of `width` by `height` RGB or RGBA `pixels`, with `exif` if any.
+    fn webp_file(width: u32, height: u32, pixels: &[u8], exif: Option<&[u8]>) -> Vec<u8> {
+        let mut file = Vec::new();
+        let mut encoder = image_webp::WebPEncoder::new(&mut file);
+        if let Some(exif) = exif {
+            encoder.set_exif_metadata(exif.to_vec());
+        }
+        let kind = if pixels.len() == (width * height * 4) as usize {
+            image_webp::ColorType::Rgba8
+        } else {
+            image_webp::ColorType::Rgb8
+        };
+        encoder.encode(pixels, width, height, kind).unwrap();
+        file
+    }
+
+    #[test]
+    fn a_webp_picture_reads_as_the_same_picture_in_png() {
+        let pixel = |x: u32, y: u32| [(x * 3) as u8, (y * 5) as u8, 90];
+        let png = png_file(80, 40, pixel);
+        let rgb: Vec<u8> = (0..40)
+            .flat_map(|y| (0..80).flat_map(move |x| pixel(x, y)))
+            .collect();
+        let webp = webp_file(80, 40, &rgb, None);
+        assert_eq!(grid(&webp, 40).unwrap(), grid(&png, 40).unwrap());
+        // Transparent pixels are laid over white, as a PNG's are.
+        let clear = webp_file(40, 20, &[0; 40 * 20 * 4], None);
+        assert!((grid(&clear, 40).unwrap().colors()[0].l - 100.0).abs() < 0.01);
+        // Turned a quarter by its EXIF orientation: 80 by 40 pixels stand 40 across, 80 down.
+        let turned = b"MM\0\x2a\0\0\0\x08\0\x01\x01\x12\0\x03\0\0\0\x01\0\x06\0\0";
+        let upright = webp_file(80, 40, &rgb, Some(turned));
+        let read = grid(&upright, 40).unwrap();
+        assert_eq!((read.width(), read.height()), (40, 80));
+        assert_eq!(
+            grid(b"RIFF\0\0\0\0WEBPVP8 ", 40),
+            Err(PictureError::NotAPicture)
+        );
     }
 
     #[test]

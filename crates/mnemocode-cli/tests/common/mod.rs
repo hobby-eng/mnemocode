@@ -18,6 +18,8 @@ use std::process::{Command, Output, Stdio};
 
 use mnemocode::self_check::vectors::{PUBLIC_MNEMONIC, PUBLIC_MNEMONIC_24};
 
+pub(crate) mod colour;
+
 /// The file of the public phrase in every folder.
 pub(crate) const PHRASE: &str = "phrase.txt";
 /// The file of the phrase of 24 words.
@@ -69,6 +71,14 @@ pub(crate) fn folder(name: &str) -> PathBuf {
     folder
 }
 
+/// `name`, '/' between its parts, in `folder` in full, as a message names a saved file.
+pub(crate) fn full(folder: &Path, name: &str) -> String {
+    name.split('/')
+        .fold(folder.to_path_buf(), |path, part| path.join(part))
+        .display()
+        .to_string()
+}
+
 /// The names in `folder`, sorted, without the inputs that `folder` put there.
 pub(crate) fn outputs(folder: &Path) -> Vec<String> {
     names(folder)
@@ -100,9 +110,9 @@ pub(crate) fn numbered(start: &str, count: usize, end: &str) -> Vec<String> {
         .collect()
 }
 
-/// Runs the program in `folder`, without a terminal.
+/// Runs the program in `folder`, without a terminal and without the inherited colour settings.
 pub(crate) fn run(folder: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_mnemocode"))
+    colour::plain(&mut Command::new(env!("CARGO_BIN_EXE_mnemocode")))
         .args(args)
         .current_dir(folder)
         .stdin(Stdio::null())
@@ -165,14 +175,27 @@ pub(crate) fn assert_no_metadata(file: &[u8]) {
 /// Expects the folder `path` to be open to its owner alone, where the file system says so.
 #[track_caller]
 pub(crate) fn assert_private(path: &Path) {
+    assert!(path.is_dir());
+    assert_permissions(path, 0o700);
+}
+
+/// Expects a saved file to be readable and writable by its owner alone on Unix.
+#[track_caller]
+pub(crate) fn assert_private_file(path: &Path) {
+    assert!(path.is_file());
+    assert_permissions(path, 0o600);
+}
+
+#[track_caller]
+fn assert_permissions(path: &Path, expected: u32) {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mode = fs::metadata(path).expect("a folder").permissions().mode();
-        assert_eq!(mode & 0o777, 0o700, "{}", path.display());
+        let mode = fs::metadata(path).expect("an entry").permissions().mode();
+        assert_eq!(mode & 0o777, expected, "{}", path.display());
     }
     #[cfg(not(unix))]
-    assert!(path.is_dir());
+    let _platform_specific = (path, expected);
 }
 
 /// What a PDF reader reads on each page of the PDF at `path`, its white space as single spaces: the

@@ -147,6 +147,25 @@ impl Keys {
         }
     }
 
+    /// Polls cancellation and suspension between work steps. Escape cancels only
+    /// where the current operation's hint explicitly offers it.
+    pub(crate) fn cancelled(&mut self, escape_cancels: bool) -> Result<bool, Interrupted> {
+        if let Some(signal) = os::pending_signal() {
+            return Err(Interrupted::Signal(signal));
+        }
+        self.suspend_if_asked();
+        while self.is_raw() && self.more_within(0) {
+            match self.next()? {
+                Some(key::CTRL_C | key::CTRL_BACKSLASH) => return Ok(true),
+                Some(key::ESCAPE) if escape_cancels && escape_key(self)? == Key::Back => {
+                    return Ok(true);
+                }
+                Some(key::CTRL_Z) => self.suspend(),
+                _ => {}
+            }
+        }
+        Ok(false)
+    }
     /// Stops for SIGTSTP when it arrived.
     pub(crate) fn suspend_if_asked(&self) {
         if os::suspend_requested() {
@@ -389,13 +408,17 @@ pub(crate) enum Key {
     /// Ctrl+C.
     Cancel,
     Digit(u8),
+    /// A letter, in lower case, that a list entry may take as its key (q is Back).
+    Letter(u8),
+    /// The space bar, which ticks an entry of a checklist.
+    Space,
     Other,
 }
 
 /// Reads one key: the arrows, Page Up and Down, Home and End however a terminal sends them, Enter,
-/// a digit, Escape alone (and q, Q, Ctrl+D or the end of the input) back, Ctrl+C cancel. Every
-/// other key's sequence is read to its end and ignored; bytes after an ESC that are no key's
-/// sequence are read again as keys.
+/// a digit or a letter, Escape alone (and q, Q, Ctrl+D or the end of the input) back, Ctrl+C
+/// cancel. Every other key's sequence is read to its end and ignored; bytes after an ESC that are
+/// no key's sequence are read again as keys.
 pub(crate) fn read_key(keys: &mut Keys) -> Result<Key, Interrupted> {
     let Some(byte) = keys.next()? else {
         return Ok(Key::Back);
@@ -405,24 +428,29 @@ pub(crate) fn read_key(keys: &mut Keys) -> Result<Key, Interrupted> {
         key::CARRIAGE_RETURN | key::LINE_FEED => Key::Enter,
         b'0'..=b'9' => Key::Digit(byte - b'0'),
         b'q' | b'Q' | key::CTRL_D if !keys.only_escape => Key::Back,
-        key::ESCAPE => {
-            if !keys.more_within(ESCAPE_DELAY_MS) {
-                return Ok(Key::Back);
-            }
-            match read_escape(keys)? {
-                Escape::None(mut again) => {
-                    keys.give_back(&mut again);
-                    Key::Other
-                }
-                Escape::Alt => Key::Other,
-                Escape::Sequence {
-                    introducer,
-                    parameters,
-                    last,
-                } => sequence_key(introducer, &parameters, last),
-            }
-        }
+        b'a'..=b'z' | b'A'..=b'Z' => Key::Letter(byte.to_ascii_lowercase()),
+        b' ' => Key::Space,
+        key::ESCAPE => escape_key(keys)?,
         _ => Key::Other,
+    })
+}
+
+// Questions and busy work share the same lone-Escape timing and sequence parser.
+fn escape_key(keys: &mut Keys) -> Result<Key, Interrupted> {
+    if !keys.more_within(ESCAPE_DELAY_MS) {
+        return Ok(Key::Back);
+    }
+    Ok(match read_escape(keys)? {
+        Escape::None(mut again) => {
+            keys.give_back(&mut again);
+            Key::Other
+        }
+        Escape::Alt => Key::Other,
+        Escape::Sequence {
+            introducer,
+            parameters,
+            last,
+        } => sequence_key(introducer, &parameters, last),
     })
 }
 

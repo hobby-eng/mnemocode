@@ -18,8 +18,9 @@ use crate::gate::Stop;
 use crate::input::dropped_path;
 use crate::os::{FileError, Folder, pending_signal};
 use crate::output::{
-    OutputError, check_new_file, check_new_folder, check_ruled, check_usable, discard_renamed,
-    validate_output_paths, warn_of_cloud_copy,
+    MAX_COPY_NUMBER, OutputError, check_new_file, check_new_folder, check_ruled, check_usable,
+    discard_renamed, renumber_collided_output, shown_path, validate_output_paths,
+    warn_of_cloud_copy,
 };
 use crate::terminal::{
     self, Choice, NoticeKind, clear_private_screen, end_warnings, lasting_warning, notice,
@@ -77,7 +78,7 @@ fn save_failure(what: &str, path: &str, error: &FileError) -> String {
     });
     format!(
         "{what} could not be saved as {}: {reason}.",
-        printable(path)
+        shown_path(path)
     )
 }
 
@@ -194,6 +195,7 @@ pub(crate) fn save_output(
     let mut path = given.clone();
     let mut under_result = showing_result();
     let mut try_write = true;
+    let mut collisions = 0;
     loop {
         if try_write {
             match write_saved(|| write(&path)) {
@@ -205,6 +207,18 @@ pub(crate) fn save_output(
                         parsed.insert(key.to_owned(), Given::One(path.clone()));
                     }
                     return Ok(Some(path));
+                }
+                Err(FileError::System(error))
+                    if !folder
+                        && error.kind() == io::ErrorKind::AlreadyExists
+                        && pending_signal().is_none() =>
+                {
+                    collisions += 1;
+                    if collisions > MAX_COPY_NUMBER {
+                        return Err(OutputError::TooManyCopies(printable(&given)).into());
+                    }
+                    path = renumber_collided_output(parsed, key, &path)?;
+                    continue;
                 }
                 // An ending signal ends the command too, with nothing left to ask.
                 Err(error) if !on_private_screen() || pending_signal().is_some() => {
@@ -241,6 +255,7 @@ pub(crate) fn save_output(
             AfterFailedSave::Skip => {
                 end_failed_step(under_result);
                 discard_renamed(&given);
+                discard_renamed(&path);
                 let verb = if name.plural { "were" } else { "was" };
                 lasting_warning(&format!("{} {verb} not saved.", name.what));
                 return Ok(None);
@@ -263,7 +278,10 @@ pub(crate) fn save_output(
                     },
                 )?;
                 match other {
-                    Some(other) => path = other,
+                    Some(other) => {
+                        discard_renamed(&path);
+                        path = other;
+                    }
                     None => try_write = false,
                 }
             }
@@ -272,5 +290,98 @@ pub(crate) fn save_output(
         if try_write {
             end_failed_step(under_result);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the regression checks real filesystem collision bytes using only public fixtures"
+    )]
+    fn a_name_taken_during_publication_selects_a_fresh_suffix_without_overwriting() {
+        for extension in ["jpg", "mp3"] {
+            for preexisting in [false, true] {
+                crate::os::in_temporary_folder("mnemocode-public-name-race-", |folder| {
+                    let original = folder.join(format!("public.{extension}"));
+                    let original = original.to_str().unwrap();
+                    if preexisting {
+                        crate::os::publish_new_file(Path::new(original), b"original file").unwrap();
+                    }
+                    let mut parsed = Parsed::new();
+                    parsed.insert("output".into(), Given::One(original.to_owned()));
+                    crate::output::preflight(&mut parsed).unwrap();
+                    let requested = value(&parsed, "output").unwrap().to_owned();
+                    let next = if preexisting { 2 } else { 1 };
+                    let occupied = folder.join(format!("public_{next}.{extension}"));
+                    let mut raced = false;
+                    let saved = save_output(
+                        &mut parsed,
+                        "output",
+                        ResultName::one("The public fixture"),
+                        |path| {
+                            if !raced {
+                                crate::os::publish_new_file(Path::new(path), b"other writer")?;
+                                crate::os::publish_new_file(&occupied, b"another existing copy")?;
+                                raced = true;
+                            }
+                            crate::os::publish_new_file(Path::new(path), b"new public export")
+                        },
+                    )
+                    .unwrap()
+                    .unwrap();
+                    assert!(
+                        saved.ends_with(&format!("public_{}.{extension}", next + 1)),
+                        "{saved}"
+                    );
+                    assert_eq!(std::fs::read(&requested).unwrap(), b"other writer");
+                    if preexisting {
+                        assert_eq!(std::fs::read(original).unwrap(), b"original file");
+                    }
+                    assert_eq!(std::fs::read(&occupied).unwrap(), b"another existing copy");
+                    assert_eq!(std::fs::read(&saved).unwrap(), b"new public export");
+                    discard_renamed(&saved);
+                })
+                .unwrap();
+            }
+        }
+    }
+
+    #[test]
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "public zero-length collision fixtures exercise the actual last filename boundary"
+    )]
+    fn the_final_numbered_file_is_used_after_repeated_collisions() {
+        crate::os::in_temporary_folder("mnemocode-public-last-name-", |folder| {
+            let original = folder.join("public.mp3");
+            let mut parsed = Parsed::new();
+            parsed.insert(
+                "output".into(),
+                Given::One(original.to_str().unwrap().to_owned()),
+            );
+            let mut attempts = 0;
+            let saved = save_output(
+                &mut parsed,
+                "output",
+                ResultName::one("The public fixture"),
+                |path| {
+                    attempts += 1;
+                    if attempts <= MAX_COPY_NUMBER {
+                        std::fs::write(path, b"other writer")?;
+                        return Err(io::Error::from(io::ErrorKind::AlreadyExists).into());
+                    }
+                    crate::os::publish_new_file(Path::new(path), b"new public export")
+                },
+            )
+            .unwrap()
+            .unwrap();
+            assert!(saved.ends_with("public_999.mp3"), "{saved}");
+            assert_eq!(std::fs::read(&saved).unwrap(), b"new public export");
+            discard_renamed(&saved);
+        })
+        .unwrap();
     }
 }

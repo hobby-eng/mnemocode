@@ -36,14 +36,19 @@ pub(crate) struct Environment {
     pub(crate) current: Option<PathBuf>,
 }
 
+/// The settings of the colour rule. The tests remove them from every program they start: their
+/// helper `tests/common/colour.rs` keeps a deliberate copy, which a test below keeps in step.
+const COLOUR_SETTINGS: [&str; 3] = ["NO_COLOR", "CLICOLOR", "CLICOLOR_FORCE"];
+
 impl Environment {
     /// Reads the variables.
     pub(crate) fn read() -> Self {
         let set = |name: &str| std::env::var_os(name).filter(|value| !value.is_empty());
+        let [no_color, clicolor, clicolor_force] = COLOUR_SETTINGS;
         Self {
-            no_color: set("NO_COLOR").is_some(),
-            force_color: set("CLICOLOR_FORCE").is_some_and(|value| value != "0"),
-            clicolor_off: std::env::var_os("CLICOLOR").is_some_and(|value| value == "0"),
+            no_color: set(no_color).is_some(),
+            force_color: set(clicolor_force).is_some_and(|value| value != "0"),
+            clicolor_off: std::env::var_os(clicolor).is_some_and(|value| value == "0"),
             dumb_terminal: std::env::var_os("TERM").is_some_and(|value| value == "dumb"),
             home: home_folder(),
             onedrive: ["OneDrive", "OneDriveConsumer", "OneDriveCommercial"]
@@ -70,4 +75,21 @@ fn home_folder() -> Option<PathBuf> {
 #[cfg(not(windows))]
 fn home_folder() -> Option<PathBuf> {
     std::env::home_dir()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::COLOUR_SETTINGS;
+
+    /// AUD-006 follow-up: the tests' copy of the colour settings is this list, written the same
+    /// way, so that a setting added here reaches every program a test starts (CORE-10).
+    #[test]
+    fn the_tests_remove_exactly_the_colour_settings() {
+        let helper = include_str!("../../tests/common/colour.rs");
+        let list = format!("= {COLOUR_SETTINGS:?};");
+        assert!(
+            helper.contains(&list),
+            "tests/common/colour.rs lacks {list}"
+        );
+    }
 }

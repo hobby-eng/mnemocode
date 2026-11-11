@@ -127,9 +127,13 @@ impl Phrase {
         phrase
     }
 
-    /// The phrase of the word indexes `indexes`, from 0; refused for a failed checksum.
+    /// The phrase of the word indexes `indexes`, from 0; refused for an index outside the
+    /// dictionary or a failed checksum. Unknown indexes name their position, never their value.
     pub fn of_indexes(indexes: &[usize]) -> Result<Self, PhraseError> {
         check_word_count(indexes.len()).map_err(|_| PhraseError::WordCount)?;
+        if let Some(place) = indexes.iter().position(|&index| index >= english().len()) {
+            return Err(PhraseError::UnknownWord(place + 1));
+        }
         let text = SecretText::build("a phrase", indexes.len() * 9, |filler| {
             for (place, index) in indexes.iter().enumerate() {
                 if place > 0 {
@@ -182,7 +186,7 @@ impl Phrase {
 
     /// The index, from 0, of the word at `place`, from 0.
     pub fn index(&self, place: usize) -> Option<usize> {
-        let bytes = self.indexes.get(place * 2..place * 2 + 2)?;
+        let bytes = self.indexes.as_chunks::<2>().0.get(place)?;
         Some(usize::from(u16::from_le_bytes([bytes[0], bytes[1]])))
     }
 
@@ -381,6 +385,39 @@ mod tests {
         assert!(matches!(
             Phrase::parse(&unknown),
             Err(PhraseError::UnknownWord(12))
+        ));
+    }
+
+    #[test]
+    fn every_index_must_name_a_word_in_the_same_checked_phrase() {
+        for count in super::super::sizes::WORD_COUNTS {
+            let phrase = Phrase::of_entropy(&vec![0; entropy_bytes(count)]).unwrap();
+            let valid: Vec<usize> = (0..count).map(|at| phrase.index(at).unwrap()).collect();
+            assert_eq!(
+                Phrase::of_indexes(&valid).unwrap().text().as_str(),
+                phrase.text().as_str()
+            );
+            for place in 0..count {
+                for invalid in [english().len(), usize::from(u16::MAX), usize::MAX] {
+                    let mut indexes = valid.clone();
+                    indexes[place] = invalid;
+                    assert_eq!(
+                        Phrase::of_indexes(&indexes).err(),
+                        Some(PhraseError::UnknownWord(place + 1))
+                    );
+                }
+            }
+            for outside in [count, usize::MAX, 1 << (usize::BITS - 1)] {
+                assert_eq!(phrase.index(outside), None);
+            }
+        }
+        // Omitting twelve invalid words must not validate just the remaining twelve.
+        let mut mixed = vec![0; 11];
+        mixed.push(3);
+        mixed.extend([2048; 12]);
+        assert!(matches!(
+            Phrase::of_indexes(&mixed),
+            Err(PhraseError::UnknownWord(13))
         ));
     }
 

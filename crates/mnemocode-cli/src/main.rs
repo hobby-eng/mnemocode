@@ -5,7 +5,9 @@
 //! The order of a run: core dumps off and the memory cap first (os::Protection::start), the signal
 //! handlers, the environment and the terminal, then the arguments: a flag that would carry a
 //! secret refused before anything is parsed, then the command, whose outputs are checked and whose
-//! folders are made before its protections are restricted and its first secret is asked (gate).
+//! folders are made before its protections are restricted and the seed phrase is asked (gate). With
+//! --configure, and for Re-encode's new backup, the Seedshift dates are asked first, and the writes
+//! are ruled once the answers name the outputs.
 
 mod args;
 mod commands;
@@ -170,7 +172,11 @@ fn run_command_line(argv: &[String], protection: &mut Protection) -> Result<(), 
         });
         return run(protection);
     }
-    // Before anything secret is read: the outputs checked, their folders made, the rest given up.
+    if command.name != "qr-hide" {
+        commands::hidden_qr::validate(&parsed)?;
+    }
+    // Before the seed phrase is read: the outputs checked, their folders made, the rest given up.
+    // A command whose answers name its outputs rules its writes once they are answered.
     let mut needs = output::preflight(&mut parsed)?;
     needs.answers_name_folders = command.asks_outputs.is_some_and(|asks| asks(&parsed));
     protection.restrict(&needs);

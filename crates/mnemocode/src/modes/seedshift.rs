@@ -1,5 +1,6 @@
 //! Seedshift (MnemoCode TS 0.1.0's `core/seedshift.ts`, CAP-PHRASE-FORMATS-MODE-SEEDSHIFT, -MODE-LEGACY,
-//! -MODE-DIRECT): each word moved by the shift its date gives it, modulo the 2,048 words.
+//! -MODE-DIRECT, -LEGACY-VALID-LAST-WORD): each word moved by the shift its date gives it, modulo
+//! the 2,048 words.
 //!
 //! - MnemoCode Seedshift moves the entropy, not the checksum: each 11-bit chunk modulo 2,048 and the
 //!   bits the last word keeps beside the checksum modulo their own range, so that the masked words
@@ -19,15 +20,16 @@ use crate::bip39::sizes::{
     DICTIONARY_SIZE, SizesError, check_word_count, check_word_indexes, last_word_entropy_bits,
 };
 use crate::dates::{Date, Dates, DatesError, Shifts, derive_shifts};
+use crate::secret::SecretU16s;
 
-/// Word indexes, from 0, wiped when dropped.
+/// Word indexes, from 0, locked where available and wiped when dropped.
 #[derive(Clone, PartialEq, Eq)]
-pub struct Indexes(Vec<u16>);
+pub struct Indexes(SecretU16s);
 
 impl Indexes {
     /// The indexes `values`; each below 2,048 is the caller's to check (`check`).
     pub fn new(values: Vec<u16>) -> Self {
-        Self(values)
+        Self(SecretU16s::new(values))
     }
 
     /// The indexes.
@@ -44,12 +46,6 @@ impl Indexes {
     pub fn check(&self) -> Result<(), SizesError> {
         check_word_count(self.0.len())?;
         check_word_indexes(&self.0)
-    }
-}
-
-impl Drop for Indexes {
-    fn drop(&mut self) {
-        self.0.zeroize();
     }
 }
 
@@ -243,7 +239,7 @@ pub fn mask(phrase: &Phrase, dates: &[Date]) -> Result<Masked, ShiftError> {
     entropy.zeroize();
     moved_entropy.zeroize();
     Ok(Masked {
-        shifted: Indexes(shifted),
+        shifted: Indexes::new(shifted),
         dates: Dates::new(&dates),
         shifts: Shifts::new(&shifts),
     })
@@ -256,7 +252,7 @@ pub fn mask_legacy(phrase: &Phrase, dates: &[Date]) -> Result<Masked, ShiftError
     let shifted = shifted_indexes(&indexes, &shifts, Direction::Mask);
     indexes.zeroize();
     Ok(Masked {
-        shifted: Indexes(shifted),
+        shifted: Indexes::new(shifted),
         dates: Dates::new(&dates),
         shifts: Shifts::new(&shifts),
     })
@@ -283,7 +279,7 @@ pub fn legacy_checksum_valid(shifted: &Indexes) -> Result<Indexes, ShiftError> {
     }
     let indexes = indexes_of_entropy(&entropy)?;
     entropy.zeroize();
-    Ok(Indexes(indexes))
+    Ok(Indexes::new(indexes))
 }
 
 /// What a decoder recovered: the phrase's indexes, the dates, the shifts, and whether the phrase
@@ -341,7 +337,7 @@ fn checked_and_dated(
 fn unmasked(recovered: Vec<u16>, dates: Vec<Date>, shifts: Vec<u16>) -> Unmasked {
     let checksum_valid = keeps_checksum(&recovered);
     Unmasked {
-        recovered: Indexes(recovered),
+        recovered: Indexes::new(recovered),
         dates: Dates::new(&dates),
         shifts: Shifts::new(&shifts),
         checksum_valid,
@@ -371,7 +367,7 @@ pub fn unmask_legacy_valid(indexes: &Indexes, dates: &[Date]) -> Result<Vec<Unma
             let mut recovered = prefix.clone();
             recovered.push(u16::try_from(last).unwrap_or(0));
             Unmasked {
-                recovered: Indexes(recovered),
+                recovered: Indexes::new(recovered),
                 dates: Dates::new(&dates),
                 shifts: Shifts::new(&shifts),
                 checksum_valid: true,

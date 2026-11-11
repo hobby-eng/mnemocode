@@ -27,6 +27,18 @@ pub enum Lookup {
     Unicode,
 }
 
+impl Lookup {
+    /// The lookup named `name`; refuses names other than word, index or unicode.
+    pub fn named(name: &str) -> Result<Self, TableError> {
+        match name {
+            "word" => Ok(Self::Word),
+            "index" => Ok(Self::Index),
+            "unicode" => Ok(Self::Unicode),
+            _ => Err(TableError::Lookup),
+        }
+    }
+}
+
 /// The numbered dictionaries; Chinese is the Traditional Chinese BIP39 list.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Format {
@@ -123,6 +135,8 @@ impl Row {
 /// The refusals of the table, word for word as TS 0.1.0 writes them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TableError {
+    /// A name other than one of the three supported lookup modes.
+    Lookup,
     /// A word number outside 1 through 2,048.
     Index,
     /// Text that fits no row, with the lookup's refusal.
@@ -134,6 +148,9 @@ pub enum TableError {
 impl fmt::Display for TableError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Lookup => {
+                f.write_str("Word table lookup must use a word, index or Unicode code.")
+            }
             Self::Index => write!(
                 f,
                 "A wordlist index must be from {}.",
@@ -160,6 +177,7 @@ impl std::error::Error for TableError {}
 impl Refusal for TableError {
     fn code(&self) -> &'static str {
         match self {
+            Self::Lookup => "core.words.word-table-lookup",
             Self::Index => "core.words.wordlist-index-from",
             Self::Row(_) => "core.words.word-table-row-refused",
             Self::Format => "core.words.word-table-format",
@@ -334,6 +352,21 @@ mod tests {
             Err(TableError::Row(Lookup::Index))
         );
         assert_eq!(row(2049), Err(TableError::Index));
+    }
+
+    #[test]
+    fn lookup_names_refuse_unknown_selectors_without_a_default() {
+        for (name, expected) in [
+            ("word", Lookup::Word),
+            ("index", Lookup::Index),
+            ("unicode", Lookup::Unicode),
+        ] {
+            assert_eq!(Lookup::named(name), Ok(expected));
+        }
+        for name in ["", "typo", "Word", "index "] {
+            let error = Lookup::named(name).unwrap_err();
+            assert_eq!(error.code(), "core.words.word-table-lookup");
+        }
     }
 
     #[test]

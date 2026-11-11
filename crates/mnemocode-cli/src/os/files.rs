@@ -34,6 +34,8 @@ use super::random::SystemRandom;
 pub(crate) enum FileError {
     /// The file named, at the start of a sentence, is missing or cannot be read.
     Unreadable(&'static str),
+    /// The regular file grew or shrank after its size was admitted.
+    Changed(&'static str),
     /// The file named is a folder, a device or a pipe.
     NotRegular(&'static str),
     /// The file named, which holds no text, is a folder, a device or a pipe.
@@ -83,6 +85,10 @@ impl fmt::Display for FileError {
                 f,
                 "{what} could not be read. Check that the file exists and is readable."
             ),
+            Self::Changed(what) => write!(
+                f,
+                "{what} changed size while being read. Choose a stable file copy and try again."
+            ),
             Self::NotRegular(what) => write!(f, "{what} must be a regular text file."),
             Self::NotAFile(what) => write!(f, "{what} must be a regular file."),
             Self::TooLarge(error) => error.fmt(f),
@@ -126,6 +132,7 @@ impl Refusal for FileError {
     fn code(&self) -> &'static str {
         match self {
             Self::Unreadable(_) => "cli.bounded-read.file-unreadable",
+            Self::Changed(_) => "cli.bounded-read.file-changed",
             Self::NotRegular(_) => "cli.bounded-read.regular-file-required",
             Self::NotAFile(_) => "cli.bounded-read.not-a-file",
             Self::TooLarge(error) => error.code(),
@@ -281,6 +288,80 @@ pub(crate) fn read_public_file(
     limit: usize,
     what: &'static str,
 ) -> Result<Vec<u8>, FileError> {
+    let file = open_regular(path, what)?;
+    let mut bytes = Vec::new();
+    file.take(limit as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| FileError::Unreadable(what))?;
+    if bytes.len() > limit {
+        return Err(FileError::TooLarge(InputTooLarge::new(what, limit)));
+    }
+    Ok(bytes)
+}
+
+/// The regular file at `path` that holds a secret too large to lock, such as a pattern's PDF: read
+/// whole into a buffer of its size, never more than `limit` bytes, never locked and wiped when
+/// dropped, as such a file is written ([`SecretBytes::large`]).
+pub(crate) fn read_large_secret_file(
+    path: &Path,
+    limit: usize,
+    what: &'static str,
+) -> Result<SecretBytes, FileError> {
+    let file = open_regular(path, what)?;
+    let size = file
+        .metadata()
+        .map_err(|_| FileError::Unreadable(what))?
+        .len();
+    let size = usize::try_from(size)
+        .ok()
+        .filter(|n| *n <= limit)
+        .ok_or_else(|| FileError::TooLarge(InputTooLarge::new(what, limit)))?;
+    read_fixed_large(file, size, what)
+}
+
+fn read_fixed_large(
+    mut reader: impl Read,
+    size: usize,
+    what: &'static str,
+) -> Result<SecretBytes, FileError> {
+    // A changing file must not double the admitted allocation before the next
+    // budget check. Read only into this fixed owner, then probe EOF on the stack.
+    let mut held = SecretBytes::large(what, vec![0; size]);
+    reader.read_exact(&mut held).map_err(|error| {
+        if error.kind() == io::ErrorKind::UnexpectedEof {
+            FileError::Changed(what)
+        } else {
+            FileError::Unreadable(what)
+        }
+    })?;
+    let mut extra = zeroize::Zeroizing::new([0_u8; 1]);
+    let count = loop {
+        match reader.read(&mut *extra) {
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            result => break result.map_err(|_| FileError::Unreadable(what))?,
+        }
+    };
+    // Even the sentinel may be a secret byte when a file grows.
+    if count != 0 {
+        return Err(FileError::Changed(what));
+    }
+    Ok(held)
+}
+
+/// Whether the regular file at `path` begins with `prefix`; reads no more than `prefix`'s length.
+pub(crate) fn file_starts_with(path: &Path, prefix: &[u8]) -> bool {
+    let Ok(file) = open_regular(path, "The file") else {
+        return false;
+    };
+    let mut start = Vec::with_capacity(prefix.len());
+    file.take(prefix.len() as u64)
+        .read_to_end(&mut start)
+        .is_ok_and(|_| start == prefix)
+}
+
+/// The regular file at `path`, opened to read without waiting on a pipe; `what` names it in a
+/// refusal of something else at the path.
+fn open_regular(path: &Path, what: &'static str) -> Result<File, FileError> {
     let mut options = OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
@@ -297,14 +378,7 @@ pub(crate) fn read_public_file(
     if !metadata.is_file() {
         return Err(FileError::NotAFile(what));
     }
-    let mut bytes = Vec::new();
-    file.take(limit as u64 + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|_| FileError::Unreadable(what))?;
-    if bytes.len() > limit {
-        return Err(FileError::TooLarge(InputTooLarge::new(what, limit)));
-    }
-    Ok(bytes)
+    Ok(file)
 }
 
 /// What `reader` gives to its end, into a locked buffer of `capacity` bytes that grows to at most
@@ -533,37 +607,56 @@ pub(crate) fn publish_written_file(
     path: &Path,
     write: impl FnOnce(File) -> Result<(), FileError>,
 ) -> Result<(), FileError> {
+    publish_staged_file(path, |temporary| {
+        write(private_file(temporary)?)?;
+        Ok(true)
+    })
+    .map(|_| ())
+}
+
+/// One publication and cleanup path for ordinary and authenticated file writers.
+fn publish_staged_file(
+    path: &Path,
+    fill: impl FnOnce(&Path) -> Result<bool, FileError>,
+) -> Result<bool, FileError> {
     let parent = path.parent().unwrap_or(Path::new("."));
     let staging = make_staging(&parent.join(".mnemocode-export-"))?;
     let temporary = staging.join("document");
-    let published = private_file(&temporary)
-        .map_err(FileError::from)
-        .and_then(write)
-        .and_then(|()| stop_if_signalled())
-        .and_then(|()| match fs::hard_link(&temporary, path) {
-            Ok(()) => Ok(()),
-            Err(error) if no_hard_links(&error) => {
-                new_private_file(path, &[])?;
-                fs::rename(&temporary, path).map_err(|renamed| {
-                    // The reservation was made just above with create_new: this program's own.
-                    match fs::remove_file(path) {
-                        Ok(()) => FileError::System(renamed),
-                        Err(_) => FileError::FailedSaveLeftReservation {
-                            reservation: path.to_path_buf(),
-                            cause: Box::new(FileError::System(renamed)),
-                        },
-                    }
-                })
-            }
-            Err(error) => Err(FileError::System(error)),
-        });
+    let checked = fill(&temporary);
+    let proceed = match checked {
+        Ok(proceed) => proceed,
+        Err(failure) => return Err(after_failed_staging(&staging, failure)),
+    };
+    if !proceed {
+        remove_staging(&staging, false)?;
+        return Ok(false);
+    }
+    let published = stop_if_signalled().and_then(|()| match fs::hard_link(&temporary, path) {
+        Ok(()) => Ok(()),
+        Err(error) if no_hard_links(&error) => {
+            new_private_file(path, &[])?;
+            fs::rename(&temporary, path).map_err(|renamed| {
+                // The reservation was made just above with create_new: this program's own.
+                match fs::remove_file(path) {
+                    Ok(()) => FileError::System(renamed),
+                    Err(_) => FileError::FailedSaveLeftReservation {
+                        reservation: path.to_path_buf(),
+                        cause: Box::new(FileError::System(renamed)),
+                    },
+                }
+            })
+        }
+        Err(error) => Err(FileError::System(error)),
+    });
     if let Err(failure) = published {
         return Err(after_failed_staging(&staging, failure));
     }
-    remove_staging(&staging, false).map_err(|_| FileError::LeftStagingCopy {
-        saved: path.to_path_buf(),
-        staging,
-    })
+    remove_staging(&staging, false)
+        .map(|()| true)
+        .map_err(|_| FileError::LeftStagingCopy {
+            saved: path.to_path_buf(),
+            staging,
+        })
 }
 
 /// A new folder of an export, claimed before anything secret is read and published afterwards
@@ -612,11 +705,27 @@ pub(crate) fn publish_new_folder<T>(
     taken: &str,
     write: impl FnOnce(&Path) -> Result<T, FileError>,
 ) -> Result<T, FileError> {
+    publish_folder_if(target, prefix, taken, |path| {
+        write(path).map(|value| (value, true))
+    })
+}
+
+/// The shared publication/cleanup path also admits an expected cancellation.
+fn publish_folder_if<T>(
+    target: &Path,
+    prefix: &str,
+    taken: &str,
+    write: impl FnOnce(&Path) -> Result<(T, bool), FileError>,
+) -> Result<T, FileError> {
     let parent = target.parent().unwrap_or(Path::new("."));
     fs::create_dir_all(parent)?;
     let staging = make_staging(&parent.join(prefix))?;
     let mut reservation = None;
-    let result = write(&staging).and_then(|result| {
+    let result = write(&staging).and_then(|(result, proceed)| {
+        if !proceed {
+            remove_staging(&staging, false)?;
+            return Ok(result);
+        }
         stop_if_signalled()?;
         match private_folder(target) {
             Ok(()) => {}
@@ -682,6 +791,21 @@ mod tests {
         assert!(matches!(refused, Err(FileError::TooLarge(_))));
         let mut exact = &b"abcdefgh"[..];
         assert!(read_bounded(&mut exact, 8, 8, "The file").is_ok_and(|bytes| bytes.len() == 8));
+    }
+
+    #[test]
+    fn large_file_reads_never_grow_the_admitted_buffer() {
+        let stable = read_fixed_large(&b"abc"[..], 3, "The public file").unwrap();
+        assert_eq!(&*stable, b"abc");
+        assert_eq!(stable.reserved_bytes(), 3);
+        assert!(matches!(
+            read_fixed_large(&b"abcd"[..], 3, "The public file"),
+            Err(FileError::Changed(_))
+        ));
+        assert!(matches!(
+            read_fixed_large(&b"ab"[..], 3, "The public file"),
+            Err(FileError::Changed(_))
+        ));
     }
 
     #[test]

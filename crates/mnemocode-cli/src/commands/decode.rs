@@ -259,8 +259,10 @@ fn show_legacy_valid_candidates(backup: &Backup, dates: &[Date]) -> Result<(), S
 /// The encoded seed phrase and its complete dates from the options, as Decode reads them; Re-encode
 /// reads an old backup so. The dates are counted as soon as the mode is known, so that a wrong count
 /// is refused before the form of the codes is asked about.
-pub(crate) fn backup_and_dates_from_options(parsed: &Parsed) -> Result<(Backup, Vec<Date>), Stop> {
-    let mut entered = Vec::new();
+pub(crate) fn backup_and_dates_from_options(
+    parsed: &Parsed,
+) -> Result<(Backup, mnemocode::secret::SecretVec<Date>), Stop> {
+    let mut entered = mnemocode::secret::SecretVec::new(Vec::new());
     let backup = backup_from_options(parsed, false, |mode| {
         entered = dates(parsed)?;
         Ok(mode.check_date_count(entered.len(), false, DateWords::Codes)?)
@@ -635,9 +637,11 @@ fn decode_and_show(
         .found
         .as_ref()
         .and_then(|(_, found)| found.dates.as_ref());
-    let known: Vec<Date> = found_dates
-        .or(typed.map(DatesAnswer::known))
-        .map_or_else(Vec::new, |dates| dates.iter().collect());
+    let known = mnemocode::secret::SecretVec::new(
+        found_dates
+            .or(typed.map(DatesAnswer::known))
+            .map_or_else(Vec::new, |dates| dates.iter().collect()),
+    );
     let (mode, form) = (backup.mode(), backup.form());
     if backup.gives_several() {
         return purpose.several(backup, &known);

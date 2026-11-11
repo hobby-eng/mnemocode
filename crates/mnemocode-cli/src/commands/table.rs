@@ -14,7 +14,8 @@ use super::saving::folder_taken;
 use crate::args::{Parsed, choice_option, integer_option, is_on, value};
 use crate::gate::Stop;
 use crate::os::{self, Folder};
-use crate::terminal::{self, Channel, printable, result_line, saved};
+use crate::output::shown_path;
+use crate::terminal::{self, Channel, result_line, saved};
 
 /// The options `table` takes.
 pub(crate) const OPTIONS: [&str; 8] = [
@@ -144,7 +145,7 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
         } else {
             "numbered BIP39 word list"
         };
-        saved(&format!("Saved {what}: {}", printable(output)));
+        saved(&format!("Saved {what}: {}", shown_path(output)));
         return Ok(());
     }
     let row = if index.is_some() {
@@ -184,7 +185,7 @@ fn save_pack(directory: &str) -> Result<(), Stop> {
     })?;
     saved(&format!(
         "Saved full word-list and recovery set: {}",
-        printable(directory)
+        shown_path(directory)
     ));
     Ok(())
 }

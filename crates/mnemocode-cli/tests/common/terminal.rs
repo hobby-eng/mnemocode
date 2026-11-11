@@ -11,6 +11,13 @@ use std::time::{Duration, Instant};
 
 use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
 
+#[path = "colour.rs"]
+#[allow(
+    clippy::duplicate_mod,
+    reason = "a test that loads both helpers gets a second copy of this one list; each helper must also work alone"
+)]
+pub(crate) mod colour;
+
 /// How long the program has to answer, a debug build on a busy machine.
 const PATIENCE: Duration = Duration::from_secs(180);
 
@@ -45,7 +52,8 @@ impl Session {
         Self::start_with(&setting, program, args)
     }
 
-    /// `program` with `args` in `setting`.
+    /// `program` with `args` in `setting`, without the inherited colour settings: the setting's
+    /// TERM alone decides colour.
     pub(crate) fn start_with(setting: &Setting<'_>, program: &str, args: &[&str]) -> Self {
         let pair = native_pty_system()
             .openpty(PtySize {
@@ -58,12 +66,24 @@ impl Session {
         let mut command = CommandBuilder::new(program);
         command.args(args);
         command.env("TERM", setting.term);
+        for name in colour::SETTINGS {
+            command.env_remove(name);
+        }
         command.cwd(setting.folder);
+        let mut reader = pair.master.try_clone_reader().expect("a reader");
+        let keys = pair.master.take_writer().expect("a writer");
         let child = pair.slave.spawn_command(command).expect("the program runs");
         drop(pair.slave);
-        let mut reader = pair.master.try_clone_reader().expect("a reader");
         let seen = Arc::new(Mutex::new(Vec::new()));
         let filled = Arc::clone(&seen);
+        // Own the child before thread creation, so unwinding also terminates it.
+        let session = Self {
+            child,
+            keys,
+            seen,
+            from: 0,
+            terminal: pair.master,
+        };
         thread::spawn(move || {
             let mut chunk = [0; 4096];
             while let Ok(count) = reader.read(&mut chunk) {
@@ -74,13 +94,7 @@ impl Session {
                 seen.extend_from_slice(&chunk[..count]);
             }
         });
-        Self {
-            child,
-            keys: pair.master.take_writer().expect("a writer"),
-            seen,
-            from: 0,
-            terminal: pair.master,
-        }
+        session
     }
 
     pub(crate) fn written(&self) -> String {
@@ -112,6 +126,14 @@ impl Session {
                 pixel_height: 0,
             })
             .expect("the new size");
+    }
+
+    /// Whether the child has entered noncanonical input on the actual terminal.
+    #[cfg(unix)]
+    pub(crate) fn is_raw(&self) -> bool {
+        self.terminal
+            .get_termios()
+            .is_some_and(|mode| mode.local_flags.bits() & libc::ICANON == 0)
     }
 
     /// The process of the program.
@@ -151,4 +173,34 @@ impl Session {
             thread::sleep(Duration::from_millis(10));
         }
     }
+}
+
+impl Drop for Session {
+    fn drop(&mut self) {
+        match self.child.try_wait() {
+            Ok(Some(_)) => return,
+            Ok(None) => {}
+            Err(error) => cleanup_failure(&error),
+        }
+        // Drop also runs during a failed assertion: never panic or print the
+        // captured terminal contents here. wait reaps even an exit/kill race.
+        if let Err(error) = self.child.kill() {
+            cleanup_failure(&error);
+        }
+        if let Err(error) = self.child.wait() {
+            cleanup_failure(&error);
+        }
+    }
+}
+
+#[expect(
+    clippy::disallowed_methods,
+    reason = "best-effort public cleanup diagnostic only; no fixture or caller text is written"
+)]
+pub(crate) fn cleanup_failure(error: &std::io::Error) {
+    // Drop cannot propagate a logging error, and must not panic while unwinding.
+    let _reported = writeln!(
+        std::io::stderr().lock(),
+        "PTY test child cleanup failed: {error}"
+    );
 }

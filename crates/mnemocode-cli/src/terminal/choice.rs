@@ -1,7 +1,7 @@
-//! A list chosen with the arrow keys or a digit (MnemoCode TS 0.1.0's `cli/terminal-choice.ts`,
-//! CAP-CLI-QUESTIONS), drawn on standard error: the question stands apart, wrapped, with a warning
-//! above it and its explanation below; once it is answered, the question and its list are replaced
-//! by one line, its label and the chosen entry.
+//! A list chosen with the arrow keys or an entry's key, a digit or a letter (MnemoCode TS 0.1.0's
+//! `cli/terminal-choice.ts`, CAP-CLI-QUESTIONS), drawn on standard error: the question stands
+//! apart, wrapped, with a warning above it and its explanation below; once it is answered, the
+//! question and its list are replaced by one line, its label and the chosen entry.
 
 use std::fmt::Display;
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -31,13 +31,13 @@ const DIGIT_PLACES: usize = 9;
 const TEXT_INDENT: &str = "  ";
 const LINK_INDENT: &str = "    ";
 
-/// The digit that chooses an entry.
+/// The key that chooses an entry at once.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Digit {
-    /// Its place in the list, the first nine.
+pub(crate) enum Shortcut {
+    /// The digit of its place in the list, the first nine.
     Place,
-    /// A digit of its own, or none.
-    Own(Option<u8>),
+    /// A key of its own, a digit or a lower-case letter, or none.
+    Own(Option<char>),
 }
 
 /// One entry of a list.
@@ -48,8 +48,10 @@ pub(crate) struct Choice<T> {
     pub(crate) note: Option<String>,
     /// A grey second line under the note, such as an example.
     pub(crate) example: Option<String>,
-    pub(crate) digit: Digit,
+    pub(crate) shortcut: Shortcut,
     pub(crate) value: T,
+    /// Visible but skipped by navigation and shortcuts when false.
+    pub(crate) enabled: bool,
 }
 
 impl<T> Choice<T> {
@@ -59,7 +61,8 @@ impl<T> Choice<T> {
             label: label.to_owned(),
             note: None,
             example: None,
-            digit: Digit::Place,
+            shortcut: Shortcut::Place,
+            enabled: true,
             value,
         }
     }
@@ -70,17 +73,18 @@ impl<T> Choice<T> {
             label: label.to_owned(),
             note: Some(note.to_owned()),
             example: None,
-            digit: Digit::Place,
+            shortcut: Shortcut::Place,
+            enabled: true,
             value,
         }
     }
 
-    /// The digit that chooses it at `place`.
-    const fn digit_at(&self, place: usize) -> Option<u8> {
-        match self.digit {
-            Digit::Place if place < DIGIT_PLACES => Some(place as u8 + 1),
-            Digit::Place => None,
-            Digit::Own(digit) => digit,
+    /// The key that chooses it at `place`.
+    fn shortcut_at(&self, place: usize) -> Option<char> {
+        match self.shortcut {
+            Shortcut::Place if place < DIGIT_PLACES => char::from_digit(place as u32 + 1, 10),
+            Shortcut::Place => None,
+            Shortcut::Own(key) => key,
         }
     }
 }
@@ -167,17 +171,19 @@ fn list_lines<T>(choices: &[Choice<T>], selected: usize) -> Vec<String> {
         .iter()
         .enumerate()
         .flat_map(|(index, choice)| {
-            let digit = choice
-                .digit_at(index)
-                .map_or_else(|| " ".to_owned(), |digit| digit.to_string());
-            let number = paint(channel, style::MUTED, &digit);
+            let key = choice
+                .shortcut_at(index)
+                .map_or_else(|| " ".to_owned(), |key| key.to_string());
+            let number = paint(channel, style::MUTED, &key);
             let chosen = index == selected;
             let marker = if chosen {
                 paint(channel, style::ACCENT, "›")
             } else {
                 " ".to_owned()
             };
-            let label = if chosen {
+            let label = if !choice.enabled {
+                paint(channel, style::MUTED, &choice.label)
+            } else if chosen {
                 paint(channel, style::STRONG, &choice.label)
             } else {
                 choice.label.clone()
@@ -204,25 +210,93 @@ fn list_lines<T>(choices: &[Choice<T>], selected: usize) -> Vec<String> {
 
 /// The digits of a list in words: "1 to 9", or "7, 8, 9 or 0" where the entries that ask for a
 /// secret are left out.
-fn digits_in_words(digits: &[u8]) -> String {
+fn digits_in_words(digits: &[u32]) -> String {
     let lowest = digits.iter().copied().min().unwrap_or(0);
     let highest = digits.iter().copied().max().unwrap_or(0);
-    if digits.len() == usize::from(highest - lowest) + 1 {
+    if digits.len() as u32 == highest - lowest + 1 {
         format!("{lowest} to {highest}")
     } else {
         list_in_words(digits, "or")
     }
 }
 
-/// The keys of a list.
-fn key_hint<T>(choices: &[Choice<T>], quit: &str) -> String {
-    let digits: Vec<u8> = choices
+/// The keys that choose entries at once, in words: "0 to 9 or s"; the digits as a range where
+/// they run without a gap.
+fn shortcuts_in_words(keys: &[char]) -> String {
+    let digits: Vec<u32> = keys.iter().filter_map(|key| key.to_digit(10)).collect();
+    let mut parts: Vec<String> = Vec::new();
+    if !digits.is_empty() {
+        parts.push(digits_in_words(&digits));
+    }
+    parts.extend(
+        keys.iter()
+            .filter(|key| !key.is_ascii_digit())
+            .map(char::to_string),
+    );
+    list_in_words(&parts, "or")
+}
+
+fn choice_shortcuts<T>(choices: &[Choice<T>]) -> Vec<char> {
+    choices
         .iter()
         .enumerate()
-        .filter_map(|(place, choice)| choice.digit_at(place))
-        .collect();
-    let range = if digits.len() > 1 {
-        format!(" · {} at once", digits_in_words(&digits))
+        .filter(|(_, choice)| choice.enabled)
+        .filter_map(|(place, choice)| choice.shortcut_at(place))
+        .collect()
+}
+
+fn shortcut_place<T>(choices: &[Choice<T>], key: Key) -> Option<usize> {
+    let pressed = match key {
+        Key::Digit(digit) => char::from(b'0' + digit),
+        Key::Letter(letter) => char::from(letter),
+        _ => return None,
+    };
+    (0..choices.len())
+        .find(|&place| choices[place].enabled && choices[place].shortcut_at(place) == Some(pressed))
+}
+
+/// Moves across enabled entries only; the current enabled entry is the fallback.
+fn next_choice<T>(choices: &[Choice<T>], selected: usize, key: Key) -> usize {
+    let count = choices.len();
+    (1..=count)
+        .map(|step| {
+            if key == Key::Up {
+                (selected + count - step) % count
+            } else {
+                (selected + step) % count
+            }
+        })
+        .find(|&index| choices[index].enabled)
+        .unwrap_or(selected)
+}
+
+fn back_from_list<T>(drawn: &[String], above: usize) -> Chosen<T> {
+    redraw_from(rows_of(drawn) + above);
+    question_ended();
+    Chosen::Back
+}
+
+fn draw_choices<T>(
+    choices: &[Choice<T>],
+    selected: usize,
+    explanation: &[String],
+    hint: &str,
+    above: impl FnOnce() -> usize,
+) -> Vec<String> {
+    let mut lines = explanation.to_vec();
+    lines.extend(list_lines(choices, selected));
+    lines.push(String::new());
+    lines.push(hint.to_owned());
+    error_raw(&format!("{}\n", lines.join("\n")));
+    reach_answers(above() + rows_of(&lines) + 1);
+    lines
+}
+
+/// The keys of a list.
+fn key_hint<T>(choices: &[Choice<T>], quit: &str) -> String {
+    let keys = choice_shortcuts(choices);
+    let range = if keys.len() > 1 {
+        format!(" · {} at once", shortcuts_in_words(&keys))
     } else {
         String::new()
     };
@@ -412,43 +486,33 @@ pub(crate) fn choose_from<T: Clone>(
         error_line(line);
     }
     error_line(&question);
-    let mut selected = initial;
+    let Some(mut selected) = choices
+        .get(initial)
+        .filter(|choice| choice.enabled)
+        .map(|_| initial)
+        .or_else(|| choices.iter().position(|choice| choice.enabled))
+    else {
+        return Ok(Chosen::Back);
+    };
     // Counted at the width of each drawing: a resize moves the rows.
     let above = || rows_of(&warned) + question_rows(&question);
-    let draw = |selected: usize| {
-        let mut lines = explanation.clone();
-        lines.extend(list_lines(choices, selected));
-        lines.push(String::new());
-        lines.push(hint.clone());
-        error_raw(&format!("{}\n", lines.join("\n")));
-        reach_answers(above() + rows_of(&lines) + 1);
-        lines
-    };
+    let draw = |selected| draw_choices(choices, selected, &explanation, &hint, above);
     let mut drawn = draw(selected);
     loop {
+        // deliberate copy: Enter selects here but confirms a checklist; only the dispatch
+        // skeleton remains separate. Key decoding, drawing and leaving behavior are shared.
         let index = match read_key(&mut keys)? {
             Key::Cancel => return Ok(Chosen::Cancelled),
-            Key::Back => {
-                redraw_from(rows_of(&drawn) + above());
-                question_ended();
-                return Ok(Chosen::Back);
-            }
+            Key::Back => return Ok(back_from_list(&drawn, above())),
             Key::Enter => selected,
-            Key::Digit(digit) => {
-                let chosen =
-                    (0..choices.len()).find(|&place| choices[place].digit_at(place) == Some(digit));
-                let Some(chosen) = chosen else {
+            key @ (Key::Digit(_) | Key::Letter(_)) => {
+                let Some(chosen) = shortcut_place(choices, key) else {
                     continue;
                 };
                 chosen
             }
             key @ (Key::Up | Key::Down) => {
-                let count = choices.len();
-                selected = if key == Key::Up {
-                    (selected + count - 1) % count
-                } else {
-                    (selected + 1) % count
-                };
+                selected = next_choice(choices, selected, key);
                 redraw_from(rows_of(&drawn));
                 drawn = draw(selected);
                 continue;
@@ -461,6 +525,108 @@ pub(crate) fn choose_from<T: Clone>(
         question_ended();
         return Ok(Chosen::One(choices[index].value.clone()));
     }
+}
+
+/// The keys of a checklist.
+fn checklist_hint<T>(choices: &[Choice<T>], quit: &str) -> String {
+    let keys = choice_shortcuts(choices);
+    let tick = if keys.is_empty() {
+        String::new()
+    } else {
+        format!(" or {}", shortcuts_in_words(&keys))
+    };
+    format!("↑ ↓ choose · Space{tick} ticks · Enter confirms · Esc {quit}")
+}
+
+/// `choices` as a checklist shows them: "[x]" before each ticked label, "[ ]" before the others.
+fn checklist_entries<T: Clone>(choices: &[Choice<T>], ticked: &[bool]) -> Vec<Choice<T>> {
+    choices
+        .iter()
+        .zip(ticked)
+        .map(|(choice, &on)| Choice {
+            label: format!("{} {}", if on { "[x]" } else { "[ ]" }, choice.label),
+            ..choice.clone()
+        })
+        .collect()
+}
+
+/// Asks `asked` as a checklist: the arrow keys move, Space or an entry's key ticks or clears
+/// it, and Enter confirms the ticked entries, none being an answer too. `ticked` holds the
+/// entries ticked at first.
+pub(crate) fn choose_many<T: Clone>(
+    asked: &ListQuestion<'_>,
+    choices: &[Choice<T>],
+    ticked: &[bool],
+) -> Result<Chosen<Vec<T>>, Interrupted> {
+    let mut ticked = ticked.to_vec();
+    ticked.resize(choices.len(), false);
+    let hint = paint(
+        Channel::Error,
+        style::MUTED,
+        &checklist_hint(choices, asked.quit),
+    );
+    let explanation = explanation_lines(asked.explanation);
+    let question = shown_question(asked.question);
+    if !before_question(list_rows(asked, choices))? {
+        return Ok(Chosen::Cancelled);
+    }
+    step_begin();
+    let mut keys = Keys::open();
+    error_raw("\n");
+    error_line(&question);
+    let above = || question_rows(&question);
+    let draw = |selected, ticked: &[bool]| {
+        draw_choices(
+            &checklist_entries(choices, ticked),
+            selected,
+            &explanation,
+            &hint,
+            above,
+        )
+    };
+    let Some(mut selected) = choices.iter().position(|choice| choice.enabled) else {
+        return Ok(Chosen::Back);
+    };
+    let mut drawn = draw(selected, &ticked);
+    loop {
+        match read_key(&mut keys)? {
+            Key::Cancel => return Ok(Chosen::Cancelled),
+            Key::Back => return Ok(back_from_list(&drawn, above())),
+            Key::Enter => break,
+            Key::Space => ticked[selected] = !ticked[selected],
+            key @ (Key::Digit(_) | Key::Letter(_)) => {
+                let Some(place) = shortcut_place(choices, key) else {
+                    continue;
+                };
+                selected = place;
+                ticked[place] = !ticked[place];
+            }
+            key @ (Key::Up | Key::Down) => selected = next_choice(choices, selected, key),
+            _ => continue,
+        }
+        redraw_from(rows_of(&drawn));
+        drawn = draw(selected, &ticked);
+    }
+    redraw_from(rows_of(&drawn) + above());
+    let chosen: Vec<&Choice<T>> = choices
+        .iter()
+        .zip(&ticked)
+        .filter_map(|(choice, &on)| (on && choice.enabled).then_some(choice))
+        .collect();
+    let answer = if chosen.is_empty() {
+        "none".to_owned()
+    } else {
+        let labels: Vec<&str> = chosen.iter().map(|choice| choice.label.as_str()).collect();
+        list_in_words(&labels, "and")
+    };
+    write_answer(asked.label, &answer);
+    question_ended();
+    Ok(Chosen::One(
+        chosen
+            .into_iter()
+            .map(|choice| choice.value.clone())
+            .collect(),
+    ))
 }
 
 /// The line after an empty answer: what to type, and how the question is left instead.
@@ -664,5 +830,60 @@ fn wait_after(message: &str, mut keys: Keys) -> Result<Chosen<()>, Interrupted> 
             Key::Cancel => return Ok(Chosen::Cancelled),
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_checklist_marks_ticked_entries_and_names_its_keys() {
+        let choices = [
+            Choice::new("A record file", 1),
+            Choice::new("A QR code image", 2),
+        ];
+        let shown = checklist_entries(&choices, &[false, true]);
+        assert_eq!(shown[0].label, "[ ] A record file");
+        assert_eq!(shown[1].label, "[x] A QR code image");
+        assert_eq!(shown[1].value, 2);
+        assert_eq!(
+            checklist_hint(&choices, "goes back"),
+            "↑ ↓ choose · Space or 1 to 2 ticks · Enter confirms · Esc goes back"
+        );
+    }
+
+    #[test]
+    fn disabled_entries_keep_their_numbers_but_cannot_be_chosen() {
+        let choices = [
+            Choice {
+                enabled: false,
+                ..Choice::new("minimum", 1)
+            },
+            Choice::new("low", 2),
+            Choice {
+                enabled: false,
+                ..Choice::new("balanced", 3)
+            },
+            Choice::new("high", 4),
+        ];
+        assert_eq!(shortcut_place(&choices, Key::Digit(1)), None);
+        assert_eq!(shortcut_place(&choices, Key::Digit(3)), None);
+        assert_eq!(shortcut_place(&choices, Key::Digit(4)), Some(3));
+        assert_eq!(next_choice(&choices, 1, Key::Down), 3);
+        assert_eq!(next_choice(&choices, 3, Key::Down), 1);
+        assert_eq!(next_choice(&choices, 1, Key::Up), 3);
+        assert_eq!(next_choice(&choices, 3, Key::Up), 1);
+        assert_eq!(choice_shortcuts(&choices), vec!['2', '4']);
+        let shown = list_lines(&choices, 1).join("\n");
+        assert!(shown.contains("minimum"));
+        assert!(shown.contains("balanced"));
+    }
+
+    #[test]
+    fn shortcut_keys_join_a_digit_range_and_letters_in_words() {
+        let menu = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 's', 'q'];
+        assert_eq!(shortcuts_in_words(&menu), "0 to 9, s or q");
+        assert_eq!(shortcuts_in_words(&['1', '2', '3']), "1 to 3");
     }
 }

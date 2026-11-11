@@ -571,10 +571,11 @@ fn asked_new_backup(refusal: Option<&str>) -> Result<(PreparedEncode, Needs), St
             break encoding;
         }
     };
+    let (encoding, dates) = encoding;
     let mut fresh = args::parse_arguments(&encoding[1..])?;
     let needs = preflight(&mut fresh)?;
     // Only answers that are taken name files that will be saved.
-    let prepared = prepare_encode(&fresh)?;
+    let prepared = prepare_encode(&fresh)?.with_dates(Some(dates));
     warn_of_cloud_copies(&fresh);
     Ok((prepared, needs))
 }

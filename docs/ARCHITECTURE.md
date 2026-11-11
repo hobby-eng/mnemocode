@@ -4,14 +4,14 @@ This is the Rust implementation of MnemoCode. The command line and WebAssembly b
 
 ## Crates and responsibilities
 
-| Crate                         | Responsibility                                                                                                      |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `crates/mnemocode`            | BIP39, representations, Seedshift, records, wallet checks, SSKR, recovery, candidate lists and QR codes             |
-| `crates/mnemocode-cards`      | Card settings, designs, drawing scenes, PDFs, PNG/JPEG images and heir sheets                                       |
-| `crates/mnemocode-embroidery` | SeedStitch: pictures turned into DMC cross-stitch patterns whose legend holds a masked phrase, and their PDF charts |
-| `crates/mnemocode-cli`        | Options, menu, terminal questions, files, operating-system protections and output                                   |
-| `crates/mnemocode-wasm`       | Feature-selected browser classes and conversion between JavaScript values and library types                         |
-| `xtask`                       | Repository gates, WebAssembly profiles, packaging, reproducible builds and release signing                          |
+| Crate                         | Responsibility                                                                                                                                                          |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `crates/mnemocode`            | BIP39, representations, Seedshift, records, wallet checks, SSKR, recovery, candidate lists and QR codes                                                                 |
+| `crates/mnemocode-cards`      | Card settings, designs, drawing scenes, PDFs, PNG/JPEG images and heir sheets                                                                                           |
+| `crates/mnemocode-embroidery` | SeedStitch: pictures turned into DMC cross-stitch patterns whose legend holds a phrase, masked with Seedshift unless the person chooses otherwise, and their PDF charts |
+| `crates/mnemocode-cli`        | Options, menu, terminal questions, files, operating-system protections and output                                                                                       |
+| `crates/mnemocode-wasm`       | Feature-selected browser classes and conversion between JavaScript values and library types                                                                             |
+| `xtask`                       | Repository gates, WebAssembly profiles, packaging, reproducible builds and release signing                                                                              |
 
 The cards crate depends on the library, and the embroidery crate on both; the library never depends on them or on either front end. `module-map.json` declares permitted dependencies, unsafe-code locations and OS access. `cargo xtask code-rules` checks the map against the source. The [design's module map](design/architect/ARCHITECTURE.md#3-module-map) explains the dependency direction.
 

@@ -706,7 +706,7 @@ fn starts_word(text: &[u8], at: usize) -> bool {
 
 /// Whether a host name with a domain ending starts at `at`, such as example.org.
 fn host_at(text: &[u8], at: usize) -> bool {
-    let label = |byte: u8| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-';
+    let label = |byte: u8| byte.is_ascii_alphabetic() || byte.is_ascii_digit() || byte == b'-';
     let word = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'_';
     let mut place = at;
     loop {
@@ -722,7 +722,7 @@ fn host_at(text: &[u8], at: usize) -> bool {
         }
         let ending = place + 1;
         let mut end = ending;
-        while end < text.len() && text[end].is_ascii_lowercase() {
+        while end < text.len() && text[end].is_ascii_alphabetic() {
             end += 1;
         }
         if end - ending >= 2 && text.get(end).is_none_or(|byte| !word(*byte)) {
@@ -742,9 +742,11 @@ fn holds_web_address(text: &str) -> bool {
         }
         let linked = [&b"http://"[..], b"https://", b"www."].iter().any(|start| {
             bytes[at..]
-                .strip_prefix(*start)
-                .and_then(<[u8]>::first)
-                .is_some_and(|next| !next.is_ascii_whitespace() && !matches!(next, b',' | b'"'))
+                .get(..start.len())
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case(start))
+                && bytes
+                    .get(at + start.len())
+                    .is_some_and(|next| !next.is_ascii_whitespace() && !matches!(next, b',' | b'"'))
         });
         linked || host_at(bytes, at)
     })

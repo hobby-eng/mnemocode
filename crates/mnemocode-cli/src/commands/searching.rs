@@ -7,8 +7,7 @@ use std::fmt;
 use mnemocode::search::{Progress, Search, Step};
 
 use crate::gate::Stop;
-use crate::os;
-use crate::terminal::{Choice, Chosen, Keys, ListQuestion, choose, key, seconds_of};
+use crate::terminal::{Choice, Chosen, Keys, ListQuestion, choose, seconds_of};
 
 /// How long a step takes before the keys and the signals are looked at, so that a person stops a
 /// search at once, whatever one candidate costs; the work of a step follows it.
@@ -120,16 +119,8 @@ where
         if matches!(step, Step::Done(_)) {
             return Ok(());
         }
-        if let Some(signal) = os::pending_signal() {
-            return Err(Stop::Signal(signal));
-        }
-        keys.suspend_if_asked();
-        while keys.is_raw() && keys.more_within(0) {
-            match keys.next()? {
-                Some(key::CTRL_C | key::CTRL_BACKSLASH) => return Err(Stop::Cancelled),
-                Some(key::CTRL_Z) => keys.suspend(),
-                _ => {}
-            }
+        if keys.cancelled(false)? {
+            return Err(Stop::Cancelled);
         }
     }
 }

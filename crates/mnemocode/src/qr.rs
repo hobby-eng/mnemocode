@@ -8,6 +8,7 @@
 //! copies are not reachable here.
 
 pub mod admission;
+pub mod hidden;
 mod segments;
 
 use std::fmt;
@@ -46,6 +47,10 @@ pub enum QrError {
     VerificationFailed,
     /// An image of no text.
     Empty,
+    /// Both layers do not fit together in a QR at level M.
+    TooLarge,
+    /// No intact MnemoCode hidden record was found.
+    NoHiddenRecord,
 }
 
 impl fmt::Display for QrError {
@@ -55,6 +60,8 @@ impl fmt::Display for QrError {
             Self::InvalidPng => f.write_str("The QR input is not a valid PNG file."),
             Self::NoCode => f.write_str("No readable QR code was found in the PNG file."),
             Self::NotText(error) => error.fmt(f),
+            Self::TooLarge => f.write_str("The visible text and hidden record do not fit in one QR code."),
+            Self::NoHiddenRecord => f.write_str("No valid MnemoCode hidden record was found in the QR image."),
             Self::Empty => f.write_str("QR payload must not be empty."),
             Self::VerificationFailed => f.write_str(
                 "QR verification failed: the image is unreadable or does not match the backup. It was not saved. Try creating it again.",
@@ -73,6 +80,8 @@ impl Refusal for QrError {
             Self::NoCode => "cli.qr-input.no-readable-qr-code-was-found-png-file",
             Self::NotText(error) => error.code(),
             Self::VerificationFailed => "export.qr-image.qr-verification-failed",
+            Self::TooLarge => "export.qr-image.capacity",
+            Self::NoHiddenRecord => "export.qr-image.no-hidden-record",
             Self::Empty => "export.qr-image.qr-payload-not-empty",
         }
     }
@@ -85,10 +94,23 @@ impl From<PngError> for QrError {
 }
 
 /// The modules of a QR symbol, without its quiet zone.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Matrix {
     size: usize,
     dark: Vec<bool>,
+}
+
+impl fmt::Debug for Matrix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Matrix")
+            .field("size", &self.size)
+            .finish_non_exhaustive()
+    }
+}
+impl Drop for Matrix {
+    fn drop(&mut self) {
+        zeroize::Zeroize::zeroize(&mut self.dark);
+    }
 }
 
 impl Matrix {
@@ -109,6 +131,15 @@ pub fn matrix(payload: &str) -> Result<Matrix, QrError> {
     // Version 40 at level M holds 2331 bytes, far above any backup or share; a payload past it
     // gives no matrix to check, and fails as one that does not read back would.
     let code = segments::code_of(payload).ok_or(QrError::VerificationFailed)?;
+    let matrix = matrix_from_code(&code)?;
+    let side = (matrix.size + 2 * QR_QUIET_MODULES) * CHECK_MODULE_PIXELS;
+    let mut pixels = SecretBytes::zeroed("a QR raster", side * side);
+    draw(&matrix, &mut pixels, side, CHECK_MODULE_PIXELS as f64);
+    check_reads_as(read_pixels(&pixels, side, side), payload)?;
+    Ok(matrix)
+}
+
+fn matrix_from_code(code: &qrcodegen::QrCode) -> Result<Matrix, QrError> {
     let size = usize::try_from(code.size()).map_err(|_| QrError::VerificationFailed)?;
     let mut dark = Vec::with_capacity(size * size);
     for row in 0..code.size() {
@@ -116,12 +147,7 @@ pub fn matrix(payload: &str) -> Result<Matrix, QrError> {
             dark.push(code.get_module(column, row));
         }
     }
-    let matrix = Matrix { size, dark };
-    let side = (size + 2 * QR_QUIET_MODULES) * CHECK_MODULE_PIXELS;
-    let mut pixels = SecretBytes::zeroed("a QR raster", side * side);
-    draw(&matrix, &mut pixels, side, CHECK_MODULE_PIXELS as f64);
-    check_reads_as(read_pixels(&pixels, side, side), payload)?;
-    Ok(matrix)
+    Ok(Matrix { size, dark })
 }
 
 /// `matrix` drawn on `pixels`, a square of grey levels `side` wide, with its quiet zone, each module
@@ -160,11 +186,17 @@ pub fn png(payload: &str) -> Result<SecretBytes, QrError> {
         return Err(QrError::Empty);
     }
     let matrix = matrix(payload)?;
+    let image = png_matrix(&matrix)?;
+    check_reads_as(read_png(&image), payload)?;
+    Ok(image)
+}
+
+fn png_matrix(matrix: &Matrix) -> Result<SecretBytes, QrError> {
     let symbol = matrix.size + 2 * QR_QUIET_MODULES;
     let scale = QR_IMAGE_PIXELS as f64 / symbol as f64;
     let side = (symbol as f64 * scale) as usize;
     let mut pixels = SecretBytes::zeroed("a QR image's pixels", side * side);
-    draw(&matrix, &mut pixels, side, scale);
+    draw(matrix, &mut pixels, side, scale);
     let mut file = Vec::new();
     let width = u32::try_from(side).map_err(|_| QrError::VerificationFailed)?;
     let mut encoder = png::Encoder::new(&mut file, width, width);
@@ -177,7 +209,6 @@ pub fn png(payload: &str) -> Result<SecretBytes, QrError> {
     let image = SecretBytes::copy_of("a QR image", &file);
     zeroize::Zeroize::zeroize(&mut file);
     written.map_err(|_| QrError::VerificationFailed)?;
-    check_reads_as(read_png(&image), payload)?;
     Ok(image)
 }
 
@@ -185,6 +216,12 @@ pub fn png(payload: &str) -> Result<SecretBytes, QrError> {
 /// admission counted, decoded, and read with rqrr, also inverted. Refused: what the admission
 /// refuses, a file that does not decode as admitted, no code found, and bytes of no UTF-8 text.
 pub fn read_png(bytes: &[u8]) -> Result<SecretText, QrError> {
+    validate_png(bytes)?;
+    let (luma, width, height) = grey_pixels(bytes)?;
+    read_pixels(&luma, width, height)
+}
+
+fn validate_png(bytes: &[u8]) -> Result<(), QrError> {
     let admitted = admit(bytes)?;
     // png bounds its own inflation only by its allocation limit: the exact budget comes first.
     let compressed = admitted.compressed_data();
@@ -197,8 +234,7 @@ pub fn read_png(bytes: &[u8]) -> Result<SecretText, QrError> {
     admitted
         .check_inflated_size(inflated.len())
         .map_err(|_| QrError::InvalidPng)?;
-    let (luma, width, height) = grey_pixels(bytes)?;
-    read_pixels(&luma, width, height)
+    Ok(())
 }
 
 /// The grey level of each pixel of the PNG `bytes`, its width and its height: expanded to 8 bits,

@@ -8,8 +8,17 @@
 //!   of its count from 1000 stitches, the last digit from 100, nothing below.
 //! - Read as one number, the first row's symbol lowest, its remainder below 2 to the power of
 //!   `8 * L + 32` is the entropy of a phrase (L of 16, 20, 24, 28 or 32 bytes) and a check of four
-//!   bytes: the first four of SHA-256 of `MnemoCode embroidery 1`, the byte L and the entropy. What
-//!   lies above it is chosen freely by the writer.
+//!   bytes: the first four of SHA-256 of a domain, the byte L and the entropy. The domain says what
+//!   the phrase is ([`Masking`]): `MnemoCode embroidery 1` for one masked with Seedshift dates,
+//!   `MnemoCode embroidery 1 unmasked` for the phrase itself. What lies above it is chosen freely
+//!   by the writer.
+//!
+//! Format 2 adds the order of the rows (the owner's choice of 2026-11-05, for patterns too small
+//! or too plain for format 1): each row also names its DMC thread, typed as `symbol:DMC:stitches`,
+//! and the place of its thread among the rows' threads sorted as [`dmc::Thread::order`] sorts them
+//! is one more digit of the number, below the row's symbol. Its check's domains end in `2` where
+//! format 1's end in `1`, so the two never read as each other. MnemoCode writes format 1 wherever
+//! it holds the phrase.
 //!
 //! A reading whose check fails is tried again with every change of one row: another symbol, one
 //! digit of its count or two neighbouring digits swapped, its count on the other side of a limit,
@@ -26,17 +35,42 @@ use mnemocode::secret::{
     CapacityExceeded, SecretBytes, SecretText, TextFiller, equal_bytes, redacted,
 };
 use sha2::{Digest, Sha256};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
-use number::Number;
+use mnemocode::random::{Random, RandomError};
+
+use crate::dmc::{self, THREADS};
+pub(crate) use number::Number;
 pub use symbols::{Glyph, SYMBOLS, Shape, Symbol};
 
 /// The entropy lengths of phrases of 12, 15, 18, 21 and 24 words, in bytes.
 pub const ENTROPY_LENGTHS: [usize; 5] = [16, 20, 24, 28, 32];
 /// The bytes of the check.
 const CHECK_BYTES: usize = 4;
-/// What the check's hash starts with.
-const CHECK_DOMAIN: &[u8] = b"MnemoCode embroidery 1";
+/// What a legend's phrase is, which the domain its check's hash starts with says, so that a reader
+/// learns from the check alone whether to ask for dates.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Masking {
+    /// Masked with MnemoCode Seedshift dates: Decode asks for them.
+    Seedshift,
+    /// The phrase itself, for one protected some other way: anyone who knows the format reads it.
+    Unmasked,
+}
+
+impl Masking {
+    /// What the check's hash starts with, in format 2 where the rows' order counts (`ordered`).
+    const fn domain(self, ordered: bool) -> &'static [u8] {
+        match (self, ordered) {
+            (Self::Seedshift, false) => b"MnemoCode embroidery 1",
+            (Self::Unmasked, false) => b"MnemoCode embroidery 1 unmasked",
+            (Self::Seedshift, true) => b"MnemoCode embroidery 2",
+            (Self::Unmasked, true) => b"MnemoCode embroidery 2 unmasked",
+        }
+    }
+}
+
+/// Every masking a reader tries.
+const MASKINGS: [Masking; 2] = [Masking::Seedshift, Masking::Unmasked];
 /// The most rows a legend has: one for each symbol.
 pub const MAX_ROWS: usize = SYMBOLS.len();
 /// The most stitches a row may count.
@@ -51,6 +85,12 @@ pub const ONE_DIGIT_FROM: u32 = 100;
 pub const EXAMPLE: &str = "28:1725 25:2163 57:3275 34:3917 9:480 54:1505 17:5063 63:372 46:328 \
     7:2818 62:1114 53:1997 37:2496 40:1945 3:882 58:7130 41:180 59:336 22:1634 36:778 64:1147 \
     10:3804 24:1214 69:479 56:931 30:2066 23:3224 29:797";
+/// The format 2 legend of docs/SEEDSTITCH.md, "Examples": 30 rows that name their threads and hold
+/// the public phrase "abandon … art" masked with the date 01-01-2000. The full self-test reads it.
+pub const EXAMPLE_ORDERED: &str = "15:407:38 23:703:169 70:471:337 20:898:65 16:936:36 \
+    52:3772:73 48:368:113 10:523:87 12:3825:16 67:742:31 41:3787:25 57:469:67 17:3371:72 59:317:49 \
+    61:829:27 30:535:53 3:905:72 2:03:315 26:07:160 21:610:136 64:3021:58 58:3031:76 66:3072:433 \
+    44:06:291 9:3032:163 25:642:55 63:3864:60 19:3013:93 45:310:325 29:414:105";
 
 /// Why typed rows of a legend cannot be read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,16 +105,18 @@ pub enum LegendError {
     UnknownSymbol(usize),
     /// Row `n` counts no stitch, or more than [`MAX_STITCHES`].
     CountOutOfRange(usize),
+    /// Row `n` names no DMC thread.
+    UnknownThread(usize),
 }
 
 impl fmt::Display for LegendError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Empty => f.write_str("Type the rows of the legend: each as the symbol's number, a colon and the stitches."),
+            Self::Empty => f.write_str("Type the rows of the legend: each as the symbol's number, a colon and the stitches, with the DMC number between them where the legend gives it."),
             Self::TooManyRows => write!(f, "A legend has at most {MAX_ROWS} rows."),
             Self::NotARow(n) => write!(
                 f,
-                "Row {n} is not the symbol's number, a colon and the stitches, such as 12:3401."
+                "Row {n} is not the symbol's number, a colon and the stitches, such as 12:3401, or with the DMC number between them, such as 12:310:3401, as every row is."
             ),
             Self::UnknownSymbol(n) => write!(
                 f,
@@ -85,6 +127,7 @@ impl fmt::Display for LegendError {
                 f,
                 "Row {n} counts no stitch, or more than {MAX_STITCHES}."
             ),
+            Self::UnknownThread(n) => write!(f, "Row {n} names no DMC thread."),
         }
     }
 }
@@ -99,6 +142,7 @@ impl Refusal for LegendError {
             Self::NotARow(_) => "embroidery.legend.not-a-row",
             Self::UnknownSymbol(_) => "embroidery.legend.unknown-symbol",
             Self::CountOutOfRange(_) => "embroidery.legend.count-out-of-range",
+            Self::UnknownThread(_) => "embroidery.legend.unknown-thread",
         }
     }
 }
@@ -110,6 +154,16 @@ pub struct Row {
     /// The symbol's number, from 1.
     symbol: usize,
     stitches: u32,
+    /// The place in [`THREADS`] of the row's thread, in format 2; none in format 1.
+    thread: Option<usize>,
+}
+
+impl Zeroize for Row {
+    fn zeroize(&mut self) {
+        self.symbol.zeroize();
+        self.stitches.zeroize();
+        self.thread.zeroize();
+    }
 }
 
 impl fmt::Debug for Row {
@@ -131,7 +185,31 @@ impl Row {
         if !(1..=MAX_STITCHES).contains(&stitches) {
             return Err(LegendError::CountOutOfRange(place));
         }
-        Ok(Self { symbol, stitches })
+        Ok(Self {
+            symbol,
+            stitches,
+            thread: None,
+        })
+    }
+
+    /// The row as format 2 writes it, naming its thread, the place `thread` in [`THREADS`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Row::new`], and [`LegendError::UnknownThread`] for a place past [`THREADS`].
+    pub fn naming(
+        place: usize,
+        symbol: usize,
+        thread: usize,
+        stitches: u32,
+    ) -> Result<Self, LegendError> {
+        if thread >= THREADS.len() {
+            return Err(LegendError::UnknownThread(place));
+        }
+        Ok(Self {
+            thread: Some(thread),
+            ..Self::new(place, symbol, stitches)?
+        })
     }
 
     /// The symbol's number, from 1.
@@ -145,6 +223,12 @@ impl Row {
     pub const fn stitches(&self) -> u32 {
         self.stitches
     }
+
+    /// The thread it names, in format 2.
+    #[must_use]
+    pub fn thread(&self) -> Option<&'static dmc::Thread> {
+        self.thread.map(|place| &THREADS[place])
+    }
 }
 
 /// The words of a legend line: apart by spaces, commas, semicolons or line breaks.
@@ -154,33 +238,46 @@ fn line_words(text: &str) -> impl Iterator<Item = &str> {
 }
 
 /// Whether `text` is written as a legend line: at least one word, and every word digits, a colon and
-/// digits. Codes and records of MnemoCode's forms never are.
+/// digits, or with a DMC number of letters and digits and a colon between them. Codes and records
+/// of MnemoCode's forms never are.
 #[must_use]
 pub fn is_line(text: &str) -> bool {
     let digits = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+    let number = |part: &str| {
+        (1..=6).contains(&part.len()) && part.bytes().all(|b| b.is_ascii_alphanumeric())
+    };
     let mut words = line_words(text).peekable();
     words.peek().is_some()
         && words.all(|word| {
-            word.split_once(':')
-                .is_some_and(|(symbol, stitches)| digits(symbol) && digits(stitches))
+            let parts: Vec<&str> = word.split(':').collect();
+            match parts.as_slice() {
+                [symbol, stitches] => digits(symbol) && digits(stitches),
+                [symbol, thread, stitches] => digits(symbol) && number(thread) && digits(stitches),
+                _ => false,
+            }
         })
 }
 
 /// `rows` as the line a person types back: each row's symbol number, a colon and its stitches, a
-/// space between rows, as `28:1725 25:2163`.
+/// space between rows, as `28:1725 25:2163`; in format 2 with its DMC number and a colon between
+/// them, as `28:310:1725`.
 ///
 /// # Errors
 ///
 /// [`CapacityExceeded`] where a row is longer than a legend's rows can be, which none is.
 pub fn line(rows: &[Row]) -> Result<SecretText, CapacityExceeded> {
-    // Each row at most "70:1000000 ".
-    SecretText::build("a SeedStitch legend", rows.len() * 11, |filler| {
+    // Each row at most "70:B5200:1000000 ".
+    SecretText::build("a SeedStitch legend", rows.len() * 17, |filler| {
         for (place, row) in rows.iter().enumerate() {
             if place > 0 {
                 filler.push(' ')?;
             }
             push_number(filler, row.symbol as u32)?;
             filler.push(':')?;
+            if let Some(thread) = row.thread() {
+                filler.push_str(thread.number())?;
+                filler.push(':')?;
+            }
             push_number(filler, row.stitches)?;
         }
         Ok(())
@@ -208,13 +305,15 @@ fn push_number(filler: &mut TextFiller<'_, '_>, value: u32) -> Result<(), Capaci
     written
 }
 
-/// The rows of `text`: each a symbol's number, a colon and a count, apart by spaces, commas, semicolons
-/// or line breaks, as `12:3401 7:85`.
+/// The rows of `text`: each a symbol's number, a colon and a count, or in format 2 a symbol's
+/// number, its DMC thread and a count, apart by spaces, commas, semicolons or line breaks, as
+/// `12:3401 7:85` or `12:310:3401 7:06:85`.
 ///
 /// # Errors
 ///
 /// [`LegendError`]: `legend.empty`, `legend.too-many-rows`, `legend.not-a-row`,
-/// `legend.unknown-symbol` and `legend.count-out-of-range` of the `embroidery` namespace.
+/// `legend.unknown-symbol`, `legend.unknown-thread` and `legend.count-out-of-range` of the
+/// `embroidery` namespace.
 pub fn parse(text: &str) -> Result<Vec<Row>, LegendError> {
     let tokens: Vec<&str> = line_words(text).take(MAX_ROWS + 1).collect();
     if tokens.is_empty() {
@@ -224,17 +323,28 @@ pub fn parse(text: &str) -> Result<Vec<Row>, LegendError> {
         return Err(LegendError::TooManyRows);
     }
     let mut rows = Vec::with_capacity(tokens.len());
+    let first_parts = tokens[0].split(':').count();
     for (index, token) in tokens.iter().enumerate() {
         let place = index + 1;
-        let (symbol, stitches) = token.split_once(':').ok_or(LegendError::NotARow(place))?;
+        let parts: Vec<&str> = token.split(':').collect();
+        // Every row as the first is: with a DMC number, or every row without one.
+        if parts.len() != first_parts || !(2..=3).contains(&parts.len()) {
+            return Err(LegendError::NotARow(place));
+        }
         let digits = |part: &str| {
             (!part.is_empty() && part.len() <= 7 && part.bytes().all(|b| b.is_ascii_digit()))
                 .then(|| part.parse::<u32>().ok())
                 .flatten()
         };
-        let symbol = digits(symbol).ok_or(LegendError::NotARow(place))?;
-        let stitches = digits(stitches).ok_or(LegendError::NotARow(place))?;
-        rows.push(Row::new(place, symbol as usize, stitches)?);
+        let symbol = digits(parts[0]).ok_or(LegendError::NotARow(place))?;
+        let stitches = digits(parts[parts.len() - 1]).ok_or(LegendError::NotARow(place))?;
+        let row = if parts.len() == 3 {
+            let thread = dmc::find(parts[1]).ok_or(LegendError::UnknownThread(place))?;
+            Row::naming(place, symbol as usize, thread, stitches)?
+        } else {
+            Row::new(place, symbol as usize, stitches)?
+        };
+        rows.push(row);
     }
     Ok(rows)
 }
@@ -271,10 +381,10 @@ fn moduli_with_biggest(counts: &[u32], biggest: usize) -> Vec<u32> {
         .collect()
 }
 
-/// The four bytes of the check of `entropy`.
-fn check(entropy: &[u8]) -> [u8; CHECK_BYTES] {
+/// The four bytes of the check of `entropy` with `masking`, in format 2 where `ordered`.
+pub(crate) fn check(entropy: &[u8], masking: Masking, ordered: bool) -> [u8; CHECK_BYTES] {
     let mut hash = Sha256::new();
-    hash.update(CHECK_DOMAIN);
+    hash.update(masking.domain(ordered));
     hash.update([entropy.len() as u8]);
     hash.update(entropy);
     let digest = hash.finalize();
@@ -287,13 +397,20 @@ pub const fn payload_bits(length: usize) -> usize {
     8 * (length + CHECK_BYTES)
 }
 
-/// How many symbols and digits of rows with `moduli` can be: the room of a legend, in bits.
+/// How many symbols and digits of rows with `moduli` can be, and in format 2 (`ordered`) their
+/// orders too: the room of a legend, in bits.
 #[must_use]
-pub fn room_bits(moduli: &[u32]) -> f64 {
+pub fn room_bits(moduli: &[u32], ordered: bool) -> f64 {
     let symbols: f64 = (0..moduli.len())
         .map(|i| libm::log2((SYMBOLS.len() - i.min(SYMBOLS.len() - 1)) as f64))
         .sum();
+    let orders: f64 = if ordered {
+        (2..=moduli.len()).map(|k| libm::log2(k as f64)).sum()
+    } else {
+        0.0
+    };
     symbols
+        + orders
         + moduli
             .iter()
             .map(|&m| libm::log2(f64::from(m)))
@@ -301,66 +418,115 @@ pub fn room_bits(moduli: &[u32]) -> f64 {
 }
 
 /// How many values the part above the payload of `length` bytes may take in rows with `moduli`;
-/// zero where the rows cannot hold the payload. Capped at [`u64::MAX`].
-pub(crate) fn free_values(length: usize, moduli: &[u32]) -> u64 {
+/// zero where the rows cannot hold the payload. It is kept whole, so that every row of a long
+/// legend is drawn at random: cut to 64 bits, the last rows of a legend of 40 rows took the first
+/// free symbols and counts ending in 00 in every pattern (the review of 2026-11-05).
+pub(crate) fn free_values(length: usize, moduli: &[u32], ordered: bool) -> Number {
     if moduli.len() > SYMBOLS.len() {
-        return 0;
+        return Number::of(0);
     }
     let mut room = Number::of(1);
     for (i, &m) in moduli.iter().enumerate() {
         room.mul_add(u32::try_from(SYMBOLS.len() - i).unwrap_or(1), 0);
         room.mul_add(m, 0);
+        if ordered {
+            room.mul_add(u32::try_from(moduli.len() - i).unwrap_or(1), 0);
+        }
     }
     room.shifted_down(payload_bits(length))
 }
 
-/// The symbols (places in [`SYMBOLS`]) and the digits of rows with `moduli` that hold `entropy`
-/// with `free` above it. Both hold part of a backup and are wiped when dropped.
+/// The part above the payload for the draw `attempt`, below `free`, which is not 0: 64 bits more
+/// than `free` takes, drawn from `random`, with `attempt` added, divided by `free`; what is left is
+/// uniform to within 2^-64. The attempt's number makes a source that gives the same bytes every
+/// time still try other legends, and drawing nothing again keeps every draw to one call.
+pub(crate) fn draw_free(
+    random: &mut dyn Random,
+    free: &Number,
+    attempt: u32,
+) -> Result<Number, RandomError> {
+    let mut bytes = SecretBytes::zeroed("a legend's free part", free.bit_length().div_ceil(8) + 8);
+    random.fill(&mut bytes)?;
+    let mut drawn = Number::of_be_bytes(&bytes);
+    drawn.add_shifted(&Number::of(attempt), 0);
+    Ok(drawn.remainder(free))
+}
+
+/// The symbols (places in [`SYMBOLS`]) and the digits of the threads with `moduli` that hold
+/// `entropy` with `free` above it, each by its thread's place, and the threads in the legend's
+/// order: their own in format 1, chosen in format 2. All hold part of a backup and are wiped when
+/// dropped.
 pub(crate) struct Assignment {
     pub(crate) symbols: Vec<usize>,
     pub(crate) digits: Vec<u32>,
+    pub(crate) order: Vec<usize>,
 }
 
 impl Drop for Assignment {
     fn drop(&mut self) {
         self.symbols.zeroize();
         self.digits.zeroize();
+        self.order.zeroize();
     }
 }
 
-/// The rows' symbols and digits that hold `entropy` with `free` above it.
-pub(crate) fn assign(entropy: &[u8], moduli: &[u32], free: u64) -> Assignment {
+/// The symbols and digits of the threads with `moduli`, in their own order, that hold `entropy`
+/// with `masking` and `free` above it, and in format 2 (`ordered`) the legend's order of them.
+pub(crate) fn assign(
+    entropy: &[u8],
+    masking: Masking,
+    moduli: &[u32],
+    free: &Number,
+    ordered: bool,
+) -> Assignment {
     let mut payload = SecretBytes::zeroed("an embroidery's payload", entropy.len() + CHECK_BYTES);
     payload[..entropy.len()].copy_from_slice(entropy);
-    payload[entropy.len()..].copy_from_slice(&check(entropy));
+    payload[entropy.len()..].copy_from_slice(&check(entropy, masking, ordered));
     let mut n = Number::of_be_bytes(&payload);
     n.add_shifted(free, payload_bits(entropy.len()));
+    let rows = moduli.len();
     let mut left: Vec<usize> = (0..SYMBOLS.len()).collect();
+    let mut threads_left: Vec<usize> = (0..rows).collect();
     let mut assignment = Assignment {
-        symbols: Vec::with_capacity(moduli.len()),
-        digits: Vec::with_capacity(moduli.len()),
+        symbols: vec![0; rows],
+        digits: vec![0; rows],
+        order: Vec::with_capacity(rows),
     };
-    for (i, &m) in moduli.iter().enumerate() {
+    for i in 0..rows {
+        // The row's digits come off the number in the reverse of the order a reader puts them on:
+        // its thread's place, then its symbol, then its digit.
+        let thread = if ordered {
+            let rank = n.div_small(u32::try_from(rows - i).unwrap_or(1)) as usize;
+            threads_left.remove(rank.min(threads_left.len().saturating_sub(1)))
+        } else {
+            i
+        };
         let rank = n.div_small(u32::try_from(SYMBOLS.len() - i).unwrap_or(1)) as usize;
-        assignment
-            .symbols
-            .push(left.remove(rank.min(left.len().saturating_sub(1))));
-        assignment
-            .digits
-            .push(if m > 1 { n.div_small(m) } else { 0 });
+        assignment.symbols[thread] = left.remove(rank.min(left.len().saturating_sub(1)));
+        let m = moduli[thread];
+        assignment.digits[thread] = if m > 1 { n.div_small(m) } else { 0 };
+        assignment.order.push(thread);
     }
     left.zeroize();
+    threads_left.zeroize();
     assignment
 }
 
 /// What reading a legend gave.
 pub enum Reading {
-    /// The entropy of the phrase.
-    Read(SecretBytes),
+    /// The entropy of the phrase and what the phrase is.
+    Read {
+        /// The entropy.
+        entropy: SecretBytes,
+        /// Whether the phrase is masked.
+        masking: Masking,
+    },
     /// The entropy of the phrase, found by taking one row as misread.
     Corrected {
         /// The entropy.
         entropy: SecretBytes,
+        /// Whether the phrase is masked.
+        masking: Masking,
         /// The row taken as misread, from 1.
         row: usize,
     },
@@ -376,16 +542,20 @@ impl fmt::Debug for Reading {
     }
 }
 
-/// The phrase's entropy that `rows` hold, as a legend of format 1 lists them.
+/// The phrase's entropy that `rows` hold and how it is masked, as a legend of format 1 lists them
+/// or, where every row names its thread, of format 2.
 #[must_use]
 pub fn read(rows: &[Row]) -> Reading {
-    if let Some(entropy) = entropy_by_counts(rows) {
-        return Reading::Read(entropy);
+    if let Some((entropy, masking)) = entropy_by_counts(rows) {
+        return Reading::Read { entropy, masking };
     }
-    let mut found: Vec<(SecretBytes, usize)> = Vec::new();
-    let mut note = |entropy: SecretBytes, row: usize| {
-        if !found.iter().any(|(e, _)| equal_bytes(e, &entropy)) {
-            found.push((entropy, row));
+    let mut found: Vec<(SecretBytes, Masking, usize)> = Vec::new();
+    let mut note = |(entropy, masking): (SecretBytes, Masking), row: usize| {
+        if !found
+            .iter()
+            .any(|(e, m, _)| *m == masking && equal_bytes(e, &entropy))
+        {
+            found.push((entropy, masking, row));
         }
     };
     let mut changed = rows.to_vec();
@@ -432,8 +602,12 @@ pub fn read(rows: &[Row]) -> Reading {
     match found.len() {
         0 => Reading::NotRead,
         1 => {
-            let (entropy, row) = found.remove(0);
-            Reading::Corrected { entropy, row }
+            let (entropy, masking, row) = found.remove(0);
+            Reading::Corrected {
+                entropy,
+                masking,
+                row,
+            }
         }
         _ => Reading::Ambiguous,
     }
@@ -444,8 +618,9 @@ fn counts(rows: &[Row]) -> Vec<u32> {
     rows.iter().map(|r| r.stitches).collect()
 }
 
-/// The entropy `rows` hold read by the digit rule of their own counts, the working copy wiped.
-fn entropy_by_counts(rows: &[Row]) -> Option<SecretBytes> {
+/// The entropy `rows` hold read by the digit rule of their own counts, and its masking, the working
+/// copy wiped.
+fn entropy_by_counts(rows: &[Row]) -> Option<(SecretBytes, Masking)> {
     let mut counted = counts(rows);
     let entropy = moduli(&counted).and_then(|m| entropy_of(rows, &m));
     counted.zeroize();
@@ -488,16 +663,24 @@ fn misread_counts(stitches: u32) -> Vec<u32> {
     out
 }
 
-/// The entropy that `rows` read with `moduli` hold; none where no length's check passes, or where
-/// two do.
-fn entropy_of(rows: &[Row], moduli: &[u32]) -> Option<SecretBytes> {
-    let mut left: Vec<usize> = (1..=SYMBOLS.len()).collect();
-    let mut ranks = Vec::with_capacity(rows.len());
+/// The entropy that `rows` read with `moduli` hold, and its masking; none where no length's check
+/// passes with any masking, or where two do.
+fn entropy_of(rows: &[Row], moduli: &[u32]) -> Option<(SecretBytes, Masking)> {
+    // Each working copy is wiped however the reading ends: a correction's search tries many
+    // changed rows that stop early, such as at a symbol named twice.
+    let mut left: Zeroizing<Vec<usize>> = Zeroizing::new((1..=SYMBOLS.len()).collect());
+    let mut ranks = Zeroizing::new(Vec::with_capacity(rows.len()));
     for row in rows {
         let rank = left.iter().position(|&s| s == row.symbol)?;
         left.remove(rank);
         ranks.push(rank);
     }
+    let ordered = rows.iter().all(|row| row.thread.is_some());
+    let places = if ordered {
+        thread_places(rows)?
+    } else {
+        Zeroizing::new(Vec::new())
+    };
     let mut n = Number::of(0);
     for i in (0..rows.len()).rev() {
         if moduli[i] > 1 {
@@ -507,29 +690,52 @@ fn entropy_of(rows: &[Row], moduli: &[u32]) -> Option<SecretBytes> {
             u32::try_from(SYMBOLS.len() - i).ok()?,
             u32::try_from(ranks[i]).ok()?,
         );
+        if ordered {
+            n.mul_add(
+                u32::try_from(rows.len() - i).ok()?,
+                u32::try_from(places[i]).ok()?,
+            );
+        }
     }
-    ranks.zeroize();
-    left.zeroize();
+    drop((ranks, places, left));
     let mut passing = None;
     for length in ENTROPY_LENGTHS {
         let payload = n.low_be_bytes("an embroidery's payload", payload_bits(length));
         let (entropy, sum) = payload.split_at(length);
-        if equal_bytes(sum, &check(entropy)) {
-            if passing.is_some() {
-                return None;
+        for masking in MASKINGS {
+            if equal_bytes(sum, &check(entropy, masking, ordered)) {
+                if passing.is_some() {
+                    return None;
+                }
+                passing = Some((SecretBytes::copy_of("a phrase's entropy", entropy), masking));
             }
-            passing = Some(SecretBytes::copy_of("a phrase's entropy", entropy));
         }
     }
     passing
 }
 
+/// The place of each row's thread, counted from 0, in the threads' own order
+/// ([`dmc::Thread::order`]) among the threads that no row above it named; none where two rows name
+/// one thread.
+fn thread_places(rows: &[Row]) -> Option<Zeroizing<Vec<usize>>> {
+    let mut sorted: Zeroizing<Vec<usize>> =
+        Zeroizing::new(rows.iter().filter_map(|row| row.thread).collect());
+    sorted.sort_by_key(|&place| THREADS[place].order());
+    if sorted.windows(2).any(|pair| pair[0] == pair[1]) {
+        return None;
+    }
+    let mut places = Zeroizing::new(Vec::with_capacity(rows.len()));
+    for row in rows {
+        let place = sorted.iter().position(|&t| Some(t) == row.thread)?;
+        sorted.remove(place);
+        places.push(place);
+    }
+    Some(places)
+}
+
 /// Wipes rows that held part of a backup.
 pub(crate) fn wipe_rows(rows: &mut [Row]) {
-    for row in rows {
-        row.symbol.zeroize();
-        row.stitches.zeroize();
-    }
+    rows.iter_mut().for_each(Zeroize::zeroize);
 }
 
 #[cfg(test)]
@@ -547,20 +753,93 @@ mod tests {
             .collect()
     }
 
-    /// Rows of the given counts written with `entropy` and `free`.
+    /// Rows of the given counts written with `entropy` and `free`, masked with Seedshift, in
+    /// format 1.
     fn written(entropy: &[u8], counts: &[u32], free: u64) -> Vec<Row> {
+        written_as(entropy, Masking::Seedshift, counts, (free, false))
+    }
+
+    /// Rows of threads with the given counts, the first threads in their own order, written with
+    /// `entropy`, `masking` and `free`, in format 2 where `ordered`, in the legend's order.
+    fn written_as(
+        entropy: &[u8],
+        masking: Masking,
+        counts: &[u32],
+        (free, ordered): (u64, bool),
+    ) -> Vec<Row> {
         let moduli = moduli(counts).unwrap();
-        let assignment = assign(entropy, &moduli, free);
-        counts
+        let free = Number::of_be_bytes(&free.to_be_bytes());
+        let assignment = assign(entropy, masking, &moduli, &free, ordered);
+        let mut threads: Vec<usize> = (0..THREADS.len()).collect();
+        threads.sort_by_key(|&t| THREADS[t].order());
+        assignment
+            .order
             .iter()
-            .zip(&assignment.symbols)
-            .zip(&moduli)
-            .zip(&assignment.digits)
-            .map(|(((&n, &s), &m), &d)| Row {
-                symbol: s + 1,
-                stitches: if m > 1 { n - n % m + d } else { n },
+            .map(|&t| {
+                let (n, m) = (counts[t], moduli[t]);
+                Row {
+                    symbol: assignment.symbols[t] + 1,
+                    stitches: if m > 1 {
+                        n - n % m + assignment.digits[t]
+                    } else {
+                        n
+                    },
+                    thread: ordered.then_some(threads[t]),
+                }
             })
             .collect()
+    }
+
+    /// A source of bytes that look random and repeat from run to run.
+    struct Xorshift(u64);
+
+    impl Random for Xorshift {
+        fn fill(&mut self, bytes: &mut [u8]) -> Result<(), RandomError> {
+            for byte in bytes {
+                self.0 ^= self.0 << 13;
+                self.0 ^= self.0 >> 7;
+                self.0 ^= self.0 << 17;
+                *byte = self.0 as u8;
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn every_row_of_a_long_legend_is_drawn_at_random() {
+        // The 40 threads of a pattern of a photograph: 30 rows of 1000 stitches or more, 9 of 100
+        // or more and the biggest, which holds a 12-word phrase with some 300 bits to spare.
+        let mut moduli = vec![100; 30];
+        moduli.extend([10; 9]);
+        moduli.push(1);
+        let free = free_values(16, &moduli, false);
+        assert!(free.bit_length() > 64);
+        let mut random = Xorshift(0x9e37_79b9_7f4a_7c15);
+        let mut last_rows = std::collections::HashSet::new();
+        for _ in 0..20 {
+            let drawn = draw_free(&mut random, &free, 0).unwrap();
+            assert!(drawn.is_below(&free));
+            let assignment = assign(&[7; 16], Masking::Seedshift, &moduli, &drawn, false);
+            last_rows.insert((assignment.symbols[38], assignment.digits[38]));
+        }
+        // Cut to 64 bits, the free part left this row the first free symbol and the digit 0 in
+        // every legend.
+        assert!(last_rows.len() > 10, "{last_rows:?}");
+    }
+
+    /// Asserts that `rows` read as `entropy` with `masking`, unchanged.
+    #[track_caller]
+    fn assert_reads(rows: &[Row], entropy: &[u8], masking: Masking) {
+        match read(rows) {
+            Reading::Read {
+                entropy: read,
+                masking: as_read,
+            } => {
+                assert_eq!(&*read, entropy);
+                assert_eq!(as_read, masking);
+            }
+            _ => panic!("not read"),
+        }
     }
 
     fn counts_for(rows: usize) -> Vec<u32> {
@@ -575,7 +854,10 @@ mod tests {
         // docs/SEEDSTITCH.md, "Example": the entropy is Trezor's published 24-word test vector.
         let line = EXAMPLE;
         match read(&parse(line).unwrap()) {
-            Reading::Read(entropy) => assert_eq!(&*entropy, &hex(VOID_COME)[..]),
+            Reading::Read { entropy, masking } => {
+                assert_eq!(&*entropy, &hex(VOID_COME)[..]);
+                assert_eq!(masking, Masking::Seedshift);
+            }
             _ => panic!("not read"),
         }
         let mut digits_swapped = parse(line).unwrap();
@@ -589,26 +871,94 @@ mod tests {
     #[test]
     fn a_written_legend_reads_back_as_its_entropy() {
         for entropy in [hex(VOID_COME), vec![0x7f; 16]] {
-            let rows = written(&entropy, &counts_for(25), 12_345);
-            match read(&rows) {
-                Reading::Read(read) => assert_eq!(&*read, &entropy[..]),
-                _ => panic!("not read"),
+            for masking in MASKINGS {
+                let rows = written_as(&entropy, masking, &counts_for(25), (12_345, false));
+                assert_reads(&rows, &entropy, masking);
             }
         }
     }
 
     #[test]
+    fn a_legend_in_its_rows_order_reads_back_and_never_as_format_1() {
+        for entropy in [hex(VOID_COME), vec![0x7f; 16]] {
+            for masking in MASKINGS {
+                let rows = written_as(&entropy, masking, &counts_for(20), (54_321, true));
+                assert_reads(&rows, &entropy, masking);
+                // Without its threads the order is lost, and format 1 does not read the rows.
+                let plain: Vec<Row> = rows.iter().map(|r| Row { thread: None, ..*r }).collect();
+                assert!(!matches!(read(&plain), Reading::Read { .. }));
+            }
+        }
+        // One row read wrong is found in format 2 too.
+        let entropy = hex(VOID_COME);
+        let mut rows = written_as(&entropy, Masking::Seedshift, &counts_for(20), (3, true));
+        // A row other than the biggest, whose digits carry part of the number.
+        let most = rows.iter().map(|r| r.stitches).max().unwrap();
+        let wrong = rows.iter().position(|r| r.stitches != most).unwrap();
+        let n = rows[wrong].stitches;
+        rows[wrong].stitches = n - n % 10 + (n % 10 + 1) % 10;
+        assert!(matches!(
+            read(&rows),
+            Reading::Corrected { row, .. } if row == wrong + 1
+        ));
+    }
+
+    #[test]
+    fn the_format_2_example_of_the_specification_reads_as_a_masked_phrase() {
+        // The masked words 2001 2 2 … 2001 2 322, as the manual recovery guide's own helper reads
+        // the line, in Python.
+        let words = [[2001, 2, 2]; 8].concat();
+        let mut bits: Vec<bool> = Vec::new();
+        for (place, word) in words.iter().enumerate() {
+            let number: u32 = if place == 23 { 322 } else { *word };
+            bits.extend((0..11).rev().map(|bit| (number - 1) >> bit & 1 == 1));
+        }
+        let expected: Vec<u8> = bits[..256]
+            .chunks(8)
+            .map(|byte| {
+                byte.iter()
+                    .fold(0, |value, &bit| value << 1 | u8::from(bit))
+            })
+            .collect();
+        assert_reads(
+            &parse(EXAMPLE_ORDERED).unwrap(),
+            &expected,
+            Masking::Seedshift,
+        );
+    }
+
+    #[test]
+    fn a_line_names_its_threads_in_format_2_and_every_row_alike() {
+        let rows = parse("12:310:3401 7:06:85, 3:blanc:1").unwrap();
+        assert_eq!(rows[1].thread().unwrap().number(), "06");
+        assert_eq!(rows[2].thread().unwrap().number(), "Blanc");
+        assert_eq!(
+            line(&rows).unwrap().as_str(),
+            "12:310:3401 7:06:85 3:Blanc:1"
+        );
+        assert!(is_line("12:310:3401 7:B5200:85"));
+        assert_eq!(parse("12:310:3401 7:85"), Err(LegendError::NotARow(2)));
+        assert_eq!(parse("12:9999:3401"), Err(LegendError::UnknownThread(1)));
+        assert_eq!(dmc::find("6"), dmc::find("06"));
+    }
+
+    #[test]
     fn one_misread_row_is_corrected_and_named() {
         let entropy = hex(VOID_COME);
-        let rows = written(&entropy, &counts_for(25), 7);
+        let rows = written_as(&entropy, Masking::Unmasked, &counts_for(25), (7, false));
         let mut wrong = rows.clone();
         wrong[3].symbol = if wrong[3].symbol == 1 { 2 } else { 1 };
         let mut digit = rows.clone();
         digit[10].stitches += 1;
         for (misread, expected_row) in [(wrong, 4), (digit, 11)] {
             match read(&misread) {
-                Reading::Corrected { entropy: e, row } => {
+                Reading::Corrected {
+                    entropy: e,
+                    masking,
+                    row,
+                } => {
                     assert_eq!(&*e, &entropy[..]);
+                    assert_eq!(masking, Masking::Unmasked);
                     assert_eq!(row, expected_row);
                 }
                 _ => panic!("not corrected"),
@@ -665,10 +1015,90 @@ mod tests {
 
     #[test]
     fn the_check_is_sha256_of_the_domain_the_length_and_the_entropy() {
-        // SHA-256("MnemoCode embroidery 1" || 0x10 || 0x00 * 16), computed with Python's hashlib.
-        assert_eq!(check(&[0; 16]), CHECK_OF_ZERO_16);
+        // SHA-256("MnemoCode embroidery 1" || 0x10 || 0x00 * 16), and of the domain
+        // "MnemoCode embroidery 1 unmasked", computed with Python's hashlib.
+        assert_eq!(check(&[0; 16], Masking::Seedshift, false), CHECK_OF_ZERO_16);
+        assert_eq!(
+            check(&[0; 16], Masking::Unmasked, false),
+            UNMASKED_CHECK_OF_ZERO_16
+        );
     }
 
-    /// The first four bytes of that hash, 22bec22d, written down when the format was fixed.
+    /// The first four bytes of those hashes, 22bec22d and 4b0a75ea, written down when the format
+    /// was fixed.
     const CHECK_OF_ZERO_16: [u8; 4] = [0x22, 0xbe, 0xc2, 0x2d];
+    const UNMASKED_CHECK_OF_ZERO_16: [u8; 4] = [0x4b, 0x0a, 0x75, 0xea];
+    #[test]
+    #[ignore = "Twelve public legend/contact QR capacity cases; run for hidden-QR acceptance."]
+    #[expect(
+        clippy::print_stderr,
+        reason = "the requested capacity measurement reports only public fixture sizes and QR dimensions"
+    )]
+    fn full_legends_and_card_contacts_fit_and_recover_both_qr_layers() {
+        use mnemocode::qr;
+        use mnemocode_cards::settings::{CardProfile, ProfileField};
+        let mut contact = CardProfile::default();
+        for (field, value) in [
+            (ProfileField::Name, "Alex Morgan"),
+            (ProfileField::Company, "Public Studio"),
+            (ProfileField::Role, "Designer"),
+            (ProfileField::Email, "alex@example.com"),
+            (ProfileField::Phone, "+1 202 555 0148"),
+        ] {
+            contact.set(field, value.to_owned());
+        }
+        let mut long = CardProfile::default();
+        for field in [
+            ProfileField::Name,
+            ProfileField::Company,
+            ProfileField::Role,
+            ProfileField::Email,
+            ProfileField::Phone,
+        ] {
+            long.set(
+                field,
+                "A".repeat(mnemocode_cards::text_rules::MAX_CARD_TEXT_LENGTH),
+            );
+        }
+        let contacts = [
+            contact.validated().unwrap().qr_contact(),
+            long.validated().unwrap().qr_contact(),
+        ];
+        let entropy = hex(VOID_COME);
+        // Public fixture sizes, independent of the writer's search configuration.
+        for count in [40, 60, MAX_ROWS] {
+            for ordered in [false, true] {
+                let rows = written_as(
+                    &entropy,
+                    Masking::Seedshift,
+                    &counts_for(count - 1),
+                    (42, ordered),
+                );
+                assert_eq!(rows.len(), count);
+                assert_reads(&rows, &entropy, Masking::Seedshift);
+                let text = line(&rows).unwrap();
+                for visible in &contacts {
+                    let code = qr::hidden::matrix(visible, text.as_str()).unwrap();
+                    let png = qr::hidden::png(visible, text.as_str()).unwrap();
+                    assert_eq!(qr::read_png(&png).unwrap().as_str(), visible);
+                    let recovered = qr::hidden::read_png(&png).unwrap();
+                    assert_eq!(recovered.as_str(), text.as_str());
+                    let parsed = parse(recovered.as_str()).unwrap();
+                    assert_eq!(parsed, rows);
+                    assert_reads(&parsed, &entropy, Masking::Seedshift);
+                    eprintln!(
+                        "public_legend rows={count} ordered={ordered} contact_bytes={} legend_bytes={} qr_modules={}",
+                        visible.len(),
+                        text.len(),
+                        code.size()
+                    );
+                }
+            }
+        }
+        // A QR cannot promise room for arbitrary amounts of visible text.
+        assert!(matches!(
+            qr::hidden::matrix(&"A".repeat(2400), EXAMPLE),
+            Err(qr::QrError::TooLarge)
+        ));
+    }
 }

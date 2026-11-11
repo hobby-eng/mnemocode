@@ -8,8 +8,10 @@ The workspace `AGENTS.md` and its coding guide apply. This repository adds:
   a task of the `xtask` crate. The fast gates of CORE-43: `cargo xtask check` (rustfmt, dprint,
   clippy for every crate and for the binding's wasm32 build with each module alone, doc, tests,
   code-rules, copies, Markdown lists, notices, action pins, every page's WebAssembly file built and
-  started in wasmi against its glue, the RustSec audit). Run it before every commit, with the workspace's Rust and
-  `CARGO_BUILD_JOBS=4` under the workspace's heavy-checks lock.
+  started in wasmi against its glue, the RustSec audit). Run it before every commit with the
+  workspace toolchain and CORE-53's machine-wide resource budget. Set Cargo jobs from
+  the available combined budget; serialize jobs when they share mutable build/output resources
+  or the combined memory budget cannot accommodate them.
 - The TS known answers: the TypeScript repository's (hobby-eng/mnemocode_typescript)
   `pnpm record:rust-parity <this repo>/vectors/ts-0.1.0`
   writes them from a clean commit there; never edit them by hand (DOC-04).

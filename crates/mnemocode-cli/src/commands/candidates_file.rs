@@ -30,10 +30,10 @@ use crate::args::{Parsed, is_on, option_label, value};
 use crate::gate::Stop;
 use crate::input::{read_input_path, secret_ask};
 use crate::os::{self, SystemRandom};
-use crate::output::{check_new_file, discard_renamed};
+use crate::output::{check_new_file, discard_renamed, shown_path};
 use crate::terminal::{
     Choice, Chosen, LineQuestion, ListQuestion, NoticeKind, ask_line, choose, lasting_warning,
-    notice, on_private_screen, printable, saved,
+    notice, on_private_screen, saved,
 };
 
 /// How any search is narrowed when its candidates are more than a list holds.
@@ -371,12 +371,12 @@ impl CandidatesFile {
             "Saved {}, {}: {} (record N is candidate N).",
             counted(list.records as u64, "candidate phrase"),
             list.description,
-            printable(&path)
+            shown_path(&path)
         ));
         lasting_warning(if list.encrypted {
             "Delete the file once the wallet is found."
         } else {
-            "This file holds real seed phrases in the open: keep it offline, and delete it once the wallet is found."
+            "This file holds real seed phrases without encryption: keep it offline, and delete it once the wallet is found."
         });
         Ok(())
     }

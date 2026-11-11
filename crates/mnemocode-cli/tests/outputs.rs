@@ -16,7 +16,7 @@ mod common;
 use std::fs;
 use std::process::{Command, Stdio};
 
-use common::{DATES, PHRASE, assert_refused, folder, outputs, run, saved};
+use common::{DATES, PHRASE, assert_refused, folder, full, outputs, run, saved};
 #[cfg(unix)]
 use common::{names, read};
 
@@ -41,7 +41,7 @@ fn a_number_given_to_a_taken_name_is_checked_against_the_other_outputs() {
     fs::write(folder.join("a.txt"), "taken").expect("a file");
     assert_refused(
         &folder,
-        &encode(&["--output", "a.txt", "--qr", "a-1.txt"]),
+        &encode(&["--output", "a.txt", "--qr", "a_1.txt"]),
         "The output record file and QR output file must use separate, non-overlapping paths.",
     );
     fs::create_dir(folder.join("c")).expect("a folder");
@@ -185,7 +185,10 @@ fn the_image_beside_a_sheet_is_named_as_a_path_is_written() {
     let folder = folder("qr-name");
     let said = saved(&folder, &encode(&["--pdf", "./c.pdf", "--card-qr"]));
     assert!(
-        said.contains("Saved the QR code of the sheet as an image: c-qr.png"),
+        said.contains(&format!(
+            "Saved the QR code of the sheet as an image: {}",
+            full(&folder, "c-qr.png")
+        )),
         "{said}"
     );
     assert_eq!(outputs(&folder), ["c-qr.png", "c.pdf"]);
@@ -201,7 +204,7 @@ fn a_standard_output_that_nobody_reads_ends_a_command_as_done() {
     ] {
         let (reader, writer) = std::io::pipe().expect("a pipe");
         drop(reader);
-        let output = Command::new(env!("CARGO_BIN_EXE_mnemocode"))
+        let output = common::colour::plain(&mut Command::new(env!("CARGO_BIN_EXE_mnemocode")))
             .args(&args)
             .current_dir(&folder)
             .stdin(Stdio::null())
@@ -347,7 +350,7 @@ fn of_several_wrong_card_options_the_one_ts_names_first_is_named() {
 fn a_result_that_standard_output_does_not_take_ends_the_command_with_its_reason() {
     let folder = folder("output-failure");
     let full = fs::File::create("/dev/full").expect("Linux has /dev/full");
-    let failed = Command::new(env!("CARGO_BIN_EXE_mnemocode"))
+    let failed = common::colour::plain(&mut Command::new(env!("CARGO_BIN_EXE_mnemocode")))
         .args(["table", "--all"])
         .current_dir(&folder)
         .stdin(Stdio::null())

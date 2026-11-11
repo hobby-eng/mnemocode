@@ -334,8 +334,8 @@ fn draw_study_frame(
     // clear of the code on both sides; a card-sized page only has room beside the code.
     let reserved = layout.qr.map_or(0.0, |qr| qr.size + metrics.margin);
     let spare = if compact { reserved } else { 2.0 * reserved };
-    let heading_width = width - 2.0 * metrics.margin - spare;
-    let heading_left = if compact {
+    let mut heading_width = width - 2.0 * metrics.margin - spare;
+    let mut heading_left = if compact {
         metrics.margin
     } else {
         (width - heading_width) / 2.0
@@ -375,6 +375,18 @@ fn draw_study_frame(
             palette.muted,
         ),
     ];
+    // A larger hidden QR can leave too little symmetric room on a narrow sheet.
+    // Keep the usual centring where it fits; otherwise use the clear area beside
+    // the QR, with the same minimum font and the same reserved QR plate.
+    if !compact
+        && layout.qr.is_some()
+        && lines.iter().any(|(_, text, _, _, _)| {
+            font.width(text, metrics.frame_minimum_font) > heading_width * MM
+        })
+    {
+        heading_width = width - 2.0 * metrics.margin - reserved;
+        heading_left = metrics.margin;
+    }
     for (label, value, top, preferred, color) in lines {
         let place = TextBox {
             left: heading_left,
@@ -386,8 +398,9 @@ fn draw_study_frame(
     }
     if let Some(rule) = metrics.rows.rule {
         let rule_width = (heading_width * 0.4).min(40.0);
-        let from = page.point((width - rule_width) / 2.0, rule);
-        let to = page.point((width + rule_width) / 2.0, rule);
+        let centre = heading_left + heading_width / 2.0;
+        let from = page.point(centre - rule_width / 2.0, rule);
+        let to = page.point(centre + rule_width / 2.0, rule);
         page.line(from, to, palette.muted, 0.4, 0.55);
     }
     // The slogan shares the footer line, where nothing crosses it.
@@ -476,6 +489,19 @@ pub fn collection_payload(cards: &ColorCards) -> Option<&str> {
     (cards.settings.card_qr || whole_share_qr(cards)).then_some(cards.codes.payload.as_str())
 }
 
+/// The verified QR matrix for a sheet, with a contact or the ordinary backup text.
+pub fn collection_matrix(cards: &ColorCards) -> Result<Option<Matrix>, mnemocode::qr::QrError> {
+    collection_payload(cards)
+        .map(|payload| {
+            if cards.settings.hidden_qr {
+                mnemocode::qr::hidden::matrix(&cards.settings.profile.qr_contact(), payload)
+            } else {
+                matrix(payload)
+            }
+        })
+        .transpose()
+}
+
 /// The separate card that a renderer is asked for: `index`, or none, a sheet, where the content asks
 /// for a share's whole-share QR code, which only a sheet prints. An index that is not one of the
 /// cards is refused first, also where the sheet is drawn.
@@ -519,7 +545,7 @@ pub fn draw_collection_study(
         font, cards, theme, ..
     } = study;
     // One matrix for the room that the layout keeps and for the code drawn in it.
-    let code = collection_payload(cards).map(matrix).transpose()?;
+    let code = collection_matrix(cards)?;
     // The captions decide how narrow a column may be, and how many lines they take in it.
     let room = StudyCaptions::new(font, &study.captions);
     let layout = collection_sheet_layout(&LayoutRequest {

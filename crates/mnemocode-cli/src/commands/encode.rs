@@ -10,19 +10,21 @@ use mnemocode::backup::{Backup, Encoding};
 use mnemocode::bip32::{ExtendedKey, fingerprint_hex};
 use mnemocode::bip39::phrase::Phrase;
 use mnemocode::bip39::sizes::WORD_NUMBER_RANGE;
+use mnemocode::dates::Date;
 use mnemocode::forms::Form;
 use mnemocode::modes::phrase_words::{FINGERPRINT_ROLES, ORIGINAL_FINGERPRINT};
 use mnemocode::modes::{DateWords, Mode};
 use mnemocode::recovery::backup_check::EncodedOriginal;
 use mnemocode::refusal::Refusal;
-use mnemocode::secret::SecretText;
+use mnemocode::secret::{SecretText, SecretVec};
 
 use super::backup_check::{backup_check_answer, offer_encoded_check};
 use super::cards::{
     PlannedCards, card_file_format, card_outputs, card_settings, card_template, check_cards_fit,
-    export_card_files, export_page_images, image_format, publish_pdf, save_qr_beside,
-    save_qr_inside, saved_pages_notice, validate_card_options, validate_image_options,
+    export_card_files, export_page_images, image_format, publish_pdf, saved_pages_notice,
+    validate_card_options, validate_image_options,
 };
+use super::configure::asked_options;
 use super::given::{check_date_input, encode_format, phrase_and_dates, transform_mode};
 use super::heir_sheet::{save_heir_sheet, validate_heir_sheet_options};
 use super::resolved;
@@ -32,13 +34,12 @@ use super::sskr_split::{CheckedSplit, prepare_split, split_checked};
 use crate::args::{Parsed, choice_option, is_on, option_label, value};
 use crate::gate::Stop;
 use crate::os::{self, FileError, SystemRandom};
-use crate::output::report_renamed;
+use crate::output::{report_renamed, shown_path};
 use crate::terminal::result::{
     backup_code_lines, plain_fingerprint_line, print, print_phrase, print_sentence, result_header,
 };
 use crate::terminal::{
-    self, Channel, NoticeKind, can_redraw, clear_private_screen, hint, more_line, notice,
-    printable, saved,
+    self, Channel, NoticeKind, can_redraw, clear_private_screen, hint, more_line, notice, saved,
 };
 use mnemocode_cards::content::backup_card_content;
 use mnemocode_cards::export::{CardJob, card_pages, individual_cards};
@@ -307,16 +308,27 @@ pub(crate) struct CheckedEncode {
 /// which Re-encode decoded and confirmed, then its dates, and makes and saves the backup.
 #[derive(Debug)]
 pub(crate) enum PreparedEncode {
-    Plain(Parsed, CheckedEncode),
-    Split(Parsed, CheckedSplit),
+    Plain(Parsed, CheckedEncode, Option<SecretVec<Date>>),
+    Split(Parsed, CheckedSplit, Option<SecretVec<Date>>),
 }
 
 impl PreparedEncode {
+    /// Retains dates already asked on this process's private screen.
+    pub(crate) fn with_dates(mut self, dates: Option<SecretVec<Date>>) -> Self {
+        let (Self::Plain(_, _, stored) | Self::Split(_, _, stored)) = &mut self;
+        *stored = dates;
+        self
+    }
+
     /// Makes the backup.
     pub(crate) fn run(&self, known: Option<&Phrase>) -> Result<(), Stop> {
         match self {
-            Self::Plain(parsed, checked) => encode_checked(parsed, checked, known),
-            Self::Split(parsed, checked) => split_checked(parsed, checked, known),
+            Self::Plain(parsed, checked, dates) => {
+                encode_checked(parsed, checked, known, dates.as_deref())
+            }
+            Self::Split(parsed, checked, dates) => {
+                split_checked(parsed, checked, known, dates.as_deref())
+            }
         }
     }
 }
@@ -356,13 +368,15 @@ impl Refusal for EncodeOptionError {
     }
 }
 
-/// Checks every option of Encode, the destinations included, before any secret is asked or read,
+/// Checks every option of Encode, the destinations included, before the phrase is asked or read,
 /// and gives what then encodes: a plain backup, or with --sskr its shares.
 pub(crate) fn prepare_encode(parsed: &Parsed) -> Result<PreparedEncode, Stop> {
+    super::hidden_qr::validate(parsed)?;
     if is_on(parsed, "sskr") {
         return Ok(PreparedEncode::Split(
             parsed.clone(),
             prepare_split(parsed, true)?,
+            None,
         ));
     }
     for key in SSKR_ONLY_OPTIONS {
@@ -403,6 +417,7 @@ pub(crate) fn prepare_encode(parsed: &Parsed) -> Result<PreparedEncode, Stop> {
             check_answer,
             cards,
         },
+        None,
     ))
 }
 
@@ -451,7 +466,7 @@ fn save_cards(
         publish_pdf(drawing, pages, &resolved(path))
     })?;
     if let Some(path) = &pdf {
-        saved(&format!("Saved PDF: {}", printable(path)));
+        saved(&format!("Saved PDF: {}", shown_path(path)));
     }
     let (format, mut count) = (image_format(outputs)?, 0);
     let images = save_output(
@@ -491,7 +506,7 @@ fn save_cards(
         if let Some(folder) = folder {
             saved(&format!(
                 "Saved {files} individual card files to: {}",
-                printable(&folder)
+                shown_path(&folder)
             ));
         }
     }
@@ -504,28 +519,34 @@ fn save_cards(
 fn save_sheet_qr(
     parsed: &Parsed,
     text: &str,
+    cards: Option<&EncodeCards>,
     (pdf, images): (Option<&str>, Option<&str>),
 ) -> Result<(), Stop> {
-    if !is_on(parsed, "card-qr") || value(parsed, "qr").is_some() {
+    if !cards.is_some_and(|c| c.settings.card_qr) || value(parsed, "qr").is_some() {
         return Ok(());
     }
+    let contact = cards
+        .filter(|c| c.settings.hidden_qr)
+        .map(|c| c.settings.profile.qr_contact());
     let path = match (pdf, images) {
-        (Some(pdf), _) => save_qr_beside(text, pdf, "")?,
-        (None, Some(images)) => save_qr_inside(text, images, "")?,
+        (Some(pdf), _) => super::cards::save_qr_beside_with(text, pdf, "", contact.as_deref())?,
+        (None, Some(images)) => {
+            super::cards::save_qr_inside_with(text, images, "", contact.as_deref())?
+        }
         (None, None) => None,
     };
     if let Some(path) = path {
         saved(&format!(
             "Saved the QR code of the sheet as an image: {}",
-            printable(&path)
+            shown_path(&path)
         ));
     }
     Ok(())
 }
 
 /// A QR image written where a save asks, its image read back first (qr::png).
-fn write_qr(text: &str, path: &str) -> Result<(), FileError> {
-    let image = mnemocode::qr::png(text).map_err(super::share_output::step_failed)?;
+fn write_qr(parsed: &Parsed, text: &str, path: &str) -> Result<(), FileError> {
+    let image = super::hidden_qr::image(parsed, text).map_err(super::share_output::step_failed)?;
     os::publish_new_file(&resolved(path), &image)
 }
 
@@ -547,7 +568,7 @@ fn save_results(
         |path| os::publish_new_file(&resolved(path), record.as_str().as_bytes()),
     )?;
     if let Some(path) = record_saved {
-        saved(&format!("Saved MnemoCode record: {}", printable(&path)));
+        saved(&format!("Saved MnemoCode record: {}", shown_path(&path)));
     }
     // The colour cards on the terminal come after the record.
     if is_on(parsed, "cards") {
@@ -561,17 +582,22 @@ fn save_results(
         None => (None, None),
     };
     let qr_saved = save_output(&mut outputs, "qr", ResultName::one("The QR code"), |path| {
-        write_qr(text.as_str(), path)
+        write_qr(parsed, text.as_str(), path)
     })?;
     if let Some(path) = qr_saved {
         report_qr_verified(1);
         saved(&format!(
             "Saved QR code ({}): {}",
             backup.form().name(),
-            printable(&path)
+            shown_path(&path)
         ));
     }
-    save_sheet_qr(parsed, &text, (sheets.0.as_deref(), sheets.1.as_deref()))?;
+    save_sheet_qr(
+        parsed,
+        &text,
+        cards,
+        (sheets.0.as_deref(), sheets.1.as_deref()),
+    )?;
     Ok(outputs)
 }
 
@@ -580,6 +606,7 @@ fn encode_checked(
     parsed: &Parsed,
     checked: &CheckedEncode,
     known: Option<&Phrase>,
+    dates: Option<&[Date]>,
 ) -> Result<(), Stop> {
     let CheckedEncode {
         mode,
@@ -590,7 +617,7 @@ fn encode_checked(
         check_answer,
         ref cards,
     } = *checked;
-    let (phrase, dates) = match phrase_and_dates(parsed, mode, DateWords::Codes, known)? {
+    let (phrase, dates) = match phrase_and_dates(parsed, mode, DateWords::Codes, known, dates)? {
         Ok(given) => given,
         Err(_) => return Err(Stop::Cancelled),
     };
@@ -627,8 +654,15 @@ fn encode_checked(
 }
 
 /// Runs the command.
-pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
-    prepare_encode(parsed)?.run(None)
+pub(crate) fn run(parsed: &Parsed, protection: &mut crate::os::Protection) -> Result<(), Stop> {
+    let (fresh, dates) = asked_options(parsed, protection, || {
+        if is_on(parsed, "sskr") {
+            super::encode_questions::ask_splitting()
+        } else {
+            super::encode_questions::ask_encoding_in(encode_format(parsed)?)
+        }
+    })?;
+    prepare_encode(&fresh)?.with_dates(dates).run(None)
 }
 
 #[cfg(test)]

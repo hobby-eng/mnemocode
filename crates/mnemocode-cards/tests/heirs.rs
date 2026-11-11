@@ -301,6 +301,9 @@ fn a_route_may_print_its_own_address_once_and_no_other() {
         "www.elsewhere.example",
         "elsewhere.example/guide",
         "elsewhere.example",
+        "HTTPS://OTHER.EXAMPLE/guide",
+        "WwW.Other.Example",
+        "OTHER.EXAMPLE",
     ] {
         let start = [opening.clone(), format!("See {other}.")];
         assert_address_refused(&WalletTool::at(ADDRESS, &start));

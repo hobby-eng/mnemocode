@@ -25,8 +25,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use common::{
-    PHRASE, assert_same_cards, assert_same_pictures, folder, names, numbered, outputs, page_sizes,
-    read, run,
+    PHRASE, assert_same_cards, assert_same_pictures, folder, full, names, numbered, outputs,
+    page_sizes, read, run,
 };
 use mnemocode::self_check::vectors::PUBLIC_MNEMONIC;
 use terminal::{Session, Setting};
@@ -35,7 +35,7 @@ use terminal::{Session, Setting};
 /// machine.
 const PATIENCE: Duration = Duration::from_secs(180);
 /// Where the private screen asks for the phrase.
-const PHRASE_ASKED: &str = "(Esc cancels)";
+const PHRASE_ASKED: &str = " to cancel";
 /// What the private screen asks after a save that failed; "1", "2" and "3" choose an answer.
 const WHAT_NOW: &str = "What now?";
 const TRY_AGAIN: &str = "1";
@@ -191,12 +191,27 @@ fn each_output_tries_its_failed_save_again_and_every_file_shows_the_one_plan() {
     assert_eq!(status, 0, "{written}");
     assert_eq!(written.matches(WHAT_NOW).count(), 3, "{written}");
     for notice in [
-        format!("The PDF could not be saved as {PDF}: {NO_PERMISSION}"),
-        format!("The images could not be saved as for-images/images: {NO_PERMISSION}"),
-        format!("The card files could not be saved as for-cards/cards: {NO_PERMISSION}"),
-        format!("Saved PDF: {PDF}"),
-        format!("Saved {CARDS} PNG pages to: for-images/images"),
-        format!("Saved {CARDS} individual card files to: for-cards/cards"),
+        format!(
+            "The PDF could not be saved as {}: {NO_PERMISSION}",
+            full(&folder, PDF)
+        ),
+        format!(
+            "The images could not be saved as {}: {NO_PERMISSION}",
+            full(&folder, "for-images/images")
+        ),
+        format!(
+            "The card files could not be saved as {}: {NO_PERMISSION}",
+            full(&folder, "for-cards/cards")
+        ),
+        format!("Saved PDF: {}", full(&folder, PDF)),
+        format!(
+            "Saved {CARDS} PNG pages to: {}",
+            full(&folder, "for-images/images")
+        ),
+        format!(
+            "Saved {CARDS} individual card files to: {}",
+            full(&folder, "for-cards/cards")
+        ),
     ] {
         assert!(written.contains(&notice), "{notice}: {written}");
     }
@@ -252,7 +267,7 @@ fn a_pdf_saved_under_another_name_shows_the_cards_of_the_one_plan() {
     screen.press(&format!("{other}\r"));
     let written = end_with_the_closed_folder_empty(&folder, screen);
     assert!(
-        written.contains(&format!("Saved PDF: {other}")),
+        written.contains(&format!("Saved PDF: {}", full(&folder, other))),
         "{written}"
     );
     assert_eq!(written.matches("New name for the PDF:").count(), 1);
@@ -334,7 +349,8 @@ fn assert_save_fails(folder: &Path, saves: &[&str]) {
         "--template",
         "material-tile",
     ];
-    let output = Command::new("sh")
+    // The shell passes its environment on to the program.
+    let output = common::colour::plain(&mut Command::new("sh"))
         .args(["-c", LITTLE_ROOM, env!("CARGO_BIN_EXE_mnemocode")])
         .args(encode)
         .args(saves)

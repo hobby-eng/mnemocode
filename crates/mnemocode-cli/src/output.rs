@@ -1,10 +1,11 @@
 //! Where a command saves (MnemoCode TS 0.1.0's `output-paths.ts`, `cloud-folders.ts`), checked
-//! before any secret is asked or read: every output path usable, the outputs apart from each other
-//! and from the inputs, a taken name numbered ("record-1.txt"; reported once saved), a new
-//! folder's name without a document's ending, and each output's parent folder made where it is
-//! missing (ARCHITECTURE.md §5: the preflight makes it, so that Landlock can rule it before the
-//! secret). The folders it gives are the command's needs (os::Needs). A cloud service that copies
-//! an output's folder is warned of.
+//! before the seed phrase is asked or read (with --configure the Seedshift dates come first):
+//! every output path usable, the outputs apart from each other and from the inputs, a taken name
+//! numbered ("record_1.txt"; reported once saved), a new folder's name without a document's
+//! ending, and each output's parent folder made where it is missing (ARCHITECTURE.md §5: the
+//! preflight makes it, so that Landlock can rule it before the seed phrase). The folders it gives
+//! are the command's needs (os::Needs). A cloud service that copies an output's folder is warned
+//! of.
 
 use std::ffi::OsString;
 use std::io;
@@ -18,7 +19,7 @@ use crate::os::{self, Entry, FileError, FileLook, Needs};
 use crate::terminal::{self, lasting_warning, printable, warning_with_more};
 
 /// The most numbered copies of one name.
-const MAX_COPY_NUMBER: usize = 999;
+pub(crate) const MAX_COPY_NUMBER: usize = 999;
 /// The endings of the documents a command writes, which a new folder's name may not take.
 const DOCUMENT_EXTENSIONS: [&str; 4] = ["pdf", "png", "jpg", "jpeg"];
 /// The file inputs, which no output may overlap.
@@ -124,7 +125,7 @@ impl std::fmt::Display for OutputError {
             ),
             Self::OutsideRuled(folders) => write!(
                 f,
-                "MnemoCode may save only in the folders ruled before the secret was asked: {folders}."
+                "MnemoCode may save only in the folders ruled before the seed phrase was asked: {folders}."
             ),
             Self::NotResolved => f.write_str("The output path could not be resolved safely."),
             Self::UnreadableInput(label) => write!(
@@ -194,12 +195,18 @@ pub(crate) fn resolved(path: &str) -> PathBuf {
     os::resolve(Path::new(path), terminal::environment().current.as_deref())
 }
 
+/// A saved file's or folder's `path` as a message names it: in full, from the root, so that it is
+/// found wherever the program was started (the owner's request of 2026-11-04).
+pub(crate) fn shown_path(path: &str) -> String {
+    printable(&resolved(path).to_string_lossy())
+}
+
 /// Whether `child` is `parent` or lies inside it, by their resolved names.
 fn within(parent: &Path, child: &Path) -> bool {
     child.starts_with(parent)
 }
 
-/// `path` with `-number` before its ending (none for a folder): "cards-2.pdf".
+/// File copies use `_number` before their ending; folder copies retain `-number`.
 fn numbered_name(path: &str, number: usize, folder: bool) -> String {
     let trimmed = path.trim_end_matches(['/', std::path::MAIN_SEPARATOR]);
     let name_start = trimmed
@@ -213,9 +220,10 @@ fn numbered_name(path: &str, number: usize, folder: bool) -> String {
             .filter(|&at| at > 0)
             .map(|at| name_start + at)
     };
+    let separator = if folder { '-' } else { '_' };
     match ending {
-        Some(at) => format!("{}-{number}{}", &trimmed[..at], &trimmed[at..]),
-        None => format!("{trimmed}-{number}"),
+        Some(at) => format!("{}{separator}{number}{}", &trimmed[..at], &trimmed[at..]),
+        None => format!("{trimmed}{separator}{number}"),
     }
 }
 
@@ -225,6 +233,30 @@ pub(crate) fn first_free_name(path: &str) -> Result<String, OutputError> {
         return Ok(path.to_owned());
     }
     first_free_numbered(path, false)
+}
+
+/// Re-resolves a file taken after preflight, retaining its original unsuffixed
+/// request and checking the same input/output boundaries before another write.
+pub(crate) fn renumber_collided_output(
+    parsed: &mut Parsed,
+    key: &str,
+    path: &str,
+) -> Result<String, OutputError> {
+    let original = renamed()
+        .iter()
+        .find(|(used, _)| used == path)
+        .map_or_else(|| path.to_owned(), |(_, given)| given.clone());
+    let free = first_free_name(&original)?;
+    let mut candidate = parsed.clone();
+    candidate.insert(key.to_owned(), Given::One(free.clone()));
+    validate_output_paths(&candidate)?;
+    let mut records = renamed();
+    records.retain(|(used, _)| used != path);
+    if free != original {
+        records.push((free.clone(), original));
+    }
+    parsed.insert(key.to_owned(), Given::One(free.clone()));
+    Ok(free)
 }
 
 /// The first numbered name of `path` that nothing takes.
@@ -257,8 +289,8 @@ pub(crate) fn report_renamed() {
     for (used, given) in renamed().drain(..) {
         lasting_warning(&format!(
             "{} already exists: saved as {} instead.",
-            printable(&given),
-            printable(&used)
+            shown_path(&given),
+            shown_path(&used)
         ));
     }
 }
@@ -404,7 +436,8 @@ fn settle(parsed: &mut Parsed) -> Result<(), OutputError> {
     Ok(())
 }
 
-/// The preflight of a command's outputs, before any secret: a taken name numbered in `parsed`,
+/// The preflight of a command's outputs, before the seed phrase is asked or read (with --configure
+/// the Seedshift dates come first): a taken name numbered in `parsed`,
 /// refusals as above, each missing parent folder made, and the folders the command writes beneath,
 /// for the protections.
 pub(crate) fn preflight(parsed: &mut Parsed) -> Result<Needs, OutputError> {
@@ -494,7 +527,7 @@ pub(crate) fn warn_of_cloud_copy(path: &str) {
         let message = format!(
             "{} keeps a copy of {}",
             printable(&service),
-            printable(path)
+            shown_path(path)
         );
         warning_with_more(&message, "cloud-folders");
     }
@@ -615,9 +648,11 @@ mod tests {
 
     #[test]
     fn a_taken_name_is_numbered_before_its_ending() {
-        assert_eq!(numbered_name("out/cards.pdf", 2, false), "out/cards-2.pdf");
+        assert_eq!(numbered_name("out/cards.pdf", 2, false), "out/cards_2.pdf");
+        assert_eq!(numbered_name("out/photo.jpg", 1, false), "out/photo_1.jpg");
+        assert_eq!(numbered_name("out/music.mp3", 2, false), "out/music_2.mp3");
         assert_eq!(numbered_name("out/cards/", 1, true), "out/cards-1");
-        assert_eq!(numbered_name(".hidden", 3, false), ".hidden-3");
+        assert_eq!(numbered_name(".hidden", 3, false), ".hidden_3");
     }
 
     #[test]

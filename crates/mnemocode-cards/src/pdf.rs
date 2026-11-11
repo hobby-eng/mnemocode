@@ -23,6 +23,8 @@ use subsetter::GlyphRemapper;
 
 use crate::scene::{Blend, Page, Path, Picture, Pixels, Segment, Step, UiFont};
 
+pub mod piece;
+
 /// The deflate level of the streams.
 const DEFLATE_LEVEL: u8 = 6;
 /// The name of the font in a PDF.
@@ -31,6 +33,9 @@ const FONT_NAME: &[u8] = b"AAAAAA+DejaVuSans";
 const FONT_RESOURCE: &[u8] = b"F0";
 /// The start of a file: its version, and bytes past ASCII that tell a reader it is binary.
 const FILE_HEADER: &[u8] = b"%PDF-1.7\n%\x80\x80\x80\x80\n\n";
+/// The date a page's private data says it was changed (ISO 32000-1, 14.5, `LastModified`, which
+/// the standard asks for): one fixed date, so that it tells nothing of when the file was made.
+const PIECE_DATE: &[u8] = b"D:20000101000000Z";
 
 /// Why a document could not be written.
 #[derive(Debug)]
@@ -461,6 +466,28 @@ impl<W: Write> PdfPages<W> {
 
     /// Writes `page` after those so far.
     pub fn add(&mut self, page: &Page) -> Result<(), PdfError> {
+        self.add_with_piece(page, None)
+    }
+
+    /// Writes `page` after those so far, with `piece`, an application's name and its data, kept
+    /// compressed in the page's private data (ISO 32000-1, 14.5, `PieceInfo`), which no viewer
+    /// shows and [`piece::private_data`] reads back.
+    pub fn add_with_piece(
+        &mut self,
+        page: &Page,
+        piece: Option<(&str, &[u8])>,
+    ) -> Result<(), PdfError> {
+        let private = match piece {
+            Some((application, data)) => {
+                let id = self.ids.next();
+                let compressed = SecretBytes::large("a page's private data", deflated(data));
+                self.output.object(id, |chunk| {
+                    chunk.stream(id, &compressed).filter(Filter::FlateDecode);
+                })?;
+                Some((application, id))
+            }
+            None => None,
+        };
         let content = page_content(
             &mut self.output,
             &mut self.ids,
@@ -482,6 +509,13 @@ impl<W: Write> PdfPages<W> {
             written.parent(tree);
             written.media_box(Rect::new(0.0, 0.0, page.width as f32, page.height as f32));
             written.contents(content_id);
+            if let Some((application, id)) = private {
+                written.pair(Name(b"LastModified"), Str(PIECE_DATE));
+                let mut pieces = written.insert(Name(b"PieceInfo")).dict();
+                let mut entry = pieces.insert(Name(application.as_bytes())).dict();
+                entry.pair(Name(b"LastModified"), Str(PIECE_DATE));
+                entry.pair(Name(b"Private"), id);
+            }
             let mut resources = written.resources();
             resources.fonts().pair(Name(FONT_RESOURCE), font);
             {
@@ -591,9 +625,22 @@ impl<W: Write> PdfPages<W> {
 /// The PDF of `pages` already drawn, in their order: it shows the codes, so its bytes are held as a
 /// secret. [`crate::export::pdf_of`] takes them as they are drawn.
 pub fn document(font: &UiFont, pages: &[Page]) -> Result<SecretBytes, PdfError> {
+    document_with_piece(font, pages, None)
+}
+
+/// As [`document`], with `piece`'s data, under its application's name, in the private data of the
+/// page of `piece`'s place (see [`PdfPages::add_with_piece`]).
+pub fn document_with_piece(
+    font: &UiFont,
+    pages: &[Page],
+    piece: Option<(usize, &str, &[u8])>,
+) -> Result<SecretBytes, PdfError> {
     let mut pdf = PdfPages::new(Vec::new())?;
-    for page in pages {
-        pdf.add(page)?;
+    for (place, page) in pages.iter().enumerate() {
+        let here = piece
+            .filter(|&(at, _, _)| at == place)
+            .map(|(_, application, data)| (application, data));
+        pdf.add_with_piece(page, here)?;
     }
     Ok(SecretBytes::large("a card document", pdf.finish(font)?))
 }

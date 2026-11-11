@@ -93,8 +93,7 @@ impl Family {
             self.check_vector(place, true)?;
         }
         if self.built(self.elsewhere) {
-            let first = ok(AddressLocation::new(0, 0, 0))?;
-            let found = self.found_at(self.elsewhere, first, None, true)?;
+            let found = self.found_at(self.elsewhere, AddressLocation::FIRST, None, true)?;
             expect_same(
                 found.as_str(),
                 "not matched",
@@ -105,8 +104,8 @@ impl Family {
             let (_, _, path, address) = self.vectors[place];
             let own = location_of(path)?;
             let start = ok(AddressLocation::new(
-                u64::from(own.account),
-                u64::from(own.branch),
+                u64::from(own.account()),
+                u64::from(own.branch()),
                 0,
             ))?;
             let expected = format!("{path} {address}");

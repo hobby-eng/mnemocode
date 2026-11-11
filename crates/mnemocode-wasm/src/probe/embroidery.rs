@@ -1,12 +1,12 @@
-//! The embroidery's entries of the memory scan: a public phrase, masked with its dates, hidden in a
-//! pattern of a public picture, its legend and its PDF given out, and the legend read back, as a
-//! page does.
+//! The embroidery's entries of the memory scan: a public phrase, masked with its dates and then
+//! itself, hidden in a pattern of a public picture, its legend and its PDF given out, and the legend
+//! read back, typed and from the PDF, as a page does.
 
 use mnemocode_embroidery::phrase::masked_entropy;
 use mnemocode_embroidery::sample::gradient_png;
 
 use super::{Given, Met, js};
-use crate::embroidery::{StitchPattern, read_stitch_legend};
+use crate::embroidery::{StitchPattern, read_stitch_legend, read_stitch_pdf};
 use crate::host::phrase_and_dates;
 
 /// Stitches across the pattern: few, since the gate interprets the WebAssembly, and enough for a
@@ -30,6 +30,7 @@ pub(super) fn embroidery_entries(given: Given<'_>, met: &mut Met) {
         js(given.dates),
         &gradient_png(),
         STITCHES_ACROSS,
+        None,
     );
     let Some(pattern) = met.ok("stitch pattern", made) else {
         return;
@@ -38,9 +39,26 @@ pub(super) fn embroidery_entries(given: Given<'_>, met: &mut Met) {
         return;
     };
     met.text(&legend);
-    met.ok("stitch pdf", pattern.pdf());
     if let Some(Some(read)) = met.ok("read stitch legend", read_stitch_legend(js(&legend))) {
         let record = met.gave("stitch record", read.record());
         met.text(&record);
+    }
+    if let Some(pdf) = met.ok("stitch pdf", pattern.pdf(Some("linen-28".to_owned())))
+        && let Some(Some(read)) = met.ok("read stitch pdf", read_stitch_pdf(&pdf))
+    {
+        let record = met.gave("stitch pdf record", read.record());
+        met.text(&record);
+    }
+    let direct = StitchPattern::new(
+        js(given.phrase),
+        js(""),
+        &gradient_png(),
+        STITCHES_ACROSS,
+        Some("direct".to_owned()),
+    );
+    if let Some(pattern) = met.ok("stitch pattern of the phrase itself", direct)
+        && let Some(legend) = met.ok("stitch legend of the phrase itself", pattern.legend())
+    {
+        met.text(&legend);
     }
 }

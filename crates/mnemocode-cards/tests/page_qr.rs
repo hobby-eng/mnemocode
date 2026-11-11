@@ -33,6 +33,10 @@ const FORMS: [Form; 2] = [Form::Unicode, Form::Colors];
 /// refusal where none does. The parts take three fifths of each side, at either edge and in the
 /// middle, so that one holds a code in any corner or in the centre whole.
 fn read_image(drawing: &CardDrawing, page: &Page) -> String {
+    read_image_layer(drawing, page, false)
+}
+
+fn read_image_layer(drawing: &CardDrawing, page: &Page, hidden: bool) -> String {
     let image = page_image(&drawing.font, page, ImageFormat::Png).expect("the image");
     let (frame, pixels) = png_pixels(&image);
     let (width, height) = (frame.width as usize, frame.height as usize);
@@ -48,7 +52,12 @@ fn read_image(drawing: &CardDrawing, page: &Page) -> String {
                 );
             }
             let file = png_of(wide as u32, high as u32, &part).expect("a part");
-            match read_png(&file) {
+            let read = if hidden {
+                mnemocode::qr::hidden::read_png(&file)
+            } else {
+                read_png(&file)
+            };
+            match read {
                 Ok(text) => return text.as_str().to_owned(),
                 Err(error) => refusal = error.to_string(),
             }
@@ -63,6 +72,7 @@ fn sheet(size: PageSize, turn: Orientation) -> CardSettings {
         page_size: Some(size),
         orientation: Some(turn),
         card_qr: true,
+        hidden_qr: false,
         ..CardSettings::default()
     }
 }
@@ -86,7 +96,12 @@ fn check_sheet(
     };
     let pages = render_cards(drawing, &mut first_choices(), &[job]).expect("the sheet");
     let read = read_image(drawing, &pages[0]);
-    assert_eq!(read, payload, "{id} {size:?} {turn:?} {}", form.name());
+    assert_eq!(
+        read,
+        payload.as_str(),
+        "{id} {size:?} {turn:?} {}",
+        form.name()
+    );
 }
 
 /// Expects the QR code of each sheet of `records` in the design `id` to read as it was written.
@@ -106,6 +121,7 @@ fn check_shares(
         settings: CardSettings {
             page_size: Some(size),
             card_qr: true,
+            hidden_qr: false,
             ..CardSettings::default()
         },
     };
@@ -202,4 +218,32 @@ fn the_qr_card_of_a_share_reads_at_the_size_of_a_card() {
             size_and_layout,
         );
     }
+}
+
+#[test]
+fn a_hidden_sheet_qr_shows_the_printed_contact_and_recovers_the_exact_codes() {
+    let drawing = CardDrawing::new();
+    let backup = direct_backup(PHRASE, Form::Unicode);
+    let expected = backup.text().unwrap().as_str().to_owned();
+    let mut settings = sheet(PageSize::A5, Orientation::Landscape);
+    settings.hidden_qr = true;
+    settings.profile.set(
+        mnemocode_cards::settings::ProfileField::Name,
+        "Public Test".to_owned(),
+    );
+    settings.profile.set(
+        mnemocode_cards::settings::ProfileField::Company,
+        "Example Studio".to_owned(),
+    );
+    let cards = backup_card_content(&backup, settings, None).unwrap();
+    let job = CardJob {
+        template: template("business-it"),
+        cards,
+    };
+    let rendered = render_cards(&drawing, &mut first_choices(), &[job]).unwrap();
+    let shown = read_image(&drawing, &rendered[0]);
+    assert!(shown.contains("FN:Public Test"), "{shown}");
+    assert!(shown.contains("ORG:Example Studio"));
+    assert!(!shown.contains("URL:"));
+    assert_eq!(read_image_layer(&drawing, &rendered[0], true), expected);
 }

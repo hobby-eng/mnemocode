@@ -67,7 +67,7 @@ impl From<std::io::Error> for Failure {
 
 const USAGE: &str = "usage: cargo xtask <check | code-rules [--self-test] | copies [--tokens N | \
                      --self-test] | markdown | notices [--check] | wasm build [<edition>/<page>] \
-                     | wasm verify | windows-imports <file.exe> [--check] | action-pins | knowndlls | release build <target> | release pages | verify-executable <file> | reproducible | features | sign <tag> [--publish] | audit>";
+                     | wasm verify | wasm diagnose-backup-abi <profile-or-absolute-folder> | windows-imports <file.exe> [--check] | action-pins | knowndlls | release build <target> | release pages | verify-executable <file> | reproducible | features | sign <tag> [--publish] | audit>";
 
 /// The repository's root: the folder above this crate's.
 pub(crate) fn root() -> PathBuf {
@@ -140,6 +140,7 @@ fn run(task: &str, arguments: &[String]) -> Result<(), Failure> {
         ("wasm", ["build"]) => wasm::build_all(&root),
         ("wasm", ["build", profile]) => wasm::build(&root, profile),
         ("wasm", ["verify"]) => wasm::verify(&root),
+        ("wasm", ["diagnose-backup-abi", profile]) => wasm::diagnose_backup_abi(&root, profile),
         ("windows-imports", [file]) => windows::run(&root, Path::new(file), false),
         ("windows-imports", [file, "--check"]) => windows::run(&root, Path::new(file), true),
         ("audit", []) => check::audit(&root, true),

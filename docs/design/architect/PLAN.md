@@ -295,7 +295,8 @@ Decided on 2026-11-02:
 - A QR image has at most 2 megapixels: a screen of 1920 × 1080 fits, and a page image is cropped.
 - The help of `--ask-secrets` names standard error; a failed write of standard output is reported.
 - Kept as they are: encode refuses English words and word numbers without Seedshift; the working
-  vectors of a repair and the codes of cards are wiped on free but not locked (RUST-13); the
+  vectors of a repair and the codes of cards are wiped on free but not locked (RUST-13; card codes
+  have used locked owners since AUD-006, 2026-11-09); the
   progress of a date search of shares counts over every set; the self-test's rows as they are; no
   note of pdftocairo; recover-word keeps the right to write on its private screen; jpeg-encoder's
   license text as its upstream writes it; the messages of missing codes and the white space of
@@ -474,7 +475,9 @@ the TS capsule (`multi-chain-wallet-tools/packages/recovery-mnemocode`) to the W
   `visible` and `hidden`, `ReadingSpace.particular` and `basis` and `ReadingUnits.values` stay
   for a whole search, one set of them for each branch and share. Kept the same way: a card's
   `CardCodes` and each `Page` being drawn are wiped on free but not locked, since the same codes stand
-  unlocked in the finished PDF and page images, so that locking one copy closes no path. Moved: the share commands,
+  unlocked in the finished PDF and page images, so that locking one copy closes no path. Superseded
+  for `CardCodes` and retained command dates on 2026-11-09 (AUD-006): they use locked owners, as
+  ARCHITECTURE.md records; a `Page` is still wiped without locking. Moved: the share commands,
   `--qr-dir` of shares and the sources of typed shares (CAP-SSKR-SAVE-SHARE-QR,
   CAP-SSKR-SHARE-SOURCES) to increment 9 with the commands that use them; the wallet check of
   restored sets (CAP-SSKR-WALLET-CHECK-SETS) to increment 8, where the share restore steps unmask

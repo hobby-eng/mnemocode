@@ -44,7 +44,7 @@ struct AddressWords {
 }
 
 fn first_receiving(location: AddressLocation) -> bool {
-    location.account == 0 && location.branch == 0 && location.index == 0
+    location == AddressLocation::FIRST
 }
 
 /// The place of an address as the questions name it, from the account on.
@@ -52,9 +52,9 @@ fn place_path(location: AddressLocation) -> String {
     let account = if first_receiving(location) {
         String::new()
     } else {
-        format!("{}'/", location.account)
+        format!("{}'/", location.account())
     };
-    format!("m/.../{account}{}/{}", location.branch, location.index)
+    format!("m/.../{account}{}/{}", location.branch(), location.index())
 }
 
 /// The words for an address at `location`, or among `addresses` of them from there.
@@ -165,7 +165,7 @@ fn ask_address_count(place: &Place, asker: Asker) -> Result<Option<u64>, Stop> {
     } else {
         place_path(location)
     };
-    let fallback = default_address_count(location.index).to_string();
+    let fallback = default_address_count(location.index()).to_string();
     let prompt = format!("Compare with how many addresses from {from}");
     let value = Value {
         prompt: &prompt,
@@ -176,7 +176,7 @@ fn ask_address_count(place: &Place, asker: Asker) -> Result<Option<u64>, Stop> {
     asker.ask(&value, |answer: &str| {
         let count = typed_whole_number(answer, ADDRESS_COUNT_RANGE, None)
             .map_err(|refused| refused.to_string())?;
-        address_count(Some(count), u64::from(location.index))
+        address_count(Some(count), u64::from(location.index()))
             .map(u64::from)
             .map_err(|refused| refused.to_string())
     })

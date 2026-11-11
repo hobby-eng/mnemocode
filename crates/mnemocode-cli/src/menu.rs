@@ -20,7 +20,6 @@ use mnemocode::forms::Form;
 use mnemocode::modes::Mode;
 use mnemocode::qr::admission::MAX_PNG_BYTES;
 use mnemocode::recovery::date_search::wallet_needed;
-use mnemocode::sskr::forms::ShareFormat;
 use mnemocode::wallet::coins::AddressLocation;
 use mnemocode::wallet::evidence::{KeyNetwork, Place};
 use mnemocode_cards::export::SAMPLE_FILE_BASE;
@@ -34,20 +33,22 @@ use crate::commands::candidates_file::ask_candidate_list;
 use crate::commands::card_questions::ask_design;
 use crate::commands::date_search::wallet_explanation;
 use crate::commands::encode_questions::{
-    QR_FILE, RECORD_FILE, ask_encoding, ask_heir_sheet, ask_seedshift, ask_share_set, ask_shares,
-    example, file_questions, sample_of, seedshift_explanation, variant_explanation,
+    QR_FILE, RECORD_FILE, ask_encoding, example, file_questions, sample_of, seedshift_explanation,
+    variant_explanation,
 };
 use crate::commands::menu_entries::{
     self, Guide, MENU_GUIDE, MenuEntry, PHRASE_WORDS_QUESTION, TYPED_SOURCE, phrase_words_answer,
 };
 use crate::commands::output_questions::{ask_output_file, forget_claimed, input_file};
+use crate::commands::pattern_questions::PATTERN_FILE;
 use crate::commands::wallet_question::{Asker, WalletAnswer, ask_wallet_evidence_by};
 use crate::commands::{help, named, self_test};
 use crate::gate::Stop;
+use crate::input::MAX_PATTERN_PDF_BYTES;
 use crate::os::{self, Protection};
 use crate::terminal::{
-    self, Channel, Choice, Chosen, Digit, Explanation, LEAVE_ALTERNATE_SCREEN, LineQuestion,
-    ListQuestion, NoticeKind, answer_mark, ask_line, choose, choose_from, error_line, error_raw,
+    self, Channel, Choice, Chosen, Explanation, LEAVE_ALTERNATE_SCREEN, LineQuestion, ListQuestion,
+    NoticeKind, Shortcut, answer_mark, ask_line, choose, choose_from, error_line, error_raw,
     heading_line, more_line, notes_room, notice, paint, printable, readme_link,
     redraw_answer_record, start_answer_record, style, terminal_available, wait_for_enter_or_escape,
 };
@@ -147,6 +148,7 @@ enum Source {
     Typed,
     Record,
     Qr,
+    Pattern,
 }
 
 /// Where an encoded seed phrase is read from, as options: typed on the private screen, with how many
@@ -167,8 +169,14 @@ fn ask_source() -> Result<Option<Vec<String>>, Stop> {
         "the PNG file that Encode saved",
         Source::Qr,
     );
+    // The legend line that a pattern's PDF keeps, which Decode reads from the file itself.
+    let pattern = Choice::noted(
+        "In a cross-stitch pattern",
+        "the PDF file that Encode saved",
+        Source::Pattern,
+    );
     // Two samples share the room beside the labels, with what stands between them.
-    let room = (notes_room(&[typed.clone(), record.clone(), qr.clone()])
+    let room = (notes_room(&[typed.clone(), record.clone(), qr.clone(), pattern.clone()])
         - SAMPLES_APART.chars().count())
         / 2;
     let samples = [
@@ -182,7 +190,7 @@ fn ask_source() -> Result<Option<Vec<String>>, Stop> {
     let source = ask_list(
         "Where is the encoded seed phrase?",
         "Source",
-        &[typed, record, qr],
+        &[typed, record, qr, pattern],
         None,
     )?;
     let (question, fallback, limit, option) = match source {
@@ -195,6 +203,12 @@ fn ask_source() -> Result<Option<Vec<String>>, Stop> {
             "--input-file",
         ),
         Some(Source::Qr) => (file_questions::QR, QR_FILE, MAX_PNG_BYTES, "--qr-file"),
+        Some(Source::Pattern) => (
+            file_questions::PDF,
+            PATTERN_FILE,
+            MAX_PATTERN_PDF_BYTES,
+            "--input-file",
+        ),
     };
     let how = LineQuestion {
         fallback: Some(fallback),
@@ -282,57 +296,12 @@ fn marked_codes_action() -> Result<Action, Stop> {
 /// Entry 4: standard Shamir shares of the seed phrase itself, in Bytewords or as a short code, as
 /// other SSKR tools write and read them; restoring them gives the seed phrase in words.
 fn split_action() -> Result<Action, Stop> {
-    let Some(mode) = ask_seedshift("Use Seedshift before splitting?", false, true)? else {
-        return Ok(Action::Back);
-    };
-    let explanation = Explanation {
-        lines: vec![
-            "Standard SSKR shares of the seed phrase itself, which other SSKR tools read."
-                .to_owned(),
-        ],
-        more: vec![readme_link("splitting-a-mnemonic-into-shares")],
-    };
-    let set = ask_share_set(
-        "How many shares, and how many of them restore the seed phrase?",
-        &explanation,
-        false,
-    )?;
-    let Some(Some(set)) = set else {
-        return Ok(Action::Back);
-    };
-    let choices = [
-        Choice::noted(
-            "Words",
-            "Bytewords, such as tuna next keep gyro ...",
-            ShareFormat::Words,
-        ),
-        Choice::noted(
-            "Short code",
-            "ur:sskr/..., the standard short form",
-            ShareFormat::Ur,
-        ),
-    ];
-    let Some(format) = ask_list(
-        "How should each share be written?",
-        "Shares as",
-        &choices,
-        None,
-    )?
-    else {
-        return Ok(Action::Back);
-    };
-    let Some(shares) = ask_shares(set, format)? else {
-        return Ok(Action::Back);
-    };
-    let Some(heirs) = ask_heir_sheet(mode)? else {
-        return Ok(Action::Back);
-    };
-    let mut run = joined(
-        &["encode", "--sskr", "--ask-secrets", "--mode", mode.id()],
-        shares,
-    );
-    run.extend(heirs);
-    Ok(Action::run(run))
+    Ok(Action::run(line(&[
+        "encode",
+        "--configure",
+        "--ask-secrets",
+        "--sskr",
+    ])))
 }
 
 /// Whether the phrase of shares was masked before it was split; none means back.
@@ -541,11 +510,7 @@ fn share_repair_action() -> Result<Action, Stop> {
 fn ask_wallet(required: bool, explanation: &Explanation) -> Result<Option<Vec<String>>, Stop> {
     let place = Place {
         network: KeyNetwork::Mainnet,
-        location: AddressLocation {
-            account: 0,
-            branch: 0,
-            index: 0,
-        },
+        location: AddressLocation::FIRST,
         addresses: None,
     };
     let answer = ask_wallet_evidence_by(Asker::Menu, !required, Some(explanation), &place)?;
@@ -575,12 +540,12 @@ fn preview_action() -> Result<Action, Stop> {
     Ok(Action::run(run))
 }
 
-/// Entry 9.
+/// Entry 0.
 fn self_test_action() -> Result<Action, Stop> {
     Ok(Action::run(line(&["self-test"])))
 }
 
-/// Entry 0.
+/// Entry s.
 fn help_action() -> Result<Action, Stop> {
     Ok(Action::Help)
 }
@@ -779,7 +744,7 @@ fn ask_entry(closure: Option<&Closure>, selected: usize) -> Result<Option<usize>
         .map(|&index| {
             let name = ENTRIES[index].name;
             Choice {
-                digit: Digit::Own(name.digit),
+                shortcut: Shortcut::Own(name.key),
                 ..Choice::new(name.label, index)
             }
         })

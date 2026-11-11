@@ -80,7 +80,7 @@ x25519-dalek = { version = "=3.0.0", default-features = false, features = [
 ] }
 scrypt = { version = "=0.12.0", default-features = false }
 base64ct = { version = "=1.8.3", default-features = false, features = ["alloc"] }
-# The SSKR engine, vendored unchanged, and its seeded generator
+# The SSKR engine with recorded ownership/cleanup patches (vendor/*/UPSTREAM.json), and its seeded generator
 sskr = { version = "=0.12.0", path = "vendor/sskr-0.12.0" }
 bc-rand = "=0.5.0"
 rand_chacha = "=0.9.0"
@@ -92,6 +92,8 @@ png = "=0.18.1"
 miniz_oxide = "=0.9.1"
 jpeg-encoder = "=0.7.1"
 zune-jpeg = "=0.5.15"
+# WebP pictures of a cross-stitch pattern (owner, 2026-11-04): image-rs's pure-Rust decoder.
+image-webp = "=0.2.4"
 # Cards: PDF, fonts, raster, colour maths
 pdf-writer = "=0.15.0"
 skrifa = "=0.49.0"
@@ -118,9 +120,14 @@ strip = true
 
 # The cryptographic primitives run unoptimized at a fraction of their speed: scrypt at the candidate
 # files' work factor 2^18 takes half a minute, a list of 16 MiB seconds. The debug builds of the tests
-# and the self-test optimize the dependencies, never the workspace's own crates; overflow checks and
-# debug assertions stay on.
+# and the self-test optimize dependencies; product crates retain their debug builds. Overflow
+# checks and debug assertions stay on.
 [profile.dev.package."*"]
+opt-level = 3
+
+# The verification tool scans complete WASM memories. Optimize its host scans too;
+# this leaves product compilation, WASM bytes, overflow checks and assertions unchanged.
+[profile.dev.package.xtask]
 opt-level = 3
 
 # The WebAssembly files: the release profile, built for size, as the TS SSKR engine was
@@ -131,7 +138,7 @@ opt-level = "s"
 
 # Option (d) of the crates report, decided by the owner on 2026-10-27: bc-shamir 0.13.0 takes three
 # items from bc-crypto, whose crates.io defaults compile the C libsecp256k1; the stand-in gives those
-# three over hmac, sha2 and zeroize, and every vendored file stays unchanged. The `code-rules` gate
+# three over hmac, sha2 and zeroize; vendor/*/UPSTREAM.json records the separate ownership patches. The `code-rules` gate
 # refuses a Cargo.lock that lists bc-crypto from a registry, since an unmatched patch only warns.
 [patch.crates-io]
 bc-crypto = { path = "shims/bc-crypto" }

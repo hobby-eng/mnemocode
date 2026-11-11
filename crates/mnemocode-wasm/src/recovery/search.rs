@@ -17,7 +17,7 @@ use mnemocode::recovery::shares::repair::{ShareRepairOutcome, repair_before_rest
 use mnemocode::recovery::shares::{SearchLimits, ShareFlowError};
 use mnemocode::recovery::wallet_check::WalletCheck;
 use mnemocode::recovery::word_search::{WordCandidateSearch, WordLimits};
-use mnemocode::refusal::Refusal;
+use mnemocode::refusal::{Refusal, RefusalKind};
 use mnemocode::search::plan::SearchPlan;
 use mnemocode::search::{Progress, Search, SearchSize, Step, kept_count};
 use mnemocode::sskr::forms::ShareFormat;
@@ -576,7 +576,7 @@ impl RecoverySearch {
 
     /// Tries at most `work` candidates.
     pub fn step(&mut self, work: f64) -> Result<SearchProgress, JsValue> {
-        let work = u32::try_from(whole(work)).unwrap_or(u32::MAX);
+        let work = work_of(work).map_err(fail)?;
         after_secret(|| {
             let step = with_search!(&mut self.0, search => search.step(work).map_err(fail))?;
             Ok(SearchProgress(
@@ -605,5 +605,60 @@ impl RecoverySearch {
                     .map_err(fail)
             }
         })
+    }
+}
+
+/// Malformed public work must not turn into the largest possible scheduling turn.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct WorkRefused;
+
+impl fmt::Display for WorkRefused {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use mnemocode::text::numbers::{WholeRange, integer_refusal};
+        f.write_str(&integer_refusal(
+            "Search work",
+            WholeRange::new(0, u64::from(u32::MAX)),
+            None,
+        ))
+    }
+}
+
+impl std::error::Error for WorkRefused {}
+
+impl Refusal for WorkRefused {
+    fn code(&self) -> &'static str {
+        "wasm.recovery.work"
+    }
+    fn kind(&self) -> RefusalKind {
+        RefusalKind::Range
+    }
+}
+
+fn work_of(work: f64) -> Result<u32, WorkRefused> {
+    u32::try_from(whole(work)).map_err(|_| WorkRefused)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn malformed_work_is_refused_without_expanding_a_turn() {
+        for value in [
+            -1.0,
+            0.5,
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::from(u32::MAX) + 1.0,
+            f64::MAX,
+        ] {
+            assert_eq!(work_of(value), Err(WorkRefused));
+        }
+        for value in [0, 1, 32, u32::MAX] {
+            assert_eq!(work_of(f64::from(value)), Ok(value));
+        }
+        assert_eq!(WorkRefused.code(), "wasm.recovery.work");
+        assert_eq!(WorkRefused.kind(), RefusalKind::Range);
     }
 }

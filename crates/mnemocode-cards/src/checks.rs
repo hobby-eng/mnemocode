@@ -124,6 +124,7 @@ fn card_details() -> CardSettings {
             reference_label: "Ref.".to_owned(),
         }),
         card_qr: false,
+        hidden_qr: false,
     }
 }
 
@@ -131,11 +132,11 @@ fn card_details() -> CardSettings {
 fn phrase_cards(settings: CardSettings) -> Result<ColorCards, CheckFailure> {
     Ok(ColorCards {
         kind: ContentKind::Colors,
-        codes: CardCodes {
-            colors: ok(code_colors(&PUBLIC_UNICODE_CODES))?,
-            labels: Some(PUBLIC_UNICODE_CODES.map(str::to_owned).to_vec()),
-            payload: PUBLIC_UNICODE_CODES.concat(),
-        },
+        codes: CardCodes::new(
+            ok(code_colors(&PUBLIC_UNICODE_CODES))?,
+            Some(PUBLIC_UNICODE_CODES.map(str::to_owned).to_vec()),
+            PUBLIC_UNICODE_CODES.concat(),
+        ),
         decoys: None,
         title: None,
         reference: None,
@@ -210,6 +211,7 @@ fn drawn_set() -> Result<(), CheckFailure> {
     let drawing = CardDrawing::new();
     let settings = CardSettings {
         card_qr: true,
+        hidden_qr: false,
         ..card_details()
     };
     let template = ok(select_template(Some("material-tile")))?;
@@ -224,9 +226,9 @@ fn drawn_set() -> Result<(), CheckFailure> {
     if job.cards.decoys.unwrap_or(0) < 1 {
         return Err(CheckFailure::Mismatch("Decoys of a planned set"));
     }
-    let labels = job.cards.codes.labels.clone().unwrap_or_default();
+    let labels = job.cards.codes.labels.as_deref().unwrap_or(&[]);
     expect_same(
-        &labels.get(..12).map(<[String]>::concat).as_deref(),
+        &labels.get(..12).map(|values| values.join("")).as_deref(),
         &Some(PUBLIC_UNICODE_CODES.concat().as_str()),
         "Codes of a set",
     )?;
@@ -257,7 +259,7 @@ fn decoys_of_a_set() -> Result<(), CheckFailure> {
     expect_same(&pool.decoys, &Some(MAX_DECOYS), "Decoys of a set")?;
     let labels = pool.codes.labels.as_deref().unwrap_or_default();
     expect_same(
-        &labels.last().map(String::as_str),
+        &labels.last().map(|value| value.as_str()),
         &PUBLIC_UNICODE_CODES.first().copied(),
         "Decoy code",
     )?;
@@ -280,7 +282,7 @@ fn decoys_of_a_set() -> Result<(), CheckFailure> {
     )?;
     let labels = individual.codes.labels.as_deref().unwrap_or_default();
     expect_same(
-        &labels.get(..12).map(<[String]>::concat).as_deref(),
+        &labels.get(..12).map(|values| values.join("")).as_deref(),
         &Some(phrase.codes.payload.as_str()),
         "Separate real codes",
     )?;
@@ -592,7 +594,7 @@ fn share_faces(records: &[&str]) -> Result<(), CheckFailure> {
         FIRST_SHARE_UNICODE,
         "Share card QR code in Unicode codes",
     )?;
-    let labels = codes.labels.clone().unwrap_or_default();
+    let labels = codes.labels.as_deref().unwrap_or(&[]);
     expect_same(
         labels.join(" ").as_str(),
         FIRST_SHARE_UNICODE,
@@ -601,7 +603,7 @@ fn share_faces(records: &[&str]) -> Result<(), CheckFailure> {
     // One color for each distinct code, and the same color for the same code.
     expect_same(
         &distinct(&codes.colors),
-        &distinct(&labels),
+        &distinct(labels),
         "Colors of the Unicode codes",
     )?;
     let with_cards: Vec<&str> = ShareFormat::ALL
@@ -624,8 +626,8 @@ fn share_faces(records: &[&str]) -> Result<(), CheckFailure> {
 
 /// How many different texts `texts` holds.
 #[cfg(feature = "sskr")]
-fn distinct(texts: &[String]) -> usize {
-    let mut sorted: Vec<&String> = texts.iter().collect();
+fn distinct<S: AsRef<str>>(texts: &[S]) -> usize {
+    let mut sorted: Vec<&str> = texts.iter().map(AsRef::as_ref).collect();
     sorted.sort();
     sorted.dedup();
     sorted.len()
@@ -668,6 +670,7 @@ fn card_export(tier: Tier) -> Result<(), CheckFailure> {
         }
         let settings = CardSettings {
             card_qr: true,
+            hidden_qr: false,
             ..card_details()
         };
         let cards = ok(backup_card_content(&encoding.backup, settings, None))?;

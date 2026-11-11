@@ -23,6 +23,10 @@ cargo xtask release build x86_64-unknown-linux-gnu
 cargo xtask verify-executable dist/release/mnemocode-<version>-linux-x64
 ```
 
+The canonical Dockerfile accepts an optional `CARGO_BUILD_JOBS` build argument. Set it with
+`docker buildx build --build-arg CARGO_BUILD_JOBS=<jobs> ...` to choose Cargo parallelism for
+toolchain installation and artifact compilation within the machine's available memory.
+
 ## Signed tag
 
 Make an annotated tag, signed like the commits with the SSH key that Git is set up with, and push

@@ -4,7 +4,7 @@ use super::super::{CommandHelp, HelpGroup, HelpOption};
 use super::options::{
     ASK_SECRETS, BACKUP_CHECK, CARD_LAYOUT, CARD_QR_2, CARDS_DIR_2, DATES, DATES_FILE, HEIR_SHEET,
     HEIR_SHEET_SIZE, IMAGE_FORMAT_2, IMAGES_DIR, MNEMONIC, MNEMONIC_FILE, ORIENTATION, PAGE_SIZE,
-    QR_DIR, RUN_2, SHARES, TEMPLATE, THRESHOLD,
+    QR_DIR, QR_HIDDEN, QR_TEXT, RUN_2, SHARES, TEMPLATE, THRESHOLD,
 };
 
 const OWN_0_3: HelpOption = HelpOption {
@@ -64,6 +64,8 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
                 &PAGE_SIZE,
                 &ORIENTATION,
                 &CARD_QR_2,
+                &QR_HIDDEN,
+                &QR_TEXT,
                 &HEIR_SHEET,
                 &HEIR_SHEET_SIZE,
                 &BACKUP_CHECK,
