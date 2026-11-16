@@ -428,6 +428,10 @@ pub(crate) fn features(root: &Path) -> Result<(), Failure> {
             "--release",
             "--",
             "--include-ignored",
+            // The probe scan needs the test/probe WebAssembly build, which this gate does not make;
+            // `cargo xtask wasm verify` in `check` builds and scans it.
+            "--skip",
+            "secret_probe_artifact_matches_its_declared_exports_and_starts",
         ],
     )
 }
