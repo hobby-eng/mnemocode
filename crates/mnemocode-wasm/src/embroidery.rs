@@ -1,13 +1,13 @@
 //! The embroidery part for a page (`browser-embroidery`): a phrase, masked with Seedshift dates
-//! unless the page asks for the phrase itself, hidden in the legend of a cross-stitch pattern of
-//! the page's picture; and a legend line, typed or kept in a pattern's PDF, read back as the record
-//! of its phrase, which the recovery part decodes, with the dates where the legend says it is
-//! masked (docs/SEEDSTITCH.md). The phrase, the dates and a legend cross as `JsValue`s that Rust
-//! reads (ARCHITECTURE.md §6); the picture is no secret and crosses as bytes, and a pattern's PDF
-//! as bytes too. What a page gets back holds the phrase: it drops [`StitchPattern`] and
-//! [`StitchLegend`] soon after, which wipes them.
+//! unless the page asks otherwise, hidden in the legend of a pattern of the page's picture; and a
+//! legend line or pattern PDF read back as its phrase's record (docs/SEEDSTITCH.md). Secrets cross
+//! as `JsValue`s that Rust reads (ARCHITECTURE.md §6); results hold the phrase, so a page drops
+//! [`StitchPattern`] and [`StitchLegend`] soon after, which wipes them.
+
+use std::fmt;
 
 use mnemocode::modes::Mode;
+use mnemocode::refusal::Refusal;
 use mnemocode::self_check::{Check, Tier};
 use mnemocode::text::numbers::WholeRange;
 use mnemocode_embroidery::checks::ROW;
@@ -70,12 +70,10 @@ impl StitchPattern {
 
 #[wasm_bindgen]
 impl StitchPattern {
-    /// `phrase`, masked with `dates` (a typed line of them) by MnemoCode Seedshift, hidden in the
-    /// legend of a pattern of `picture`, a PNG, JPEG or WebP file, `stitchesAcross` wide (0: 200).
-    /// `mode`, which a page may leave out, is "seedshift" or "direct" for the phrase itself, with
-    /// no dates: anyone who knows the public format reads it from the legend. Refused as the
-    /// library refuses the mode, the phrase, the dates, the picture and the width, and where the
-    /// picture has too few colors to hold the phrase.
+    /// `phrase`, masked with `dates` (a typed line) by Seedshift, hidden in the legend of a pattern
+    /// of `picture` (PNG, JPEG or WebP), `stitchesAcross` wide (0: 200). `mode` may be left out, or
+    /// is "seedshift" or "direct" (the phrase itself, no dates, readable by anyone). Refused as the
+    /// library refuses its inputs, and where the picture has too few colors to hold the phrase.
     #[wasm_bindgen(constructor)]
     pub fn new(
         phrase: JsValue,
@@ -246,16 +244,19 @@ impl StitchSizes {
         DETAILED_ACROSS
     }
 
-    /// The fewest centimetres across that a width typed in them may have, rounded up.
+    /// The least width, to a millimetre, that [`StitchSizes::typed_width`] takes; none where no
+    /// width in millimetres gives the stitches allowed, as for a few on fine linen: the page then
+    /// asks for stitches only.
     #[wasm_bindgen(getter, js_name = fewestCentimetres)]
-    pub fn fewest_centimetres(&self) -> f64 {
-        fabric::centimetre_range(self.widths, self.fabric.count()).0
+    pub fn fewest_centimetres(&self) -> Option<f64> {
+        fabric::centimetre_range(self.widths, self.fabric.count()).map(|(least, _)| least)
     }
 
-    /// The most centimetres across that a width typed in them may have, rounded down.
+    /// The most width, to a millimetre, that [`StitchSizes::typed_width`] takes; none where
+    /// [`StitchSizes::fewest_centimetres`] is none.
     #[wasm_bindgen(getter, js_name = mostCentimetres)]
-    pub fn most_centimetres(&self) -> f64 {
-        fabric::centimetre_range(self.widths, self.fabric.count()).1
+    pub fn most_centimetres(&self) -> Option<f64> {
+        fabric::centimetre_range(self.widths, self.fabric.count()).map(|(_, most)| most)
     }
 
     /// The stitches across of a width of `centimetres` that a person typed; none where it is no
@@ -279,10 +280,18 @@ impl StitchLegend {
     }
 
     /// The row, from 1, that did not fit and was read as the only change of it that gives a phrase,
-    /// for the page to ask the person to check it; undefined where the line read as it is.
+    /// for the page to ask the person to check it; undefined where the line read as it is, or where
+    /// changes of several rows give the phrase (see `corrected`).
     #[wasm_bindgen(getter, js_name = correctedRow)]
     pub fn corrected_row(&self) -> Option<usize> {
         self.0.corrected_row()
+    }
+
+    /// Whether a row did not fit and was read as changed; true with no correctedRow where changes of
+    /// several rows give the same phrase, and the page asks for all the rows to be checked.
+    #[wasm_bindgen(getter)]
+    pub fn corrected(&self) -> bool {
+        self.0.corrected()
     }
 }
 
@@ -297,11 +306,54 @@ pub fn read_stitch_legend(line: JsValue) -> Result<Option<StitchLegend>, JsValue
     })
 }
 
+/// A pattern's PDF larger than [`chart::MAX_PATTERN_PDF_BYTES`], refused before it is read.
+#[derive(Debug)]
+struct PdfTooLarge;
+
+impl fmt::Display for PdfTooLarge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "A pattern's PDF is read up to {} MiB.",
+            chart::MAX_PATTERN_PDF_BYTES / 1024 / 1024
+        )
+    }
+}
+
+impl std::error::Error for PdfTooLarge {}
+
+impl Refusal for PdfTooLarge {
+    fn code(&self) -> &'static str {
+        "wasm.embroidery.pdf-too-large"
+    }
+}
+
+/// The most bytes [`read_stitch_pdf`] reads. The page checks a file's size against it before it
+/// reads the file: the bytes are copied into WebAssembly memory before the function runs.
+#[wasm_bindgen(js_name = stitchPdfMaxBytes)]
+#[must_use]
+pub fn stitch_pdf_max_bytes() -> u32 {
+    u32::try_from(chart::MAX_PATTERN_PDF_BYTES).unwrap_or(u32::MAX)
+}
+
+/// Whether `pdf` is read for a legend at all: refused above the limit, as the command line refuses
+/// the file; false for what is no PDF.
+fn admitted_pdf(pdf: &[u8]) -> Result<bool, PdfTooLarge> {
+    if pdf.len() > chart::MAX_PATTERN_PDF_BYTES {
+        return Err(PdfTooLarge);
+    }
+    Ok(pdf.starts_with(b"%PDF-"))
+}
+
 /// The legend line that the PDF `pdf` of a pattern keeps, read back as [`read_stitch_legend`]
 /// reads a typed one; undefined where the PDF keeps none, as when another program saved it again,
-/// and the page asks for the legend typed from the key instead.
+/// and the page asks for the legend typed from the key instead. Refused above
+/// [`stitch_pdf_max_bytes`].
 #[wasm_bindgen(js_name = readStitchPdf)]
 pub fn read_stitch_pdf(pdf: &[u8]) -> Result<Option<StitchLegend>, JsValue> {
+    if !admitted_pdf(pdf).map_err(|refusal| refused(&refusal))? {
+        return Ok(None);
+    }
     after_secret(|| match chart::legend_of_pdf(pdf) {
         Some(line) => record_of_legend(line.as_str())
             .map(|read| read.map(StitchLegend))
@@ -320,13 +372,50 @@ pub fn self_check_embroidery(full: bool) -> Result<(), JsValue> {
 #[cfg(test)]
 mod tests {
     use mnemocode_embroidery::legend::EXAMPLE;
-    use mnemocode_embroidery::sample::gradient_png;
+    use mnemocode_embroidery::sample::{gradient_png, narrow_png};
 
     use super::*;
 
     /// Trezor's published 24-word test vector.
     const VOID: &str = "void come effort suffer camp survey warrior heavy shoot primary clutch crush \
                         open amazing screen patrol group space point ten exist slush involve unfold";
+
+    // AUD-007-API002: the browser refuses a PDF above the command line's limit before scanning it.
+    #[test]
+    fn a_pattern_pdf_is_admitted_up_to_the_limit_of_the_command_line() {
+        assert_eq!(
+            stitch_pdf_max_bytes() as usize,
+            chart::MAX_PATTERN_PDF_BYTES
+        );
+        let mut pdf = b"%PDF-1.7\n".to_vec();
+        pdf.resize(chart::MAX_PATTERN_PDF_BYTES, b' ');
+        assert!(admitted_pdf(&pdf).unwrap());
+        pdf.push(b' ');
+        assert!(admitted_pdf(&pdf).is_err());
+        assert!(!admitted_pdf(b"not a PDF").unwrap());
+    }
+
+    // AUD-007-FUN002, as the audit's browser check met it: the narrowest picture gives one width,
+    // offered in centimetres only where a typed width gives it.
+    #[test]
+    fn the_narrowest_picture_offers_only_widths_that_are_taken_when_typed() {
+        let aida = StitchSizes::new(&narrow_png(), Some("14".to_owned())).unwrap();
+        let (least, most) = (
+            aida.fewest_centimetres().unwrap(),
+            aida.most_centimetres().unwrap(),
+        );
+        assert!(least <= most, "{least} {most}");
+        assert_eq!(
+            (aida.typed_width(least), aida.typed_width(most)),
+            (Some(40), Some(40))
+        );
+        let linen = StitchSizes::new(&narrow_png(), Some("linen-36".to_owned())).unwrap();
+        assert_eq!(
+            (linen.fewest_centimetres(), linen.most_centimetres()),
+            (None, None)
+        );
+        assert_eq!(linen.typed_width(2.8), None);
+    }
 
     #[test]
     fn a_pattern_is_made_and_its_legend_read_back_as_the_library_does() {

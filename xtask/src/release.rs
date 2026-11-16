@@ -1,9 +1,7 @@
-//! The release tasks (ARCHITECTURE.md §1, docs/RELEASING.md), each a port of the TS repository's
-//! script of that step: `release build`, which makes an executable with its notices and checksums;
-//! `release pages`, which packs every page's WebAssembly file; `verify-executable`, which runs a
-//! built executable away from the checkout on public test data; `reproducible`, which rebuilds them
-//! in the pinned container and compares them byte for byte; `features`, each unit built alone; and
-//! `sign`, which checks a draft release and signs its SHA256SUMS on the owner's computer.
+//! The release tasks (ARCHITECTURE.md §1, docs/RELEASING.md): `release build` (an executable with
+//! its notices and checksums), `release pages`, `verify-executable` (run away from the checkout on
+//! public data), `reproducible` (rebuilt in the pinned container and compared), `features` and
+//! `sign` (a draft release's SHA256SUMS signed on the owner's computer).
 
 use std::fmt::Write as _;
 use std::fs;
@@ -64,6 +62,33 @@ fn system_of(target: &str) -> Result<&'static str, Failure> {
         .ok_or_else(|| Failure(format!("No executable is built for {target}.")))
 }
 
+/// The file name of the executable of `target` in a release of `version`.
+fn executable_name(target: &str, system: &str, version: &str) -> String {
+    let ending = if target.contains("windows") {
+        ".exe"
+    } else {
+        ""
+    };
+    format!("mnemocode-{version}-{system}{ending}")
+}
+
+/// Every file a release of `version` holds besides SHA256SUMS: each executable with its notices,
+/// and the archive of the pages' WebAssembly files.
+fn release_files(version: &str) -> Vec<String> {
+    let mut files: Vec<String> = CANONICAL_TARGETS
+        .iter()
+        .chain(&MACOS_TARGETS)
+        .flat_map(|(target, system)| {
+            [
+                executable_name(target, system, version),
+                format!("mnemocode-{version}-{system}-licenses.txt"),
+            ]
+        })
+        .collect();
+    files.push(format!("mnemocode-{version}-wasm.tar"));
+    files
+}
+
 /// A line of a checksum file, as sha256sum writes it.
 fn checksum_line(bytes: &[u8], file: &str) -> String {
     format!("{}  {file}\n", sha256(bytes))
@@ -91,11 +116,6 @@ pub(crate) fn build(root: &Path, target: &str) -> Result<(), Failure> {
             "The executable of {target} did not build."
         )));
     }
-    let ending = if target.contains("windows") {
-        ".exe"
-    } else {
-        ""
-    };
     let version = version(root)?;
     let name = format!("mnemocode-{version}-{system}");
     let folder = root.join(RELEASE_FOLDER);
@@ -104,8 +124,12 @@ pub(crate) fn build(root: &Path, target: &str) -> Result<(), Failure> {
     let built = target_folder
         .join(target)
         .join("release")
-        .join(format!("mnemocode{ending}"));
-    let executable = format!("{name}{ending}");
+        .join(if target.contains("windows") {
+            "mnemocode.exe"
+        } else {
+            "mnemocode"
+        });
+    let executable = executable_name(target, system, &version);
     let notices = format!("{name}-licenses.txt");
     fs::copy(&built, folder.join(&executable))?;
     fs::copy(root.join("THIRD_PARTY_NOTICES.md"), folder.join(&notices))?;
@@ -118,12 +142,25 @@ pub(crate) fn build(root: &Path, target: &str) -> Result<(), Failure> {
     Ok(())
 }
 
-/// Packs every page's file, in a tar archive that holds no time and no owner.
+/// The license and notice files every distribution carries; the WebAssembly archive holds them in
+/// its wasm/ folder, as an executable has its notices beside it.
+const DISTRIBUTION_NOTICES: [&str; 4] = [
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+    "NOTICE",
+    "THIRD_PARTY_NOTICES.md",
+];
+
+/// Packs every page's file with the license and notices, in a tar archive that holds no time and no
+/// owner.
 pub(crate) fn pack_pages(root: &Path) -> Result<(), Failure> {
     let version = version(root)?;
     let archive = format!("mnemocode-{version}-wasm.tar");
     let folder = root.join(RELEASE_FOLDER);
     fs::create_dir_all(&folder)?;
+    for name in DISTRIBUTION_NOTICES {
+        fs::copy(root.join(name), root.join("dist/wasm").join(name))?;
+    }
     run_tool(
         &root.join("dist"),
         "tar",
@@ -440,12 +477,23 @@ fn check_assets(assets: &str) -> Result<(), Failure> {
 }
 
 /// Checks the files of a draft of `version` in `folder` against its SHA256SUMS: each listed once
-/// and of that version, there with its hash, and no file beyond them but an earlier run's signature
-/// and key.
+/// and of that version, there with its hash, exactly the files of a release (release_files: no
+/// executable, notice or archive missing, none added), and no file beyond them but an earlier run's
+/// signature and key.
 fn check_draft(folder: &Path, version: &str) -> Result<Vec<String>, Failure> {
     let listed = listed_files(&fs::read_to_string(folder.join(CHECKSUMS))?)?;
-    if listed.is_empty() {
-        return Err(Failure(format!("{CHECKSUMS} lists no file.")));
+    let expected = release_files(version);
+    for file in &expected {
+        if !listed.iter().any(|(name, _)| name == file) {
+            return Err(Failure(format!(
+                "{CHECKSUMS} does not list {file}: the draft is incomplete."
+            )));
+        }
+    }
+    if let Some((extra, _)) = listed.iter().find(|(name, _)| !expected.contains(name)) {
+        return Err(Failure(format!(
+            "{CHECKSUMS} lists {extra}, which is no file of a release."
+        )));
     }
     let prefix = format!("mnemocode-{version}-");
     for (place, (file, hash)) in listed.iter().enumerate() {
@@ -476,6 +524,25 @@ fn check_draft(folder: &Path, version: &str) -> Result<Vec<String>, Failure> {
     Ok(listed.into_iter().map(|(file, _)| file).collect())
 }
 
+/// The arguments of `gh` that verify the build attestation of `file`: made by the release workflow
+/// of the repository, on GitHub's runners, for `tag` at `commit`.
+fn attestation_args(file: &str, tag: &str, commit: &str) -> Vec<String> {
+    vec![
+        "attestation".to_owned(),
+        "verify".to_owned(),
+        file.to_owned(),
+        "--repo".to_owned(),
+        REPOSITORY.to_owned(),
+        "--signer-workflow".to_owned(),
+        format!("{REPOSITORY}/.github/workflows/release.yml"),
+        "--source-ref".to_owned(),
+        format!("refs/tags/{tag}"),
+        "--source-digest".to_owned(),
+        commit.to_owned(),
+        "--deny-self-hosted-runners".to_owned(),
+    ]
+}
+
 /// Whether `tag` has the form of a release tag: "v" and a version of three numbers.
 fn is_release_tag(tag: &str) -> bool {
     let parts: Vec<&str> = tag
@@ -487,6 +554,47 @@ fn is_release_tag(tag: &str) -> bool {
         && parts
             .iter()
             .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
+}
+
+/// Checks that every file of the draft in `folder` and its SHA256SUMS were built by the release
+/// workflow for `tag` at the commit the tag names here, which GitHub's tag must name too.
+fn check_provenance(
+    root: &Path,
+    folder: &Path,
+    tag: &str,
+    files: &[String],
+) -> Result<(), Failure> {
+    let commit = output_of(
+        root,
+        "git",
+        &["rev-parse", "--verify", &format!("{tag}^{{commit}}")],
+    )?;
+    let commit = commit.trim();
+    let remote = output_of(
+        root,
+        "gh",
+        &[
+            "api",
+            &format!("repos/{REPOSITORY}/commits/{tag}"),
+            "--jq",
+            ".sha",
+        ],
+    )?;
+    if remote.trim() != commit {
+        return Err(Failure(format!(
+            "GitHub's {tag} names {}, the tag here {commit}.",
+            remote.trim()
+        )));
+    }
+    for file in files.iter().map(String::as_str).chain([CHECKSUMS]) {
+        let args = attestation_args(file, tag, commit);
+        run_tool(
+            folder,
+            "gh",
+            &args.iter().map(String::as_str).collect::<Vec<_>>(),
+        )?;
+    }
+    Ok(())
 }
 
 /// Signs the draft release of `tag` on the owner's computer, so that the OpenPGP key never enters
@@ -548,13 +656,7 @@ pub(crate) fn sign(root: &Path, tag: &str, publish: bool) -> Result<(), Failure>
         ],
     )?;
     let files = check_draft(&folder, tag.trim_start_matches('v'))?;
-    for file in &files {
-        run_tool(
-            &folder,
-            "gh",
-            &["attestation", "verify", file, "--repo", REPOSITORY],
-        )?;
-    }
+    check_provenance(root, &folder, tag, &files)?;
     run_tool(
         &folder,
         "gpg",
@@ -644,6 +746,90 @@ mod tests {
             format!("{}  .hidden", "0".repeat(64)),
         ] {
             assert!(listed_files(&bad).is_err(), "{bad}");
+        }
+    }
+
+    /// A draft folder holding `files`, each with its line in SHA256SUMS; removed when dropped.
+    struct Draft(PathBuf);
+    impl Draft {
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+    impl Drop for Draft {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    fn draft(files: &[String]) -> Draft {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let n = NEXT.fetch_add(1, Ordering::Relaxed);
+        let folder =
+            std::env::temp_dir().join(format!("mnemocode-draft-{}-{n}", std::process::id()));
+        let _ = fs::remove_dir_all(&folder);
+        fs::create_dir_all(&folder).expect("a folder");
+        let mut sums = String::new();
+        for file in files {
+            fs::write(folder.join(file), file.as_bytes()).expect("a file");
+            sums.push_str(&checksum_line(file.as_bytes(), file));
+        }
+        fs::write(folder.join(CHECKSUMS), sums).expect("the checksums");
+        Draft(folder)
+    }
+
+    // AUD-007-BLD001: a draft is signed only when it holds exactly the files of a release.
+    #[test]
+    fn a_draft_holds_exactly_the_files_of_a_release() {
+        let files = release_files("0.2.0");
+        assert_eq!(files.len(), 11);
+        assert!(files.contains(&"mnemocode-0.2.0-win-x64.exe".to_owned()));
+        assert!(files.contains(&"mnemocode-0.2.0-macos-arm64-licenses.txt".to_owned()));
+        assert!(files.contains(&"mnemocode-0.2.0-wasm.tar".to_owned()));
+        let complete = draft(&files);
+        assert_eq!(
+            check_draft(complete.path(), "0.2.0")
+                .expect("complete")
+                .len(),
+            11
+        );
+        for missing in &files {
+            let fewer: Vec<String> = files
+                .iter()
+                .filter(|file| *file != missing)
+                .cloned()
+                .collect();
+            let error = check_draft(draft(&fewer).path(), "0.2.0").expect_err(missing);
+            assert!(error.0.contains("incomplete"), "{}", error.0);
+        }
+        let mut more = files.clone();
+        more.push("mnemocode-0.2.0-extra".to_owned());
+        assert!(check_draft(draft(&more).path(), "0.2.0").is_err());
+    }
+
+    #[test]
+    fn an_attestation_is_bound_to_the_workflow_the_tag_and_its_commit() {
+        let args = attestation_args("SHA256SUMS", "v0.2.0", "abc123");
+        let joined = args.join(" ");
+        for part in [
+            "attestation verify SHA256SUMS --repo hobby-eng/mnemocode",
+            "--signer-workflow hobby-eng/mnemocode/.github/workflows/release.yml",
+            "--source-ref refs/tags/v0.2.0",
+            "--source-digest abc123",
+            "--deny-self-hosted-runners",
+        ] {
+            assert!(joined.contains(part), "{joined}");
+        }
+    }
+
+    // AUD-007-BLD003: the files the WebAssembly archive takes are in the repository.
+    #[test]
+    fn the_distribution_notices_exist() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("the workspace");
+        for name in DISTRIBUTION_NOTICES {
+            assert!(root.join(name).is_file(), "{name}");
         }
     }
 

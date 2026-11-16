@@ -67,9 +67,9 @@ fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen(
     session.wait_for("152 x 101 stitches, 27.6 x 18.3 cm");
     session.press("6");
     session.wait_for("Width in centimetres");
-    session.wait_for(" (7.3 to 43.5): ");
+    session.wait_for(" (7.3 to 43.7): ");
     session.press("5\r");
-    session.wait_for("Type a number of centimetres from 7.3 to 43.5.");
+    session.wait_for("Type a number of centimetres from 7.3 to 43.7.");
     session.press("21.9\r");
     session.wait_for("PDF file name");
     // The pattern may not be saved over its own picture: the name is asked again.

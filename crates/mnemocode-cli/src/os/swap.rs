@@ -1,9 +1,6 @@
-//! Whether swap may write this program's memory, the seed phrase included, to a disk unencrypted
-//! (`L-SWAP-CHECK`), as MnemoCode TS 0.1.0 checks it (`src/cli/swap-check.ts`) and mhfe
-//! (`src/bin/mhfe/protect.rs`): each area of /proc/swaps is safe when its block device is dm-crypt,
-//! directly or below LVM, or zram without a backing device; a swap file is traced to the device that
-//! holds it. A table that cannot be read or does not have its form warns too: a warning too many is
-//! safe, a missing one is not. Linux only: macOS encrypts its swap, and Windows does not say.
+//! Whether swap may write this program's memory to a disk unencrypted (`L-SWAP-CHECK`): each area
+//! of /proc/swaps is safe on dm-crypt (also below LVM) or on zram without a backing device. A table
+//! that cannot be read warns too: a warning too many is safe, a missing one is not.
 
 #![expect(
     clippy::disallowed_methods,
@@ -105,9 +102,14 @@ fn encrypted(root: &Path, name: &str, depth: usize) -> bool {
         return false;
     }
     if name.starts_with("zram") {
-        // A zram device written back to a disk keeps idle pages there unencrypted.
-        let backing = fs::read_to_string(root.join("sys/block").join(name).join("backing_dev"));
-        return backing.is_err() || backing.is_ok_and(|device| device.trim() == "none");
+        // A zram device written back to a disk keeps idle pages there unencrypted. A kernel without
+        // writeback has no backing_dev at all: RAM only. One that cannot be read, or a device not in
+        // /sys at all, tells nothing, so it is not taken as safe (AUD-007-SEC003).
+        let device = root.join("sys/block").join(name);
+        return match fs::read_to_string(device.join("backing_dev")) {
+            Ok(backing) => backing.trim() == "none",
+            Err(error) => error.kind() == std::io::ErrorKind::NotFound && device.is_dir(),
+        };
     }
     let device = root.join("sys/class/block").join(name);
     if fs::read_to_string(device.join("dm/uuid")).is_ok_and(|uuid| uuid.starts_with("CRYPT-")) {
@@ -155,6 +157,35 @@ mod tests {
         assert_eq!(unescape("/swap\\040file"), Ok("/swap file".to_owned()));
         assert_eq!(unescape("/a\\9"), Err(()));
         assert_eq!(unescape("/a\\377"), Err(()));
+    }
+
+    // AUD-007-SEC003: zram is safe without a backing device, unsafe with one, and not known safe
+    // where its attribute cannot be read or the device is not in /sys.
+    #[cfg(unix)]
+    #[test]
+    fn zram_is_safe_only_without_a_backing_device() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("mnemocode-zram-{}", std::process::id()));
+        let attribute = root.join("sys/block/zram0/backing_dev");
+        assert!(
+            !encrypted(&root, "zram0", 0),
+            "no device in /sys: nothing known"
+        );
+        fs::create_dir_all(attribute.parent().unwrap()).unwrap();
+        assert!(
+            encrypted(&root, "zram0", 0),
+            "no attribute: a kernel without writeback"
+        );
+        fs::write(&attribute, "none\n").unwrap();
+        assert!(encrypted(&root, "zram0", 0));
+        fs::write(&attribute, "/dev/sda3\n").unwrap();
+        assert!(!encrypted(&root, "zram0", 0));
+        fs::set_permissions(&attribute, fs::Permissions::from_mode(0o000)).unwrap();
+        if fs::read_to_string(&attribute).is_err() {
+            assert!(!encrypted(&root, "zram0", 0), "an unreadable attribute");
+        }
+        fs::set_permissions(&attribute, fs::Permissions::from_mode(0o600)).unwrap();
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]

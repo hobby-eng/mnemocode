@@ -1,9 +1,6 @@
-//! The restore of shares (MnemoCode TS 0.1.0's `src/sskr/complete-shares.ts` and `share-set.ts`,
-//! CAP-SSKR-RESTORE-COMPLETE, CAP-SSKR-RESTORED-SET-FACTS and CAP-SSKR-COMBINE-LIBRARY): the
-//! phrase complete shares restore, every share given checked against it, and the facts of the set
-//! that restored it. The engine uses only the first members of a group and the first groups that
-//! meet the threshold, so each surplus member and group is used once in place of one of those and
-//! must give the same secret (AUD-008-FUN001).
+//! The restore of complete shares: the phrase, every share checked against it, and the set's facts.
+//! The engine uses only the first members and groups that meet the thresholds, so each surplus
+//! member and group is used once in their place and must give the same secret (AUD-008-FUN001).
 
 use std::fmt;
 
@@ -366,13 +363,10 @@ impl Restorer<'_> {
     }
 }
 
-/// Restores the phrase from complete `shares` and checks that every share agrees with it: each
-/// surplus member, and each surplus group, used once in place of one of the reference's. The
-/// shares of a group with fewer members than its threshold take no part: they are returned, from
-/// 0. A refusal names a share by its place in `places`, by its index; by its index from 1 without
-/// them. Refuses shares that are not one set or too few ([`check_set`]), no secret, a secret of no
-/// phrase's length, and a group or surplus share that gives another secret, or, where no digest
-/// checked the reference, either of them.
+/// Restores the phrase from complete `shares`, using each surplus member and group once in place of
+/// a reference one to check that it agrees; shares of a group below its threshold are returned. A
+/// refusal names a share by its place in `places`, or by its index from 1 without them. Refuses
+/// what [`check_set`] refuses, a secret of no phrase's length, and a share that disagrees.
 pub fn restore_complete(
     shares: &[&Share],
     places: Option<&[usize]>,

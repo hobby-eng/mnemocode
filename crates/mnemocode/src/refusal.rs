@@ -26,12 +26,9 @@ impl RefusalKind {
     }
 }
 
-/// A refusal: its `Display` is the one message of the condition, word for word as TS 0.1.0 writes
-/// it, and [`Refusal::code`] its stable code, such as `core.pieces.length-no-whole-number-pieces`.
-///
-/// Each module has its own error enum, one variant per condition (RUST-04). A variant holds
-/// positions, counts and option names, never text a person typed (CORE-24), so a message never
-/// repeats a secret.
+/// A refusal: its `Display` is the condition's one message, and [`Refusal::code`] its stable code,
+/// such as `core.pieces.length-no-whole-number-pieces`. A variant holds positions, counts and
+/// option names, never typed text (CORE-24), so a message never repeats a secret.
 pub trait Refusal: std::error::Error {
     /// The stable code of the condition: the module's namespace, a dot, and the condition's name.
     fn code(&self) -> &'static str;

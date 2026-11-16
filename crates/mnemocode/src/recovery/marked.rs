@@ -1,12 +1,7 @@
-//! Codes of an encoded seed phrase of which some cannot be read, each marked at its place
-//! (MnemoCode TS 0.1.0's `core/missing-codes.ts`, CAP-RECOVERY-MARKED-CODES). A ? stands for a code
-//! that cannot be read. In English words a few letters with * or words joined by | narrow it, as
-//! recover-word reads them; in word numbers and Unicode codes a ? may stand for one digit, such as
-//! 1?34 or 4E?0; in colors a ? stands for a whole color. Each place then holds the codes that fit
-//! what was read. Codes that keep a BIP39 checksum of their own, those of MnemoCode Seedshift and
-//! those without Seedshift, are candidates only where the checksum holds; the Original Seedshift's
-//! keep none, and every combination is one. Always built: backup reading needs it, and only the
-//! search is a feature.
+//! Codes of an encoded seed phrase marked with ? where they cannot be read: a whole code, or in
+//! English words a prefix with * or words joined by |, in numbers and Unicode codes one digit. Each
+//! place holds the codes that fit. Codes with a BIP39 checksum of their own count only where it
+//! holds; the Original Seedshift keeps none. Always built: backup reading needs it.
 
 use std::fmt;
 use std::rc::Rc;

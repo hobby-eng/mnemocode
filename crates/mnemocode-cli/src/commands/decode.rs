@@ -1,13 +1,7 @@
-//! `mnemocode decode` (MnemoCode TS 0.1.0's `cli/decode-command.ts`): an encoded seed phrase turned
-//! back into the words. From the command line every input is given, and one that cannot be used
-//! ends the command. With --ask-secrets, on the private screen, each answer is checked as soon as
-//! it is given and asked again, and the other answers are kept. Once the codes are checked, the
-//! fingerprint of the encoded phrase is shown before the dates are asked, so that a mistyped code
-//! shows before any date is typed. A date may hold ? for each forgotten digit: the dates are then
-//! searched as recover-date searches them, with the wallet, which is optional where the checksum
-//! alone leaves only some of the dates. Options answer the questions that are no secret: the
-//! wallet, the encoded fingerprint, whether to list the candidates, the limits, and what a text
-//! that may be a Shamir share is read as.
+//! `mnemocode decode`: an encoded seed phrase turned back into its words. With --ask-secrets each
+//! answer is checked at once and asked again on error. The fingerprint is shown before the dates
+//! are asked, so a mistyped code shows before any date is typed. A date may hold ? for each
+//! forgotten digit; the dates are then searched as recover-date searches them.
 
 use std::fmt;
 use std::rc::Rc;
@@ -463,11 +457,10 @@ impl Codes {
     }
 }
 
-/// The answers of decode on the private screen, in this order, each checked at once: the encoded
-/// seed phrase and everything that can be checked before the dates, the dates, which may hold ?,
-/// then either the decoding or, for dates with ?, the wallet (optional where the mode's checksum
-/// leaves only some dates) and the search. A result that cannot be right offers what to type again;
-/// every other answer is kept. `purpose` says what the decoded phrase is for.
+/// The answers on the private screen, each checked at once: the encoded phrase and what can be
+/// checked before the dates, the dates, then the decoding, or for dates with ? the wallet and the
+/// search. A result that cannot be right offers what to type again; `purpose` says what the phrase
+/// is for.
 pub(crate) fn decode_with_questions(
     parsed: &Parsed,
     purpose: &mut dyn DecodeUse,

@@ -1,9 +1,6 @@
-//! `mnemocode stitch` (docs/SEEDSTITCH.md, ADR 0010): the phrase, masked with MnemoCode's
-//! Seedshift unless --mode direct hides the phrase itself, in the legend of a cross-stitch pattern
-//! of a picture, the pattern saved as a PDF. The picture is read before the phrase is asked; where it cannot be used, at the terminal,
-//! another picture or width is asked instead of ending (CORE-42). Where Decode takes codes, a
-//! SeedStitch legend typed or read is turned back into the record of the masked phrase, so that
-//! Decode, and the menu's Decode, go on as for any record.
+//! `mnemocode stitch` (docs/SEEDSTITCH.md, ADR 0010): the phrase, masked with Seedshift unless
+//! --mode direct, hidden in the legend of a cross-stitch pattern saved as a PDF. The picture is
+//! read before the phrase is asked. Legends that Decode reads are turned back into records here.
 
 use std::fmt;
 use std::path::Path;
@@ -122,8 +119,8 @@ impl Source {
     }
 
     /// Asks after `failure` for another picture or another size, offered as the menu offers it
-    /// first (the owner's request of 2026-11-05); false where the person stops. Another size is not
-    /// offered for a picture that no size can make a pattern of.
+    /// first; false where the person stops. Another size is not offered for a picture that no size
+    /// can make a pattern of.
     fn change(&mut self, failure: &str) -> Result<bool, Stop> {
         // The picture's size and the widths it allows; none where it is no picture that a size helps.
         let sized = read_picture(Path::new(&self.path))
@@ -295,14 +292,11 @@ fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> 
     Ok(())
 }
 
-/// The record of the masked phrase that `text` holds where it is a SeedStitch legend line; none
-/// where it is not one. A legend read by taking one row as misread names the row, and the warning
-/// stays in the summary.
+/// The masked phrase's record where `text` is a SeedStitch legend line, warning of a misread row.
 ///
 /// # Errors
 ///
-/// The legend's refusals: `embroidery.legend.*`, `embroidery.phrase.legend-not-read` and
-/// `embroidery.phrase.legend-ambiguous`.
+/// The legend's refusals: `embroidery.legend.*` and `embroidery.phrase.legend-*`.
 pub(crate) fn record_of_legend(text: &str) -> Result<Option<SecretText>, Stop> {
     let Some(read) = phrase::record_of_legend(text)? else {
         return Ok(None);
@@ -311,6 +305,10 @@ pub(crate) fn record_of_legend(text: &str) -> Result<Option<SecretText>, Stop> {
         lasting_warning(&format!(
             "Row {row} of the legend did not fit; it was read as the only change of it that gives a phrase. Check that row on the paper."
         ));
+    } else if read.corrected() {
+        lasting_warning(
+            "A row of the legend did not fit; a change of any of several rows gives the same phrase, so the row cannot be told. Check the rows on the paper.",
+        );
     }
     Ok(Some(read.into_record()))
 }

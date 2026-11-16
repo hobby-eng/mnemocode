@@ -1,16 +1,8 @@
-//! Seedshift (MnemoCode TS 0.1.0's `core/seedshift.ts`, CAP-PHRASE-FORMATS-MODE-SEEDSHIFT, -MODE-LEGACY,
-//! -MODE-DIRECT, -LEGACY-VALID-LAST-WORD): each word moved by the shift its date gives it, modulo
-//! the 2,048 words.
+//! Seedshift: each word moved by the shift its date gives it, modulo the 2,048 words.
 //!
-//! - MnemoCode Seedshift moves the entropy, not the checksum: each 11-bit chunk modulo 2,048 and the
-//!   bits the last word keeps beside the checksum modulo their own range, so that the masked words
-//!   keep a valid checksum, which BIP39 computes again. Modular addition is reversible even where
-//!   several dates give the same shifts.
-//! - The Original Seedshift moves each word number modulo 2,048, kept for existing records; its
-//!   masked words need not keep the checksum.
-//! - Direct writes the words themselves.
-//!
-//! The word indexes are counted from 0 and held in [`Indexes`], which wipes them when dropped.
+//! MnemoCode Seedshift moves the entropy, not the checksum, so the masked words keep a valid
+//! checksum; the Original Seedshift moves each word number and need not keep it. Modular addition
+//! stays reversible even where several dates give the same shifts.
 
 use bip39::{Language, Mnemonic};
 use zeroize::Zeroize;

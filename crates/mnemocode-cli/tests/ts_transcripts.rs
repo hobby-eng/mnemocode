@@ -30,8 +30,8 @@ const WRITTEN_IN: [(&str, &str); 38] = [
         "These are the codes of an encoded seed phrase, not its words: Decode numbers, codes or colors back into a seed phrase reads them, with ? for each unread code.",
         "These are the codes of an encoded seed phrase, not its words: Recover a seed phrase from a backup reads them, with ? for each unread code.",
     ),
-    // The owner's request of 2026-11-03, through the mhfe session: an address names its coins, as
-    // every coin whose form it has, and a key's form its Bitcoin profiles; --bitcoin-profile is gone.
+    // An address names its coins, as every coin whose form it has, and a key's form its Bitcoin
+    // profiles; --bitcoin-profile is gone.
     (
         "      --bitcoin-address <ADDRESS>\n          A Bitcoin address of the wallet, one of the --scan-gap from the\n          selected place.\n\n      --coin-address <ADDRESS>\n          An address of another coin, one of the --scan-gap from the place, with\n          --coin.\n\n          Single-key receiving addresses of the coins of mhfe, on their standard\n          paths: Bitcoin Cash, Cosmos, Dash (also Platform), Dogecoin, Ethereum\n          and EVM networks, Ethereum Classic, Injective, Litecoin, Tron, XRP and\n          Zcash (transparent). The address tells its type and network.\n\n      --coin <ID>\n          The coin of --coin-address, such as ethereum, litecoin or\n          bitcoin-cash.\n\n",
         "      --bitcoin-address <ADDRESS>\n          A Bitcoin address of the wallet, one of the --scan-gap from the\n          selected place.\n\n          Its form names its path: 1… BIP44, 3… BIP49, bc1q… BIP84 and bc1p…\n          BIP86.\n\n      --coin-address <ADDRESS>\n          An address of the wallet, of any coin, one of the --scan-gap from the\n          place.\n\n          Single-key receiving addresses on their standard paths: Bitcoin,\n          Bitcoin Cash, Cosmos, Dash (also Platform), Dogecoin, Ethereum and EVM\n          networks, Ethereum Classic, Injective, Litecoin, Tron, XRP and Zcash\n          (transparent). The address tells its coin, type and network. Where\n          coins share a form, as 1…, 3… and 0x… do, the paths of each are\n          searched.\n\n      --coin <ID>\n          Read --coin-address as this coin's alone, such as ethereum or\n          bitcoin-cash.\n\n",
@@ -56,12 +56,12 @@ const WRITTEN_IN: [(&str, &str); 38] = [
         "    --dates-file date-patterns.txt \\\n    --bitcoin-address bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu \\\n    --bitcoin-profile native-segwit\n",
         "    --dates-file date-patterns.txt \\\n    --coin-address bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu\n",
     ),
-    // The owner's SeedStitch of 2026-11-03 (ADR 0010): a command TS does not have.
+    // SeedStitch (ADR 0010): a command TS does not have.
     (
         "  sskr-export   Print existing Shamir shares as cards\n  preview",
         "  sskr-export   Print existing Shamir shares as cards\n  stitch        Hide a phrase in the legend of a cross-stitch pattern\n  preview",
     ),
-    // The owner's corrections of 2026-11-02 (PLAN.md, parity).
+    // The corrections of 2026-11-02 (PLAN.md, parity).
     (
         "Standard input must be the terminal; without one, or in a terminal\n          that says TERM=dumb, the command stops at once. Output sent to a file\n          goes there as before.",
         "Standard input and standard error must be the terminal; without them,\n          or in a terminal that says TERM=dumb, the command stops at once.\n          Output sent to a file goes there as before.",
@@ -188,8 +188,7 @@ const WRITTEN_IN: [(&str, &str); 38] = [
 /// The manual recovery guide as this program bundles it.
 const GUIDE: &str = include_str!("../../mnemocode/assets/MANUAL_RECOVERY.md");
 /// What this program's guide adds that TS's does not have, each from its first heading to the
-/// heading it stands before: the cross-stitch legend in section 1, and its helper in section 7
-/// (the owner's request of 2026-11-05).
+/// heading it stands before: the cross-stitch legend in section 1, and its helper in section 7.
 const GUIDE_ADDED: [(&str, &str); 2] = [
     (
         "### Cross-stitch pattern (SeedStitch)",
@@ -267,6 +266,15 @@ fn expected(args: &[&str], text: &str) -> String {
     text
 }
 
+// The guide a reader finds in docs/ is the one the program hands out.
+#[test]
+fn the_bundled_guide_is_the_guide_of_the_documentation() {
+    assert!(
+        GUIDE == include_str!("../../../docs/MANUAL_RECOVERY.md"),
+        "copy docs/MANUAL_RECOVERY.md to crates/mnemocode/assets/"
+    );
+}
+
 #[test]
 fn every_command_writes_what_ts_writes() {
     let recorded: Value = serde_json::from_str(RECORDED).expect("the recorded file is JSON");
@@ -297,7 +305,7 @@ fn every_command_writes_what_ts_writes() {
             expected(&args, entry["stdout"].as_str().expect("standard output")),
             "{name}"
         );
-        // A saved folder is named in full, the owner's request of 2026-11-04; TS named it as given.
+        // A saved folder is named in full; TS named it as given.
         let errors = expected(&args, entry["stderr"].as_str().expect("standard error")).replace(
             "Saved 9 individual card files to: out\n",
             &format!(

@@ -1,9 +1,7 @@
-//! Page locks counted per page, mhfe's (`mhfe/src/memory.rs:231-349`): mlock and munlock (and
-//! VirtualLock and VirtualUnlock) act on whole pages and do not count, so one unlock would unlock a
-//! page for every buffer on it. A page is unlocked only once the last guard that holds it is
-//! dropped, so small secrets share pages within the lock budget (8 MiB since Linux 5.16, 64 KiB
-//! before). Locking is best effort: a refusal leaves the secret unlocked, still wiped, and
-//! [`any_lock_refused`] lets the command line warn once. The browser locks nothing.
+//! Page locks counted per page: mlock and VirtualLock act on whole pages and do not count, so one
+//! unlock would unlock a page for every buffer on it. A page is unlocked only when its last guard
+//! drops, so small secrets share pages within the lock budget. Locking is best effort;
+//! [`any_lock_refused`] lets the command line warn once.
 
 #![allow(
     unsafe_code,

@@ -1,13 +1,8 @@
 //! Hiding a phrase's entropy in a pattern's legend: the fewest threads whose legend can hold it,
-//! then, among many legends that read as the same phrase, the one whose stitch counts are reached
-//! with the least visible change. A count is set by moving stitches between two threads that touch:
-//! close ones, or a thread and its parent in a tree of the threads rooted at the biggest one, which
-//! joins every thread to the nearest in colour that it touches, so that no thread is left without a
-//! partner; the rows are set in the order that leaves the biggest last, and each move takes the
-//! stitch whose picture colour the new thread fits best. Stitches where the picture changes sharply
-//! never move. A row that cannot move (near a digit limit, or with too few movable stitches) keeps
-//! its count: only legends whose digits already fit it are taken, and a pattern with too many such
-//! rows gives way to one of more threads.
+//! and among the legends that read as the same phrase, the one reached with the least visible
+//! change. A count is set by moving stitches between touching threads (close ones, or a thread and
+//! its parent in a tree rooted at the biggest), each move taking the stitch that fits the new
+//! thread best; stitches where the picture changes sharply never move.
 
 use std::fmt;
 
@@ -25,9 +20,9 @@ use crate::picture::Grid;
 
 /// The fewest threads tried in a small pattern.
 const FEWEST_THREADS: usize = 12;
-/// The fewest threads tried in a large one: as many as a pattern of a photograph usually has, so that
-/// it keeps its shades where fewer would hold the phrase (the owner's look at 29 and 50 threads in
-/// 200 stitches across, 2026-11-04); a picture that needs fewer gets fewer.
+/// The fewest threads tried in a large one: as many as a pattern of a photograph usually has, so
+/// that it keeps its shades where fewer would hold the phrase (judged at 29 and 50 threads, 200
+/// stitches across); a picture that needs fewer gets fewer.
 const SHADED_THREADS: usize = 40;
 /// The stitches for each thread tried at least, between those two: a small pattern given many
 /// threads leaves each too few stitches to carry its digits.
@@ -38,7 +33,7 @@ const CANDIDATES: usize = 4;
 /// How much the worst places count beside the mean when patterns are compared.
 const WORST_WEIGHT: f64 = 0.25;
 /// How much further from the picture than the nearest a pattern of fewer threads may look and still
-/// be tried first: fewer threads look cleaner, as the owner saw at 78 stitches (2026-11-05).
+/// be tried first: fewer threads look cleaner, as seen at 78 stitches.
 const FEWER_THREADS_SLACK: f64 = 0.05;
 /// The most threads tried.
 pub const MOST_THREADS: usize = 60;
@@ -164,13 +159,11 @@ impl Hidden {
     }
 }
 
-/// `entropy`, a masked phrase's, hidden in a pattern of `grid`, with `random` choosing among the
-/// legends that hold it.
+/// `entropy`, a masked phrase's, hidden in a pattern of `grid`; `random` picks among the legends.
 ///
 /// # Errors
 ///
-/// [`HideError`]: `embroidery.hide.not-an-entropy`, `embroidery.hide.too-few-colours`,
-/// `embroidery.hide.no-legend`, or the randomness's `core.random.unavailable`.
+/// [`HideError`]: `embroidery.hide.*`, or the randomness's `core.random.unavailable`.
 pub fn hide(
     grid: &Grid,
     entropy: &LegendEntropy,

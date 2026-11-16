@@ -1,13 +1,8 @@
-//! The `mnemocode` executable: the command line and the start menu over the `mnemocode` and
-//! `mnemocode-cards` libraries. It translates input and output only; the process protections,
-//! the terminal and the files live in its `os` module (docs/design/architect/ARCHITECTURE.md §5).
+//! The `mnemocode` executable: the command line and the start menu over the libraries; process
+//! protections, terminal and files live in `os` (ARCHITECTURE.md §5).
 //!
-//! The order of a run: core dumps off and the memory cap first (os::Protection::start), the signal
-//! handlers, the environment and the terminal, then the arguments: a flag that would carry a
-//! secret refused before anything is parsed, then the command, whose outputs are checked and whose
-//! folders are made before its protections are restricted and the seed phrase is asked (gate). With
-//! --configure, and for Re-encode's new backup, the Seedshift dates are asked first, and the writes
-//! are ruled once the answers name the outputs.
+//! Order of a run: core dumps off and the memory cap first; outputs checked and their folders made
+//! before the protections are restricted and the seed phrase is asked.
 
 mod args;
 mod commands;

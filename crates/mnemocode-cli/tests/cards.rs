@@ -1,9 +1,6 @@
-//! What the commands that save cards leave on the disk, as MnemoCode TS 0.1.0's tests pin it
-//! (card-title, card-file-names, encode-card-content, aud-021-export, aud-026-export,
-//! cards-fit-before-secrets, heir-sheet, share-export-decision, export): tests/ts_transcripts.rs
-//! compares what recorded commands say; here the files they write, their count, names and first
-//! bytes, the order of the refusals, and that nothing is left behind after one; tests/card_saves.rs
-//! holds the saves that fail. The program runs on public inputs, in a folder of each test's own.
+//! What the card-saving commands leave on disk, as MnemoCode TS 0.1.0's tests pin it: the files,
+//! their names and first bytes, the order of refusals, and nothing left behind after one.
+//! tests/ts_transcripts.rs covers what the commands say; tests/card_saves.rs the failing saves.
 
 // Test code throughout, so that clippy's allow-*-in-tests keys cover the helpers too.
 #![cfg(test)]

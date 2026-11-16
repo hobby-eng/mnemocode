@@ -1,11 +1,7 @@
 //! The restore of a seed phrase from Shamir shares and the repair of damaged shares, in the steps
-//! that every host takes, so that none writes them again (MnemoCode TS 0.1.0's
-//! `sskr/share-restore.ts`, CAP-SSKR-RESTORE-STEPS, CAP-SSKR-SEARCH-CONSENT,
-//! CAP-SSKR-EXPORT-REPAIR-FLOW): read the shares; search marked shares, after the host's question
-//! when the search is long; unmask the phrases with the dates of a Seedshift phrase, searched where
-//! a date holds ?, and say why none is the wallet's; write damaged shares again. A flow runs them in
-//! one go for a host that asks its questions before it starts, such as a page: a long search stops
-//! with the question, and runs once the person said yes. It asks nothing and shows nothing.
+//! every host takes: read the shares, search marked ones (after consent when long), unmask with
+//! Seedshift dates, and write damaged shares again. `flow` runs them in one go for a host that asks
+//! first, such as a page. It asks and shows nothing.
 
 pub mod flow;
 pub mod repair;

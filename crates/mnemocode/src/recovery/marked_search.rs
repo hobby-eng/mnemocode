@@ -1,10 +1,7 @@
-//! The search of codes that cannot be read, marked with ? (MnemoCode TS 0.1.0's
-//! `core/missing-codes-search.ts`, CAP-RECOVERY-MARKED-CODES-SEARCH and its three ways): how the
-//! right codes are told (the encoded fingerprint that Encode showed for them, the wallet, with the
-//! dates where the phrase was masked, or every candidate listed where they are few), the size and
-//! time of each way before it starts, and what it found. A host asks the person and shows the
-//! results; this module decides every rule, so that the command line and a page search alike. A
-//! resumable search the host steps (ADR 0005). Its messages never repeat a code or a phrase.
+//! The search of codes marked with ?: how the right codes are told (the encoded fingerprint, the
+//! wallet, or listing every candidate when few), each way's size and time before it starts, and
+//! what it found. The rules are here so the command line and a page search alike; the host steps it
+//! (ADR 0005). Its messages never repeat a code or a phrase.
 
 mod way;
 

@@ -22,7 +22,7 @@ mod windows;
 pub(crate) use child::{CommandEnd, run_own_process, start_failure};
 pub(crate) use console::{
     RawMode, Stream, drop_typed_ahead, input_within, is_terminal, prepare, read_input, restore,
-    terminal_size, without_echo, write_error, write_output,
+    same_terminal, terminal_size, without_echo, write_error, write_output,
 };
 pub(crate) use env::{Environment, arguments};
 pub(crate) use files::{

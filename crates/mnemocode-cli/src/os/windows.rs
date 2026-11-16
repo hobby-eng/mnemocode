@@ -1,9 +1,6 @@
-//! Windows's protections without an administrator (protections.md, `W-*`): DLLs only from the
-//! system's folder (`W-DLL-SEARCH`, with the release gate on the executable's imports), no heap in
-//! crash reports (`W-WER-NOHEAP`), and a job whose process-memory limit is the memory cap
-//! (`W-JOB-MEMORY`), each read back. Windows offers no program a way to refuse its own network or
-//! file writes without an administrator or a new process, and writes no core dump unless an
-//! administrator set up LocalDumps; the report says both.
+//! Windows protections without an administrator (protections.md, `W-*`): DLLs only from the system
+//! folder, no heap in crash reports, and a job memory limit, each read back. Without an
+//! administrator no program can refuse its own network or file writes; the report says so.
 
 #![allow(
     unsafe_code,

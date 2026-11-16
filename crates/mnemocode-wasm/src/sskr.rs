@@ -1,10 +1,7 @@
-//! The shares part for a page (`browser-sskr`): a backup split into Shamir shares in one form, with
-//! the note they are kept with; shares typed in any form, some with elements marked with ?,
-//! restored together and every share checked; a share's form, the share written in another form,
-//! and a share QR code checked against the cards beside it; and the part's self-check. The phrase,
-//! the dates and the shares cross as `JsValue`s that Rust reads (ARCHITECTURE.md §6); the shares a
-//! page gets back are JS strings it drops soon after. A repair that needs a long search is the
-//! recovery part's, which steps it.
+//! The shares part for a page (`browser-sskr`): a backup split into shares, shares restored and
+//! checked, a share converted between forms or its QR code checked, and the part's self-check.
+//! Secrets cross as `JsValue`s that Rust reads (ARCHITECTURE.md §6); returned shares are JS strings
+//! the page drops soon after. A repair that needs a long search belongs to the recovery part.
 
 use mnemocode::checks::Part;
 use mnemocode::modes::Mode;

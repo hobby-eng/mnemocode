@@ -109,3 +109,22 @@ fn colour_follows_the_environment() {
     assert!(on("xterm-256color").contains(STYLE));
     assert!(!on("dumb").contains(STYLE));
 }
+
+// AUD-007-SEC004: a command that fails after it read its secret still says that memory was not
+// locked; here no memory may be locked at all (ulimit -l 0).
+#[cfg(target_os = "linux")]
+#[test]
+fn a_failed_command_still_reports_memory_it_could_not_lock() {
+    let record = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("not-a-record.txt");
+    std::fs::write(&record, "U+0001 U+0001 U+0001\n").expect("a file");
+    let (errors, _) = terminal::colour::refused(
+        Command::new("sh").args([
+            "-c",
+            "ulimit -l 0 && exec \"$0\" decode --input-file \"$1\" --mode direct --format unicode",
+            PROGRAM,
+            record.to_str().expect("a path"),
+        ]),
+        "did not lock all of this memory",
+    );
+    assert!(errors.contains("four hexadecimal digits"), "{errors}");
+}

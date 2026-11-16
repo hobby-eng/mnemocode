@@ -1,10 +1,7 @@
-//! Phrases as BIP39 takes them (MnemoCode TS 0.1.0's `core/words.ts` and `core/english-words.ts`,
-//! CAP-PHRASE-FORMATS-PHRASE-VALIDATION): the tokens, the count and the places of the words are
-//! MnemoCode's, the checksum and the entropy the bip39 crate's (owner, 2026-10-27: no own BIP39
-//! code). A [`Phrase`] is a phrase checked once, so that later steps never check it again; its
-//! words live in a locked buffer that is wiped when it is dropped. Word numbers, from 1 through
-//! 2,048, and Unicode codes, four hexadecimal digits of each word's Traditional Chinese character,
-//! are read here for every reader of them.
+//! Phrases as BIP39 takes them: tokens, word count and places are MnemoCode's; checksum and entropy
+//! come from the bip39 crate, with no BIP39 code of our own. A [`Phrase`] is checked once, so later
+//! steps never check it again; its words are in a locked buffer wiped on drop. Word numbers and
+//! Unicode codes are read here too.
 
 use std::fmt;
 

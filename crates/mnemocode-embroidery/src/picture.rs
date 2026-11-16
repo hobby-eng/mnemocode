@@ -143,10 +143,9 @@ impl Pixels {
         }
     }
 
-    /// Brightens every pixel as a designer brightens a photograph for a pattern (the owner's choice
-    /// of 2026-11-04 among the ways shown at 200 stitches): each colour moved away from its own grey
-    /// by [`SATURATION`], then away from the picture's mean grey by [`CONTRAST`], each step kept
-    /// within a byte, as an image editor's colour and contrast controls do.
+    /// Brightens every pixel as a designer brightens a photograph for a pattern: each colour moved
+    /// away from its own grey by [`SATURATION`], then from the picture's mean grey by [`CONTRAST`],
+    /// each step kept within a byte, as an image editor's controls do.
     fn brighten(&mut self) {
         let grey = |[r, g, b]: [u8; 3]| {
             (f64::from(r) * 299.0 + f64::from(g) * 587.0 + f64::from(b) * 114.0) / 1000.0
@@ -180,13 +179,11 @@ impl Pixels {
     }
 }
 
-/// The colours of `file` averaged down to `width` stitches across, the height following the
-/// picture's shape.
+/// The colours of `file` averaged down to `width` stitches across, keeping the picture's shape.
 ///
 /// # Errors
 ///
-/// [`PictureError`]: a file too large, no PNG, JPEG or WebP, too many pixels, a width outside the
-/// limits, a picture narrower than the pattern or too tall for it.
+/// [`PictureError`]: a file too large, not PNG, JPEG or WebP, too many pixels, or a bad width.
 pub fn grid(file: &[u8], width: usize) -> Result<Grid, PictureError> {
     if !(MIN_WIDTH..=MAX_WIDTH).contains(&width) {
         return Err(PictureError::WidthOutOfRange);
@@ -226,12 +223,11 @@ pub fn grid(file: &[u8], width: usize) -> Result<Grid, PictureError> {
     })
 }
 
-/// The upright size in pixels of the picture in `file`, read within the limits of [`grid`], so that
-/// a front end can offer sizes of a pattern before it is made.
+/// The upright pixel size of the picture in `file`, so a front end can offer pattern sizes first.
 ///
 /// # Errors
 ///
-/// [`PictureError`]: a file too large, no PNG, JPEG or WebP, or too many pixels.
+/// [`PictureError`]: a file too large, not PNG, JPEG or WebP, or too many pixels.
 pub fn upright_size(file: &[u8]) -> Result<(usize, usize), PictureError> {
     Ok(pixels(file)?.upright_size())
 }
@@ -259,10 +255,13 @@ fn pixels(file: &[u8]) -> Result<Pixels, PictureError> {
     }
 }
 
-/// The source pixels `[start, end)` that stitch `index` of `stitches` covers, at least one.
+/// The source pixels `[start, end)` that stitch `index` of `stitches` covers, at least one. The
+/// products are taken in 64 bits: a side of a very long picture times the stitch index overflows a
+/// 32-bit usize (WebAssembly), though each result fits.
 fn span(index: usize, stitches: usize, pixels: usize) -> (usize, usize) {
-    let start = index * pixels / stitches;
-    let end = ((index + 1) * pixels / stitches).max(start + 1);
+    let at = |i: usize| (i as u64 * pixels as u64 / stitches as u64) as usize;
+    let start = at(index);
+    let end = at(index + 1).max(start + 1);
     (start, end.min(pixels))
 }
 
@@ -440,6 +439,25 @@ fn exif_orientation(exif: &[u8]) -> u8 {
 mod tests {
     use super::*;
     use crate::sample::png_file;
+
+    // AUD-007-FUN003: the spans of the longest side a picture may have, at the most stitches, cover it
+    // whole and in order, with no product that a 32-bit usize could not hold.
+    #[test]
+    fn the_spans_of_a_very_long_side_cover_it_in_order() {
+        for (pixels, stitches) in [(MAX_PIXELS, 400), (MAX_PIXELS, 7), (40, 40), (3, 400)] {
+            let mut previous = 0;
+            for index in 0..stitches {
+                let (start, end) = span(index, stitches, pixels);
+                assert!(
+                    previous <= start && start < end && end <= pixels,
+                    "{pixels} {stitches} {index}"
+                );
+                assert!(u64::try_from(end).is_ok_and(|end| end <= u64::from(u32::MAX)));
+                previous = start;
+            }
+            assert_eq!(span(stitches - 1, stitches, pixels).1, pixels);
+        }
+    }
 
     #[test]
     fn a_picture_is_averaged_down_to_one_colour_per_stitch() {

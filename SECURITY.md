@@ -19,7 +19,7 @@ Security fixes are made in the current source and release. Installed copies do n
 
 ## Security model
 
-MnemoCode is an offline command-line program and Rust library. Its own code has no online service, telemetry, analytics, update check or remote file access. Wallet comparisons are calculated locally, without contacting a wallet, node or block explorer.
+MnemoCode is an offline command-line program and Rust library. Its own code opens no network connection and has no online service, telemetry, analytics or update check. Files are read through the operating system: an input named by a network path (`//host/…`, `\\host\…` or a `file:` link to another computer) is refused, but a network share mounted as a folder or a mapped drive looks local to the program, and a file there is read over that network. Output paths are not checked this way. Wallet comparisons are calculated locally, without contacting a wallet, node or block explorer.
 
 Use a trusted computer disconnected from every network, preferably a freshly started read-only live system. Unplug the network cable and turn off wireless connections before entering secrets. Avoid cloud terminals and remote shells. Shut down the temporary system after saving the result. A firewall, virtual machine or container adds protection only to the extent that you trust and check its configuration.
 
@@ -27,11 +27,11 @@ Use a trusted computer disconnected from every network, preferably a freshly sta
 
 Each menu task runs in a fresh process of the same executable. Before reading a secret, the CLI applies the protections available on that system and reads them back. Where a task's own answers name its outputs, the file-write restriction follows those answers, and the Protection line says so. It reports unavailable protections rather than assuming they worked; `self-test` lists the limits.
 
-| Platform | Protections                                                                                                                                                                                                                                    |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | Core dumps disabled; same-user memory inspection restricted; an attached tracer refuses secrets; seccomp blocks new sockets and io_uring; Landlock restricts file writes to the output folders where supported; a data-memory cap is requested |
-| macOS    | Core dumps disabled; debugger attachment refused; Seatbelt restricts network access where available                                                                                                                                            |
-| Windows  | DLL search restrictions and mitigation policies; a job object with a memory cap; Windows Error Reporting asked to omit heap data; configured LocalDumps reported                                                                               |
+| Platform | Protections                                                                                                                                                                                                                                          |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | Core dumps disabled; same-user memory inspection restricted; an attached tracer refuses secrets; seccomp blocks new sockets and io_uring; Landlock restricts file writes to the output folders where supported; a data-memory cap is requested       |
+| macOS    | Core dumps disabled; debugger attachment refused; Seatbelt restricts network access where available                                                                                                                                                  |
+| Windows  | DLL search restrictions and mitigation policies; a job object with a memory cap; Windows Error Reporting asked to omit heap data; a reminder that LocalDumps, where an administrator set them up, still write dumps (the setting itself is not read) |
 
 On Linux and macOS, failure to disable core dumps prevents secret input. Other unavailable measures are reported. Windows has no unprivileged network or file-write sandbox here. macOS leaves file writes open. The program does not restrict child-process creation; image rendering runs in process and needs no converter.
 

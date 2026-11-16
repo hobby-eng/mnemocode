@@ -79,7 +79,7 @@ fn seedstitch(tier: Tier) -> Result<(), CheckFailure> {
     )?;
     let mut one = rows.clone();
     one[0] = ok(legend::Row::new(1, one[0].symbol(), 1752))?;
-    let corrected = matches!(legend::read(&one), Reading::Corrected { row: 1, .. });
+    let corrected = matches!(legend::read(&one), Reading::Corrected { row: Some(1), .. });
     expect_same(
         &corrected,
         &true,

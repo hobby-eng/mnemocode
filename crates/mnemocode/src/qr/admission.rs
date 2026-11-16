@@ -18,9 +18,9 @@ pub const MAX_PNG_DIMENSION: u32 = 4096;
 /// A megapixel as the limit names it: 2^20 pixels.
 pub const MEGAPIXEL: u64 = 1 << 20;
 /// The most pixels of a QR code image read: a screen of 1920 x 1080 fits, and the QR images that
-/// MnemoCode saves are 720 px; a page image is read cropped to its code (owner, 2026-11-02; TS 0.1.0
-/// took 8). A smaller image shortens rqrr's search through noise, which grows faster than the
-/// pixels, but does not bound it: noise of 2 megapixels has kept it for 21 s.
+/// MnemoCode saves are 720 px; a page image is read cropped to its code (TS 0.1.0 took 8). A
+/// smaller image shortens rqrr's search through noise, which grows faster than the pixels, but does
+/// not bound it: noise of 2 megapixels has kept it for 21 s.
 pub const MAX_PNG_PIXELS: u64 = 2 * MEGAPIXEL;
 /// The most bits of a sample read: a QR code has two levels.
 pub const MAX_PNG_SAMPLE_BITS: u8 = 8;

@@ -1,10 +1,6 @@
-//! Saving a result that is on the screen already (MnemoCode TS 0.1.0's `cli/save-retry.ts` and
-//! `output-saving.ts`), through one path for every command: on the private screen a failure, a full
-//! disk or a folder taken meanwhile, keeps the result: one line says why, in plain words for the
-//! usual errors of a file system, another names each file or folder that the failed save left
-//! behind to delete, and the person tries again, gives another name, which is checked first and,
-//! once the result is saved there, warned of when a cloud service copies its folder, or skips that
-//! result. Elsewhere the failure ends the command, as every failure there does.
+//! Saving a result already on the screen, one path for every command. On the private screen a
+//! failed save keeps the result: it says why, names leftovers to delete, and lets the person retry,
+//! pick another name or skip. Elsewhere the failure ends the command.
 
 use std::io;
 use std::path::Path;
@@ -177,11 +173,10 @@ fn check_output_name(parsed: &Parsed, key: &str, path: &str) -> Result<(), Outpu
     validate_output_paths(&with_it)
 }
 
-/// Saves the output that the option `key` names, which is on the screen already: a failure keeps it
-/// and offers to try again, another name or to skip it, which the messages say of it by `name`.
-/// `write` saves it at a path, never over anything that exists there. A name used instead of the one
-/// given is kept in `parsed`, so that the next new name is checked against it. None when the option
-/// is not given or the output was skipped.
+/// Saves the output that the option `key` names, already on the screen; a failure offers to retry,
+/// rename or skip, naming it `name`. `write` never saves over an existing path. A replacement name
+/// is kept in `parsed`, so the next one is checked against it. None when the option is absent or
+/// the output was skipped.
 pub(crate) fn save_output(
     parsed: &mut Parsed,
     key: &str,

@@ -1,11 +1,6 @@
-//! Where a command saves (MnemoCode TS 0.1.0's `output-paths.ts`, `cloud-folders.ts`), checked
-//! before the seed phrase is asked or read (with --configure the Seedshift dates come first):
-//! every output path usable, the outputs apart from each other and from the inputs, a taken name
-//! numbered ("record_1.txt"; reported once saved), a new folder's name without a document's
-//! ending, and each output's parent folder made where it is missing (ARCHITECTURE.md §5: the
-//! preflight makes it, so that Landlock can rule it before the seed phrase). The folders it gives
-//! are the command's needs (os::Needs). A cloud service that copies an output's folder is warned
-//! of.
+//! Where a command saves, checked before the seed phrase is read: every output usable and apart
+//! from the inputs, a taken name numbered, a cloud-synced folder warned of, and each missing parent
+//! folder made now, so that Landlock can rule it (ARCHITECTURE.md §5).
 
 use std::ffi::OsString;
 use std::io;
@@ -196,7 +191,7 @@ pub(crate) fn resolved(path: &str) -> PathBuf {
 }
 
 /// A saved file's or folder's `path` as a message names it: in full, from the root, so that it is
-/// found wherever the program was started (the owner's request of 2026-11-04).
+/// found wherever the program was started.
 pub(crate) fn shown_path(path: &str) -> String {
     printable(&resolved(path).to_string_lossy())
 }
@@ -436,10 +431,9 @@ fn settle(parsed: &mut Parsed) -> Result<(), OutputError> {
     Ok(())
 }
 
-/// The preflight of a command's outputs, before the seed phrase is asked or read (with --configure
-/// the Seedshift dates come first): a taken name numbered in `parsed`,
-/// refusals as above, each missing parent folder made, and the folders the command writes beneath,
-/// for the protections.
+/// The preflight of a command's outputs, before the seed phrase is asked or read: a taken name
+/// numbered in `parsed`, refusals as above, each missing parent folder made, and the folders the
+/// command writes beneath, for the protections.
 pub(crate) fn preflight(parsed: &mut Parsed) -> Result<Needs, OutputError> {
     settle(parsed)?;
     validate_output_paths(parsed)?;

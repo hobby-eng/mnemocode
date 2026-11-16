@@ -1,9 +1,6 @@
-//! The rows of QR codes: PNG admission (MnemoCode TS 0.1.0's `core/png-admission-self-test.ts`),
-//! the exact scanline bytes of small images without and with Adam7 and the files a lenient reader
-//! would let in; and the QR adapter (TS's command-line "QR adapter" row), a backup's QR image
-//! written and read back, in the full self-test. The budgets follow the W3C PNG specification and were computed
-//! independently in Python; the images are synthetic, uncompressed data, which admission does not
-//! inflate. Public data only.
+//! The self-test rows of QR codes: PNG admission (scanline sizes with and without Adam7, and files
+//! a lenient reader would let in) and, in the full self-test, a backup's QR image written and read
+//! back. The budgets follow the W3C PNG specification, computed independently in Python.
 
 use super::{Row, ok};
 use crate::backup::Backup;

@@ -4,7 +4,7 @@
 //! PROVENANCE.json lists them (DOC-04).
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
@@ -307,26 +307,53 @@ fn check_lock_vendor_vectors(
     )
 }
 
+/// The TS repository beside the checkout `own`: a folder of one of its names whose own top level Git
+/// names, so that a folder with an empty or broken .git inside another repository is never taken
+/// for it (AUD-007-BLD002).
+fn ts_beside(own: &Path) -> Option<PathBuf> {
+    ["mnemocode_typescript", "mnemocode"]
+        .into_iter()
+        .find_map(|name| {
+            let folder = own.parent()?.join(name).canonicalize().ok()?;
+            if folder == own || !folder.join(".git").exists() {
+                return None;
+            }
+            let top = output_of(&folder, "git", &["rev-parse", "--show-toplevel"]).ok()?;
+            (Path::new(top.trim()).canonicalize().ok()? == folder).then_some(folder)
+        })
+}
+
 /// The recorders' SHA-256 in the recording's provenance, `recorded`, against the TS repository
 /// beside this one at the commit it names, both ways; said, not failed, where that repository is
-/// not beside this one, as in CI.
+/// not beside this one, as in CI; a problem where it is but lacks that commit.
 fn check_recorders(problems: &mut Problems, root: &Path, recorded: &Value) -> Result<(), Failure> {
     const RECORD: &str = "vectors/ts-0.1.0/PROVENANCE.json";
     const FOLDER: &str = "scripts/rust-parity/";
-    let own = root.canonicalize()?;
-    let beside = ["mnemocode_typescript", "mnemocode"]
-        .into_iter()
-        .find_map(|name| {
-            let folder = own.parent()?.join(name);
-            (folder.join(".git").exists() && folder.canonicalize().ok()? != own).then_some(folder)
-        });
-    let Some(ts) = beside else {
+    let Some(ts) = ts_beside(&root.canonicalize()?) else {
         println!(
             "code-rules: the TS repository is not beside this one; its recorders are not checked here."
         );
         return Ok(());
     };
     let commit = recorded["commit"].as_str().unwrap_or_default();
+    if output_of(
+        &ts,
+        "git",
+        &["cat-file", "-e", &format!("{commit}^{{commit}}")],
+    )
+    .is_err()
+    {
+        problems.report(
+            RECORD,
+            1,
+            "DOC-04",
+            &format!(
+                "the TS repository {} has no commit {commit}; fetch it to check the recorders",
+                ts.display()
+            ),
+        );
+        return Ok(());
+    }
     let listed = output_of(&ts, "git", &["ls-tree", "--name-only", commit, FOLDER])?;
     let names: BTreeSet<&str> = listed
         .lines()
@@ -359,4 +386,50 @@ fn check_recorders(problems: &mut Problems, root: &Path, recorded: &Value) -> Re
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::process::Command;
+
+    use super::*;
+
+    /// `git init` in `folder`.
+    fn repository(folder: &Path) {
+        fs::create_dir_all(folder).unwrap();
+        assert!(
+            Command::new("git")
+                .args(["init", "-q"])
+                .current_dir(folder)
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+
+    // AUD-007-BLD002: a real sibling is taken; none, or a folder with an empty .git inside another
+    // repository, is not.
+    #[test]
+    fn the_ts_repository_beside_is_one_git_names_as_its_own_top() {
+        let base = std::env::temp_dir().join(format!("mnemocode-beside-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        repository(&base);
+        let own = base.join("mnemocode-rust");
+        fs::create_dir_all(&own).unwrap();
+        let own = own.canonicalize().unwrap();
+        assert_eq!(ts_beside(&own), None);
+        fs::create_dir_all(base.join("mnemocode/.git")).unwrap();
+        assert_eq!(
+            ts_beside(&own),
+            None,
+            "an empty .git inside the parent repository"
+        );
+        repository(&base.join("mnemocode_typescript"));
+        assert_eq!(
+            ts_beside(&own),
+            Some(base.join("mnemocode_typescript").canonicalize().unwrap())
+        );
+        let _ = fs::remove_dir_all(&base);
+    }
 }

@@ -1,10 +1,6 @@
-//! The gate of the age operations (MnemoCode TS 0.1.0's `CandidateEncryption` and
-//! `candidate-encryption-checks.ts`, CAP-RECOVERY-CANDIDATE-ENCRYPTION-GATE, redesigned): their known
-//! answers, checked before the first operation and again where the host asks. A check that passed is
-//! kept for the gate's life, the process's for the host that holds one; one that failed runs again
-//! at the next call. TS's failure epochs and recheck barriers, which order concurrent promises, go:
-//! a gate has one caller at a time. The known answers hold public test keys and data, no secret;
-//! scrypt's is slow and runs only in the full self-test (`checks`).
+//! The gate of the age operations: their known answers, checked before the first operation and
+//! again when the host asks. A pass is kept for the gate's life; a failure is checked again at the
+//! next call. scrypt's answer is slow, so it runs only in the full self-test (`checks`).
 
 use super::admission::{Lock, MAX_ENCRYPTED_BYTES, MAX_HEADER_BYTES, check_encrypted_size, lock};
 use super::age::{

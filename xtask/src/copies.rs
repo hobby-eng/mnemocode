@@ -1,10 +1,6 @@
-//! Gate `copies` (CORE-10): the same run of at least 50 tokens in two places of the repository's
-//! Rust code (crates/, shims/, xtask/), whatever the white space, the line breaks and the comments,
-//! read with the Rust lexer. A copy is reported as "file A:lines = file B:lines": the code belongs
-//! in one function that both call. A deliberate copy says so in a comment that contains
-//! "deliberate copy" inside the copied lines or the three lines above them, with its reason; it is
-//! then not reported. `use` lists are left out: two files that use the same modules share no code.
-//! Taken from mhfe, whose recipe is MnemoCode TS's scripts/verify-no-copies.mjs.
+//! Gate `copies` (CORE-10): the same run of at least 50 tokens in two places of the Rust code,
+//! whatever the white space and comments, `use` lists aside. A copy is not reported where a comment
+//! saying "deliberate copy", with its reason, stands in it or up to three lines above.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;

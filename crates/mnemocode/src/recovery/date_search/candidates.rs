@@ -122,12 +122,9 @@ struct Stand {
 
 /// Whether an earlier combination of the patterns gave the same effective shifts as a given one.
 ///
-/// Two combinations give the same shifts only where their sorted dates agree, place by place, in
-/// the year modulo 2,048, the month and the day, except for the day of the last date where the mode
-/// adds it to the last word in part. So every date of an earlier combination has the shift key of
-/// one of the guessed dates, or is such a last date, and the patterns allow only a few: those are
-/// tried in the order the search goes, up to the combination itself. Worked out from the
-/// combination, never kept: a search of two billion combinations needs no memory for it.
+/// Two combinations shift alike only where their sorted dates agree in year modulo 2,048, month and
+/// day (bar a partly added last day), so only a few earlier ones can, and they are tried in order.
+/// Worked out, never kept: a search of two billion combinations needs no memory for it.
 #[derive(Debug)]
 struct EarlierShifts {
     known: Vec<Date>,
@@ -308,12 +305,9 @@ impl EarlierShifts {
     }
 }
 
-/// The phrases of every combination of the forgotten dates with the known ones, in the order of the
-/// patterns, keeping its place. A combination that shifts every word as an earlier one did gives
-/// the same phrases, and none here: the same dates in another order, a year 2,048 years later,
-/// since Seedshift adds the year to a word number modulo the 2,048 words, or a last date whose day
-/// the mode adds to the last word only in part. So each shift is tried once, with the earliest
-/// dates that give it.
+/// The phrases of every combination of the forgotten dates with the known ones, in pattern order.
+/// Combinations that shift every word as an earlier one did (dates reordered, a year 2,048 later, a
+/// partly added last day) are skipped, so each shift is tried once, with its earliest dates.
 #[derive(Debug)]
 pub struct DateCandidates {
     indexes: Indexes,

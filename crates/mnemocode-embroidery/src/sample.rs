@@ -36,6 +36,12 @@ pub fn gradient_png() -> Vec<u8> {
     })
 }
 
+/// A white picture of 40 by 40 pixels, the narrowest that a pattern takes.
+#[must_use]
+pub fn narrow_png() -> Vec<u8> {
+    png_file(40, 40, |_, _| [255, 255, 255])
+}
+
 /// A picture of two flat colours, 200 by 100 pixels, which cannot hold a phrase.
 #[must_use]
 pub fn two_colours_png() -> Vec<u8> {

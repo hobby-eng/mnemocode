@@ -1,11 +1,7 @@
-//! QR codes (MnemoCode TS 0.1.0's `export/qr-image.ts`, `export/qr-reader.ts` and the hosts' QR
-//! matrices, CAP-CARDS-QR-PNG-EXPORT and CAP-CLI-QR-IMAGE-INPUT): a payload's matrix at error
-//! correction level M, its PNG image of 720 pixels with the quiet zone of ISO/IEC 18004 (four
-//! modules, owner, 2026-10-27, TS first), and a PNG read back to its text. Every matrix is drawn and
-//! read back with rqrr before it is given out, and every image before it is saved: the owner's
-//! product promise. A PNG is read only after its admission ([`admission`]) and an inflation bounded
-//! to the scanline bytes it counted. The pixels and the text read are wiped; the decoders' own
-//! copies are not reachable here.
+//! QR codes: a payload's matrix at error correction level M, its 720-pixel PNG with the four-module
+//! quiet zone of ISO/IEC 18004, and a PNG read back to its text. Every matrix and image is read
+//! back with rqrr before it is given out or saved. A PNG is read only after its [`admission`], with
+//! inflation bounded to the scanline bytes it counted.
 
 pub mod admission;
 pub mod hidden;

@@ -1,27 +1,6 @@
-//! Gate `code-rules` of docs/design/architect/GATES.md: the coding rules that no compiler lint
-//! checks, each in its part, all read from module-map.json where the design states them:
-//!
-//! - layers (CORE-04, RUST-15): every top module a Rust file reaches through `crate::`, `super::`,
-//!   `self::` or a macro's `$crate::` path, and every library module the cards crate reaches
-//!   through `mnemocode::`, against module-map.json; both ways for the library's listed edges; the
-//!   crate root under no other name;
-//! - lints (RUST-05, RUST-07, CORE-09, CORE-46): `unsafe_code` allowed only in the files
-//!   module-map.json names; the disallowed std methods and types, under their old names too,
-//!   expected only at the top of the CLI's I/O modules and in test code; no lint group and no
-//!   `renamed_and_removed_lints` allowed anywhere; no `OsRng` named; `cfg_attr` read as the
-//!   attribute it may become;
-//! - manifests (RUST-01, RUST-12): `[lints] workspace = true` in every crate but the vendored ones,
-//!   `#![forbid(unsafe_code)]` in the roots module-map.json marks, the release profile exactly;
-//! - deps (CORE-25, CORE-47, DOC-04): each crate's direct and test dependencies, pinned exactly; no
-//!   crate of `refusedInTree` in an artifact's resolve on any release target; the bc-crypto
-//!   stand-in without a registry source; every vendored file and recorded vector byte-equal to its
-//!   record;
-//! - size (CORE-15): at most 800 lines of code per file, a Rust file's unit-test modules left out;
-//! - tests (CORE-32, CORE-34): test names of three words or more; fakes only of the Random port and
-//!   mhfe's Probes, in unit-test modules and test files alike;
-//! - refusals (CORE-23): each code of a `Refusal` is TS's or the port's own, and of one enum;
-//! - tooling (TOOL-01, TOOL-02): no script of another language than Rust and no Node.js, shell
-//!   scripts that stop on their first error and quote their expansions.
+//! Gate `code-rules` (docs/design/architect/GATES.md): the coding rules that no compiler lint
+//! checks, read from module-map.json: layers, lints, manifests, dependencies, file size, tests,
+//! refusal codes and tooling. Each part's module says what it checks.
 
 mod cases;
 pub(crate) mod deps;

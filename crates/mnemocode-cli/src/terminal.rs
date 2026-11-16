@@ -1,9 +1,6 @@
-//! Everything MnemoCode shows on a terminal, in the one style of the bip_tools command-line tools
-//! (MnemoCode TS 0.1.0's `src/cli/terminal.ts` and `terminal-style.ts`, as `mhfe`): the sixteen
-//! standard colours only, cyan for headings, grey for labels and secondary text, a green ✓, a
-//! yellow ! and a red ✗; running text wrapped to 78 columns. Output that does not go to a terminal,
-//! or to TERM=dumb, carries no colour and keeps its plain form for scripts. Questions, progress and
-//! messages go to standard error; results to standard output.
+//! Everything MnemoCode shows on a terminal, in the style of the bip_tools command-line tools: the
+//! sixteen standard colours, text wrapped to 78 columns, and no colour off a terminal or with
+//! TERM=dumb. Questions, progress and messages go to standard error; results to standard output.
 
 mod answer;
 mod choice;
@@ -124,6 +121,8 @@ struct Context {
     input: bool,
     output: bool,
     error: bool,
+    /// Whether standard output is the terminal of standard error, where the private screen is.
+    output_private: bool,
 }
 
 static CONTEXT: OnceLock<Context> = OnceLock::new();
@@ -136,6 +135,7 @@ pub(crate) fn init(environment: Environment) {
         input: os::is_terminal(Stream::Input),
         output: os::is_terminal(Stream::Output),
         error: os::is_terminal(Stream::Error),
+        output_private: os::same_terminal(Stream::Output, Stream::Error),
     });
 }
 
@@ -145,6 +145,7 @@ fn context() -> &'static Context {
         input: false,
         output: false,
         error: false,
+        output_private: false,
     })
 }
 
@@ -160,6 +161,18 @@ pub(crate) enum Channel {
     Output,
     /// Standard error.
     Error,
+}
+
+/// The stream that a result for the screen goes to: standard output, unless it is a terminal other
+/// than the private screen's (AUD-007-SEC002), whose lines the screen could not clear; then the
+/// private screen itself. A file or a pipe on standard output keeps its plain lines.
+pub(crate) fn screen_channel(channel: Channel) -> Channel {
+    let context = context();
+    if channel == Channel::Output && context.output && context.error && !context.output_private {
+        Channel::Error
+    } else {
+        channel
+    }
 }
 
 /// Whether `channel` is a terminal that can move its cursor and rewrite a line: a terminal that is

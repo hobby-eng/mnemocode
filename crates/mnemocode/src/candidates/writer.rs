@@ -1,10 +1,6 @@
-//! The writing of a candidate list (MnemoCode TS 0.1.0's `core/candidate-list-writer.ts`,
-//! CAP-RECOVERY-CANDIDATE-LIST-WRITER): the phrases of a search as their BIP39 entropy in their
-//! order, in one owner reserved at the list's exact size from the count (ADR 0003), with one BIP39
-//! passphrase for all, encoded ([`super::format`]) and protected as the person chose
-//! ([`super::protection`]). No list is written for no candidate, or for more than one list holds.
-//! The phrases are the library's own [`Phrase`] values, checked when they were made, so TS's
-//! checks of a host's phrase texts go (CORE-54).
+//! Writing a candidate list: the phrases' BIP39 entropy in order, in one owner reserved at the
+//! list's exact size (ADR 0003), with one BIP39 passphrase for all, encoded ([`super::format`]) and
+//! protected as chosen ([`super::protection`]). No list is written for no candidate or too many.
 
 use std::fmt;
 

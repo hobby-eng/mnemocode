@@ -1,9 +1,6 @@
-//! How a candidate list is protected (MnemoCode TS 0.1.0's `ListProtection`, `parseListPassphrase`
-//! and `protectionFor` in `core/candidate-encryption.ts`, CAP-RECOVERY-CANDIDATE-PROTECTION-CHOICE):
-//! to the Scanner's key, under a passphrase, or, only on the person's explicit request, not at all;
-//! chosen once, then every list is saved the same way. The recipient and the passphrase are trimmed
-//! by the one rule (`text::space::trim`, owner, 2026-10-27). TS's check of a host's choice object
-//! goes: the choice is a closed enum here, and the binding reads a JavaScript one.
+//! How a candidate list is protected: to the Scanner's key, under a passphrase, or, only on
+//! explicit request, not at all; chosen once for every list. The recipient and passphrase are
+//! trimmed by the one rule (`text::space::trim`).
 
 use super::admission::check_plaintext_size;
 use super::age::{EncryptionError, Recipient, To};

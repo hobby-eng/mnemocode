@@ -1,8 +1,8 @@
 //! White space as typed text needs it. Two rules, each where TS has it: ECMAScript's white space
 //! (`/\s/u`: WhiteSpace and LineTerminator), which splits words, dates and codes into tokens as TS
 //! splits them; and Unicode's White_Space (`str::trim`, TS `trimWhiteSpace`), the one trim of every
-//! value a person typed or pasted (owner, 2026-10-27). They differ in two characters: U+FEFF is
-//! ECMAScript white space only, U+0085 is White_Space only.
+//! value a person typed or pasted. They differ in two characters: U+FEFF is ECMAScript white space
+//! only, U+0085 is White_Space only.
 
 /// U+FEFF, which an editor may put at the start of a text file.
 pub const BYTE_ORDER_MARK: char = '\u{feff}';
@@ -34,8 +34,8 @@ pub fn tokens(text: &str) -> impl Iterator<Item = &str> {
 }
 
 /// `text` without Unicode White_Space at its ends, as people paste and type it: TS's
-/// `trimWhiteSpace`, the one trim of every value a wallet check or reader takes (owner,
-/// 2026-10-27). A byte order mark is no white space and stays.
+/// `trimWhiteSpace`, the one trim of every value a wallet check or reader takes. A byte order mark
+/// is no white space and stays.
 pub fn trim(text: &str) -> &str {
     text.trim()
 }

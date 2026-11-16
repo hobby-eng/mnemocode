@@ -1,8 +1,5 @@
-//! The public data the self-checks check the rules with, each written once (TS
-//! `src/core/self-test-vectors.ts`): the phrase of all-zero entropy, the first BIP39 vector, its
-//! master fingerprint, its Unicode codes, its Seedshift vector (vectors/mnemocode-v1.json: direct-12
-//! and checksum-valid-seedshift-12), the 24-word phrase of all-zero entropy, the dates of the
-//! Seedshift vectors of 15 to 24 words, and the candidate list of three phrases
+//! The public data the self-checks use, each written once: BIP39 vectors and their fingerprint and
+//! codes, the Seedshift vectors (vectors/mnemocode-v1.json) and the candidate list of three phrases
 //! (vectors/candidates-v1.json).
 
 /// The public test phrase of all-zero entropy, the first BIP39 vector.

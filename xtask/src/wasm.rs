@@ -1,19 +1,7 @@
-//! The WebAssembly file of each wallet-tools page (ADR 0007, ARCHITECTURE.md §9), from its profile
-//! in wasm-profiles.json:
-//!
-//! - `wasm build [<edition>/<page>]` writes dist/wasm/<edition>/<page>/: mnemocode.wasm, its glue
-//!   mnemocode.js with initSync only (the network loader and the asynchronous start removed, each
-//!   found exactly once), mnemocode.d.ts, and modules.json with the version, the profile and the
-//!   SHA-256 of each file. No directory of the builder's computer reaches the file: the repository,
-//!   CARGO_HOME and RUSTUP_HOME are remapped to fixed names (mhfe's remap-builder-paths.sh).
-//! - `wasm verify` checks every page's files: modules.json against the folder, no network code in
-//!   the glue, no builder's directory in the WebAssembly, exactly the exports of the profile's
-//!   modules as the glue exports them, each file started in wasmi, an interpreter of WebAssembly
-//!   written in Rust, with every import it takes given by the glue and every export the glue reads
-//!   present (the glue's JavaScript itself is read, not run: there is no JavaScript engine here),
-//!   a test profile with the probe module, and that profile's checks (`probe`): the instance's
-//!   memory holds no marker after the probe entries, and a refusal reaches the page as TS's kind
-//!   of error with an enumerable, read-only code.
+//! The WebAssembly file of each wallet-tools page (ADR 0007, ARCHITECTURE.md §9). `wasm build`
+//! writes each page's files from wasm-profiles.json, the glue with `initSync` only and no builder's
+//! directory in them; `wasm verify` checks hashes, glue, exports and imports in wasmi, and the
+//! probe checks (`probe`).
 
 mod probe;
 

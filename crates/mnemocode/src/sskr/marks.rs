@@ -1,9 +1,6 @@
-//! The marks of a share's unreadable elements (MnemoCode TS 0.1.0's `src/sskr/repair-models.ts`
-//! and the mark counts of `repair.ts`, CAP-SSKR-MARK-SYNTAX): an element that cannot be read is a ?
-//! at its place, a word number, a Unicode code, a color, a Color Unicode code, a Byteword or a pair
-//! of letters of a UR; a color or a code may be read in part, a ? for each digit. Each way to read
-//! a marked share as units of one form is a unit model: the values read, what a solution must fit,
-//! and the structures its count of units allows.
+//! The marks of a share's unreadable elements: a ? at its place, or a ? per digit of a color or
+//! code read in part. Each way to read a marked share as units of one form is a unit model: the
+//! values read, what a solution must fit, and the structures its unit count allows.
 
 use std::fmt;
 

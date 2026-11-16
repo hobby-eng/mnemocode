@@ -1,10 +1,7 @@
-//! The segments of a QR code's text (ISO/IEC 18004, 7.4): which mode writes each run of its
-//! characters, at the lowest count of bits. qrcodegen writes a text in one mode; node-qrcode, which
-//! draws TS 0.1.0's codes, mixes modes, and the version of a code follows from its bits.
-//!
-//! The cheapest segments depend on the bits of their counts, which change with the version, so
-//! each span of versions that shares those bits is tried in turn, the smallest first. node-qrcode
-//! estimates a version instead; the two gave the same version on 133,000 payloads of every form.
+//! The segments of a QR code's text (ISO/IEC 18004, 7.4): the mode of each run of characters, at
+//! the lowest bit count. The cheapest segments depend on the count bits, which change with the
+//! version, so each span of versions sharing those bits is tried, smallest first. This gave the
+//! versions of node-qrcode, which drew TS 0.1.0's codes, on 133,000 payloads of every form.
 
 use std::ops::Range;
 

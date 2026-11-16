@@ -1,9 +1,7 @@
-//! W-DLL-SEARCH's release gate (docs/design/platform/protections.json): every DLL that a Windows
-//! executable imports, directly or delay-loaded, is in the stored KnownDLL list
-//! (xtask/knowndlls.json) or is an API set, so the loader takes it from the system and never from
-//! the executable's folder, where a planted DLL would wait. The GNU target cannot set
-//! DependentLoadFlags: the MinGW-w64 libraries of the pinned build define no `_load_config_used`
-//! (increment 0's probe, 2026-10-27).
+//! W-DLL-SEARCH's release gate: every DLL a Windows executable imports, directly or delay-loaded,
+//! must be a stored KnownDLL (xtask/knowndlls.json) or an API set, so it never loads from the
+//! executable's folder. The GNU target cannot set DependentLoadFlags: MinGW-w64 defines no
+//! `_load_config_used`.
 
 use std::path::Path;
 

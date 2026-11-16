@@ -203,6 +203,7 @@
       "StitchSizes",
       "readStitchLegend",
       "readStitchPdf",
+      "stitchPdfMaxBytes",
       "selfCheckEmbroidery"
     ]
   }

@@ -1,8 +1,7 @@
-//! The coins whose addresses a wallet check reads (MnemoCode TS 0.1.0's `core/coins/coin.ts`,
-//! CAP-WALLET-COIN-REGISTRY): each a static entry in its own module behind its feature `coin-<id>`
-//! (ADR 0002), listed once in [`COINS`]. A coin reads an address into its type and the commitment
-//! it holds, a HASH160, a Keccak account or a Taproot key, and says the BIP32 paths of its keys;
-//! an address is a key's when the key's commitment of that type is the address's.
+//! The coins whose addresses a wallet check reads: each a static entry in its own module behind its
+//! feature `coin-<id>` (ADR 0002), listed once in [`COINS`]. A coin reads an address into its type
+//! and the commitment it holds (a HASH160, a Keccak account or a Taproot key) and gives the BIP32
+//! paths of its keys; an address is a key's when it holds the key's commitment.
 
 pub mod encodings;
 
@@ -320,10 +319,9 @@ pub struct Coin {
     pub reader: Reader,
 }
 
-/// Where an address's key stands below its coin type: the account, the branch (0 receiving, 1
-/// change) and the index (CAP-WALLET-ADDRESS-LOCATION). Each part is a normal BIP32 index: a
-/// location is either [`AddressLocation::FIRST`] or made by [`AddressLocation::new`], which refuses
-/// a hardened index, so that no part can alias one:
+/// Where an address's key stands below its coin type: account, branch (0 receiving, 1 change) and
+/// index. Each part is a normal BIP32 index; [`AddressLocation::new`] refuses a hardened one, so no
+/// part can alias one:
 ///
 /// ```
 /// use mnemocode::wallet::coins::AddressLocation;
@@ -815,16 +813,11 @@ impl Coin {
     }
 }
 
-/// `text`, trimmed, read as an address of every coin of this build whose form it has, in the order
-/// of [`COINS`]: one coin for most addresses, more where coins share a form, as Bitcoin and Bitcoin
-/// Cash share 1…, Bitcoin and Litecoin's older P2SH 3…, and Ethereum and Ethereum Classic 0x…, so
-/// that a check searches the paths of each. A coin added to the registry takes part with no list
-/// of such pairs.
+/// `text`, trimmed, read as an address of each coin whose form it has, in the order of [`COINS`].
 ///
 /// # Errors
 ///
-/// An address of no coin is refused with the reason of the first coin whose form it has, such as a
-/// wrong EIP-55 checksum or a shielded address; else as [`CoinError::NoCoin`].
+/// The first matching coin's reason, such as a wrong EIP-55 checksum; else [`CoinError::NoCoin`].
 pub fn parse_any(text: &str) -> Result<Vec<CoinAddress>, CoinError> {
     let mut read = Vec::new();
     let mut reason = None;

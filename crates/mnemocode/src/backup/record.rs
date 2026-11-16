@@ -50,8 +50,9 @@ impl Refusal for RecordError {
     }
 }
 
-/// A record as it is read: its mode, its form and its codes.
-#[derive(Debug, PartialEq, Eq)]
+/// A record as it is read: its mode, its form and its codes. Its Debug shows the mode and form only:
+/// the codes are the backup.
+#[derive(PartialEq, Eq)]
 pub struct Record<'a> {
     /// The mode the codes were written in.
     pub mode: Mode,
@@ -59,6 +60,16 @@ pub struct Record<'a> {
     pub form: Form,
     /// The codes, as written.
     pub payload: &'a str,
+}
+
+impl fmt::Debug for Record<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Record")
+            .field("mode", &self.mode)
+            .field("form", &self.form)
+            .field("payload", &format_args!("[codes: redacted]"))
+            .finish()
+    }
 }
 
 /// The record of the codes `payload`, trimmed, in `form` and `mode`; refused for codes that are
@@ -117,6 +128,26 @@ pub fn parse_record(value: &str) -> Result<Option<Record<'_>>, RecordError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // AUD-007-SEC001: formatting a record for a log never shows its codes.
+    #[test]
+    fn a_record_hides_its_codes_from_debug() {
+        let record = Record {
+            mode: Mode::Seedshift,
+            form: Form::Unicode,
+            payload: "7684 5512",
+        };
+        for shown in [format!("{record:?}"), format!("{record:#?}")] {
+            assert!(
+                !shown.contains("7684") && !shown.contains("5512"),
+                "{shown}"
+            );
+            assert!(
+                shown.contains("Seedshift") && shown.contains("Unicode"),
+                "{shown}"
+            );
+        }
+    }
 
     #[test]
     fn a_record_names_its_mode_and_form() {

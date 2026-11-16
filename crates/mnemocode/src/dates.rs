@@ -1,9 +1,6 @@
-//! Dates as Seedshift takes them (MnemoCode TS 0.1.0's `core/dates.ts`, CAP-PHRASE-FORMATS-DATES,
-//! -DATE-PATTERNS, -SHIFT-SCHEDULE): a date of the Gregorian calendar from 0001 through 9999,
-//! written DD-MM-YYYY or YYYY-MM-DD, a year always with its four digits; the shifts of a phrase's
-//! words, three words to a date (its year, its month, its day) in calendar order, repeated; and the
-//! patterns of a date search, ? for a forgotten digit, values of a part joined by |, or a lone ?
-//! for a whole date, counted without listing their dates.
+//! Dates as Seedshift takes them: Gregorian, 0001 to 9999, written DD-MM-YYYY or YYYY-MM-DD; the
+//! shifts of a phrase's words (year, month, day per date, in calendar order, repeated); and date
+//! search patterns (? for a forgotten digit, `|` between values, a lone ? for a whole date).
 
 pub mod answer;
 

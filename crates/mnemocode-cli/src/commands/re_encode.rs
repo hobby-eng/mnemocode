@@ -1,13 +1,7 @@
-//! `mnemocode re-encode` (MnemoCode TS 0.1.0's `cli/re-encode-command.ts`): an encoded backup made
-//! again, with other dates, another mode or in another form, without its seed phrase being typed.
-//! The old backup is read and decoded as Decode reads and decodes it, every code and date complete,
-//! its dates asked right after its codes; a backup of the Original Seedshift with a valid last word
-//! also takes the last word of the original phrase, which the person remembers. The phrase is shown,
-//! and encoded again only once it is confirmed: the person recognises it or its fingerprint, or the
-//! wallet has an address or the fingerprint they name. Its checksum confirms nothing. Then the new
-//! backup is made as Encode makes it, from its options, or, with --ask-secrets and none of them,
-//! from Encode's questions. Shares given instead of codes use Restore's questions and unmasking
-//! first; only their original phrase reaches the same confirmation.
+//! `mnemocode re-encode`: an encoded backup made again with other dates, mode or form, without its
+//! seed phrase being typed. The old backup is decoded as Decode does, and the phrase is encoded
+//! again only once the person confirms it (by the phrase, its fingerprint or a wallet address); its
+//! checksum confirms nothing. Shares given instead of codes go through Restore's questions first.
 
 use std::fmt;
 
@@ -580,11 +574,9 @@ fn asked_new_backup(refusal: Option<&str>) -> Result<(PreparedEncode, Needs), St
     Ok((prepared, needs))
 }
 
-/// Confirms the phrase of `re_encoding`, shown above: as the options say, --recognised once the
-/// person has read it and pressed Enter, a wallet option at once; otherwise, or when that wallet
-/// does not match, as the person chooses: by recognising it, or by an address or fingerprint
-/// compared with the wallet, which may be tried again. They may also type the dates or the backup
-/// again.
+/// Confirms the phrase of `re_encoding`, shown above: by --recognised or a wallet option, or else
+/// as the person chooses, by recognising it or by an address or fingerprint compared with the
+/// wallet. They may also type the dates or the backup again.
 fn confirmation(
     re_encoding: &mut ReEncoding,
     mode: Mode,

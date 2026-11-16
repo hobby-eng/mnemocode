@@ -1,9 +1,6 @@
-//! Protected cross-stitch setup: Seedshift and its dates first, then the picture, fabric, size
-//! and output. The selected folders are restricted before the seed phrase is read.
-//! How large is offered as paper sizes, each with its centimetres and the stitches the picture takes
-//! in it on the chosen fabric, or as a width in centimetres or in stitches (the owner's request of
-//! 2026-11-04). The answers make stitch's command line; the phrase and the dates are asked on
-//! stitch's private screen.
+//! Protected cross-stitch setup: Seedshift and its dates first, then the picture, fabric, size and
+//! output. The chosen folders are restricted before the seed phrase is read. The size is offered as
+//! paper sizes or as a width in centimetres or stitches.
 
 use std::path::Path;
 
@@ -27,8 +24,8 @@ pub(crate) const PATTERN_FILE: &str = "cross-stitch-pattern.pdf";
 enum Size {
     /// A paper size's stitches across.
     Across(usize),
-    /// A width typed in centimetres.
-    Centimetres,
+    /// A width typed in centimetres, within the least and the most that can be typed.
+    Centimetres(f64, f64),
     /// A width typed in stitches.
     Stitches,
 }
@@ -145,13 +142,14 @@ pub(crate) fn ask_size(
         );
         choices.push(Choice::noted(&label, &note, Size::Across(across)));
     }
-    let (least, most) = fabric::centimetre_range(widths, count);
-    let range = format!("{least:.1} to {most:.1}");
-    choices.push(Choice::noted(
-        "Width in centimetres",
-        &range,
-        Size::Centimetres,
-    ));
+    // Few stitches on fine linen may leave no width to type in centimetres: stitches only then.
+    if let Some((least, most)) = fabric::centimetre_range(widths, count) {
+        choices.push(Choice::noted(
+            "Width in centimetres",
+            &format!("{least:.1} to {most:.1}"),
+            Size::Centimetres(least, most),
+        ));
+    }
     choices.push(Choice::noted(
         "Stitches across",
         &widths.to(),
@@ -167,7 +165,8 @@ pub(crate) fn ask_size(
     match ask_list_at(&question, "Size", &choices, (first, Some(&explanation)))? {
         None => Ok(None),
         Some(Size::Across(across)) => Ok(Some(across)),
-        Some(Size::Centimetres) => {
+        Some(Size::Centimetres(least, most)) => {
+            let range = format!("{least:.1} to {most:.1}");
             let what = format!("a number of centimetres from {range}");
             let how = LineQuestion {
                 what: Some(&what),

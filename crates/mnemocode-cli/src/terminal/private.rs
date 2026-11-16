@@ -1,9 +1,6 @@
-//! The private screen (MnemoCode TS 0.1.0's `private-screen.ts`, `private-steps.ts`,
-//! `private-summary.ts`): a command that handles a secret runs on the terminal's alternate screen,
-//! each step on a screen of its own under the command's title, with the context and the warnings
-//! that still hold drawn again (CORE-39); after the result, Enter clears it, and the main screen
-//! keeps only a summary of what was saved and the warnings that still hold. Ctrl+C and a signal
-//! leave it first, so that the error or "Cancelled." shows on the main screen.
+//! The private screen: a command that handles a secret runs on the alternate screen, each step
+//! under its title with the warnings that still hold (CORE-39), and leaves only a summary behind.
+//! Ctrl+C and signals leave it first, so that errors show on the main screen.
 
 use std::sync::Mutex;
 

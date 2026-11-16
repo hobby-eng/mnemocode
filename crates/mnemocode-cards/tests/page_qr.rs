@@ -1,8 +1,7 @@
 //! The QR code of a sheet as a host reads it back from the page image it saved (PLAN.md, the parity
-//! of page images). A QR image may have 2 megapixels (owner, 2026-11-02), less than a sheet of A6 or
-//! A5, so a sheet is read in overlapping parts, as a person crops the code. The designs differ in
-//! what lies around the code, and the codes in how many pixels their modules take; every kind of
-//! page is read.
+//! of page images). A QR image may have 2 megapixels, less than a sheet of A6 or A5, so a sheet is
+//! read in overlapping parts, as a person crops the code. Every kind of page is read, since the
+//! designs differ in what lies around the code and the codes in how many pixels their modules take.
 
 // Test code throughout, so that clippy's allow-*-in-tests keys cover the helpers too. The default
 // features hold the shares and every design, which the manifest asks of ts_cards one by one.

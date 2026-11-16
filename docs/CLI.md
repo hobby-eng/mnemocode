@@ -6,23 +6,25 @@ For choosing a backup or recovery method, start with the [README](../README.md).
 
 Release assets provide one executable for each supported target: `mnemocode-<version>-linux-x64`, `mnemocode-<version>-linux-arm64`, `mnemocode-<version>-win-x64.exe`, `mnemocode-<version>-macos-arm64` and `mnemocode-<version>-macos-x64`. Linux needs glibc 2.35 or later; musl systems such as Alpine cannot run these files. Each executable has a companion `-licenses.txt` file listing the licenses it contains.
 
-Check a download before running it. `SHA256SUMS` lists its SHA-256 hash, `SHA256SUMS.asc` signs that list, and `RELEASE-SIGNING-KEY.asc` contains the public key. Check that the key fingerprint is `28FC51B1DB80DF2101128CB30EDD4814591DD095`; the maintainer also publishes it at <https://github.com/hobby-eng.gpg>.
+Check a download before running it. `SHA256SUMS` lists its SHA-256 hash, `SHA256SUMS.asc` signs that list, and `RELEASE-SIGNING-KEY.asc` contains the public key, whose fingerprint must be `28FC51B1DB80DF2101128CB30EDD4814591DD095`; the maintainer also publishes it at <https://github.com/hobby-eng.gpg>. Run the commands below as one script with the name of the file you will run: it stops at the first failure, and it succeeds only when the key has that fingerprint, the signature over `SHA256SUMS` is good, and the line for exactly that file matches its bytes.
 
 ```bash
-gpg --show-keys RELEASE-SIGNING-KEY.asc
+set -euo pipefail
+file=mnemocode-0.2.0-linux-x64
+gpg --show-keys --with-colons RELEASE-SIGNING-KEY.asc | grep -qx 'fpr:::::::::28FC51B1DB80DF2101128CB30EDD4814591DD095:'
 gpg --import RELEASE-SIGNING-KEY.asc
-gpg --verify SHA256SUMS.asc SHA256SUMS
-sha256sum --check --ignore-missing SHA256SUMS
-chmod +x mnemocode-0.2.0-linux-x64
-./mnemocode-0.2.0-linux-x64 self-test
+gpg --status-fd 1 --verify SHA256SUMS.asc SHA256SUMS | grep -q '^\[GNUPG:\] VALIDSIG .*28FC51B1DB80DF2101128CB30EDD4814591DD095'
+grep -x "[0-9a-f]\{64\}  $file" SHA256SUMS | sha256sum --check --strict
+chmod +x "$file"
+./"$file" self-test
 ```
 
-`gpg --verify` must report a good signature from that key. A warning that you have not certified the key is separate from signature validity. On macOS, use `shasum -a 256` to compare the downloaded file's hash with its line in `SHA256SUMS`; on Windows, use `Get-FileHash -Algorithm SHA256`. These commands do not verify the signature: use GnuPG for that first.
+A warning from `gpg --verify` that you have not certified the key is separate from signature validity. On macOS, replace `sha256sum --check --strict` with `shasum -a 256 --check`. On Windows, after the GnuPG steps, compare `(Get-FileHash -Algorithm SHA256 mnemocode-0.2.0-win-x64.exe).Hash` with the hash on the line for that file name in `SHA256SUMS`; `Get-FileHash` alone does not verify the signature.
 
-On the connected computer used to download the release, the [GitHub CLI](https://cli.github.com/) can also check its build attestation:
+On the connected computer used to download the release, the [GitHub CLI](https://cli.github.com/) can also check that the file was built by the release workflow from the tag:
 
 ```bash
-gh attestation verify mnemocode-0.2.0-linux-x64 --repo hobby-eng/mnemocode
+gh attestation verify mnemocode-0.2.0-linux-x64 --repo hobby-eng/mnemocode --signer-workflow hobby-eng/mnemocode/.github/workflows/release.yml --source-ref refs/tags/v0.2.0
 ```
 
 The executable contains the program, artwork, fonts and native SSKR engine. PDF, PNG and JPEG export need no external image converter. To package a source build for Linux x64:

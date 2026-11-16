@@ -1,9 +1,6 @@
-//! The split of a phrase into the shares of one group (MnemoCode TS 0.1.0's `src/sskr/split.ts`,
-//! CAP-SSKR-SPLIT-PHRASE and CAP-SSKR-SPLIT-BACKUP): a backup is masked first in its mode, so the
-//! shares hold the phrase its codes hold; the seed of the split comes from the host's randomness
-//! (CORE-46); and every new split is restored, each share checked, before it is given out, as the
-//! product's promise that written shares restore. The engine is the program's own and linked, so
-//! its output is not checked again apart from that restore (CORE-54).
+//! The split of a phrase into one group's shares: a backup is masked first in its mode, the split's
+//! seed comes from the host's randomness (CORE-46), and every new split is restored and each share
+//! checked before it is given out, so written shares always restore.
 
 use std::fmt;
 

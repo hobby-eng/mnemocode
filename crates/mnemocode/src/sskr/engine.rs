@@ -1,9 +1,7 @@
-//! The SSKR engine (MnemoCode TS 0.1.0's engine, `sskr-wasm/rust/src/lib.rs`, CAP-SSKR-ENGINE-SPLIT,
-//! -COMBINE, -MEMORY-WIPE and -HOST-PLATFORM, redesigned): Blockchain Commons' SSKR, vendored
-//! with the ownership/cleanup patches recorded in vendor/*/UPSTREAM.json, splits a secret into Shamir shares and restores it. A split's generator is ChaCha20
-//! seeded with 32 bytes of the host's randomness (the Random port, CORE-46), as the TS engine seeds
-//! it; every share and secret lies in a locked owner, and the stack the library worked on is
-//! scrubbed once it returns. No WebAssembly loader stands between: the library calls it directly.
+//! The SSKR engine: Blockchain Commons' SSKR, vendored with the patches in vendor/*/UPSTREAM.json,
+//! splits a secret into Shamir shares and restores it. A split's ChaCha20 is seeded with 32 bytes
+//! of the host's randomness (CORE-46); shares and secrets live in locked owners, and the stack is
+//! scrubbed after each call.
 
 use std::fmt;
 

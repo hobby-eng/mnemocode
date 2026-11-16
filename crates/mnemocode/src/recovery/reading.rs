@@ -1,11 +1,7 @@
-//! How a backup that a person types, pastes or reads from a file is to be read, before its dates
-//! (MnemoCode TS 0.1.0's `core/backup-reading.ts`, CAP-PHRASE-FORMATS-BACKUP-READING): its MNC1
-//! record header, if it has one; a record without Seedshift where only a Seedshift backup will do;
-//! a Shamir share given where an encoded seed phrase was asked for; the mode, from the record or
-//! from the host, and what to say when the two differ; the form of the codes, from the record, from
-//! the host, or every form that fits; and then the codes themselves. The command line and a page
-//! ask the person in between, each its own way; the rules and their lines are here. Its messages
-//! name places, counts, modes and forms, never a code.
+//! How a backup that a person types, pastes or loads is read before its dates: its MNC1 header, its
+//! mode and form (from the record, the host or every form that fits), a share given in place of
+//! codes, and then the codes. Front ends ask in between; the rules and their lines are here. Its
+//! messages name places, counts, modes and forms, never a code.
 
 use std::fmt;
 
@@ -212,12 +208,10 @@ impl BackupReading {
             .collect()
     }
 
-    /// Whether `text`, given in place of an encoded seed phrase, holds Shamir shares: a share when
-    /// it reads as one and not as codes, either when it reads as both; none when it is no share, or
-    /// carries a record header, which only codes have. Marked with ?, it is a share when one of its
-    /// readings as a share has a solution; with few marks the share's checksum settles it, with
-    /// many they are either. A file or paste is split first, so later shares are not mistaken for
-    /// the decoy codes after the first one.
+    /// Whether `text`, given in place of an encoded seed phrase, holds Shamir shares: a share where
+    /// it reads only as one, either where it reads as both, none otherwise or with a record header.
+    /// Marked text counts as a share where one share reading has a solution. A file or paste is
+    /// split first, so later shares are not taken for decoy codes.
     #[cfg(feature = "sskr")]
     pub fn share_kind(text: &str) -> Result<Option<ShareKind>, ReadingError> {
         if parse_record(text)?.is_some() {

@@ -1,10 +1,7 @@
-//! The rows of Shamir shares (MnemoCode TS 0.1.0's `src/sskr/known-answers.ts`,
-//! `repair-self-test.ts`, `split-self-test.ts` and `share-restore-self-test.ts`): SSKR integrity,
-//! the official BCR-2020-011 vector and a set of the longest secret restored, shares made with a
-//! public test-only seed restored by every two, the forms and the refusals of a set; Share repair,
-//! marked elements filled in from one share and from shares together; and Share split and restore,
-//! the published phrase and a masked backup split and restored. No published vector gives the
-//! shares of a seeded split, so none is compared with them (CORE-27). Public data only.
+//! The self-test rows of Shamir shares: SSKR against the official BCR-2020-011 vector, seeded
+//! splits restored by every pair, the forms and refusals of a set, share repair, and split and
+//! restore of the published phrase. No published vector gives a seeded split's shares, so none is
+//! compared (CORE-27). Public data only.
 
 use super::{Row, hint_text, ok};
 use crate::bip39::phrase::Phrase;

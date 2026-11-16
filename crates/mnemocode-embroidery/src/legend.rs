@@ -1,29 +1,7 @@
 //! The legend of a pattern as a backup: what each row's symbol and stitch count stand for, and how
-//! they are read back with no picture. Format 1:
-//!
-//! - The rows are read in the order the legend prints them, each as its symbol's number in
-//!   [`SYMBOLS`] and its count of stitches.
-//! - A row's symbol stands for its place among the symbols that no row above it took.
-//! - The row with the most stitches carries no more; any other row carries the last two digits
-//!   of its count from 1000 stitches, the last digit from 100, nothing below.
-//! - Read as one number, the first row's symbol lowest, its remainder below 2 to the power of
-//!   `8 * L + 32` is the entropy of a phrase (L of 16, 20, 24, 28 or 32 bytes) and a check of four
-//!   bytes: the first four of SHA-256 of a domain, the byte L and the entropy. The domain says what
-//!   the phrase is ([`Masking`]): `MnemoCode embroidery 1` for one masked with Seedshift dates,
-//!   `MnemoCode embroidery 1 unmasked` for the phrase itself. What lies above it is chosen freely
-//!   by the writer.
-//!
-//! Format 2 adds the order of the rows (the owner's choice of 2026-11-05, for patterns too small
-//! or too plain for format 1): each row also names its DMC thread, typed as `symbol:DMC:stitches`,
-//! and the place of its thread among the rows' threads sorted as [`dmc::Thread::order`] sorts them
-//! is one more digit of the number, below the row's symbol. Its check's domains end in `2` where
-//! format 1's end in `1`, so the two never read as each other. MnemoCode writes format 1 wherever
-//! it holds the phrase.
-//!
-//! A reading whose check fails is tried again with every change of one row: another symbol, one
-//! digit of its count or two neighbouring digits swapped, its count on the other side of a limit,
-//! or another row as the biggest. Where
-//! exactly one entropy comes out, the row is taken as misread.
+//! they are read back with no picture. Both formats are specified in docs/SEEDSTITCH.md; MnemoCode
+//! writes format 1 wherever it holds the phrase. A reading whose check fails is tried again with
+//! every change of one row, and taken where exactly one entropy comes out.
 
 mod number;
 pub mod symbols;
@@ -258,13 +236,11 @@ pub fn is_line(text: &str) -> bool {
         })
 }
 
-/// `rows` as the line a person types back: each row's symbol number, a colon and its stitches, a
-/// space between rows, as `28:1725 25:2163`; in format 2 with its DMC number and a colon between
-/// them, as `28:310:1725`.
+/// `rows` as the line a person types back, as `28:1725 25:2163`, or in format 2 `28:310:1725`.
 ///
 /// # Errors
 ///
-/// [`CapacityExceeded`] where a row is longer than a legend's rows can be, which none is.
+/// [`CapacityExceeded`] where a row is longer than a legend row can be, which none is.
 pub fn line(rows: &[Row]) -> Result<SecretText, CapacityExceeded> {
     // Each row at most "70:B5200:1000000 ".
     SecretText::build("a SeedStitch legend", rows.len() * 17, |filler| {
@@ -305,15 +281,11 @@ fn push_number(filler: &mut TextFiller<'_, '_>, value: u32) -> Result<(), Capaci
     written
 }
 
-/// The rows of `text`: each a symbol's number, a colon and a count, or in format 2 a symbol's
-/// number, its DMC thread and a count, apart by spaces, commas, semicolons or line breaks, as
-/// `12:3401 7:85` or `12:310:3401 7:06:85`.
+/// The rows of `text` apart by white space, `,` or `;`: `12:3401 7:85`, in format 2 `12:310:3401`.
 ///
 /// # Errors
 ///
-/// [`LegendError`]: `legend.empty`, `legend.too-many-rows`, `legend.not-a-row`,
-/// `legend.unknown-symbol`, `legend.unknown-thread` and `legend.count-out-of-range` of the
-/// `embroidery` namespace.
+/// [`LegendError`]: the `embroidery.legend.*` refusals.
 pub fn parse(text: &str) -> Result<Vec<Row>, LegendError> {
     let tokens: Vec<&str> = line_words(text).take(MAX_ROWS + 1).collect();
     if tokens.is_empty() {
@@ -419,8 +391,8 @@ pub fn room_bits(moduli: &[u32], ordered: bool) -> f64 {
 
 /// How many values the part above the payload of `length` bytes may take in rows with `moduli`;
 /// zero where the rows cannot hold the payload. It is kept whole, so that every row of a long
-/// legend is drawn at random: cut to 64 bits, the last rows of a legend of 40 rows took the first
-/// free symbols and counts ending in 00 in every pattern (the review of 2026-11-05).
+/// legend is drawn at random: cut to 64 bits, the last rows of a 40-row legend took the first free
+/// symbols and counts ending in 00 in every pattern.
 pub(crate) fn free_values(length: usize, moduli: &[u32], ordered: bool) -> Number {
     if moduli.len() > SYMBOLS.len() {
         return Number::of(0);
@@ -527,8 +499,9 @@ pub enum Reading {
         entropy: SecretBytes,
         /// Whether the phrase is masked.
         masking: Masking,
-        /// The row taken as misread, from 1.
-        row: usize,
+        /// The row taken as misread, from 1; none where changes of different rows give this same
+        /// phrase, so that the phrase is sure but the row is not (AUD-007-FUN004).
+        row: Option<usize>,
     },
     /// No phrase: the check fails and no change of one row makes it pass.
     NotRead,
@@ -549,14 +522,9 @@ pub fn read(rows: &[Row]) -> Reading {
     if let Some((entropy, masking)) = entropy_by_counts(rows) {
         return Reading::Read { entropy, masking };
     }
-    let mut found: Vec<(SecretBytes, Masking, usize)> = Vec::new();
+    let mut found: Vec<(SecretBytes, Masking, Option<usize>)> = Vec::new();
     let mut note = |(entropy, masking): (SecretBytes, Masking), row: usize| {
-        if !found
-            .iter()
-            .any(|(e, m, _)| *m == masking && equal_bytes(e, &entropy))
-        {
-            found.push((entropy, masking, row));
-        }
+        note_explanation(&mut found, entropy, masking, row);
     };
     let mut changed = rows.to_vec();
     for i in 0..rows.len() {
@@ -610,6 +578,24 @@ pub fn read(rows: &[Row]) -> Reading {
             }
         }
         _ => Reading::Ambiguous,
+    }
+}
+
+/// Notes that changing `row` gives `entropy` with `masking`: a phrase found once more from another row
+/// keeps the phrase and loses its row, which is then no longer told for sure.
+fn note_explanation(
+    found: &mut Vec<(SecretBytes, Masking, Option<usize>)>,
+    entropy: SecretBytes,
+    masking: Masking,
+    row: usize,
+) {
+    match found
+        .iter_mut()
+        .find(|(e, m, _)| *m == masking && equal_bytes(e, &entropy))
+    {
+        Some((_, _, known)) if *known != Some(row) => *known = None,
+        Some(_) => {}
+        None => found.push((entropy, masking, Some(row))),
     }
 }
 
@@ -805,6 +791,21 @@ mod tests {
         }
     }
 
+    // AUD-007-FUN004: the same phrase from changes of two rows keeps the phrase and loses the row.
+    #[test]
+    fn a_phrase_explained_by_two_rows_names_no_row() {
+        let bytes = |b: u8| SecretBytes::copy_of("a test entropy", &[b; 16]);
+        let mut found = Vec::new();
+        note_explanation(&mut found, bytes(7), Masking::Unmasked, 2);
+        note_explanation(&mut found, bytes(7), Masking::Unmasked, 2);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].2, Some(2));
+        note_explanation(&mut found, bytes(7), Masking::Unmasked, 5);
+        assert_eq!((found.len(), found[0].2), (1, None));
+        note_explanation(&mut found, bytes(8), Masking::Unmasked, 5);
+        assert_eq!(found.len(), 2, "another phrase is another explanation");
+    }
+
     #[test]
     fn every_row_of_a_long_legend_is_drawn_at_random() {
         // The 40 threads of a pattern of a photograph: 30 rows of 1000 stitches or more, 9 of 100
@@ -864,7 +865,7 @@ mod tests {
         digits_swapped[0].stitches = 1752;
         assert!(matches!(
             read(&digits_swapped),
-            Reading::Corrected { row: 1, .. }
+            Reading::Corrected { row: Some(1), .. }
         ));
     }
 
@@ -899,7 +900,7 @@ mod tests {
         rows[wrong].stitches = n - n % 10 + (n % 10 + 1) % 10;
         assert!(matches!(
             read(&rows),
-            Reading::Corrected { row, .. } if row == wrong + 1
+            Reading::Corrected { row, .. } if row == Some(wrong + 1)
         ));
     }
 
@@ -925,6 +926,22 @@ mod tests {
             &expected,
             Masking::Seedshift,
         );
+    }
+
+    // AUD-007-DOC001: format 2 sees only a thread's place in DMC's order, so a misread number that
+    // keeps that place goes unnoticed and one that moves it does not.
+    #[test]
+    fn a_misread_thread_is_noticed_only_where_its_place_moves() {
+        let as_written = parse(EXAMPLE_ORDERED).unwrap();
+        let Reading::Read { entropy, .. } = read(&as_written) else {
+            panic!("the example reads");
+        };
+        // 400 falls between 368 and 414, as 407 does: the same place, the same phrase.
+        let kept = parse(&EXAMPLE_ORDERED.replacen("15:407:", "15:400:", 1)).unwrap();
+        assert!(matches!(read(&kept), Reading::Read { entropy: e, .. } if *e == *entropy));
+        // 3865 comes after every thread of the line: another place, and the check fails.
+        let moved = parse(&EXAMPLE_ORDERED.replacen("15:407:", "15:3865:", 1)).unwrap();
+        assert!(matches!(read(&moved), Reading::NotRead));
     }
 
     #[test]
@@ -959,7 +976,7 @@ mod tests {
                 } => {
                     assert_eq!(&*e, &entropy[..]);
                     assert_eq!(masking, Masking::Unmasked);
-                    assert_eq!(row, expected_row);
+                    assert_eq!(row, Some(expected_row));
                 }
                 _ => panic!("not corrected"),
             }

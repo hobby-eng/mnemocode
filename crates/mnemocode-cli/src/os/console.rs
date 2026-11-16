@@ -1,10 +1,6 @@
-//! The standard descriptors, read and written without std's static buffers, which are never freed
-//! and so never wiped (clippy.toml, ARCHITECTURE.md §6), and the terminal's raw mode and size.
-//!
-//! Raw mode is libuv's, which TS 0.1.0 used through Node.js: no echo, no line editing, no signals
-//! from keys (Ctrl+C arrives as a byte, which the line editor reads), output still translating line
-//! breaks. Entering it drops what was typed ahead (TCSAFLUSH; FlushConsoleInputBuffer), so that a
-//! key pressed before a question is never taken as its answer (CAP-CLI-TYPED-AHEAD-DROP).
+//! The standard descriptors, read and written without std's static buffers (never freed, so never
+//! wiped), and the terminal's raw mode and size. Entering raw mode drops typed-ahead input, so a
+//! key pressed before a question is never taken as its answer.
 
 #![allow(
     unsafe_code,
@@ -56,6 +52,22 @@ mod system {
     pub(crate) fn is_terminal(stream: Stream) -> bool {
         // SAFETY: the standard descriptors stay open for the life of the process.
         unsafe { BorrowedFd::borrow_raw(descriptor(stream)) }.is_terminal()
+    }
+
+    /// Whether `first` and `second` are terminals and the same one: one terminal device.
+    pub(crate) fn same_terminal(first: Stream, second: Stream) -> bool {
+        let device = |stream| {
+            let mut status = std::mem::MaybeUninit::<libc::stat>::uninit();
+            // SAFETY: fstat writes the status of an open standard descriptor into the buffer.
+            (unsafe { libc::fstat(descriptor(stream), status.as_mut_ptr()) } == 0).then(|| {
+                // SAFETY: fstat succeeded, so it filled the buffer.
+                let status = unsafe { status.assume_init() };
+                (status.st_dev, status.st_rdev)
+            })
+        };
+        is_terminal(first)
+            && is_terminal(second)
+            && device(first).is_some_and(|one| device(second) == Some(one))
     }
 
     /// Writes all of `bytes` to `stream`, again after an interruption by a signal.
@@ -222,6 +234,11 @@ mod system {
         };
         // SAFETY: GetStdHandle takes a constant and returns the process's own handle.
         unsafe { GetStdHandle(which) }
+    }
+
+    /// Whether `first` and `second` are consoles and the same one: a process has one console.
+    pub(crate) fn same_terminal(first: Stream, second: Stream) -> bool {
+        is_terminal(first) && is_terminal(second)
     }
 
     /// Whether `stream` is a console.
@@ -476,7 +493,9 @@ mod system {
     }
 }
 
-pub(crate) use system::{input_within, is_terminal, read_input, terminal_size, write_all};
+pub(crate) use system::{
+    input_within, is_terminal, read_input, same_terminal, terminal_size, write_all,
+};
 
 /// Prepares the console for UTF-8 and escape sequences, on Windows; nothing elsewhere.
 pub(crate) fn prepare() {

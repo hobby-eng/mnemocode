@@ -1,11 +1,7 @@
-//! The secret entries of the binding, searched: in an instance of its own, `probeEntries` tells
-//! each secret it meets on public secrets of two lengths: phrases, seeds, keys, dates, masks, shares
-//! and their bytes; the search must find its texts there, or it proves nothing. In another instance
-//! it calls every secret entry on the same secrets as a page does, with no scrub but the entry's
-//! own: after each return of an entry (the import `probeEntryReturned`) none of them may lie on the
-//! stack, the paint laid under the entry must be gone from what its scrub reaches, which shows the
-//! scrub ran whatever form a secret took, and after the last none may lie in the memory, as bytes
-//! or as text, in part or whole.
+//! The secret entries of the binding, searched. In one instance `probeEntries` reports each secret
+//! it meets, which the search must then find, or it proves nothing. In another it calls every entry
+//! as a page does: after each return no secret may lie on the stack and the paint under the entry
+//! must be gone, and after the last none may lie in memory, as bytes or text, whole or in part.
 
 use std::collections::{HashMap, HashSet};
 

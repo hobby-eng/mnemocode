@@ -1,10 +1,6 @@
-//! The share unmasking row (MnemoCode TS 0.1.0's `sskr/share-unmasking-self-test.ts`): the phrase
-//! that a restored set holds, the masked phrase of the published Seedshift vector, unmasked with its
-//! whole date, searched where a digit of it is forgotten with the wallet deciding, and refused with
-//! more dates than it takes; and shares of that masked phrase with unread colors repaired together
-//! and then unmasked with the forgotten digit. TS passes a set of the phrase alone; here the sets
-//! are restored from shares of it. It answers later, so it runs only in the full self-test. Public
-//! data only.
+//! The share unmasking row: shares of the published Seedshift vector's masked phrase, repaired and
+//! unmasked with whole dates, with a forgotten digit, and refused with too many dates. It is slow,
+//! so it runs only in the full self-test. Public data only.
 
 use std::rc::Rc;
 

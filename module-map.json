@@ -435,6 +435,7 @@
     "cli.terminal": "a read of the terminal that failed, which ends the command as cancelled",
     "cli.file-system": "the file system's own words",
     "wasm.cards.no-such-part": "a part that a page names and the binding has not",
+    "wasm.embroidery.pdf-too-large": "a pattern PDF above the limit the command line keeps too, refused before it is read (AUD-007-API002)",
     "wasm.recovery.no-wallet": "a search by the wallet without one, which TS's types refuse",
     "cli.output-paths.result-not-written": "a result that standard output did not take, which TS dropped (CORE-22; owner, 2026-11-02)",
     "core.wallet-evidence.network": "a build without Bitcoin, which names no Bitcoin network where TS writes core.wallet-evidence.bitcoin-network (owner, 2026-11-02)",

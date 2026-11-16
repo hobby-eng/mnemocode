@@ -121,10 +121,12 @@ masked phrase, and must then go through the remaining steps of this guide.
 A pattern made by MnemoCode keeps the phrase in its legend, the floss key: in the
 symbol of each row and in the last digits of its stitch count. Read the rows from
 the top of the key down and write each as its symbol's number from the table
-below, a colon and its stitches: `28:1725 25:2163 57:3275 …`. A small pattern
-also uses the order of the rows: there MnemoCode's line names each row's DMC
-thread too, `15:407:38 23:703:169 …`; type every row that way, the DMC number from
-the key between. MnemoCode's result screen and its `--output` file give this line
+below, a colon and its stitches: `28:1725 25:2163 57:3275 …` (format 1). A small
+pattern also uses the order of the rows (format 2): there MnemoCode's line names
+each row's DMC thread too, `15:407:38 23:703:169 …`; type every row that way, the
+DMC number from the key between. The key prints the DMC column in both formats,
+so a format 1 sheet typed with it is read as format 1 where it does not hold as
+format 2. MnemoCode's result screen and its `--output` file give this line
 already, and the pattern's PDF keeps it, compressed where no viewer shows it: the
 helper of section 7 reads it from the PDF.
 
@@ -412,7 +414,6 @@ path = os.path.expanduser(path)
 if path.lower().endswith(".pdf"):
     line = line_of_pdf(path)
 rows = [word.split(":") for word in re.split(r"[\s,;]+", line) if word]
-ordered = len(rows[0]) == 3
 if any(len(row) != len(rows[0]) or len(row) not in (2, 3) for row in rows):
     raise ValueError("Every row is symbol:stitches, or every row symbol:DMC:stitches.")
 symbols = [int(row[0]) for row in rows]
@@ -428,36 +429,47 @@ ranks = []
 for symbol in symbols:
     ranks.append(left.index(symbol))
     left.remove(symbol)
-places = []
-if ordered:
-    # DMC numbers by their value, then the named threads: B5200, Blanc, Ecru.
-    keys = [(0, int(row[1]), "") if row[1].isdigit() else (1, 0, row[1].upper()) for row in rows]
-    if len(set(keys)) != len(keys):
-        raise ValueError("Each DMC thread appears once.")
-    remaining = sorted(keys)
-    for key in keys:
-        places.append(remaining.index(key))
-        remaining.remove(key)
-n = 0
-for i in reversed(range(len(rows))):
-    if moduli[i] > 1:
-        n = n * moduli[i] + counts[i] % moduli[i]
-    n = n * (70 - i) + ranks[i]
+
+
+def readings(ordered):
+    """The phrases the rows hold in format 2 (ordered) or format 1."""
+    places = []
     if ordered:
-        n = n * (len(rows) - i) + places[i]
-version = b"2" if ordered else b"1"
-domains = {
-    b"MnemoCode embroidery " + version: "masked with Seedshift: undo it with the dates",
-    b"MnemoCode embroidery " + version + b" unmasked": "not masked: these are the phrase's own words",
-}
-found = []
-for length, words in LENGTHS.items():
-    payload = n % (1 << (8 * length + 32))
-    entropy = (payload >> 32).to_bytes(length, "big")
-    check = (payload & 0xFFFFFFFF).to_bytes(4, "big")
-    for domain, meaning in domains.items():
-        if hashlib.sha256(domain + bytes([length]) + entropy).digest()[:4] == check:
-            found.append((entropy, words, meaning))
+        # DMC numbers by their value, then the named threads: B5200, Blanc, Ecru.
+        keys = [(0, int(row[1]), "") if row[1].isdigit() else (1, 0, row[1].upper()) for row in rows]
+        if len(set(keys)) != len(keys):
+            raise ValueError("Each DMC thread appears once.")
+        remaining = sorted(keys)
+        for key in keys:
+            places.append(remaining.index(key))
+            remaining.remove(key)
+    n = 0
+    for i in reversed(range(len(rows))):
+        if moduli[i] > 1:
+            n = n * moduli[i] + counts[i] % moduli[i]
+        n = n * (70 - i) + ranks[i]
+        if ordered:
+            n = n * (len(rows) - i) + places[i]
+    version = b"2" if ordered else b"1"
+    domains = {
+        b"MnemoCode embroidery " + version: "masked with Seedshift: undo it with the dates",
+        b"MnemoCode embroidery " + version + b" unmasked": "not masked: these are the phrase's own words",
+    }
+    found = []
+    for length, words in LENGTHS.items():
+        payload = n % (1 << (8 * length + 32))
+        entropy = (payload >> 32).to_bytes(length, "big")
+        check = (payload & 0xFFFFFFFF).to_bytes(4, "big")
+        for domain, meaning in domains.items():
+            if hashlib.sha256(domain + bytes([length]) + entropy).digest()[:4] == check:
+                found.append((entropy, words, meaning))
+    return found
+
+
+found = readings(len(rows[0]) == 3)
+if not found and len(rows[0]) == 3:
+    # A format 1 sheet typed with the DMC column that its key prints too.
+    found = readings(False)
 if len(found) != 1:
     raise ValueError("The legend does not read: check each row's symbol, thread and stitches.")
 entropy, words, meaning = found[0]

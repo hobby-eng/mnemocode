@@ -1,12 +1,8 @@
-//! The PDF of pages (MnemoCode TS 0.1.0's `export/pdf-documents.ts`, CAP-CARDS-PDF-DOCUMENTS): the
-//! steps of each page written with pdf-writer, the UI font embedded with only the characters drawn,
-//! each image once, and no metadata: no document information dictionary, which would tell when a
-//! backup was printed. The bytes differ from the TS's; the pages, text, positions and images do not.
+//! The PDF of pages, written with pdf-writer: the UI font subset, each image once, and no metadata,
+//! since an information dictionary would tell when a backup was printed.
 //!
-//! The objects go to a sink as they are made, and the table of where they lie comes last, which is
-//! why it is written here: pdf-writer's `Pdf` holds the whole file in one buffer, and the cards of 16
-//! shares take 337 MB in the largest design, which that buffer cannot grow to under a command's
-//! memory cap, as a buffer that grows holds its old and its new bytes at once.
+//! Objects go to a sink as they are made and the table of where they lie comes last: pdf-writer's
+//! `Pdf` holds the whole file in one buffer, and the cards of 16 shares (337 MB) exceed the cap.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;

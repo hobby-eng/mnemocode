@@ -1,17 +1,8 @@
-//! Entries for the `wasm` gate's memory scan of the binding itself, built only into the test
-//! profile `test/probe` (wasm-profiles.json), never into a page's file: each takes a public marker
-//! the way a secret entry takes a secret, and the gate searches the instance's memory for it after
-//! the call (B-WIPE). They show that the zeroing allocator wipes a freed and a reallocated block and
-//! that `after_secret` scrubs the stack of the work it runs, that a page's string a secret entry
-//! reads (`host::text`) leaves nothing once dropped, and that the share engine's split and restore
-//! leave no copy of the secret; `probeRefusal` shows a refusal's kind and code as a page receives
-//! them. `probeRow` runs one row of the library's self-check, its known answers of every part's
-//! secret work on public data, for the gate to read how deep the row's stack goes against
-//! `probeScrubBytes` (ARCHITECTURE.md §6). `probeEntries` calls every secret entry of the binding
-//! on public secrets of two lengths. In one instance it tells the gate each secret, seed, key and
-//! share it meets; in another, which holds the same randomness, it calls them with the secrets a
-//! page gives, and the gate searches the stack after each entry and the memory after the last. It
-//! calls the Rust functions behind the generated wrappers, which pass on references alone.
+//! Entries for the `wasm` gate's memory scan of the binding (B-WIPE), built only into the test
+//! profile `test/probe`, never into a page's file. Each takes a public marker the way a secret
+//! entry takes a secret, and the gate searches the instance's memory and stack for it after the
+//! call; `probeEntries` drives every secret entry this way. They call the Rust functions behind the
+//! generated wrappers, which pass on references alone.
 
 mod cards;
 mod embroidery;

@@ -1,8 +1,7 @@
-//! What a command reads that may be secret (MnemoCode TS 0.1.0's `text-file.ts`, `ask.ts`): a file
-//! or standard input, read whole within the limit of the question it answers into a locked buffer,
-//! strict UTF-8; and the questions on the private screen, asked again until their answer can be
-//! used, each refusal one warning line that never repeats what was typed. Only the person leaves: Ctrl+C, Escape in
-//! a secret question, or the end of the input.
+//! What a command reads that may be secret: a file or standard input, read whole into a locked
+//! buffer within the question's limit, strict UTF-8; and the private-screen questions, asked again
+//! until the answer can be used, each refusal one warning line that never repeats what was typed.
+//! Only the person leaves: Ctrl+C, Escape in a secret question, or the end of the input.
 
 use std::path::{Path, PathBuf};
 
@@ -34,7 +33,7 @@ pub(crate) enum InputError {
     DumbTerminal,
     /// A file could not be read.
     File(FileError),
-    /// A typed path is no local file.
+    /// A path, typed or given in an option, that names a network share.
     LocalFileRequired,
     /// The text is not UTF-8.
     NotUtf8(String),
@@ -59,7 +58,7 @@ impl std::fmt::Display for InputError {
             ),
             Self::File(error) => error.fmt(f),
             Self::LocalFileRequired => {
-                f.write_str("Use a local text file path or type the text itself.")
+                f.write_str("Use a file on this computer: a network path (//host or \\\\host) is refused.")
             }
             Self::NotUtf8(message) | Self::Terminal(message) => f.write_str(message),
             Self::Signal => f.write_str("Cancelled."),
@@ -116,7 +115,7 @@ pub(crate) fn read_input_text(
     let bytes = if path == "-" {
         read_standard_input(limit)?
     } else {
-        let resolved = os::resolve(Path::new(path), terminal::environment().current.as_deref());
+        let resolved = local_resolved(Path::new(path))?;
         os::read_secret_file(&resolved, limit, what, false)?
     };
     let name = if path == "-" {
@@ -136,26 +135,22 @@ pub(crate) fn read_input_path(
     limit: usize,
     regular_only: bool,
 ) -> Result<SecretText, InputError> {
-    let resolved = os::resolve(path, terminal::environment().current.as_deref());
+    let resolved = local_resolved(path)?;
     text_of(
         os::read_secret_file(&resolved, limit, what, regular_only)?,
         what,
     )
 }
 
-/// The most bytes of a pattern's PDF read for its legend: a chart of 500 by 800 stitches is about
-/// 20 MiB.
-pub(crate) const MAX_PATTERN_PDF_BYTES: usize = 64 * 1024 * 1024;
+pub(crate) use mnemocode_embroidery::chart::MAX_PATTERN_PDF_BYTES;
 
-/// The legend line kept in the pattern's PDF at `path`, where the file is a PDF (it starts with
-/// `%PDF-`); none where it is not one, to be read as text. A PDF is read whole within
-/// [`MAX_PATTERN_PDF_BYTES`], held as a secret too large to lock.
+/// The legend line of the pattern PDF at `path`, or none where the file is no PDF.
 ///
 /// # Errors
 ///
 /// The file's refusals, and [`InputError::PdfWithoutLegend`] for a PDF that keeps no legend.
 pub(crate) fn pattern_legend(path: &Path) -> Result<Option<SecretText>, InputError> {
-    let resolved = os::resolve(path, terminal::environment().current.as_deref());
+    let resolved = local_resolved(path)?;
     if !os::file_starts_with(&resolved, b"%PDF-") {
         return Ok(None);
     }
@@ -167,7 +162,7 @@ pub(crate) fn pattern_legend(path: &Path) -> Result<Option<SecretText>, InputErr
 
 /// Refuses, without reading it, a file at `path` that the program cannot read, as the read would.
 pub(crate) fn check_readable(path: &Path, what: &'static str) -> Result<(), InputError> {
-    let resolved = os::resolve(path, terminal::environment().current.as_deref());
+    let resolved = local_resolved(path)?;
     match os::look_at_file(&resolved) {
         Ok(
             os::FileLook::Nothing
@@ -183,7 +178,7 @@ pub(crate) fn check_readable(path: &Path, what: &'static str) -> Result<(), Inpu
 /// The bytes of the PNG file of a QR code at `path`, for the library's strict reader; a name
 /// typed at a question is read `regular_only`, as by [`read_input_path`].
 pub(crate) fn read_qr_bytes(path: &Path, regular_only: bool) -> Result<SecretBytes, InputError> {
-    let resolved = os::resolve(path, terminal::environment().current.as_deref());
+    let resolved = local_resolved(path)?;
     Ok(os::read_secret_file(
         &resolved,
         MAX_PNG_BYTES,
@@ -195,7 +190,7 @@ pub(crate) fn read_qr_bytes(path: &Path, regular_only: bool) -> Result<SecretByt
 /// The picture of a pattern at `path`, a regular file of at most
 /// [`mnemocode_embroidery::picture::MAX_FILE_BYTES`]; no secret, so read without a lock.
 pub(crate) fn read_picture(path: &Path) -> Result<Vec<u8>, InputError> {
-    let resolved = os::resolve(path, terminal::environment().current.as_deref());
+    let resolved = local_resolved(path)?;
     Ok(os::read_public_file(
         &resolved,
         mnemocode_embroidery::picture::MAX_FILE_BYTES,
@@ -302,13 +297,48 @@ fn path_of_answer(answer: &str) -> Result<Option<PathBuf>, InputError> {
     named.then(|| local_path(expanded_path(&text))).transpose()
 }
 
+/// `path` made absolute against the folder the program started in; a network path refused as at
+/// a question, so that options and answers read only local files alike (AUD-007-DOC005).
+fn local_resolved(path: &Path) -> Result<PathBuf, InputError> {
+    let local = local_path(path.to_path_buf())?;
+    Ok(os::resolve(
+        &local,
+        terminal::environment().current.as_deref(),
+    ))
+}
+
 /// Check the final path after home expansion or URI decoding as well as typed separators.
 fn local_path(path: PathBuf) -> Result<PathBuf, InputError> {
-    let text = path.to_string_lossy();
-    if text.starts_with("//") || text.starts_with("\\\\") {
+    if network_path(&path.to_string_lossy()) {
         return Err(InputError::LocalFileRequired);
     }
     Ok(path)
+}
+
+/// Whether `text` names a network share as Windows reads it: two separators of either kind first,
+/// as in `//host`, `\\host` or `/\host`, but not the local `\\?\C:\…` or `\\.\…` forms; those and
+/// `\??\` name a share only through `UNC\`.
+fn network_path(text: &str) -> bool {
+    let separator = |byte: u8| byte == b'/' || byte == b'\\';
+    let bytes = text.as_bytes();
+    let unc_after = |at: usize| {
+        text.get(at..at + 3)
+            .is_some_and(|word| word.eq_ignore_ascii_case("UNC"))
+            && bytes.get(at + 3).copied().is_some_and(separator)
+    };
+    if text.starts_with("\\??\\") {
+        return unc_after(4);
+    }
+    let [first, second, rest @ ..] = bytes else {
+        return false;
+    };
+    if !separator(*first) || !separator(*second) {
+        return false;
+    }
+    match rest {
+        [b'?' | b'.', next, ..] if separator(*next) => unc_after(4),
+        _ => true,
+    }
 }
 
 /// `text` with its %XX escapes undone.
@@ -345,7 +375,7 @@ pub(crate) fn answered_text(
     let Some(path) = path_of_answer(answer)? else {
         return Ok(SecretText::copy_of("an answer", answer));
     };
-    let resolved = os::resolve(&path, terminal::environment().current.as_deref());
+    let resolved = local_resolved(&path)?;
     text_of(os::read_secret_file(&resolved, limit, what, true)?, what)
 }
 
@@ -453,7 +483,7 @@ pub(crate) struct Ask<'h> {
     pub(crate) prompt: String,
     /// What to type, for the line after an empty answer: "Type <what>, or press Ctrl+C to stop."
     pub(crate) what: Option<String>,
-    /// The longest answer in bytes (the owner's per-question limits).
+    /// The longest answer in bytes, the question's own limit.
     pub(crate) limit: usize,
     /// What a line break inside a paste becomes: a space by default.
     pub(crate) pasted_line_break: Option<u8>,
@@ -663,6 +693,56 @@ mod tests {
         assert!(path_of_answer("file:////example.invalid/x.txt").is_err());
         assert!(local_path(PathBuf::from("//example.invalid/home/backup.txt")).is_err());
         assert!(local_path(PathBuf::from(r"\\example.invalid\home\backup.txt")).is_err());
+    }
+
+    // AUD-007-DOC005: every form Windows reads as a share, and none of its local long forms.
+    #[test]
+    fn network_paths_are_told_from_local_long_forms() {
+        for share in [
+            "//host/share/a.txt",
+            r"\\host\share\a.txt",
+            r"/\host\share\a.txt",
+            r"\/host/share/a.txt",
+            r"\\?\UNC\host\share\a.txt",
+            r"//./unc/host/share/a.txt",
+            r"\??\UNC\host\share\a.txt",
+        ] {
+            assert!(network_path(share), "{share}");
+        }
+        for local in [
+            r"\\?\C:\backup\a.txt",
+            r"\\.\C:\backup\a.txt",
+            r"\??\C:\a.txt",
+            r"C:\backup\a.txt",
+            "/home/a.txt",
+            r"\backup\a.txt",
+            "a.txt",
+            "/",
+        ] {
+            assert!(!network_path(local), "{local}");
+        }
+    }
+
+    // AUD-007-DOC005: a file option names a network path as a typed answer does, and is refused.
+    #[test]
+    fn an_option_naming_a_network_path_is_refused_as_an_answer_is() {
+        for path in [
+            "//example.invalid/share/backup.txt",
+            r"\\example.invalid\share\backup.txt",
+        ] {
+            assert!(matches!(
+                read_input_text(path, "The backup file", 64),
+                Err(InputError::LocalFileRequired)
+            ));
+            assert!(matches!(
+                read_qr_bytes(Path::new(path), false),
+                Err(InputError::LocalFileRequired)
+            ));
+            assert!(matches!(
+                read_picture(Path::new(path)),
+                Err(InputError::LocalFileRequired)
+            ));
+        }
     }
 
     #[test]

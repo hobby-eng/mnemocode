@@ -1,11 +1,6 @@
-//! After Encode shows its result on the private screen, the person may check the backup they have
-//! written down (MnemoCode TS 0.1.0's `cli/backup-check.ts`): they type it again, with the dates,
-//! and MnemoCode says whether it restores the same seed phrase. Most losses come from a backup
-//! written wrongly, not from theft. The check is offered, never required, and shows nothing of the
-//! seed phrase. The screen is cleared before it, so that the backup is typed from the paper rather
-//! than copied from the screen. The rules and their lines are the library's; this module asks and
-//! shows. A part that can be read but is not the one of the result is named, and the person chooses
-//! to type only that part again, to see the result again, or to stop; the other parts are kept.
+//! The optional check, after Encode, that the backup written on paper restores the same seed
+//! phrase. The screen is cleared first so the backup is typed from the paper, not copied from the
+//! screen. A part that does not match can be typed again alone; the rules are the library's.
 
 use std::fmt;
 

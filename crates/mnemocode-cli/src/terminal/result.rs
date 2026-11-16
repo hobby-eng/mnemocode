@@ -25,10 +25,10 @@ const ROW_INDENT: &str = "  ";
 /// What the fingerprints are computed with.
 pub(crate) const FINGERPRINT_NOTE: &str = "empty BIP39 passphrase";
 
-/// Writes `lines` to `channel`.
+/// Writes `lines` to `channel`, or to the private screen where standard output is another terminal.
 pub(crate) fn print(channel: Channel, lines: &[String]) {
     for line in lines {
-        match channel {
+        match super::screen_channel(channel) {
             Channel::Output => super::result_line(line),
             Channel::Error => super::error_line(line),
         }

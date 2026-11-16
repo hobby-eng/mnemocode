@@ -1,7 +1,6 @@
-//! The phrase an old backup holds, before it is encoded again (MnemoCode TS 0.1.0's
-//! `core/re-encoding.ts`, CAP-PHRASE-FORMATS-REENCODING-CONFIRMATION): decoded with its dates, and
-//! with the original last word where the Original Seedshift with a valid last word keeps none of
-//! it; given out to be encoded again only once the person recognised it or the wallet matched.
+//! The phrase an old backup holds, before it is encoded again: decoded with its dates, and with the
+//! original last word where the Original Seedshift with a valid last word keeps none of it; given
+//! out only once the person recognised it or the wallet matched.
 
 use std::fmt;
 
@@ -114,8 +113,7 @@ impl MatchedBy {
     ///
     /// # Errors
     ///
-    /// [`ReEncodingError::MatchedBy`] for any other text, so that no misspelt or missing way is
-    /// taken for an address.
+    /// [`ReEncodingError::MatchedBy`] for any other text, so that no misspelt way is taken.
     pub fn named(name: &str) -> Result<Self, ReEncodingError> {
         Self::ALL
             .into_iter()

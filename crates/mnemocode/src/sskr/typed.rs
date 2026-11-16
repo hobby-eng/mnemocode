@@ -1,9 +1,6 @@
-//! The shares a person types or pastes to restore or export a phrase (MnemoCode TS 0.1.0's
-//! `src/sskr/share-input.ts`, CAP-SSKR-TYPED-SHARES and CAP-SSKR-SHARE-TROUBLE), each kept with the
-//! place it was typed at, by which every message names it: one answer split into shares, a share a
-//! paste wrapped over lines joined again, a seed phrase typed where a share was asked for told
-//! apart, each share read, the set checked, copies used once, and the share without which the others
-//! restore named; for an export of fewer shares than the threshold, each share repaired alone.
+//! The shares a person types or pastes, each kept with the place it was typed at, by which every
+//! message names it: split, joined again across wrapped lines, told apart from a seed phrase, read
+//! and checked as a set; for an export below the threshold, each share is repaired alone.
 
 use std::fmt;
 

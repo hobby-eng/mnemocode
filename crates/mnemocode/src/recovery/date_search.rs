@@ -1,9 +1,6 @@
-//! Forgotten Seedshift dates (MnemoCode TS 0.1.0's `core/date-recovery.ts` and
-//! `core/date-search.ts`, CAP-RECOVERY-DATE-CANDIDATES, CAP-RECOVERY-DATE-SEARCH): every combination
-//! that the date patterns allow is tried with the known dates, and each checksum-valid phrase is
-//! compared with the wallet. A resumable search the host steps (ADR 0005): the time of a search is
-//! told from public samples before the person consents. It does not ask, print or read files, and
-//! it keeps no phrase beyond its outcome.
+//! Forgotten Seedshift dates: every combination the patterns allow is tried with the known dates,
+//! and each checksum-valid phrase is compared with the wallet. A search the host steps (ADR 0005),
+//! timed from public samples before the person consents; it keeps no phrase beyond its outcome.
 
 mod candidates;
 

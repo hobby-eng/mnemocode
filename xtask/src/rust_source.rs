@@ -1,11 +1,7 @@
-//! A Rust file read as far as the code rules need it, with syn's parser: its attributes and the
-//! lint levels they set (those inside `cfg_attr` included), the top modules its `crate::`,
-//! `super::` and `self::` paths reach (in `use` trees, in code and in macro tokens, `$crate::`
-//! included), the uses of an outside crate, any other name for the crate root or a workspace crate
-//! (a rename, or a glob of the root), its unit-test modules, its tests, the traits it declares and
-//! implements, the `OsRng` it names, and its lines of code. Macro tokens are read for attributes,
-//! tests and trait impls too, as rustc applies what a macro expands to. Comments and strings are
-//! never taken for code.
+//! A Rust file read with syn as far as the code rules need: its lint attributes (inside `cfg_attr`
+//! too), the top modules its paths reach, outside crates used, unit-test modules and tests, traits,
+//! `OsRng` and lines of code. Macro tokens are read too, as rustc applies what a macro expands to;
+//! comments and strings are never taken for code.
 
 use std::collections::{BTreeMap, BTreeSet};
 

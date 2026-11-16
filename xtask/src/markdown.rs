@@ -1,9 +1,7 @@
-//! Gate `markdown` (DOC-01): GitHub renders a Markdown list "loose", as separate paragraphs with
-//! wider spacing than every other list, when a blank line separates two of its items or two blocks
-//! of one item; every list in the repository's documents stays tight. The files the formatter
-//! leaves alone (frozen audit records, the vectors) are left out here too. A copy of the check of
-//! MnemoCode TS and the multi-chain wallet tools (CORE-10's exception for copies across projects:
-//! a change goes to every copy).
+//! Gate `markdown` (DOC-01): every Markdown list stays tight, since GitHub renders a list with
+//! blank lines between items "loose", with wider spacing than every other list. Files the formatter
+//! leaves alone are left out. A copy of the check of MnemoCode TS and the wallet tools: a change
+//! goes to every copy.
 
 use std::path::Path;
 

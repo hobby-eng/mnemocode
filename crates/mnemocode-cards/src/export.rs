@@ -1,12 +1,8 @@
-//! What a host saves (MnemoCode TS 0.1.0's `export/render.ts`, `sskr-render.ts` and
-//! `card-preview.ts`, CAP-CARDS-RENDER-SHEETS-PDF, CAP-CARDS-INDIVIDUAL-CARDS,
-//! CAP-CARDS-SHARE-CARD-SET, CAP-CARDS-SAMPLE-PREVIEW): the pages of the cards of a backup, of the
-//! cards of each share, and of sample cards, as a PDF or as page images; the host writes the files.
+//! The files a host saves: the card pages of a backup, of each share and of sample cards, as a PDF
+//! or as page images.
 //!
-//! An export's pages are drawn one at a time, as an iterator asks for them: a page holds the artwork
-//! of its cards, and a set of shares would not fit the memory cap of a command all at once. A host
-//! that must be able to stop puts its check between the pages with `map`: an error it gives there
-//! ends the iterator's consumer, [`pdf_of`] or the host's own loop over [`crate::raster::page_image`].
+//! Pages are drawn one at a time as the iterator asks, since a set of shares would not fit a
+//! command's memory cap at once. A host that must be able to stop checks between pages with `map`.
 
 use std::fmt;
 use std::io::Write;
@@ -482,10 +478,9 @@ pub fn render_cards(
     card_pages(drawing, random, jobs)?.collect()
 }
 
-/// Writes the PDF of `pages` to `sink`, without metadata: each is drawn as this asks for it and let
-/// go once it is written. The first error of `pages` ends it, which gives a host its place to stop,
-/// and the sink holds part of a file then. A file of a set of shares takes hundreds of megabytes,
-/// which only a sink on disk keeps out of memory.
+/// Writes the PDF of `pages` to `sink` without metadata, each page drawn when needed and let go
+/// once written. The first error of `pages` ends it, leaving part of a file in the sink. A set of
+/// shares takes hundreds of megabytes, which only a sink on disk keeps out of memory.
 pub fn write_pdf<E: From<PdfError>, W: Write>(
     font: &UiFont,
     pages: impl IntoIterator<Item = Result<Page, E>>,

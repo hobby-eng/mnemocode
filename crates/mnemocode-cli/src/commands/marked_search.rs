@@ -1,9 +1,6 @@
-//! Decode's search for codes marked with ?, on the private screen (MnemoCode TS 0.1.0's
-//! `cli/missing-codes-search.ts`): it asks how the right codes are told, with Decode's options
-//! answering the first way asked (the encoded fingerprint, the wallet or the list, and the limit of
-//! a long search), shows the search's progress on one line, and what it found. Every rule of the
-//! search is the library's `MissingCodesSearch`; this module only asks, composes the wallet check
-//! and shows.
+//! Decode's search for codes marked with ?, on the private screen: it asks how the right codes are
+//! told, shows the progress on one line and what it found. The rules are the library's
+//! `MissingCodesSearch`.
 
 use std::rc::Rc;
 

@@ -1,10 +1,7 @@
-//! The Linux kernel's protections (protections.md, `L-*`), as mhfe sets them
-//! (`mhfe/src/bin/mhfe/protect.rs`, a copy of the same calls in another project: a change goes to
-//! both): core dumps off and not dumpable, the memory cap, then no_new_privs, a seccomp filter that
-//! refuses sockets and io_uring, and Landlock, which refuses every change to the file system but
-//! beneath the outputs' folders. They are applied before the first thread, so the filter's TSYNC
-//! and Landlock bind the one thread there is and every thread it starts. Each is read back by a
-//! probe that tries what it forbids.
+//! The Linux kernel's protections (protections.md, `L-*`): core dumps off, the memory cap,
+//! no_new_privs, a seccomp filter against sockets and io_uring, and Landlock. They are applied
+//! before the first thread so that they bind every thread; each is read back by a probe. mhfe's
+//! `protect.rs` makes the same calls: a change goes to both.
 
 #![allow(
     unsafe_code,

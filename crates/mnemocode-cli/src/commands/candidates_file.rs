@@ -1,11 +1,6 @@
-//! Saves the candidates of a recovery as a candidate list (MnemoCode TS 0.1.0's
-//! `cli/candidates-file.ts`, docs/CANDIDATES.md): record N is candidate N on the screen. The
-//! Discovery Scanner of the multi-chain wallet tools imports it and checks every candidate online.
-//! The list holds real seed phrases, and when the recovery is right, the wallet's own, so it is
-//! encrypted: to the Scanner's one-time key, or under a passphrase. Without either only on explicit
-//! request. The list, its limit, its protection and the passphrase rule are the library's; this
-//! module reads the options and files, asks on the private screen, writes the file and says what
-//! happened. It also asks where a list goes and how it is encrypted.
+//! Saves a recovery's candidates as a list for the Discovery Scanner (docs/CANDIDATES.md); record N
+//! is candidate N on the screen. The list holds real seed phrases, so it is encrypted to the
+//! Scanner's key or under a passphrase, and left plain only on explicit request.
 
 use std::fmt;
 use std::path::Path;

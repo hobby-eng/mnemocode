@@ -1,9 +1,5 @@
-//! BIP32's extended private keys (CAP-WALLET-MASTER-FINGERPRINT; mhfe's `ExtendedKey`):
-//! HMAC-SHA512 of the seed under the key "Bitcoin seed" gives the master private key and chain
-//! code, and CKDpriv each child; the fingerprint is the first four bytes of HASH160 (RIPEMD-160 of
-//! SHA-256) of the compressed public key. The keys live in locked buffers that are wiped when they
-//! are dropped; the scalars k256 computes with zeroize themselves. The wallet's paths come with the
-//! wallet module.
+//! BIP32 extended private keys and master fingerprints. The keys live in locked buffers wiped on
+//! drop; the scalars k256 computes with zeroize themselves.
 
 use std::fmt;
 

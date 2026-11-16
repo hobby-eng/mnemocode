@@ -1,11 +1,7 @@
-//! `cargo xtask check`: the fast gates of CORE-43 (docs/design/architect/GATES.md, "check"), run
-//! before every commit and by CI on every push, in this order: the formatters (rustfmt; dprint for
-//! Markdown, JSON, TOML and YAML), Clippy for every crate and target on this system, for the
-//! release targets of the other systems, whose own code compiles only there (RUST-02), and for the
-//! binding's wasm32 build with every module and each alone (CORE-04, RUST-15), rustdoc, the tests,
-//! code-rules and copies with their self-tests, the Markdown lists, the notices, the action pins,
-//! every page's WebAssembly file built and checked, and the RustSec audit where its database is at
-//! hand (CI's audit job fetches it).
+//! `cargo xtask check`: the fast gates of CORE-43 (GATES.md, "check"), run before every commit and
+//! by CI on every push: formatters, Clippy (this system, the other release targets and every wasm32
+//! module set), rustdoc, the tests, the repository gates, the WebAssembly files and the RustSec
+//! audit where its database is at hand.
 
 use std::path::Path;
 use std::process::Command;
@@ -105,7 +101,7 @@ pub(crate) fn run(root: &Path) -> Result<(), Failure> {
     copies::run(root, &[])?;
     markdown::run(root)?;
     notices::run(root, true)?;
-    action_pins::run(root)?;
+    action_pins::run(root, std::env::var_os("GITHUB_ACTIONS").is_none())?;
     wasm::build_all(root)?;
     wasm::verify(root)?;
     audit(root, false)?;

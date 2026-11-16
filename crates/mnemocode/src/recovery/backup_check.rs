@@ -1,11 +1,7 @@
-//! The written-backup check (MnemoCode TS 0.1.0's `core/backup-check.ts`, CAP-RECOVERY-BACKUP-CHECK
-//! and its parts): whether a backup typed again from paper restores the seed phrase just encoded,
-//! without showing it. Most losses come from a backup written wrongly, not from theft. Two kinds of
-//! backup are checked: the encoded seed phrase, as codes or an MNC1 record, and Shamir shares, each
-//! with its dates when Seedshift masked it. What does not fit is a finding: its part, its places in
-//! that part, counted from 1, and a line that says it without repeating any secret. A host with a
-//! form calls `check` with the whole backup; a host that asks part by part calls the steps and asks
-//! again only for the part that a finding names.
+//! The written-backup check: whether a backup typed again from paper restores the phrase just
+//! encoded, without showing it, since most losses come from a backup written wrongly. A mismatch is
+//! a finding that names its part and places (from 1) without repeating a secret. A host may check
+//! the whole backup with `check` or step part by part.
 
 use std::fmt;
 
@@ -193,13 +189,19 @@ impl BackupResult {
     }
 }
 
-/// A backup as written down, typed again whole.
-#[derive(Clone, Copy, Debug)]
+/// A backup as written down, typed again whole. Its Debug shows neither the backup nor the dates.
+#[derive(Clone, Copy)]
 pub struct WrittenBackup<'a> {
     /// The codes or an MNC1 record; or the shares, separated by ;, with ? for unreadable elements.
     pub backup: &'a str,
     /// The dates, separated by spaces; not read for a backup without Seedshift.
     pub dates: Option<&'a str>,
+}
+
+impl fmt::Debug for WrittenBackup<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        crate::secret::redacted(f, "a written backup and its dates")
+    }
 }
 
 /// How dates that can be read differ from the dates of the result: their count, or the places of
@@ -566,6 +568,21 @@ mod tests {
     use crate::dates::parse_date;
 
     const TWELVE: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+
+    // AUD-007-SEC001: formatting a written backup for a log shows neither the backup nor its dates.
+    #[test]
+    fn a_written_backup_hides_itself_and_its_dates_from_debug() {
+        let written = WrittenBackup {
+            backup: "wool abuse actual",
+            dates: Some("23-09-2026"),
+        };
+        for shown in [format!("{written:?}"), format!("{written:#?}")] {
+            assert!(
+                !shown.contains("wool") && !shown.contains("2026"),
+                "{shown}"
+            );
+        }
+    }
 
     fn check(mode: Mode, dates: &[Date]) -> (EncodedBackupCheck, String) {
         let phrase = Phrase::parse(TWELVE).unwrap();

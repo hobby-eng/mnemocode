@@ -1,9 +1,8 @@
-//! Gate `action-pins` of the coding guide for this repository: every GitHub Action its workflows
-//! use is pinned to the commit and version of the table in the workspace's ci.instructions.md
-//! (CI-01), and every workflow declares `permissions:` (CI-02) and `concurrency:` (CI-03). A copy
-//! of the workspace's .github/scripts/verify-action-pins.mjs for this Rust repository (CORE-10's
-//! exception for copies across projects: a change goes to both). The table is the workspace's, so
-//! the gate runs where the repository sits in the workspace; CI has no workspace beside it.
+//! Gate `action-pins`: every GitHub Action the workflows use is pinned to the commit of the
+//! workspace's table in ci.instructions.md (CI-01), and every workflow declares `permissions:` and
+//! `concurrency:` (CI-02, CI-03). A copy of the workspace's verify-action-pins.mjs: a change goes
+//! to both. CI-01 needs the workspace beside the repository, which CI does not have: there it is
+//! skipped with a warning, and everywhere else its absence fails (AUD-007-BLD004).
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -98,27 +97,38 @@ fn check_pins(
     }
 }
 
-/// The gate; said, not failed, where the workspace's table is not beside the repository.
-pub(crate) fn run(root: &Path) -> Result<(), Failure> {
+/// The gate. Without the workspace's table beside the repository CI-01 is not checked: that fails
+/// where `table_required`, and is otherwise said, as a warning in GitHub's CI.
+pub(crate) fn run(root: &Path, table_required: bool) -> Result<(), Failure> {
     let table = root
         .parent()
         .unwrap_or(root)
         .join(".github/instructions/ci.instructions.md");
-    let Ok(text) = std::fs::read_to_string(&table) else {
-        return report(
-            &[],
-            "",
-            "action-pins: the workspace's pin table is not beside this repository; not run here.",
-        );
+    let mut problems = Vec::new();
+    let pins = match std::fs::read_to_string(&table) {
+        Ok(text) => Some(pin_table(&text)),
+        Err(_) if table_required => {
+            problems.push(format!(
+                "CI-01 not checked: no pin table at {}; run this inside the workspace",
+                table.display()
+            ));
+            None
+        }
+        Err(_) => {
+            let note = "CI-01 not checked: the workspace's pin table is not beside this repository";
+            if std::env::var_os("GITHUB_ACTIONS").is_some() {
+                println!("::warning title=action-pins::{note}");
+            }
+            println!("action-pins: {note}.");
+            None
+        }
     };
-    let pins = pin_table(&text);
-    if pins.is_empty() {
+    if pins.as_ref().is_some_and(BTreeMap::is_empty) {
         return Err(Failure(format!(
             "no pin table found in {}",
             table.display()
         )));
     }
-    let mut problems = Vec::new();
     let workflows = yaml_files(&root.join(".github/workflows"));
     let actions = yaml_files(&root.join(".github/actions"));
     for file in workflows.iter().chain(&actions) {
@@ -127,12 +137,14 @@ pub(crate) fn run(root: &Path) -> Result<(), Failure> {
             .unwrap_or(file)
             .display()
             .to_string();
-        check_pins(
-            &where_,
-            &std::fs::read_to_string(file)?,
-            &pins,
-            &mut problems,
-        );
+        if let Some(pins) = &pins {
+            check_pins(
+                &where_,
+                &std::fs::read_to_string(file)?,
+                pins,
+                &mut problems,
+            );
+        }
     }
     for file in &workflows {
         let text = std::fs::read_to_string(file)?;
@@ -154,9 +166,14 @@ pub(crate) fn run(root: &Path) -> Result<(), Failure> {
     report(
         &problems,
         &format!("action-pins: {} problem(s)", problems.len()),
-        &format!(
-            "action-pins: every action matches the table of {} pins",
-            pins.len()
+        &pins.map_or_else(
+            || "action-pins: every workflow declares permissions and concurrency".to_owned(),
+            |pins| {
+                format!(
+                    "action-pins: every action matches the table of {} pins",
+                    pins.len()
+                )
+            },
         ),
     )
 }
@@ -185,5 +202,29 @@ mod tests {
             &mut problems,
         );
         assert_eq!(problems.len(), 1);
+    }
+
+    /// A repository with one workflow and no workspace around it.
+    fn standalone(name: &str, workflow: &str) -> std::path::PathBuf {
+        let root = std::env::temp_dir()
+            .join(format!("xtask-pins-{}-{name}", std::process::id()))
+            .join("repository");
+        std::fs::create_dir_all(root.join(".github/workflows")).unwrap();
+        std::fs::write(root.join(".github/workflows/ci.yml"), workflow).unwrap();
+        root
+    }
+
+    // AUD-007-BLD004: a checkout without the workspace's table never passes as checked.
+    #[test]
+    fn a_missing_pin_table_fails_where_required_and_other_rules_still_run() {
+        let declared = "permissions: {}\nconcurrency: x\n";
+        let root = standalone("declared", declared);
+        assert!(run(&root, true).is_err());
+        assert!(run(&root, false).is_ok());
+        let bare = standalone("bare", "on: push\n");
+        assert!(run(&bare, false).is_err());
+        for folder in [&root, &bare] {
+            std::fs::remove_dir_all(folder.parent().unwrap()).unwrap();
+        }
     }
 }

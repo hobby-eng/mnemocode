@@ -1,18 +1,7 @@
-//! Gate `notices`: the Rust crates part of THIRD_PARTY_NOTICES.md, the licence of every crate that
-//! the executable or a page's WebAssembly file ships, written or checked. mhfe's rules
-//! (scripts/third-party-licenses.py):
-//!
-//! - The crates are the union of `cargo tree --locked --offline -e normal,no-proc-macro` for the
-//!   executable on every release target and for the binding with each profile; build scripts,
-//!   build dependencies, procedural macros and the workspace's own crates are left out, not the
-//!   vendored SSKR engine. The texts come from the crates' sources in the local Cargo registry.
-//! - The licence expression is read from the crate's manifest; "A/B" is the old "A OR B". Every
-//!   part joined by AND is required; within one with alternatives joined by OR, MIT is used when it
-//!   is offered, otherwise Apache-2.0, otherwise the only licence.
-//! - The text is the crate's own licence file, unchanged but for LF line endings and no trailing
-//!   blank space. A crate without one gets the standard text: for MIT the SPDX text with the
-//!   holders from its `authors`, for CC0-1.0 the legal code another crate of the list ships.
-//! - Crates with byte-identical texts share one text section.
+//! Gate `notices`: the Rust crates part of THIRD_PARTY_NOTICES.md, written or checked, by mhfe's
+//! rules (scripts/third-party-licenses.py): every crate the executable or a page's WebAssembly
+//! ships, no build or proc-macro crates; MIT where offered, else Apache-2.0, else the only licence;
+//! the crate's own licence file or the standard text, identical texts shared.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;

@@ -1,10 +1,6 @@
-//! The seed phrases that restored sets of shares give (MnemoCode TS 0.1.0's
-//! `sskr/share-unmasking.ts`, CAP-SSKR-UNMASK-SHARES, CAP-SSKR-WALLET-CHECK-SETS). Shares made
-//! without Seedshift hold the seed phrase itself; shares of a phrase masked with MnemoCode Seedshift
-//! hold the masked phrase, which the dates unmask: decoded with whole dates, or searched where a
-//! date holds ? for a forgotten digit. With a wallet check only the phrases of the wallet are kept,
-//! and for a candidate list every match. The dates must fit each set's phrase, and the time of a
-//! date search is told before it runs.
+//! The seed phrases that restored share sets give. Shares without Seedshift hold the phrase itself;
+//! shares of a masked phrase are unmasked with the dates, whole or searched where a date holds ?. A
+//! wallet check keeps only the wallet's phrases; the time of a date search is told before it runs.
 
 use std::rc::Rc;
 

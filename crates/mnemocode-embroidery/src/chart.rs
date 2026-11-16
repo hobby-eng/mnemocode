@@ -1,12 +1,6 @@
-//! The pattern as a PDF dressed like one bought from a designer, three pages (the owner's request of
-//! 2026-11-04: it is kept as a file, not printed, and must look like an ordinary purchased
-//! pattern). A cover with the pattern stitched on Aida, its size, the finished size on the usual
-//! fabrics and how to start; the floss key (symbol, a sample of the thread's colour, DMC number,
-//! name, stitches and about how many skeins), every row on that page however many threads there
-//! are; and the whole chart in colour with its symbols, a bold line every ten stitches, the numbers
-//! along the edges and arrows at the centre, on the sheet the pattern was fitted into. Every page
-//! has warm paper and a band in a colour of the picture. Nothing on it names MnemoCode or a backup.
-//! The PDF holds the legend that holds a phrase, so its bytes are a secret.
+//! The pattern as a three-page PDF that looks like one bought from a designer: a cover, the floss
+//! key and the chart. Nothing on it names MnemoCode or a backup. The PDF holds the legend, and so
+//! the phrase, so its bytes are a secret.
 
 mod cover;
 mod symbols;
@@ -94,13 +88,11 @@ impl Refusal for ChartError {
     }
 }
 
-/// The PDF of the pattern of `hidden` on `fabric`, which the finished
-/// size, the skeins and the chart's sheet are given for: the cover, the floss key and the chart.
+/// The PDF of the pattern of `hidden` on `fabric`: the cover, the floss key and the chart.
 ///
 /// # Errors
 ///
-/// [`ChartError::Pdf`]: the PDF writer's `export.pdf-documents.font-not-embedded` or
-/// `export.pdf-documents.not-written`.
+/// [`ChartError::Pdf`] where the PDF writer refuses (`export.pdf-documents.*`).
 pub fn chart(hidden: &Hidden, fabric: Fabric) -> Result<SecretBytes, ChartError> {
     let font = UiFont::load();
     let pattern = hidden.pattern();
@@ -112,14 +104,18 @@ pub fn chart(hidden: &Hidden, fabric: Fabric) -> Result<SecretBytes, ChartError>
         chart_page(hidden, &font, &sheet, accent),
     ];
     // The legend line, as a person types it back, kept compressed in the key page's private data,
-    // which no viewer shows, so that Decode reads the PDF itself (the owner's request, 2026-11-05).
-    // It holds nothing that the key page does not print.
+    // which no viewer shows, so that Decode reads the PDF itself. It holds nothing that the key
+    // page does not print.
     let line = legend::line(hidden.rows()).ok();
     let piece = line
         .as_ref()
         .map(|line| (KEY_PAGE, LEGEND_PIECE, line.as_str().as_bytes()));
     pdf::document_with_piece(&font, &pages, piece).map_err(ChartError::Pdf)
 }
+
+/// The most bytes of a pattern's PDF read for its legend, by the command line and the browser alike:
+/// a chart of 500 by 800 stitches is about 20 MiB.
+pub const MAX_PATTERN_PDF_BYTES: usize = 64 * 1024 * 1024;
 
 /// The legend line kept in the private data of a pattern's PDF; none where the PDF has none, as
 /// one rewritten by another program, or what it has is no legend line.

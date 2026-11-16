@@ -1,9 +1,7 @@
-//! What every binding module shares (ARCHITECTURE.md §6, §7): a library refusal turned into the
-//! JavaScript error a page catches, of the kind TS throws (`Error`, `RangeError` or `TypeError`)
-//! and with the refusal's stable `code` as a read-only property, as TS 0.1.0's refusals carry it;
-//! the arguments of a secret entry, which cross as `JsValue`s that Rust reads, so that the glue
-//! copies nothing it could leave behind; the browser's randomness behind the library's `Random`
-//! port; and the stack scrub after each call that handled a secret.
+//! What every binding module shares (ARCHITECTURE.md §6, §7): library refusals as the JavaScript
+//! errors a page catches, with the stable `code` as a read-only property; secret arguments read
+//! from `JsValue`s by Rust, so the glue copies nothing it could leave behind; the browser's
+//! randomness behind the `Random` port; and the stack scrub after each secret call.
 
 use std::fmt;
 
@@ -67,12 +65,10 @@ pub fn refused(refusal: &impl Refusal) -> JsValue {
     error
 }
 
-/// What `call` gives, with the stack below the entry scrubbed once it returns: for every entry
-/// that handles a secret, since the libraries leave copies on the stack that no owner wipes. `call`
-/// runs in a frame of its own below the entry's, never inlined into it, so its locals are below the
-/// frame that scrubs (zeroize's `zeroize_stack` asks for this). `T` must not hold a secret by
-/// value: it comes back into the entry's frame; a secret result is an owner that keeps its bytes on
-/// the heap.
+/// What `call` gives, with the stack below the entry scrubbed once it returns, since the libraries
+/// leave copies on the stack that no owner wipes. `call` runs in its own frame, never inlined, so
+/// its locals lie below the scrubbing frame (as zeroize's `zeroize_stack` requires). `T` must not
+/// hold a secret by value; a secret result is an owner that keeps its bytes on the heap.
 pub fn after_secret<T>(call: impl FnOnce() -> T) -> T {
     let result = run_apart(call);
     scrub_stack();

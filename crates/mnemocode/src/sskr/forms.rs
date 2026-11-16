@@ -1,10 +1,7 @@
-//! The forms a share is written in (MnemoCode TS 0.1.0's `src/sskr/share-units.ts`,
-//! `mixed-layout.ts` and the forms of `transport.ts`, CAP-SSKR-FORM-*, CAP-SSKR-SHARE-ANY-FORM,
-//! CAP-SSKR-MIXED-LAYOUT): the compact UR and standard Bytewords, which write the transport's
-//! bytes, and MnemoCode's own forms, which write it mixed (its checksum, then a version, the CBOR's
-//! length and the CBOR, each byte masked from the checksum) and packed into word indexes, 11 bits
-//! each, or 24-bit colors, the last unit filled with zero bits. A share is read in any form, and a
-//! text that is none is refused by the reader of the form it is written in (owner, 2026-10-27).
+//! The forms a share is written in: compact UR and standard Bytewords, which write the transport's
+//! bytes, and MnemoCode's own forms, which write them mixed (checksum, version, CBOR length and
+//! CBOR, each byte masked from the checksum) and packed into 11-bit word indexes or 24-bit colors.
+//! A share is read in any form; a text that is none is refused by its form's reader.
 
 use std::fmt;
 

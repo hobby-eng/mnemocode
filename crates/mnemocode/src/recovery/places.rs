@@ -1,9 +1,6 @@
-//! The places of a seed phrase (MnemoCode TS 0.1.0's `core/candidates.ts`,
-//! CAP-RECOVERY-WORD-SEARCH-PLACES): unknown words at known places, each marked with ?, a prefix
-//! with * or a few words joined by |, or one word missing at an unknown place; the BIP39 checksum
-//! every candidate is held to; and the counter through every combination of the places, which the
-//! word search and the search of marked codes both count through. Always built: the reader of
-//! marked codes needs it. Its messages name a wrong word by its place, never by what was typed.
+//! The places of a seed phrase: unknown words at known places (?, a prefix with * or words joined
+//! by |) or one word missing at an unknown place, the BIP39 checksum each candidate must hold, and
+//! the counter through every combination. Messages name a wrong word by its place, never its text.
 
 use std::fmt;
 

@@ -1,13 +1,8 @@
-//! The protections of one process that handles secrets, applied in the order of
-//! docs/design/platform/protections.md, decision 2, and each read back before it is named:
+//! The protections of a process that handles secrets, in the order of protections.md decision 2,
+//! each read back before it is reported:
 //!
-//! - [`Protection::start`], the first lines of `main`: no core dumps (and on Linux not dumpable),
-//!   the memory cap, on macOS no debugger, on Windows no DLLs from the program's folder and no
-//!   heap in crash reports;
-//! - [`Protection::restrict`], once the options and the outputs' folders are known and before any
-//!   secret: on Linux no_new_privs, seccomp and Landlock, on macOS Seatbelt;
-//! - [`Protection::refusal`]: a secret is refused only while core dumps are not off or, on Linux, a
-//!   tracer is attached (decision 1); everything else the system refuses is reported, never assumed.
+//! - [`Protection::start`], first in `main`: core dumps off, the memory cap and per-system basics;
+//! - [`Protection::restrict`], before any secret: Landlock and seccomp on Linux, Seatbelt on macOS.
 
 use std::path::PathBuf;
 use std::sync::{Mutex, PoisonError};
@@ -210,14 +205,9 @@ impl Protection {
     }
 }
 
-/// The memory cap of a command's process (decision 5, `L-RLIMIT-DATA`, `W-JOB-MEMORY`): the
-/// heaviest operation's measured peak plus a quarter, rounded up to a multiple of 64 MiB. The
-/// increments that bring the heaviest operations (the encrypted candidate list, the card export)
-/// measure them and run them under it: the largest list the writer makes, encrypted through scrypt
-/// and opened again, peaks at 293 MiB resident (increment 6, `os::linux` tests). A card export draws
-/// and writes one page at a time: the largest, the cards of 16 shares of a 24-word phrase in Unicode
-/// codes on release builds, peak at 147 MiB resident and 145 MiB of data, as A4 page images; their
-/// PDFs of up to 337 MB at 73 MiB, and their business-size images and separate files at 55 MiB.
+/// The memory cap of a command's process (decision 5): the heaviest measured peak plus a quarter,
+/// rounded up to 64 MiB. The heaviest are the largest encrypted candidate list (293 MiB resident,
+/// `os::linux` tests) and the card export of 16 shares (147 MiB).
 #[cfg(any(target_os = "linux", windows))]
 pub(super) const MEMORY_CAP_BYTES: u64 = 768 * 1024 * 1024;
 

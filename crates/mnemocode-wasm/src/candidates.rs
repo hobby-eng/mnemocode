@@ -1,11 +1,8 @@
 //! The candidates part for a page (`browser-candidates`): the Discovery Scanner's session key, an
-//! X25519 identity that never leaves the WebAssembly and opens the lists encrypted to its
-//! recipient; a list opened with a passphrase; a list protected as the person chose; a list read
-//! candidate by candidate; and the part's self-check. Every age operation runs behind the
-//! library's gate of known answers, one per instance. A list and its phrases cross as bytes and
-//! text, which the page wipes and drops soon after; a list's bytes come first, before anything that
-//! could throw, and a passphrase or recipient crosses as a `JsValue` that Rust reads
-//! (ARCHITECTURE.md §6).
+//! X25519 identity that never leaves the WebAssembly, and candidate lists opened, protected and
+//! read, every age operation behind the library's gate of known answers. A list's bytes are taken
+//! before anything that could throw; a passphrase or recipient crosses as a `JsValue` that Rust
+//! reads (ARCHITECTURE.md §6).
 
 use std::cell::RefCell;
 

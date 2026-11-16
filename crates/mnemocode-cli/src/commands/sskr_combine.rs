@@ -1,7 +1,6 @@
-//! `mnemocode sskr-combine` (MnemoCode TS 0.1.0's `cli/sskr-restore-command.ts`): Shamir shares
-//! typed or read back, repaired where marked, and the seed phrase restored with the dates and
-//! checked with the wallet. With --ask-secrets each answer is checked as soon as it is given; what
-//! the shares are, and the phrases they give, the library decides.
+//! `mnemocode sskr-combine`: Shamir shares typed or read back, repaired where marked, and the seed
+//! phrase restored with the dates and checked with the wallet. With --ask-secrets each answer is
+//! checked as soon as it is given; the library decides what the shares are and what they give.
 
 use std::fmt;
 use std::rc::Rc;
@@ -524,12 +523,10 @@ fn searched_sets(
     }
 }
 
-/// Restores the phrases that the shares hold, asked in this order on the private screen, each
-/// answer checked at once: the shares, the dates of a Seedshift phrase, with ? for forgotten
-/// digits, the wallet when a date search needs it, then the search of marked shares and of the
-/// dates, and the wallet check. A result that cannot be used offers what to change; the other
-/// answers, and the phrases already found, are kept. Without a private screen the first problem
-/// ends the command.
+/// Restores the phrases the shares hold, asking on the private screen in order: the shares, the
+/// Seedshift dates (? for forgotten digits), the wallet when a date search needs it, then the
+/// searches and the wallet check. A failed step keeps the earlier answers; without a private screen
+/// the first problem ends the command.
 pub(crate) fn restore_phrases(r: &mut Recovery, rules: &RestoreRules) -> Result<Restoring, Stop> {
     let mut hand = SharesInHand::default();
     let mut step = Step::Shares;

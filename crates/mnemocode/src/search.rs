@@ -1,9 +1,7 @@
-//! Searches that the host steps (ADR 0005, CAP-RECOVERY-SEARCH-TURNS): the date, word and
-//! marked-code searches, the joint share search and share unmasking keep their place as state and
-//! check at most the work the host gives each step, so that the command line can stop one on
-//! Ctrl+C and a page can run one from its own turns or a worker. A stop is no failure (CORE-22): the
-//! outcome says it is partial. The library reads no clock: the host times each part of a search's
-//! public pace sample before the person consents, and [`plan`] turns those times into the question.
+//! Searches that the host steps (ADR 0005): each keeps its place as state and does at most the work
+//! the host gives a step, so the command line can stop on Ctrl+C and a page can run it in turns or
+//! a worker. A stop is no failure (CORE-22). The library reads no clock; [`plan`] turns the host's
+//! timings into the consent question.
 
 pub mod plan;
 

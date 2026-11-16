@@ -1,9 +1,7 @@
-//! A picture in DMC threads: the colours it needs found by median cut and k-means in CIELAB, rare
-//! colours weighted up so that a small bright object, such as a carrot on a lawn, keeps a thread of
-//! its own (the owner's look at a rabbit, 2026-11-05), each matched to the nearest unused thread, then every stitch chosen by serpentine Floyd-Steinberg
-//! dithering, as patterns made from photographs are, so that crosses of neighbouring threads blend
-//! into the shades between them seen from a little distance. A thread left with fewer than
-//! [`MIN_STITCHES`] is dropped and the picture dithered again.
+//! A picture in DMC threads: colours found by median cut and k-means in CIELAB, rare colours
+//! weighted up so a small bright object keeps a thread of its own, then each stitch chosen by
+//! serpentine Floyd-Steinberg dithering so neighbouring threads blend into the shades between. A
+//! thread with fewer than [`MIN_STITCHES`] stitches is dropped and the picture dithered again.
 
 use std::fmt;
 

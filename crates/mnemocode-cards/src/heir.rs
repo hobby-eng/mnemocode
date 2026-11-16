@@ -1,9 +1,6 @@
-//! The sheet that tells heirs how to restore a backup (MnemoCode TS 0.1.0's `export/heir-sheet.ts`
-//! and `heir-sheet-text.ts`, CAP-CARDS-HEIR-SHEET-PDF, CAP-CARDS-HEIR-SHEET-TEXT): one sheet, printed
-//! on both sides. The front says what the owner leaves and gives the rest of its room to a hint
-//! written by hand; the back gives the steps and the basics for someone new to wallets. It never
-//! names anything that would help whoever finds it: no codes, no dates, no fingerprint and no
-//! places where shares are kept, and it prints at most one address, the route's.
+//! The sheet that tells heirs how to restore a backup, printed on both sides. It never names
+//! anything that would help whoever finds it: no codes, dates, fingerprint or share places, and at
+//! most one address.
 
 use std::fmt;
 

@@ -1,9 +1,8 @@
-//! The recovery part for a page (`browser-recovery`): how a backup as given is read and decoded, a
-//! written backup checked, and in `search` the date, word and marked-code searches and the restore
-//! and repair of shares, each stepped by the page (ADR 0005), with in `found` what they find. A
-//! search's secrets cross as `JsValue`s that Rust reads, so the wallet cannot cross beside them as
-//! a class (ARCHITECTURE.md §6): every search starts from a [`Recovery`], the receiver that holds
-//! the wallet to compare with, if any. A count crosses as a number, NaN for the default.
+//! The recovery part for a page (`browser-recovery`): reading, decoding and checking a backup, and
+//! in `search` the searches and share restore and repair, each stepped by the page (ADR 0005).
+//! Secrets cross as `JsValue`s that Rust reads, so the wallet cannot cross beside them as a class:
+//! every search starts from a [`Recovery`], which holds the wallet (ARCHITECTURE.md §6). A count
+//! crosses as a number, NaN for the default.
 
 mod found;
 mod re_encoding;

@@ -1,12 +1,7 @@
-//! The repair of the shares of one set together (MnemoCode TS 0.1.0's `src/sskr/joint-repair.ts`,
-//! CAP-SSKR-JOINT-ASSESS and CAP-SSKR-JOINT-SEARCH), each with elements marked with ? where they are
-//! unreadable. Each share alone gives an affine space of solutions over the bits of its marks;
-//! across shares the identifier and thresholds are equal, each share has its member number, and
-//! every share beyond the threshold lies on their polynomial, all linear over GF(2). What is still
-//! open is decided by bc-shamir's 32-bit digest: each candidate is checked with HMAC-SHA256, and
-//! each that passes is restored by the engine. Every phrase that passes is reported; none is
-//! chosen. Only sets of one group are repaired, which is all that MnemoCode writes. The host steps
-//! the search and the assessment before it (ADR 0005).
+//! The joint repair of one set's shares with elements marked with ?. Each share gives an affine
+//! space of solutions over its marked bits, and the set's shared fields and polynomial add linear
+//! equations over GF(2); what stays open is decided by bc-shamir's 32-bit digest. Every phrase that
+//! passes is reported, none chosen. Only one-group sets are repaired, all that MnemoCode writes.
 
 mod assess;
 pub(crate) mod solve;

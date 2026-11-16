@@ -1,13 +1,8 @@
-//! Files, as MnemoCode TS 0.1.0 handles them (`src/cli/bounded-read.ts`,
-//! `src/export/private-file.ts`, `src/export/temporary-folders.ts`): a read never takes more than
-//! its limit and lands in a locked buffer, and every result is published as a new private file or
-//! folder that never replaces anything. A file is written in full into a private staging folder
-//! beside its destination, then linked to its final name, which fails where the name exists; a
-//! file system without hard links reserves the name with an empty private file first, which the
-//! finished file then replaces in one rename. A folder is filled in a staging folder, then its
-//! final name is made, and the files are moved in. Staging folders, and an output folder being
-//! filled, are recorded until their owner removes them, so that an exit at once after a signal
-//! removes those left ([`remove_left`]).
+//! Files: a read stays within its limit and lands in a locked buffer; every result is published as
+//! a new private file or folder that never replaces anything. A file is staged beside its
+//! destination, then hard-linked to its name, which fails where the name exists; without hard
+//! links, an empty private file reserves the name first. Staging folders are recorded so that an
+//! exit after a signal removes them ([`remove_left`]).
 
 #![expect(
     clippy::disallowed_methods,

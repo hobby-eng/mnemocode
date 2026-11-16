@@ -1,11 +1,7 @@
-//! The signals that end or suspend a command (`N-SIGNALS`, ARCHITECTURE.md §5): their handlers
-//! only set a flag, without SA_RESTART, so that the main thread's terminal read returns with EINTR
-//! and the main thread itself restores the terminal, leaves the private screen and removes the
-//! staging folders, which is not async-signal-safe, then exits with 128 + the signal (130 and
-//! "Cancelled." for SIGINT and SIGQUIT). SIGTSTP has its default, which stops the process at once,
-//! unless raw mode is on: there it sets its own flag, and the main thread restores the terminal and
-//! stops ([`suspend_now`]). On Windows the console handler sets the same flag and, for a closed
-//! console, waits up to the system's 5 s for the cleanup.
+//! The signals that end or suspend a command (ARCHITECTURE.md §5). Handlers only set a flag,
+//! without SA_RESTART, so the terminal read returns with EINTR and the main thread does the
+//! cleanup, which is not async-signal-safe, then exits with 128 + the signal. In raw mode SIGTSTP
+//! is caught the same way, so the terminal is restored before the process stops ([`suspend_now`]).
 
 #![allow(
     unsafe_code,

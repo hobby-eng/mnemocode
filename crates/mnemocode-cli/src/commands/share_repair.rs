@@ -1,9 +1,6 @@
-//! The command-line side of shares typed to restore or export a seed phrase (MnemoCode TS 0.1.0's
-//! `cli/share-repair.ts`): the questions for the shares, a share typed again or left out, the lines
-//! of a repair's assessment and report, and the question before a long search and its progress. On
-//! the private screen a share that cannot be used is typed again, or left out, while the others are
-//! kept; elsewhere the problem ends the command. What the shares are, and what is wrong with them,
-//! the library decides.
+//! The command-line side of typed shares: their questions, retyping or leaving out a share, the
+//! lines of a repair's report and the question before a long search. What the shares are and what
+//! is wrong with them, the library decides.
 
 use std::fmt;
 use std::path::Path;

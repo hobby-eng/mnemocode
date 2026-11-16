@@ -1,17 +1,8 @@
-//! The test profile's checks of the binding itself (B-WIPE), run on the built file in wasmi, an
-//! interpreter of WebAssembly written in Rust: each probe entry takes a public marker the way a
-//! secret entry takes a secret, and afterwards the instance's whole memory is searched for it; the
-//! search is first shown to find a marker written into the memory; `probeText` takes it as a
-//! page's string, read into Rust through the glue's `__wbindgen_string_get` (emulated: the string
-//! copied into a block of the instance's allocator, as `passStringToWasm0` copies it), the way a
-//! secret entry reads its text (`host::text`). A refusal is followed through
-//! the glue's imports, which are emulated from their code in the glue (`new RangeError(…)`,
-//! `JSON.parse(…)`, `Object.defineProperty(…)`): it must reach a page as TS's kind of error, with
-//! its message and a `code` defined enumerable and neither writable nor configurable. Each row of
-//! the library's self-check, the known answers of the secret work of every part, runs with the
-//! stack painted first: the lowest byte it left is how deep it went, which must stay inside the
-//! scrub of `after_secret` (ARCHITECTURE.md §6), and once scrubbed the stack must not hold the seed
-//! the rows derive. [`entries`] searches what the secret entries leave.
+//! The test profile's checks of the binding (B-WIPE), run on the built file in wasmi: each probe
+//! entry takes a public marker as a secret entry takes a secret, and the instance's whole memory is
+//! then searched for it. A refusal must reach a page as TS's kind of error with a read-only `code`.
+//! Each self-check row runs on a painted stack, which shows how deep it went against the scrub of
+//! `after_secret`. [`entries`] searches what the secret entries leave.
 
 mod entries;
 

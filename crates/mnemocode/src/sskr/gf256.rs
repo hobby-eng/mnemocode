@@ -1,9 +1,7 @@
-//! Arithmetic in GF(2^8) with the AES polynomial x^8 + x^4 + x^3 + x + 1 (MnemoCode TS 0.1.0's
-//! `src/sskr/gf256.ts`), the field in which bc-shamir splits a secret: a share is the value of one
-//! polynomial per byte at its member index, the secret at 255 and the digest at 254. Multiplying by
-//! a known constant is linear over GF(2), which lets the joint repair write Shamir's interpolation
-//! as equations in the bits of marked elements. Its callers pick distinct points by construction,
-//! so neither a zero inverse nor equal points are guarded (CORE-54).
+//! Arithmetic in GF(2^8) with the AES polynomial, the field of bc-shamir: a share is one polynomial
+//! per byte at its member index (the secret at 255, the digest at 254). Multiplying by a constant
+//! is linear over GF(2), so the joint repair writes interpolation as bit equations. Callers pick
+//! distinct points, so neither a zero inverse nor equal points are guarded (CORE-54).
 
 /// The reduction polynomial of the field, with its x^8 term.
 const REDUCTION: u16 = 0x11b;

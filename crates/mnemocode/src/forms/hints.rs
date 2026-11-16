@@ -1,10 +1,6 @@
-//! Hints for a word being typed (MnemoCode TS 0.1.0's `core/word-hints.ts`,
-//! CAP-PHRASE-FORMATS-WORD-HINTS), by the rule of mhfe: from [`LIST_FROM_LETTERS`] letters on, the
-//! words of the list that begin with them; after one letter, how many words do; a warning when none
-//! does. Tab completes a word as far as the words that begin with it agree.
-//!
-//! The lists are public and static, so a hint tells nothing that a person who sees the screen could
-//! not look up; a front end shows one only where the typed text itself is shown.
+//! Hints for a word being typed: from [`LIST_FROM_LETTERS`] letters on, the matching words; after
+//! one letter, how many match; a warning when none does. The word lists are public, so a hint shown
+//! beside visible typed text reveals nothing more.
 
 use std::sync::LazyLock;
 

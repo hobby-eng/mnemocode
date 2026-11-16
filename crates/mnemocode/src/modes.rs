@@ -1,9 +1,6 @@
-//! The transformation modes (MnemoCode TS 0.1.0's `core/masking.ts`, CAP-PHRASE-FORMATS-MASKING-RULES):
-//! no Seedshift, MnemoCode Seedshift, the Original Seedshift and the Original Seedshift with a
-//! valid last word, each with its rules: whether it masks with dates, keeps the checksum, gives
-//! several phrases for complete dates, and what a backup of it allows (shares, a check of what was
-//! written, a sheet for heirs). Every rule that tells the modes apart is a method of [`Mode`], so
-//! that no caller switches over their names.
+//! The transformation modes: no Seedshift, MnemoCode Seedshift, the Original Seedshift and the
+//! Original Seedshift with a valid last word. Every rule that tells them apart is a method of
+//! [`Mode`], so no caller switches over their names.
 
 pub mod seedshift;
 

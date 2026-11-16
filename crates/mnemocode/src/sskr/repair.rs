@@ -1,10 +1,7 @@
-//! The repair of one share with unreadable elements (MnemoCode TS 0.1.0's `src/sskr/repair.ts`,
-//! CAP-SSKR-REPAIR-ONE-SHARE): up to six elements, each marked with ? at its place. Every form keeps
-//! a CRC-32, and the mixed forms a version and a length, all affine over GF(2) in the bits of the
-//! share, so the missing bits are the solutions of linear equations, found by elimination instead of
-//! by trying values. Each solution is read again as an ordinary share; more than one are variants,
-//! never chosen silently; unmarked errors are never repaired. An element read in part adds the bits
-//! read as equations of their own, or, for a Unicode code, the words whose code fits as candidates.
+//! The repair of one share with up to six elements marked with ?. Every form's CRC-32, version and
+//! length are affine over GF(2) in the share's bits, so the missing bits are solved by elimination
+//! instead of by trying values. More than one solution are variants, never chosen silently;
+//! unmarked errors are never repaired.
 
 pub(crate) mod reading;
 pub mod report;
@@ -203,12 +200,10 @@ pub fn shares_of_readings(
     Ok(found)
 }
 
-/// Every share `value` can be, in any form, with up to [`MAX_MARKED_ELEMENTS`] elements marked
-/// with ?; at most 2^free_bits of them, `free_bits` at most [`MAX_LISTED_FREE_BITS`]. Each passes
-/// the ordinary reader. Text without a ? is read as a share; marked text is refused with too many
-/// marks or too long, with a ? where a code takes only a lone one or a code read in part too short,
-/// with Color Unicode marks that fit too many ways, with marks that leave too many solutions, and
-/// where no share fits.
+/// Every share `value` can be in any form, with up to [`MAX_MARKED_ELEMENTS`] elements marked with
+/// ?, at most 2 to the power [`MAX_LISTED_FREE_BITS`], each passing the ordinary reader. Text
+/// without a ? is read as a share; marked text is refused where its marks are too many or leave too
+/// many solutions, or where no share fits.
 pub(crate) fn repair_candidates(
     value: &str,
     free_bits: usize,

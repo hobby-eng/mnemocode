@@ -1,6 +1,5 @@
 //! How large a pattern is stitched: its fabric, of so many stitches an inch, and the paper sizes a
-//! picture may be fitted into, each in stitches on that fabric, as the menu offers them (the
-//! owner's requests of 2026-11-04 and 05).
+//! picture may be fitted into, each in stitches on that fabric, as the menu offers them.
 
 use std::fmt;
 
@@ -17,8 +16,8 @@ pub const AIDA_COUNTS: WholeRange = WholeRange::new(6, 28);
 pub const LINEN_COUNTS: WholeRange = WholeRange::new(20, 40);
 
 /// The fabric a pattern is stitched on: Aida, whose holes make the grid, or evenweave linen with
-/// each stitch over one thread, as fine as its count, for detail in a small piece (the owner's
-/// request of 2026-11-05: 28-count linen over one puts 200 stitches into A4's width).
+/// each stitch over one thread, as fine as its count, for detail in a small piece (28-count linen
+/// over one puts 200 stitches into A4's width).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fabric {
     /// Aida of so many stitches an inch.
@@ -79,13 +78,11 @@ impl Fabric {
         }
     }
 
-    /// The fabric that `text` names as [`Fabric::option`] writes it, within [`AIDA_COUNTS`] or
-    /// [`LINEN_COUNTS`].
+    /// The fabric that `text` names, exactly as [`Fabric::option`] writes it.
     ///
     /// # Errors
     ///
-    /// [`UnknownFabric`] for anything else, other spellings of a count included ("+14", "014",
-    /// " 14"), so that no two texts name one fabric.
+    /// [`UnknownFabric`] for any other text, such as "014", so that no two texts name one fabric.
     pub fn named(text: &str) -> Result<Self, UnknownFabric> {
         let within = |range: WholeRange, count: u64| (range.min..=range.max).contains(&count);
         match text.strip_prefix("linen-") {
@@ -187,9 +184,8 @@ pub const SHEETS: [Format; 7] = [
 ];
 /// How many of [`SHEETS`] the menu offers for the size of a pattern: A6 to A2.
 pub const OFFERED_SHEETS: usize = 5;
-/// The stitches across from which a photograph looks real (the owner's look at a rabbit in 78, 105,
-/// 200 and 300 stitches, 2026-11-04): a front end first selects the smallest offered size that
-/// gives them, and says why.
+/// The stitches across from which a photograph looks real (judged at 78, 105, 200 and 300): a front
+/// end first selects the smallest offered size that gives them, and says why.
 pub const DETAILED_ACROSS: usize = 200;
 /// The margin kept around a pattern fitted into a sheet, in millimetres, as a framed piece keeps
 /// some fabric around it.
@@ -264,13 +260,11 @@ pub fn centimetres(stitches: usize, count: u64) -> f64 {
     stitches as f64 / count as f64 * INCH / 10.0
 }
 
-/// The stitches across that a picture of `size` upright pixels may have: from [`MIN_WIDTH`] to the
-/// most within [`MAX_WIDTH`], its own width and [`MAX_HEIGHT`] down.
+/// The stitch widths that a picture of `size` upright pixels allows within the pattern's limits.
 ///
 /// # Errors
 ///
-/// [`PictureError::NarrowerThanPattern`] for a picture of fewer pixels across than [`MIN_WIDTH`],
-/// and [`PictureError::TooTall`] for one so tall that no width is left.
+/// [`PictureError::NarrowerThanPattern`], or [`PictureError::TooTall`] where no width is left.
 pub fn widths(size: (usize, usize)) -> Result<WholeRange, PictureError> {
     if size.0 < MIN_WIDTH {
         return Err(PictureError::NarrowerThanPattern { needed: MIN_WIDTH });
@@ -285,13 +279,22 @@ pub fn widths(size: (usize, usize)) -> Result<WholeRange, PictureError> {
     Ok(WholeRange::new(MIN_WIDTH as u64, most as u64))
 }
 
-/// The centimetres that `widths` take on fabric of `count`, least and most: the least rounded up and
-/// the most down to a millimetre, so that both ends are widths a pattern may have.
+/// The centimetres that `widths` take on fabric of `count`, least and most, to a millimetre: the
+/// least and the most width a person can type that [`typed_width`] takes (AUD-007-FUN002). None
+/// where no millimetre gives a width within them, as for a few stitches on fine linen: a front end
+/// then asks for stitches only.
 #[must_use]
-pub fn centimetre_range(widths: WholeRange, count: u64) -> (f64, f64) {
-    let least = centimetres(widths.min as usize, count);
-    let most = centimetres(widths.max as usize, count);
-    ((least * 10.0).ceil() / 10.0, (most * 10.0).floor() / 10.0)
+pub fn centimetre_range(widths: WholeRange, count: u64) -> Option<(f64, f64)> {
+    let taken = |mm: i64| mm > 0 && typed_width(mm as f64 / 10.0, widths, count).is_some();
+    let low = (centimetres(widths.min as usize, count) * 10.0).floor() as i64 - 1;
+    let high = (centimetres(widths.max as usize, count) * 10.0).ceil() as i64 + 1;
+    match (
+        (low..=high).find(|&mm| taken(mm)),
+        (low..=high).rev().find(|&mm| taken(mm)),
+    ) {
+        (Some(least), Some(most)) => Some((least as f64 / 10.0, most as f64 / 10.0)),
+        _ => None,
+    }
 }
 
 /// The stitches across of a width of `centimetres` that a person typed, on fabric of `count`; none
@@ -321,10 +324,11 @@ pub struct OfferedSize {
 
 /// The sizes offered for a picture of `size` upright pixels on `fabric`, smallest first: each of
 /// the first [`OFFERED_SHEETS`] of [`SHEETS`] that holds [`MIN_WIDTH`] stitches of it, with the
-/// stitches [`width_in`] gives it there.
+/// stitches [`width_in`] gives it there. A sheet that gives no more stitches than a smaller one is
+/// left out: the chart of those stitches is drawn on the smaller one (AUD-007-UI001).
 #[must_use]
 pub fn offered_sizes(size: (usize, usize), fabric: Fabric) -> Vec<OfferedSize> {
-    SHEETS[..OFFERED_SHEETS]
+    let mut offered: Vec<OfferedSize> = SHEETS[..OFFERED_SHEETS]
         .iter()
         .filter_map(|&format| {
             let across = width_in(size, format, fabric.count())?;
@@ -334,7 +338,9 @@ pub fn offered_sizes(size: (usize, usize), fabric: Fabric) -> Vec<OfferedSize> {
                 down: height_of(size, across),
             })
         })
-        .collect()
+        .collect();
+    offered.dedup_by_key(|size| size.across);
+    offered
 }
 
 /// The place among `sizes` that a front end selects first: the smallest that gives
@@ -459,6 +465,37 @@ mod tests {
         assert_eq!(first_offered(&[]), None);
     }
 
+    // AUD-007-UI001: every sheet offered is the sheet its chart is drawn on.
+    #[test]
+    fn each_offered_sheet_is_the_sheet_of_its_chart() {
+        // On Aida 14 A6 holds 46 of the 60 stitches and A5 all of them: the larger sheets add none.
+        let small = offered_sizes((60, 60), DEFAULT_FABRIC);
+        let shown: Vec<(&str, usize)> = small
+            .iter()
+            .map(|size| (size.format.name, size.across))
+            .collect();
+        assert_eq!(shown, [("A6", 46), ("A5", 60)]);
+        for fabric in FABRICS {
+            for picture in [
+                (60, 60),
+                (150, 90),
+                (400, 400),
+                (3000, 2000),
+                (2000, 3000),
+                (500, 40),
+            ] {
+                for size in offered_sizes(picture, fabric) {
+                    let sheet = sheet_for(size.across, size.down, fabric.count());
+                    assert_eq!(
+                        sheet.name,
+                        Some(size.format.name),
+                        "{picture:?} on {fabric:?}"
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn a_typed_width_is_the_whole_stitches_it_holds_within_the_widths() {
         let widths = WholeRange::new(40, 500);
@@ -467,11 +504,44 @@ mod tests {
         for wrong in [0.0, -5.0, f64::NAN, f64::INFINITY] {
             assert_eq!(typed_width(wrong, widths, 14), None);
         }
-        // 40 to 500 stitches of Aida 14 are 7.26 to 90.71 cm: rounded inward, both ends hold.
-        let (least, most) = centimetre_range(widths, 14);
-        assert_eq!((least, most), (7.3, 90.7));
+        // 40 to 500 stitches of Aida 14 are 7.26 to 90.71 cm; the range is what a person may type:
+        // 7.3 cm is the least that holds 40 stitches, 90.8 cm the most that holds no more than 500.
+        let (least, most) = centimetre_range(widths, 14).unwrap();
+        assert_eq!((least, most), (7.3, 90.8));
         assert!(typed_width(least, widths, 14).is_some());
         assert!(typed_width(most, widths, 14).is_some());
+    }
+
+    // AUD-007-FUN002: one width, or a few, on every fabric: a range given is never upside down and
+    // both its ends are taken when typed; none is given only where no millimetre is taken.
+    #[test]
+    fn a_range_of_few_stitches_is_never_upside_down_or_untypable() {
+        for count in 11..=40 {
+            for (min, max) in [(40, 40), (40, 41), (57, 57), (40, 500)] {
+                let widths = WholeRange::new(min, max);
+                let typable = (1..=10_000)
+                    .any(|mm| typed_width(f64::from(mm) / 10.0, widths, count).is_some());
+                let Some((least, most)) = centimetre_range(widths, count) else {
+                    assert!(!typable, "{min}-{max} on {count}: no range, yet typable");
+                    continue;
+                };
+                assert!(least <= most, "{min}-{max} on {count}: {least} {most}");
+                assert!(
+                    typed_width(least, widths, count).is_some(),
+                    "{min} on {count}: {least}"
+                );
+                assert!(
+                    typed_width(most, widths, count).is_some(),
+                    "{max} on {count}: {most}"
+                );
+            }
+        }
+        // 40 stitches alone: 7.3 or 7.4 cm on Aida 14; on linen 36, 2.8 cm holds 39 and 2.9 cm 41.
+        assert_eq!(
+            centimetre_range(WholeRange::new(40, 40), 14),
+            Some((7.3, 7.4))
+        );
+        assert_eq!(centimetre_range(WholeRange::new(40, 40), 36), None);
     }
 
     #[test]

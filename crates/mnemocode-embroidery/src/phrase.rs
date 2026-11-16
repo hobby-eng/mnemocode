@@ -1,8 +1,6 @@
 //! The phrase of a pattern as every front end handles it (ADR 0010): masked with MnemoCode
 //! Seedshift before it is hidden, since the format is public, unless the person chooses the phrase
-//! itself, as for one protected some other way (the owner's request of 2026-11-04, as Encode
-//! offers it); and a legend line read back as the record of its phrase, which Decode turns back
-//! into the phrase, with the dates where it is masked.
+//! itself; and a legend line read back as the record that Decode turns into the phrase.
 
 use std::fmt;
 
@@ -13,7 +11,7 @@ use mnemocode::forms::Form;
 use mnemocode::modes::{DateWords, Mode};
 use mnemocode::refusal::{Refusal, RefusalKind};
 use mnemocode::secret::{SecretBytes, SecretText};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::legend::{self, LegendError, Masking, Reading};
 
@@ -132,8 +130,7 @@ pub fn masked_entropy(phrase: &Phrase, dates: &[Date]) -> Result<LegendEntropy, 
         .map_err(SeedStitchError::Phrase)
 }
 
-/// The entropy of `phrase` itself, not masked: for a phrase protected some other way, since anyone
-/// who knows the public format reads it from the legend.
+/// The entropy of `phrase` itself, unmasked: anyone who knows the public format reads it.
 ///
 /// # Errors
 ///
@@ -160,14 +157,11 @@ pub const fn legend_mode(mode: Mode) -> Result<Mode, SeedStitchError> {
     }
 }
 
-/// What a pattern's legend holds of `phrase` in `mode`: its entropy masked with `dates` by MnemoCode
-/// Seedshift, or its own, which takes no dates.
+/// What a legend holds of `phrase` in `mode`: its entropy masked with `dates`, or its own.
 ///
 /// # Errors
 ///
-/// [`SeedStitchError::Mode`] for the original Seedshift, [`SeedStitchError::Backup`] for dates the
-/// mode does not take or lacks, as Encode refuses them, and the refusals of [`masked_entropy`] and
-/// [`unmasked_entropy`].
+/// [`SeedStitchError::Mode`] for the original Seedshift; [`SeedStitchError::Backup`] for dates.
 pub fn legend_entropy(
     phrase: &Phrase,
     mode: Mode,
@@ -187,6 +181,8 @@ pub fn legend_entropy(
 pub struct LineRecord {
     record: SecretText,
     corrected: Option<usize>,
+    /// Whether a row was taken as misread, told for sure or not.
+    misread: bool,
 }
 
 impl LineRecord {
@@ -198,10 +194,17 @@ impl LineRecord {
     }
 
     /// The row, from 1, that did not fit and was read as the only change of it that gives a phrase;
-    /// none where the line read as it is.
+    /// none where the line read as it is, or where changes of several rows give the same phrase.
     #[must_use]
     pub const fn corrected_row(&self) -> Option<usize> {
         self.corrected
+    }
+
+    /// Whether a row did not fit and was read as changed, whether or not [`Self::corrected_row`]
+    /// can tell which.
+    #[must_use]
+    pub const fn corrected(&self) -> bool {
+        self.misread
     }
 
     /// The record, kept without a copy.
@@ -211,14 +214,11 @@ impl LineRecord {
     }
 }
 
-/// The record of the phrase that `text` holds where it is written as a legend line
-/// ([`legend::is_line`]), as Decode reads one in place of codes; none where it is not one, such as
-/// codes or a record.
+/// The record of the phrase in `text` where it is a legend line ([`legend::is_line`]), else none.
 ///
 /// # Errors
 ///
-/// [`SeedStitchError::Legend`] for a line that is no legend, [`SeedStitchError::NotRead`] and
-/// [`SeedStitchError::Ambiguous`].
+/// [`SeedStitchError::Legend`], [`SeedStitchError::NotRead`] and [`SeedStitchError::Ambiguous`].
 pub fn record_of_legend(text: &str) -> Result<Option<LineRecord>, SeedStitchError> {
     if legend::is_line(text) {
         record_of_line(text).map(Some)
@@ -227,18 +227,60 @@ pub fn record_of_legend(text: &str) -> Result<Option<LineRecord>, SeedStitchErro
     }
 }
 
-/// The legend line `text` read back as the record of its phrase, masked or not.
-fn record_of_line(text: &str) -> Result<LineRecord, SeedStitchError> {
+/// How the rows of `text` read.
+fn reading_of(text: &str) -> Result<Reading, SeedStitchError> {
     let mut rows = legend::parse(text).map_err(SeedStitchError::Legend)?;
     let reading = legend::read(&rows);
     legend::wipe_rows(&mut rows);
-    let (entropy, masking, corrected) = match reading {
-        Reading::Read { entropy, masking } => (entropy, masking, None),
+    Ok(reading)
+}
+
+/// `text` with the DMC number taken out of each row, where every row has one: a format 1 sheet
+/// prints the threads too, and a person may type them (AUD-007-FUN001).
+fn without_threads(text: &str) -> Option<Zeroizing<String>> {
+    let mut plain = Zeroizing::new(String::with_capacity(text.len()));
+    for word in text
+        .split(|c: char| c.is_whitespace() || c == ',' || c == ';')
+        .filter(|word| !word.is_empty())
+    {
+        let mut parts = word.split(':');
+        let (Some(symbol), Some(_thread), Some(stitches), None) =
+            (parts.next(), parts.next(), parts.next(), parts.next())
+        else {
+            return None;
+        };
+        if !plain.is_empty() {
+            plain.push(' ');
+        }
+        plain.push_str(symbol);
+        plain.push(':');
+        plain.push_str(stitches);
+    }
+    (!plain.is_empty()).then_some(plain)
+}
+
+/// The legend line `text` read back as the record of its phrase, masked or not. Rows typed with a DMC
+/// number read as format 2, and also as format 1 without the numbers, as a person types a format 1
+/// sheet whose key prints each row's thread: a reading as typed beats one that corrects a row.
+fn record_of_line(text: &str) -> Result<LineRecord, SeedStitchError> {
+    let first = reading_of(text);
+    let reading = if matches!(first, Ok(Reading::Read { .. })) {
+        first?
+    } else {
+        match (first, without_threads(text).map(|plain| reading_of(&plain))) {
+            (_, Some(Ok(read @ Reading::Read { .. }))) => read,
+            (Ok(corrected @ Reading::Corrected { .. }), _)
+            | (_, Some(Ok(corrected @ Reading::Corrected { .. }))) => corrected,
+            (first, _) => first?,
+        }
+    };
+    let (entropy, masking, corrected, misread) = match reading {
+        Reading::Read { entropy, masking } => (entropy, masking, None, false),
         Reading::Corrected {
             entropy,
             masking,
             row,
-        } => (entropy, masking, Some(row)),
+        } => (entropy, masking, row, true),
         Reading::NotRead => return Err(SeedStitchError::NotRead),
         Reading::Ambiguous => return Err(SeedStitchError::Ambiguous),
     };
@@ -255,7 +297,11 @@ fn record_of_line(text: &str) -> Result<LineRecord, SeedStitchError> {
     let record = backup
         .and_then(|backup| backup.record())
         .map_err(SeedStitchError::Backup)?;
-    Ok(LineRecord { record, corrected })
+    Ok(LineRecord {
+        record,
+        corrected,
+        misread,
+    })
 }
 
 #[cfg(test)]
@@ -266,6 +312,25 @@ mod tests {
     /// Trezor's published 24-word test vector, which the specification's legend holds.
     const VOID: &str = "void come effort suffer camp survey warrior heavy shoot primary clutch crush \
                         open amazing screen patrol group space point ten exist slush involve unfold";
+
+    // AUD-007-FUN001: a format 1 sheet typed with the DMC column its key prints reads as typed
+    // without it; a format 2 line still reads as format 2.
+    #[test]
+    fn a_format_1_legend_typed_with_its_threads_reads_as_without_them() {
+        let typed: Vec<String> = EXAMPLE
+            .split_whitespace()
+            .zip(crate::dmc::THREADS.iter())
+            .map(|(row, thread)| {
+                let (symbol, stitches) = row.split_once(':').unwrap();
+                format!("{symbol}:{}:{stitches}", thread.number())
+            })
+            .collect();
+        let plain = record_of_line(EXAMPLE).unwrap();
+        let with_threads = record_of_line(&typed.join(" ")).unwrap();
+        assert_eq!(with_threads.record().as_str(), plain.record().as_str());
+        let ordered = record_of_line(crate::legend::EXAMPLE_ORDERED).unwrap();
+        assert!(ordered.record().as_str().starts_with("MNC1:"));
+    }
 
     #[test]
     fn the_specification_legend_becomes_the_record_of_its_masked_phrase() {

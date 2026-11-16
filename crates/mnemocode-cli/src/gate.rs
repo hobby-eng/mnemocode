@@ -1,9 +1,6 @@
-//! The gate before a command's first secret (CAP-CLI-SECRET-GATE, protections.md decision 1): the
-//! protections are restricted for the command's needs and read back, a secret is refused only while
-//! core dumps are not off or a tracer is attached, and everything else the system refused is
-//! reported, never assumed. On a terminal the command then runs on its private screen, which shows
-//! the protection first and the warnings about where the secret could leak: unencrypted swap, a
-//! memory lock refused, a cloud service that copies an output.
+//! The gate before a command's first secret (protections.md decision 1): the protections are
+//! restricted and read back, and a secret is refused only while core dumps are on or a tracer is
+//! attached; anything else the system refused is reported as a warning on the private screen.
 
 use std::fmt;
 
@@ -119,10 +116,12 @@ pub(crate) fn run_secret(
         warning_with_more(&swap, "unencrypted-swap");
     }
     warn_of_cloud_copies(parsed);
-    body(protection)?;
+    let done = body(protection);
+    // The memory that could not be locked is told whether the work ended well or not (AUD-007-SEC004).
     if mnemocode::secret::any_lock_refused() {
         warning_with_more(LOCK_WARNING, "memory-lock");
     }
+    done?;
     report_renamed();
     if !screen.wait_to_clear()? {
         return Err(Stop::Cancelled);

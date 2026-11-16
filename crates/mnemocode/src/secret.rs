@@ -1,11 +1,7 @@
-//! Secrets in memory (ADR 0003, RUST-13): owners that hold a secret in one buffer reserved at its
-//! final size, locked before the secret is written into it where the system allows, never grown,
-//! and wiped on drop; the zeroing allocator that every artifact registers, so that copies made by
-//! dependencies and by the WebAssembly glue are wiped when they are freed; and the stack scrub that
-//! the binding runs after each call that handled a secret.
-//!
-//! An owner prints itself only as `[<Label>: redacted]` (CAP-PHRASE-FORMATS-SECRET-OWNERS) and has
-//! no `Display`. Domain owners (a phrase, entropy, a seed, a share) wrap these two and lend slices.
+//! Secrets in memory (ADR 0003): owners that hold a secret in one buffer reserved at its final
+//! size, locked where the system allows, never grown and wiped on drop; the zeroing allocator,
+//! which wipes copies made by dependencies and the WebAssembly glue; and the stack scrub the
+//! binding runs after each secret call. Owners have no `Display` and print `[<Label>: redacted]`.
 
 mod allocator;
 mod normalization;
@@ -26,11 +22,9 @@ pub use pages::any_lock_refused;
 
 use crate::refusal::Refusal;
 
-/// The bytes of the stack that [`scrub_stack`] overwrites: more than the deepest stack measured
-/// over the entries that handle a secret. TS measured 2,936 bytes for its SSKR engine and kept
-/// 16 KiB (sskr-wasm/rust/src/lib.rs:22-25). The `wasm` gate measures every row of the self-check
-/// on each build and refuses one that reaches this size (ARCHITECTURE.md §6). The deepest, the QR
-/// reader, leaves data some 77 KiB down, so this keeps about two thirds more.
+/// The bytes of the stack that [`scrub_stack`] overwrites: the deepest secret entry, the QR reader,
+/// leaves data some 77 KiB down, so this keeps about two thirds more. The `wasm` gate measures
+/// every self-check row on each build and refuses one that reaches this size (ARCHITECTURE.md §6).
 pub const STACK_SCRUB_BYTES: usize = 128 * 1024;
 
 /// A secret did not fit the buffer reserved for it: the reserved size was computed too small.

@@ -1,11 +1,7 @@
-//! The search for forgotten words (MnemoCode TS 0.1.0's `WordCandidateSearch` of
-//! `core/candidates.ts` and `core/word-candidate.ts`, CAP-RECOVERY-WORD-SEARCH-MISSING,
-//! CAP-RECOVERY-WORD-SEARCH-RUN): every combination of the places is checked against the BIP39
-//! checksum, and the candidates come in one fixed order, so that candidate N is the same on
-//! MnemoCode's screen, in the Wallet Deriver and in a candidate list. A resumable search the host
-//! steps (ADR 0005): it compares each candidate with the wallet, keeps the first
-//! [`MAX_SHOWN_CANDIDATES`] and every one that matched, and keeps the entropy of every candidate
-//! for a list. It does not derive keys beyond the wallet check, save lists or print.
+//! The search for forgotten words: every combination of the places checked against the BIP39
+//! checksum, in one fixed order so that candidate N is the same on screen, in the Wallet Deriver
+//! and in a candidate list. The host steps it (ADR 0005); it keeps the first
+//! [`MAX_SHOWN_CANDIDATES`], every match, and each candidate's entropy for a list.
 
 use std::fmt;
 

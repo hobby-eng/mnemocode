@@ -1,10 +1,7 @@
-//! age v1 for candidate lists (MnemoCode TS 0.1.0's `core/candidate-cipher.ts`,
-//! CAP-RECOVERY-CANDIDATE-ENCRYPT-KEY, -ENCRYPT-PASSPHRASE, -DECRYPT): a list encrypted to the
-//! Discovery Scanner's X25519 key or with a passphrase (scrypt, work factor 2^18), and opened again
-//! with the session key or the passphrase. The format is age's own (age-encryption.org/v1), written
-//! over the RustCrypto and dalek primitives the crates report took: the file key wrapped by its one
-//! recipient, the header's HMAC, the payload in authenticated 64 KiB chunks. Every random byte comes
-//! from the host's [`Random`] port; the file key, the keys and the plaintext stay in locked buffers.
+//! age v1 for candidate lists: encrypted to the Discovery Scanner's X25519 key or with a passphrase
+//! (scrypt, work factor 2^18), and opened again. The age format is written here over the RustCrypto
+//! and dalek primitives. Random bytes come from the host's [`Random`] port; keys and plaintext stay
+//! in locked buffers.
 
 use std::fmt;
 

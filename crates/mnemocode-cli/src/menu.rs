@@ -1,15 +1,7 @@
-//! The menu that MnemoCode shows when it starts without arguments at a terminal, as from a
-//! double-click (MnemoCode TS 0.1.0's `cli/menu.ts` and `menu-runner.ts`). An entry asks its
-//! questions as lists chosen with the arrow keys, builds the command line that does the same, shows
-//! it in grey and runs it exactly as if it had been typed after `mnemocode`, in a process of its
-//! own, so that the person can type it later. A secret is never part of that command line: the
-//! command asks for it on its private screen (--ask-secrets).
-//!
-//! The menu checks each of its own answers at once, none of which is a secret; nothing is read from
-//! the files, and the menu writes nothing. It holds no secret and takes no sandbox, which its
-//! commands would inherit: each sets its own. Its questions stand under its heading with the record
-//! of the answers given so far, which the command line closes: CORE-39 makes the start menu its
-//! exception.
+//! The start menu shown when MnemoCode starts at a terminal without arguments. Each entry asks its
+//! questions, shows the equivalent command line and runs it in a process of its own, so the person
+//! can type it later. A secret is never on that line: the command asks for it on its private
+//! screen. The menu holds no secret and takes no sandbox, which its commands would inherit.
 
 mod table;
 mod typed_line;

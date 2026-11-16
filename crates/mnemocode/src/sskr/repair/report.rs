@@ -1,11 +1,6 @@
-//! What a repair of shares with unreadable elements tells the person (MnemoCode TS 0.1.0's
-//! `src/sskr/repair-report.ts`, CAP-SSKR-REPAIR-REPORT), as lines of data with their texts: before
-//! the search, what the shares settle together, what is open and how long it takes here, what
-//! would help, and the question or notice for the search, with the date search that follows for a
-//! Seedshift phrase; after it, what the repair filled in, share by share. Its lines hold what a
-//! repair filled in, so that they are redacted from `Debug`. The host measures the
-//! pace of its digest checks from the joint search's public pace sample and maps each kind of line
-//! to its own style.
+//! What a repair of shares tells the person, as lines of data with their texts: before the search,
+//! what is settled, what is open, how long it takes and what would help; after it, what was filled
+//! in, share by share. The lines hold repaired elements, so they are redacted from `Debug`.
 
 use std::fmt;
 

@@ -12,7 +12,7 @@
 mod common;
 
 use std::fs;
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 use common::{SHARES, folder};
 
@@ -32,17 +32,11 @@ fn a_changed_answer_of_the_share_engine_stops_a_share_command_before_it_reads_a_
     let changed = folder.join("changed-mnemocode");
     fs::copy(program, &changed).expect("a copy");
     fs::write(&changed, build).expect("the change");
-    let output = common::colour::plain(&mut Command::new(&changed))
-        .args(["sskr-combine", "--share-file", SHARES])
-        .current_dir(&folder)
-        .stdin(Stdio::null())
-        .output()
-        .expect("the program runs");
-    let errors = String::from_utf8_lossy(&output.stderr);
-    assert_eq!(output.status.code(), Some(1), "{errors}");
-    assert!(
-        errors.contains("MnemoCode core self-test failed."),
-        "{errors}"
+    let (_, written) = common::colour::refused(
+        Command::new(&changed)
+            .args(["sskr-combine", "--share-file", SHARES])
+            .current_dir(&folder),
+        "MnemoCode core self-test failed.",
     );
-    assert!(output.stdout.is_empty(), "the shares were read");
+    assert!(written.is_empty(), "the shares were read");
 }

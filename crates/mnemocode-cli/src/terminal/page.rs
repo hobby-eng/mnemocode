@@ -1,9 +1,6 @@
-//! The page of the private screen (MnemoCode TS 0.1.0's `cli/private-page.ts`,
-//! CAP-CLI-RESULT-PAGING): everything written to the terminal since the screen was last cleared.
-//! The alternate screen keeps no scrollback, so a result longer than the terminal would lose the
-//! rows that scrolled over its top edge. The page is recorded as it is written, and before a
-//! question or a prompt is drawn under it, a page that does not fit with them is shown again whole,
-//! by pages, until Enter or Escape. It holds the secrets shown on it, and is wiped when it ends.
+//! The page of the private screen: everything written since the last clear. The alternate screen
+//! keeps no scrollback, so a page too long for the prompt under it is shown again by pages first.
+//! It holds the secrets shown on it and is wiped when it ends.
 
 use std::sync::Mutex;
 

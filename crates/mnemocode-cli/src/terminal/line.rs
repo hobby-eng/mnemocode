@@ -1,10 +1,6 @@
-//! Reads one typed line in raw mode, as MnemoCode TS 0.1.0's `readLine` (`terminal-input.ts`) and
-//! mhfe's hidden input: every byte is kept as data except Backspace and Ctrl+U, which delete, Enter,
-//! which ends the line, Ctrl+D on an empty line, which ends the input, and Ctrl+C, which cancels. A
-//! visible answer is edited as in a shell (the arrows, Home and End, Ctrl with an arrow, Delete,
-//! Ctrl+K, Ctrl+W), with hints below it and Tab completing a word where a question takes words of
-//! a list. A line break inside a paste may become one separator, so that a paste of several lines
-//! is one answer.
+//! Reads one typed line in raw mode: every byte is data except the editing and control keys. A
+//! visible answer is edited as in a shell, with hints and Tab completion for word lists. A line
+//! break inside a paste may become one separator, so a paste of several lines is one answer.
 
 #![expect(
     clippy::disallowed_methods,
@@ -25,7 +21,7 @@ use super::keys::{
 pub(crate) struct LineOptions<'h> {
     /// Shows the answer as it is typed and lets the editing keys edit it; otherwise nothing shows.
     pub(crate) echo: bool,
-    /// The longest answer in bytes: the question's own limit (the owner's per-question limits).
+    /// The longest answer in bytes: the question's own limit.
     pub(crate) limit: usize,
     /// Escape alone goes back, as in the menu; otherwise it does nothing.
     pub(crate) escape_goes_back: bool,

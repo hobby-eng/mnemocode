@@ -19,8 +19,7 @@ use zeroize::Zeroize;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ZeroingAllocator;
 
-/// Wipes the `length` bytes at `pointer`, which may be uninitialized, as the spare capacity of a
-/// vector is.
+/// Wipes the `length` bytes at `pointer`, which may be uninitialized (a vector's spare capacity).
 ///
 /// # Safety
 ///

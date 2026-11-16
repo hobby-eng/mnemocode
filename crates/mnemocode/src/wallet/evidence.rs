@@ -1,9 +1,6 @@
-//! What tells that a phrase opens the person's wallet (MnemoCode TS 0.1.0's
-//! `core/wallet-evidence.ts`, `wallet-check.ts` and `coin-address-evidence.ts`,
-//! CAP-WALLET-EVIDENCE-*, CAP-WALLET-FINGERPRINT-EVIDENCE): a master fingerprint, the master
-//! extended public key of `master` or an address at its place in every build, read as every coin
-//! whose form it has unless one is named, with Bitcoin also the keys of `bitcoin`; each compared
-//! with the keys a master key derives, the private half of each wiped once it is compared.
+//! What shows that a phrase opens the person's wallet: a master fingerprint, a master extended
+//! public key, or an address read as every coin whose form it has; each compared with the keys a
+//! master key derives, whose private halves are wiped once compared.
 
 use std::fmt;
 

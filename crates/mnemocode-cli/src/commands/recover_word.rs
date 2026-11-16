@@ -1,13 +1,7 @@
-//! `mnemocode recover-word` (MnemoCode TS 0.1.0's `cli/recover-word-command.ts`,
-//! CAP-RECOVERY-WORD-SEARCH-RUN, CAP-RECOVERY-LEGACY-LAST-WORDS): finds forgotten or missing words
-//! of a seed phrase, or the checksum-valid last words of an exact legacy Seedshift phrase; each
-//! candidate is compared with the wallet and shown. From the command line a problem ends the
-//! command. With --ask-secrets, on the private screen, the phrase is checked as soon as it is typed,
-//! before the list's passphrase is asked, and asked again; a search without a usable result, or with
-//! more candidates than the window holds as one row each, offers what to change, keeping the list,
-//! its protection and its passphrase. Candidates that the window does not hold are offered a wallet
-//! check on the private screen also when a file gave the words, and, where no list was given, a list
-//! for the Discovery Scanner.
+//! `mnemocode recover-word`: finds forgotten or missing words of a seed phrase, or the
+//! checksum-valid last words of a legacy Seedshift phrase, and compares each candidate with the
+//! wallet. With --ask-secrets, a search with no usable result or too many candidates to show offers
+//! what to change, keeping the list and its passphrase.
 
 use std::fmt;
 
@@ -617,11 +611,9 @@ fn show_no_candidate(
     Ok(next)
 }
 
-/// The candidates to print, and whether they are all of them. Every candidate is shown when the list
-/// is short: when its rows for a script, one line each, fit on the private screen with what is
-/// printed around them, the `beside` rows. On a terminal, where each candidate is a part of its own,
-/// the screen then shows them by pages. A longer list shows only those that match the wallet, each
-/// with its number among all of them.
+/// The candidates to print, and whether that is all of them: all where one line each fits on the
+/// private screen beside the `beside` rows, else only those that match the wallet, each with its
+/// number among all.
 fn candidates_to_print<'a>(
     found: &'a Found,
     wallet: &GivenWallet,

@@ -1,14 +1,7 @@
 //! The library's one port to its host (ADR 0006, CORE-46): cryptographically secure randomness,
-//! which the host passes in. Its implementations are the browser's `crypto.getRandomValues` in the
-//! WebAssembly file (the binding's host module) and, from increment 2 on, the operating system's
-//! generator in the executable (getrandom: getrandom(2) on Linux, getentropy on macOS, ProcessPrng
-//! on Windows); no other generator exists in MnemoCode. The SSKR engine's ChaCha20 is seeded with
-//! 32 bytes from this port, as TS seeds it.
-//!
-//! The library never reads a source itself: the `code-rules` gate keeps getrandom and rand out of
-//! its dependencies, and clippy refuses bc-rand's and rand's own sources and their generators that
-//! are not cryptographically secure (clippy.toml). A test passes the choices TS made through a fixed
-//! source of its own, which exists only in tests (CORE-32).
+//! passed in by the host (the browser's `crypto.getRandomValues`, or getrandom in the executable).
+//! The library never reads a source itself; the `code-rules` gate and clippy.toml keep other
+//! generators out. Tests pass a fixed source of their own (CORE-32).
 
 use std::fmt;
 

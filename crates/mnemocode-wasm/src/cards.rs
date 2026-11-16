@@ -186,13 +186,17 @@ impl CardExport {
         self.session = Some(Rc::clone(&session.0));
     }
 
-    /// Choose a contact in the sheet QR and the exact backup record in its filler bytes.
+    /// Choose a contact in the sheet QR and the exact backup record in its filler bytes. The
+    /// ordinary QR choice of the constructor stays as it was, so turning this off brings it back.
     #[wasm_bindgen(js_name = setHiddenQr)]
     pub fn set_hidden_qr(&mut self, enabled: bool) {
         self.hidden_qr = enabled;
-        if enabled {
-            self.card_qr = true;
-        }
+    }
+
+    /// Whether the sheet gets a QR code, and whether a hidden record goes into it: a hidden record
+    /// needs the QR that carries it, and only then is a QR drawn without the ordinary choice.
+    fn sheet_qr(&self) -> (bool, bool) {
+        (self.card_qr || self.hidden_qr, self.hidden_qr)
     }
 
     /// The settings of its cards, with the details that were left out invented, for `design`.
@@ -212,8 +216,8 @@ impl CardExport {
             orientation: self.orientation,
             profile: details.profile,
             presentation: Some(details.presentation),
-            card_qr: self.card_qr,
-            hidden_qr: self.hidden_qr,
+            card_qr: self.sheet_qr().0,
+            hidden_qr: self.sheet_qr().1,
         })
     }
 
@@ -693,5 +697,31 @@ mod tests {
         let documents = plan.separate().expect("separate cards");
         let page = &documents.documents[0].pages[0];
         assert!(page.width < page.height);
+    }
+
+    /// The ordinary and the hidden QR choice of the settings that `export` draws its sheets with.
+    fn sheet_qr_settings(export: &CardExport) -> (bool, bool) {
+        let settings = export
+            .settings(None)
+            .unwrap_or_else(|_| panic!("the settings"));
+        (settings.card_qr, settings.hidden_qr)
+    }
+
+    // AUD-007-API001: turning the hidden record off must not leave an ordinary QR of the backup on a
+    // sheet whose ordinary QR was off.
+    #[test]
+    fn the_hidden_qr_switch_keeps_the_ordinary_choice() {
+        for ordinary in [false, true] {
+            let mut export = CardExport::new(None, None, None, ordinary).unwrap();
+            assert_eq!(sheet_qr_settings(&export), (ordinary, false));
+            for _ in 0..2 {
+                export.set_hidden_qr(true);
+                assert_eq!(sheet_qr_settings(&export), (true, true));
+                export.set_hidden_qr(false);
+                assert_eq!(sheet_qr_settings(&export), (ordinary, false));
+            }
+            export.set_hidden_qr(false);
+            assert_eq!(sheet_qr_settings(&export), (ordinary, false));
+        }
     }
 }

@@ -39,7 +39,9 @@ The order of this table is part of the format and never changes.
 Take the rows from the top of the legend down, in the order printed: row `i` (from 1) has symbol
 number `s_i` and `c_i` stitches. A format 1 row is typed `symbol:stitches`, as `28:1725`; a
 format 2 row names its DMC thread too, `symbol:DMC:stitches`, as `28:310:1725`. Every row of a
-legend has the same form, and the form tells the format.
+legend has the same form. Rows typed with DMC numbers are read as format 2 and also as format 1
+without the numbers, since a format 1 key prints each row's thread too; a reading as typed is taken
+before one that corrects a misread row.
 
 1. The symbol numbers are all different, from 1 to 70.
 2. The **biggest row** is the one with the most stitches. Two rows sharing the most stitches is no
@@ -71,8 +73,10 @@ When no length is right, a reader may try every change of one row: another symbo
 its count changed or two neighbouring digits of it swapped, its count taken on the other side of
 the 100 or 1000 limit, or another row taken as the biggest. If exactly one entropy comes out, that
 row was misread; if none or several do, the legend is read again from the paper. A DMC number is
-not searched: one that names no thread is refused, and one that names another thread makes the
-legend fail to read. With one row misread in one of these ways the true phrase is always among the
+not searched: one that names no thread is refused. In format 2 a thread counts only by its place in
+DMC's order among the legend's threads: a number that names another thread makes the legend fail
+to read where it changes that place, and reads as before where it keeps it, so a misread DMC number
+is not always noticed. With one row misread in one of these ways the true phrase is always among the
 results, so a wrong phrase cannot come out alone; the risk lies in mistakes the search does not
 cover, such as two rows wrong or a row left out, which pass the check about once in 140,000: a
 legend of 28 rows is tried some 15,000 ways, each against a check of 32 bits in two domains.

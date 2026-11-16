@@ -1,9 +1,6 @@
-//! The questions of a new backup, as Encode asks them (MnemoCode TS 0.1.0's
-//! `cli/encode-questions.ts`): its form, Seedshift, Shamir shares, where it goes, its cards and the
-//! sheet for heirs, each answer checked at once and recorded as the command line takes it. The
-//! start menu selects the form, then its protected child asks Seedshift and dates before the other
-//! settings. Re-encode uses the same questions on its private screen. Dates stay in a secret owner
-//! beside the non-secret command arguments. Embroidery uses the same protected setup.
+//! The questions of a new backup as Encode asks them, each answer checked at once and recorded as
+//! the command line takes it. Re-encode and embroidery reuse them; the dates stay in a secret owner
+//! beside the non-secret arguments.
 
 use mnemocode::bip39::phrase::Phrase;
 use mnemocode::dates::Date;
@@ -178,9 +175,9 @@ pub(crate) enum Takes {
     MnemoCodeOnly { unmasked: &'static str },
 }
 
-/// Whether Seedshift is used and which, on one screen (the owner's request of 2026-11-04): MnemoCode
-/// Seedshift, the original where the backup `takes` it, and none unless the form is always masked
-/// (`required`); none means back. Where only MnemoCode Seedshift is left, nothing is asked.
+/// Whether Seedshift is used and which, on one screen: MnemoCode Seedshift, the original where the
+/// backup `takes` it, and none unless the form is always masked (`required`); none means back.
+/// Where only MnemoCode Seedshift is left, nothing is asked.
 pub(crate) fn ask_seedshift(
     question: &str,
     required: bool,

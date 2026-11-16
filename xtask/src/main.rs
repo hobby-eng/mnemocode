@@ -1,26 +1,6 @@
-//! The tools of the MnemoCode repository (TOOL-01), run from anywhere in it as `cargo xtask
-//! <task>`; each prints what it checked and exits 0, or what it refused and exits 1:
-//!
-//! - `check`: the fast gates of CORE-43 (docs/design/architect/GATES.md), every one below, with
-//!   rustfmt, Clippy for every crate and target, rustdoc, the tests, the binding's tests in
-//!   WebAssembly and the RustSec audit where its database is at hand. CI runs it on every push.
-//! - `code-rules [--self-test]`: the rules of the coding guide that the compiler and Clippy cannot
-//!   see, read from module-map.json; with `--self-test`, against the cases each part must catch.
-//! - `copies [--tokens N | --self-test]`: code copied from one place to another (CORE-10).
-//! - `markdown`: every Markdown list tight (DOC-01).
-//! - `notices [--check]`: the Rust crates part of THIRD_PARTY_NOTICES.md, written or checked.
-//! - `wasm build [<edition>/<page>]` and `wasm verify`: every page's WebAssembly file, built from
-//!   wasm-profiles.json and checked (ADR 0007).
-//! - `windows-imports <file.exe> [--check]`: the DLLs a Windows executable imports, each a
-//!   KnownDLL or an API set with `--check` (W-DLL-SEARCH).
-//! - `knowndlls`: on Windows, the \\KnownDlls object directory against xtask/knowndlls.json.
-//! - `action-pins`: the workflows' actions against the workspace's pin table (CI-01 to CI-03).
-//! - `audit`: Cargo.lock against the RustSec advisories (cargo-audit).
-//! - `release build <target>`, `release pages`: the files of a release, in dist/release/.
-//! - `verify-executable <file>`: a built executable run on its own, on public test data.
-//! - `reproducible`: the canonical files rebuilt in the pinned container and compared.
-//! - `features`: each unit of the libraries built alone, and the slow tests.
-//! - `sign <tag> [--publish]`: a draft release checked and signed on the owner's computer.
+//! The tools of the MnemoCode repository (TOOL-01), run as `cargo xtask <task>` from anywhere in
+//! it; each prints what it checked and exits 0, or what it refused and exits 1. The tasks are
+//! listed in `USAGE` and described in their modules.
 
 #![deny(unsafe_code)]
 #![expect(
@@ -144,7 +124,7 @@ fn run(task: &str, arguments: &[String]) -> Result<(), Failure> {
         ("windows-imports", [file]) => windows::run(&root, Path::new(file), false),
         ("windows-imports", [file, "--check"]) => windows::run(&root, Path::new(file), true),
         ("audit", []) => check::audit(&root, true),
-        ("action-pins", []) => action_pins::run(&root),
+        ("action-pins", []) => action_pins::run(&root, true),
         ("knowndlls", []) => knowndlls::run(&root),
         ("release", ["build", target]) => release::build(&root, target),
         ("release", ["pages"]) => release::pack_pages(&root),

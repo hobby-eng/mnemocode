@@ -1,10 +1,7 @@
-//! The wallet part for a page (`browser-wallet`): the evidence of a wallet, each kind made by its
-//! own constructor and refused as the library refuses it before any phrase is asked, compared with
-//! a seed phrase; the coins of this build; and the part's self-check. Numbers cross as numbers, a
-//! place's account, branch and index whole numbers from 0, and a count of addresses NaN for the
-//! scan's default. An address names its coins, type and network itself, and a key's form its
-//! Bitcoin address profiles. An entry that takes a secret, a WIF or a phrase and its passphrase,
-//! takes its text as `JsValue`s that Rust reads (ARCHITECTURE.md §6).
+//! The wallet part for a page (`browser-wallet`): wallet evidence, each kind refused by its own
+//! constructor before any phrase is asked; the coins of this build; and the part's self-check.
+//! Places are whole numbers from 0, an address count NaN for the default. A WIF, phrase or
+//! passphrase crosses as a `JsValue` that Rust reads (ARCHITECTURE.md §6).
 
 use mnemocode::bip32::ExtendedKey;
 use mnemocode::bip39::phrase::Phrase;
