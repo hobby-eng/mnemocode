@@ -1,0 +1,1231 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-007",
+  "auditNumber": 7,
+  "date": "2026-11-16",
+  "title": "MnemoCode 0.2.0 pre-release audit: embroidery, cards and recovery",
+  "reviewer": {
+    "name": "Codex with four independent review scopes",
+    "model": null,
+    "reasoningEffort": null
+  },
+  "snapshot": {
+    "commit": "4760919b57ea9d2089f68f1427d42d9a3bcfdba9",
+    "commitComplete": true,
+    "tree": "6550c35ad7a5aedad549e7245b954bdf7c1798b6",
+    "workingTree": "112 tracked modifications at opening: 111 Rust files have only standalone comment/blank-line edits; the remaining edit is docs/RELEASING.md.",
+    "workingDiffSHA256": "09bc3d5c252f88ef3e3514568e90878094ab41c415d4ebcb6319c0c26d809053",
+    "sourceFingerprint": "9b9be4856f7bacfc50e772641a92cb783fe2adfea7363a2c071dd3427940353f",
+    "trackedFiles": 598,
+    "wasmProfiles": {
+      "dist/wasm/multi-chain/discovery-scanner": {
+        "buildId": "6344688546f46e1a",
+        "modules": [
+          "candidates"
+        ],
+        "wasmSHA256": "aa7138cfcf1e5d543453d70d5f45fd6761f7c4713509556b9b0e90b2c5102d22"
+      },
+      "dist/wasm/multi-chain/key-derivation": {
+        "buildId": "e2bcf295624d707e",
+        "modules": [
+          "phrase",
+          "wallet",
+          "qr",
+          "candidates",
+          "sskr",
+          "recovery",
+          "cards",
+          "embroidery"
+        ],
+        "wasmSHA256": "a9d5ee1bfd6c1bc8e97efc414d1e628655464b2220e0e7e0cb86bb5d66e178e1"
+      },
+      "dist/wasm/test/probe": {
+        "buildId": "d61deeddd561d99f",
+        "modules": [
+          "probe",
+          "phrase",
+          "wallet",
+          "qr",
+          "candidates",
+          "sskr",
+          "recovery",
+          "cards",
+          "embroidery"
+        ],
+        "wasmSHA256": "290b6381a54c7fcda89cafcda08ab51894c6cd939440d4816df6f9536b8a7322"
+      },
+      "dist/wasm/dash-community/key-derivation": {
+        "buildId": "8f4f3c94e94a3af7",
+        "modules": [
+          "phrase",
+          "wallet",
+          "qr",
+          "candidates",
+          "sskr",
+          "recovery",
+          "cards",
+          "embroidery"
+        ],
+        "wasmSHA256": "2adf898c5cd5c58e49bfd58b09f9195f31bf020cdf966a05b996a7487f699d4c"
+      }
+    },
+    "linuxBinarySHA256": "645cb4f6c99765c81713f71c9cb2cdf75f63945a6ad52b91ef8011e5e96ef8ee"
+  },
+  "scope": {
+    "release": "Native CLI, Rust API, embroidery, cards, hidden QR, browser WASM, tests, dependencies, release tooling, CI and documentation.",
+    "reviewScopes": [
+      "core and native secret handling",
+      "embroidery and paper recovery",
+      "WASM cards and consumer boundaries",
+      "build, packaging and independent completeness challenge"
+    ],
+    "method": "Read-only review of production sources and retained evidence plus bounded normal-path tests with public inputs. Only audit documents, harness and evidence were authored."
+  },
+  "checks": [
+    {
+      "id": "CHECK-SEC-001",
+      "title": "Threat model and secret ownership",
+      "status": "partial",
+      "assessment": "Secret owners, redacted share type and two unredacted formatters examined."
+    },
+    {
+      "id": "CHECK-SEC-002",
+      "title": "Secret Vault, CSP, sandbox, and transport",
+      "status": "partial",
+      "assessment": "Native OS gates and release WASM profiles traced. Embedding browser CSP is controlled by its consumer."
+    },
+    {
+      "id": "CHECK-SEC-003",
+      "title": "Network egress and secret guards",
+      "status": "partial",
+      "assessment": "Public executable smoke checked the Linux no-socket policy; swap detection and private output findings remain."
+    },
+    {
+      "id": "CHECK-SEC-004",
+      "title": "Randomness, encryption, and authentication",
+      "status": "partial",
+      "assessment": "Entropy, public BIP39 vectors and public share reconstruction sampled. No new independent cryptographic proof."
+    },
+    {
+      "id": "CHECK-SEC-005",
+      "title": "Secret lifecycle and exceptional paths",
+      "status": "failed",
+      "assessment": "Formatters, alternate-screen cleanup, best-effort locking and WASM ABI evidence examined."
+    },
+    {
+      "id": "CHECK-SEC-006",
+      "title": "Browser injection, persistence, and sensitive APIs",
+      "status": "partial",
+      "assessment": "WASM public bindings and QR readback considered. Consumer DOM storage is outside this release."
+    },
+    {
+      "id": "CHECK-SEC-007",
+      "title": "Read-only guarantees and availability bounds",
+      "status": "partial",
+      "assessment": "PDF input bounds, image arithmetic and render-cost exclusions assessed."
+    },
+    {
+      "id": "CHECK-FUN-001",
+      "title": "BIP39, entropy, and seed interpretation",
+      "status": "partial",
+      "assessment": "Public BIP39, Seedshift and full native self-test exercised."
+    },
+    {
+      "id": "CHECK-FUN-002",
+      "title": "HD derivation and every coin/profile",
+      "status": "partial",
+      "assessment": "Derivation used for wallet matching and fingerprints covered by native self-test. Complete external coin matrices are outside this release."
+    },
+    {
+      "id": "CHECK-FUN-003",
+      "title": "BIP85, BIP38, messages, and Silent Payments",
+      "status": "not-applicable",
+      "assessment": "Out of scope: no BIP85, BIP38 or Silent Payments feature."
+    },
+    {
+      "id": "CHECK-FUN-004",
+      "title": "Scripts, descriptors, Miniscript, and multisig",
+      "status": "not-applicable",
+      "assessment": "Out of scope: no transaction script, descriptor or multisig construction."
+    },
+    {
+      "id": "CHECK-FUN-005",
+      "title": "Transactions, PSBT version context, and commitments",
+      "status": "not-applicable",
+      "assessment": "Out of scope: no transaction construction or signing."
+    },
+    {
+      "id": "CHECK-FUN-006",
+      "title": "Recovery and backup formats",
+      "status": "partial",
+      "assessment": "Backups, two-of-three share recovery, dual-layer embroidery QR and paper manual recovery reviewed."
+    },
+    {
+      "id": "CHECK-FUN-007",
+      "title": "Discovery, providers, proofs, and accounting",
+      "status": "not-applicable",
+      "assessment": "Out of scope: no online discovery, provider or accounting service."
+    },
+    {
+      "id": "CHECK-API-001",
+      "title": "Actual dependency call contracts",
+      "status": "partial",
+      "assessment": "Rust and public WASM bindings, upstream recorder provenance and consumer metadata reviewed."
+    },
+    {
+      "id": "CHECK-API-002",
+      "title": "Async state, cancellation, and revisions",
+      "status": "partial",
+      "assessment": "CLI interruption and private-screen lifecycle reviewed. No full browser lifecycle replay."
+    },
+    {
+      "id": "CHECK-API-003",
+      "title": "Public export schema and monetary fidelity",
+      "status": "partial",
+      "assessment": "Public binding output, optional QR settings and row diagnosis inspected; monetary export is outside scope."
+    },
+    {
+      "id": "CHECK-API-004",
+      "title": "Encoding and import/export interoperability",
+      "status": "failed",
+      "assessment": "Public fixtures cover share reconstruction, card PDF and two independent QR payloads."
+    },
+    {
+      "id": "CHECK-BLD-001",
+      "title": "Manifest, flags, and feature composition",
+      "status": "partial",
+      "assessment": "Workspace manifests and feature gate inspected; ignored expensive export suites identified."
+    },
+    {
+      "id": "CHECK-BLD-002",
+      "title": "Matrix depth and runtime sampling",
+      "status": "partial",
+      "assessment": "Single-host results and retained target checks distinguished from full target execution."
+    },
+    {
+      "id": "CHECK-BLD-003",
+      "title": "Lockfiles, source provenance, and licenses",
+      "status": "partial",
+      "assessment": "RustSec, registry digests, two vendored manifests, action pins and license notices reviewed."
+    },
+    {
+      "id": "CHECK-BLD-004",
+      "title": "Canonical WASM and Docker bytes",
+      "status": "partial",
+      "assessment": "Local profile identities and historical WASM verification reviewed. No new Docker reproducibility build."
+    },
+    {
+      "id": "CHECK-BLD-005",
+      "title": "Artifacts, CI, and release workflows",
+      "status": "failed",
+      "assessment": "Release packaging, draft checking, source provenance and OpenPGP signing policy inspected."
+    },
+    {
+      "id": "CHECK-UI-001",
+      "title": "Real files and representative viewports",
+      "status": "partial",
+      "assessment": "Representative narrow portrait and dual-layer QR layouts exercised. Full template permutations excluded."
+    },
+    {
+      "id": "CHECK-UI-002",
+      "title": "Navigation, inputs, and state preservation",
+      "status": "failed",
+      "assessment": "TTY channels, wizard sheet selection and size bounds traced."
+    },
+    {
+      "id": "CHECK-UI-003",
+      "title": "Secret visibility, help, QR, and accessibility",
+      "status": "partial",
+      "assessment": "Ordinary versus hidden QR, paper-only recovery, help and disclosure surfaces reviewed."
+    },
+    {
+      "id": "CHECK-ARC-001",
+      "title": "Ownership, imports, and composition seams",
+      "status": "partial",
+      "assessment": "Crate ownership, external consumer boundary and use of external parity reference inspected."
+    },
+    {
+      "id": "CHECK-ARC-002",
+      "title": "Dead code, duplication, and false positives",
+      "status": "partial",
+      "assessment": "Copies gate and source tree inventories checked; no claim of exhaustive dead-code elimination."
+    },
+    {
+      "id": "CHECK-ARC-003",
+      "title": "Comments, tests, and production-path fidelity",
+      "status": "partial",
+      "assessment": "Working Rust edits classified by the changed lines; existing and excluded tests reviewed."
+    },
+    {
+      "id": "CHECK-DOC-001",
+      "title": "User-facing capability and safety descriptions",
+      "status": "partial",
+      "assessment": "SeedStitch paper guidance, documented security boundaries and release capability inventory compared with code."
+    },
+    {
+      "id": "CHECK-DOC-002",
+      "title": "Commands, metadata, links, and legal materials",
+      "status": "failed",
+      "assessment": "Release verification, notices, legal sidecars and missing coverage report assessed."
+    },
+    {
+      "id": "CHECK-DOC-003",
+      "title": "Audit records and evidence consistency",
+      "status": "partial",
+      "assessment": "Local evidence uses SHA-256; check statuses and schema validation are recorded with this report."
+    }
+  ],
+  "findings": [
+    {
+      "id": "AUD-007-BLD001",
+      "category": "BLD",
+      "kind": "finding",
+      "title": "The signing step can approve an incomplete draft or artifacts from a different build of this repository",
+      "severity": "high",
+      "status": "verified",
+      "releaseBlocking": true,
+      "evidence": [
+        "xtask/src/release.rs:443",
+        "xtask/src/release.rs:548",
+        ".github/workflows/release.yml:212"
+      ],
+      "reproduction": "Trace check_draft and each gh attestation verify argument before gpg.",
+      "expected": "Verify the exact five CLI filenames, their five notice files and the WASM archive. Bind each digest and the checksum manifest to the authorized release workflow, tag and source commit.",
+      "observed": "A nonempty internally consistent list of version-prefixed files is accepted. Artifact checks constrain the repository only. CI also attests the manifest, but the signer does not verify its attestation.",
+      "impact": "Someone following the documented signer can endorse an incomplete or unintended build. No draft was signed during this review.",
+      "recommendedFix": "Derive the release inventory from one explicit specification and verify provenance against the authorized workflow and immutable tag commit before invoking GPG.",
+      "requiredVerification": "Offline fixtures for missing and extra assets and incorrect provenance, plus a complete matching fixture."
+    },
+    {
+      "id": "AUD-007-API001",
+      "category": "API",
+      "kind": "finding",
+      "title": "Reusing a CardExport can put a readable backup QR on a card after hidden QR is disabled",
+      "severity": "high",
+      "status": "verified",
+      "releaseBlocking": true,
+      "evidence": [
+        "crates/mnemocode-wasm/src/cards.rs:139",
+        "crates/mnemocode-wasm/src/cards.rs:191",
+        "crates/mnemocode-wasm/src/cards.rs:215",
+        "crates/mnemocode-cards/src/sheet/frame.rs:488",
+        "AUD-007-evidence/browser-smoke.mjs (local)",
+        "AUD-007-evidence/browser-card-verified.log"
+      ],
+      "reproduction": "Create a card with ordinary QR disabled, enable hidden QR, disable it, then export on that same object. Compare with a fresh QR-disabled object. The generated WASM and its public reader completed this test on three public-fixture A6 cards.",
+      "expected": "Disabling the hidden layer restores the original ordinary-QR preference.",
+      "observed": "Enabling hidden QR overwrites card_qr. Disabling clears hidden_qr only. The sheet layout sees ordinary QR enabled and a backup payload. Public fixture returned: ordinary QR reader returned public backup, initial QR off: false after enabling and disabling hidden QR: true.",
+      "impact": "A consumer that reuses the public object may print the recoverable backup as an ordinary QR. The inspected consumer creates a fresh object; no field incident was observed.",
+      "recommendedFix": "Keep the ordinary and hidden QR preferences independent and resolve the drawing policy when exporting.",
+      "requiredVerification": "Check both starting settings, repetitions and both toggle orders through the public generated WASM binding and an ordinary scanner."
+    },
+    {
+      "id": "AUD-007-BLD002",
+      "category": "BLD",
+      "kind": "finding",
+      "title": "The parity-vector release gate can select the wrong Git repository",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "xtask/src/code_rules/deps.rs:317",
+        "AUD-007-evidence/code-gate.log",
+        "AUD-007-evidence/pinned-recorders.log"
+      ],
+      "reproduction": "Run xtask code-rules with a sibling folder containing a .git directory without a usable HEAD beneath a parent Git checkout.",
+      "expected": "Verify parity against the pinned TypeScript project or identify explicitly which prerequisite is missing.",
+      "observed": "Git resolved the parent repository. The gate failed with “not a tree object”. All seven pinned upstream recorder digests matched on an independent check.",
+      "impact": "The release gate is red on this checkout even with valid recorder bytes.",
+      "recommendedFix": "Check the canonical top level and repository identity and handle a missing checkout explicitly.",
+      "requiredVerification": "Exercise a real sibling, an absent sibling, and an incomplete nested checkout."
+    },
+    {
+      "id": "AUD-007-SEC001",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "Public diagnostic formatting exposes backup material",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "crates/mnemocode/src/backup/record.rs:54",
+        "crates/mnemocode/src/recovery/backup_check.rs:193"
+      ],
+      "reproduction": "Inspect derived Debug for Record and WrittenBackup, including borrowed strings.",
+      "expected": "Formatting a public secret-bearing type redacts its contents.",
+      "observed": "Debug prints backup contents and, for WrittenBackup, also the supplied dates.",
+      "impact": "A library consumer can persist recoverable material in diagnostic logs. No call doing so was identified in the shipping CLI.",
+      "recommendedFix": "Remove or redact Debug on both types.",
+      "requiredVerification": "Use a public fixture and check all Debug representations for the fixture values."
+    },
+    {
+      "id": "AUD-007-SEC002",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "Private-screen clearing does not cover a separate output terminal",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "crates/mnemocode-cli/src/terminal.rs:189",
+        "crates/mnemocode-cli/src/terminal/private.rs:300",
+        "crates/mnemocode-cli/src/terminal/result.rs:29",
+        "crates/mnemocode-cli/src/commands/decode.rs:281"
+      ],
+      "reproduction": "Trace alternate-screen entry, decode output and screen clearing when stdin/stderr and stdout refer to different terminals.",
+      "expected": "All screen-only sensitive output uses the terminal entered and cleared by the application.",
+      "observed": "The private screen is entered on stderr; decoded results can go to stdout. The TTY checks do not compare their device identities.",
+      "impact": "A second output terminal can retain a displayed phrase after the prompt says to clear. Intentional plain file and pipe export is a separate contract.",
+      "recommendedFix": "Route screen-only results to the private terminal or verify identical terminal devices before treating stdout as private.",
+      "requiredVerification": "Test two disjoint PTYs with a public fixture. Retest intentional piping and the ordinary shared-terminal path."
+    },
+    {
+      "id": "AUD-007-SEC003",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "An unreadable zram backing-device attribute can suppress the swap warning",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "crates/mnemocode-cli/src/os/swap.rs:104",
+        "SECURITY.md"
+      ],
+      "reproduction": "Trace the error branch for backing_dev with an unreadable sysfs attribute.",
+      "expected": "Distinguish unavailable evidence from a known RAM-only device.",
+      "observed": "Read failures take the same safe branch as a missing backing device.",
+      "impact": "The CLI can omit a useful warning on a restricted configuration.",
+      "recommendedFix": "Distinguish not-found, explicitly unbacked, and unreadable states.",
+      "requiredVerification": "Check public synthetic sysfs trees for each case."
+    },
+    {
+      "id": "AUD-007-SEC004",
+      "category": "SEC",
+      "kind": "finding",
+      "title": "Memory lock warnings can be lost on operation failure",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "crates/mnemocode-cli/src/gate.rs:119"
+      ],
+      "reproduction": "Read the ordering of command dispatch, error propagation and memory-lock reporting.",
+      "expected": "A failed lock is reported after handling secrets even when the operation later fails.",
+      "observed": "Early return from the operation bypasses the post-command lock warning.",
+      "impact": "A user may miss the reduced protection on an unsuccessful operation.",
+      "recommendedFix": "Collect lock status on all return paths while preserving the original error.",
+      "requiredVerification": "Exercise successful and failing public operations with a simulated lock failure."
+    },
+    {
+      "id": "AUD-007-FUN001",
+      "category": "FUN",
+      "kind": "finding",
+      "title": "A paper transcription of all printed columns can select the wrong SeedStitch legend format",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "crates/mnemocode-embroidery/src/chart.rs:246",
+        "crates/mnemocode-embroidery/src/legend.rs:313",
+        "docs/MANUAL_RECOVERY.md:121"
+      ],
+      "reproduction": "Compare a printed older-format legend with the parser chosen by the number of typed fields.",
+      "expected": "A person copying the fields printed on the paper can select the intended checksum and ordering rules.",
+      "observed": "Both formats print DMC; three typed fields select the ordered format even when the sheet was created using the older checksum domain.",
+      "impact": "Manual recovery from an older-format printed sheet may fail. The canonical two-column input and embedded PDF recovery remain available.",
+      "recommendedFix": "Identify the format on paper, document the exact columns per mode and address ambiguous imports explicitly.",
+      "requiredVerification": "Recover a public example of each paper format by typing what the sheet instructs, without the original PDF."
+    },
+    {
+      "id": "AUD-007-FUN002",
+      "category": "FUN",
+      "kind": "finding",
+      "title": "The physical-size picker can show its lower bound above its upper bound",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "crates/mnemocode-embroidery/src/fabric.rs:285",
+        "AUD-007-evidence/browser-smoke.mjs (local)"
+      ],
+      "reproduction": "Inspect the inward rounding of a single stitch-width interval. A 40 by 40 picture on 14-count Aida permits 40 stitches.",
+      "expected": "Both displayed endpoints form a nonempty range with an accepted width.",
+      "observed": "Independent rounding yields 7.3 cm as the lower bound and 7.2 cm as the upper bound. Public fixture returned: width interval 7.3 7.2 accepted stitches at lower endpoint 40.",
+      "impact": "A valid small drawing appears impossible to size.",
+      "recommendedFix": "Construct the displayed interval from the actual typed-width acceptance condition.",
+      "requiredVerification": "Test singleton intervals and both proposed bounds across fabric counts."
+    },
+    {
+      "id": "AUD-007-FUN003",
+      "category": "FUN",
+      "kind": "finding",
+      "title": "Embroidery sampling arithmetic can overflow on 32-bit WASM",
+      "severity": "medium",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "evidence": [
+        "crates/mnemocode-embroidery/src/picture.rs:259"
+      ],
+      "reproduction": "Inspect intermediate products in span and compare with the whole-image pixel limit and target pointer width.",
+      "expected": "Accepted dimensions yield valid sampling coordinates on native and WASM targets.",
+      "observed": "An intermediate index-times-pixels product uses usize. A pixel-count bound alone does not bound that product to 32 bits for very elongated inputs.",
+      "impact": "An accepted aspect ratio can produce incorrect sampling or an operation failure in the browser.",
+      "recommendedFix": "Use widened checked arithmetic or document and enforce dimension limits that cover the intermediate products.",
+      "requiredVerification": "Use bounded arithmetic unit tests on extreme legal dimensions, including a wasm32 target."
+    },
+    {
+      "id": "AUD-007-API002",
+      "category": "API",
+      "kind": "finding",
+      "title": "The browser embroidery PDF reader lacks the CLI whole-input bound",
+      "severity": "medium",
+      "status": "accepted",
+      "releaseBlocking": false,
+      "evidence": [
+        "crates/mnemocode-wasm/src/embroidery.rs:299",
+        "crates/mnemocode-cli/src/input.rs:145",
+        "crates/mnemocode-cards/src/pdf/piece.rs:42"
+      ],
+      "reproduction": "Compare the browser binding, shared PDF piece scanner and CLI file-admission checks.",
+      "expected": "A whole-input limit applies before large data crosses the browser binding or is scanned.",
+      "observed": "The browser path scans the supplied document. The inner piece limit does not cap the whole PDF.",
+      "impact": "A consumer assuming the CLI limit also protects the browser can exhaust tab memory. No large PDF was created or read in this audit.",
+      "recommendedFix": "Expose a binding boundary that checks the length before copying and enforces the documented PDF limit and header policy.",
+      "requiredVerification": "Boundary tests for both entry points using length-level fixtures and small representative documents."
+    },
+    {
+      "id": "AUD-007-DOC001",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "The manual overstates detection of DMC transcription changes",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "docs/SEEDSTITCH.md:73",
+        "docs/SEEDSTITCH.md:144",
+        "crates/mnemocode-embroidery/src/legend.rs:695"
+      ],
+      "reproduction": "Compare the stated protection with the inputs to the ordered legend checksum.",
+      "expected": "Specify exactly which DMC changes are detected.",
+      "observed": "A different valid DMC value preserving relative order can leave the checksum input unchanged.",
+      "impact": "A person may rely on a stronger transcription check than the paper format supplies.",
+      "recommendedFix": "Describe rank protection and its limits, preserving compatibility.",
+      "requiredVerification": "Add one rank-preserving and one rank-changing example to tests and docs."
+    },
+    {
+      "id": "AUD-007-DOC002",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "Release verification instructions do not bind success to the executable selected by the user",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "docs/CLI.md:11"
+      ],
+      "reproduction": "Read the verification steps as separate shell commands and check which filenames --ignore-missing verifies.",
+      "expected": "Failure stops the procedure and the exact executable to be run has a signed matching digest.",
+      "observed": "The commands may continue after failure. A match for a different present manifest entry does not authenticate the chosen filename.",
+      "impact": "A reader can believe the intended executable has been verified when only another file was checked.",
+      "recommendedFix": "Provide fail-fast commands matching the exact platform filename, verify its digest and require the trusted signing fingerprint.",
+      "requiredVerification": "Verify the documented instructions with the target missing, renamed, changed, and with a valid unrelated asset present."
+    },
+    {
+      "id": "AUD-007-DOC003",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "Measured release coverage has no complete published record at the reviewed snapshot",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "docs/RELEASING.md",
+        "README.md",
+        "AUD-007-evidence/inventory-check.log"
+      ],
+      "reproduction": "Check the tracked source inventory for docs/COVERAGE.md and inspect the candidate coverage run inventory.",
+      "expected": "Release documentation identifies a complete measured result, exclusions and supported scope.",
+      "observed": "Inputs match the candidate source, but the retained first-run record has no workspace test log. The reported 64.21% is partial.",
+      "impact": "There is no defensible final coverage percentage for this release.",
+      "recommendedFix": "Finish coverage on a suitable machine, publish the result with the exact scope and link it.",
+      "requiredVerification": "Verify the post-fix test log and coverage inputs against the final release tree."
+    },
+    {
+      "id": "AUD-007-BLD003",
+      "category": "BLD",
+      "kind": "finding",
+      "title": "The stand-alone WASM release archive omits distribution notices",
+      "severity": "medium",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        ".github/workflows/release.yml",
+        "THIRD_PARTY_NOTICES.md",
+        "xtask/src/release.rs:120"
+      ],
+      "reproduction": "Compare files archived for WASM with notices shipped beside native executables.",
+      "expected": "A standalone distribution carries the applicable notices required by its shipped dependencies.",
+      "observed": "The WASM archive is populated from the WASM output, which contains no license or notices. A downstream checkout supplies notices separately.",
+      "impact": "Users downloading only the WASM archive lack the included third-party attribution text.",
+      "recommendedFix": "Include the project license and relevant notices in the WASM distribution.",
+      "requiredVerification": "Inspect the final archive and verify text and provenance against the locked dependency set."
+    },
+    {
+      "id": "AUD-007-BLD004",
+      "category": "BLD",
+      "kind": "finding",
+      "title": "A standalone workflow pin check returns success after skipping the pin policy",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "xtask/src/action_pins.rs:99"
+      ],
+      "reproduction": "Compare the external workspace pin-table lookup on an isolated checkout with the local checked workspace.",
+      "expected": "Release CI confirms the pinned action table or explicitly fails when that check is mandatory.",
+      "observed": "The checker returns success when the shared table is unavailable. The populated local check passed.",
+      "impact": "A successful CI step can be mistaken for verification of the pin list.",
+      "recommendedFix": "Make the required policy available at a pinned revision or report missing policy as a release-gate failure.",
+      "requiredVerification": "Check both standalone and full-workspace layouts."
+    },
+    {
+      "id": "AUD-007-UI001",
+      "category": "UI",
+      "kind": "finding",
+      "title": "The embroidery sheet chosen in the wizard can differ from the rendered sheet",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "crates/mnemocode-cli/src/commands/pattern_questions.rs:143",
+        "crates/mnemocode-embroidery/src/chart.rs:100"
+      ],
+      "reproduction": "Follow a named sheet option when two sheets yield the same capped pattern width.",
+      "expected": "Selecting a specific sheet produces that sheet, or the menu explains that it only chooses stitch count.",
+      "observed": "The option carries only the number of stitches. The renderer independently picks the smallest sheet that fits.",
+      "impact": "The printed chart can use a different paper size than selected.",
+      "recommendedFix": "Carry the requested sheet into the renderer or label the options as pattern sizes.",
+      "requiredVerification": "Choose two sheet formats with equal pattern width and check the generated PDF MediaBox."
+    },
+    {
+      "id": "AUD-007-FUN004",
+      "category": "FUN",
+      "kind": "finding",
+      "title": "Recovery can report a unique corrected row when only the recovered payload is unique",
+      "severity": "low",
+      "status": "fixed",
+      "releaseBlocking": false,
+      "evidence": [
+        "crates/mnemocode-embroidery/src/legend.rs:525",
+        "crates/mnemocode-wasm/src/embroidery.rs:278"
+      ],
+      "reproduction": "Inspect deduplication of correction candidates for the same entropy and mask after edits to different rows.",
+      "expected": "A corrected-row index denotes a uniquely localized correction.",
+      "observed": "The candidate list keeps the first row yielding a given entropy and mask. Other rows with the same recovery are discarded.",
+      "impact": "The displayed row can misdirect a manual recheck. This does not by itself corrupt the recovered seed.",
+      "recommendedFix": "Track row ambiguity separately from payload ambiguity.",
+      "requiredVerification": "Compare recovery output and reported rows on a public fixture with multiple row-level explanations."
+    },
+    {
+      "id": "AUD-007-DOC004",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "Windows documentation promises detection of configured LocalDumps",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "SECURITY.md:34",
+        "crates/mnemocode-cli/src/os/windows.rs:144"
+      ],
+      "reproduction": "Compare the Windows protection table with the native implementation.",
+      "expected": "Describe the actual state only if the applicable policy has been queried.",
+      "observed": "The table says configured LocalDumps are reported. The implementation prints a fixed caveat about administrator-configured dumps.",
+      "impact": "A user could mistake a generic warning for an inspection of the local machine.",
+      "recommendedFix": "Qualify the documentation or inspect the effective configuration.",
+      "requiredVerification": "Verify the message against two differently configured Windows hosts."
+    },
+    {
+      "id": "AUD-007-DOC005",
+      "category": "DOC",
+      "kind": "finding",
+      "title": "Explicit path arguments have a different network-path policy than interactive input",
+      "severity": "low",
+      "status": "verified",
+      "releaseBlocking": false,
+      "evidence": [
+        "SECURITY.md:22",
+        "crates/mnemocode-cli/src/input.rs:138",
+        "crates/mnemocode-cli/src/input.rs:303"
+      ],
+      "reproduction": "Follow an explicitly supplied file path to the OS reader and compare with interactive pasted-file validation.",
+      "expected": "The offline documentation specifies which path forms are rejected and which depend on the host filesystem.",
+      "observed": "The interactive parser rejects UNC-style paths; explicit file arguments can go to normal OS file resolution. On Windows a network share is a filesystem path.",
+      "impact": "Host filesystem access can involve a network redirector despite the unconditional wording about remote file access. No live network or Windows share was tested.",
+      "recommendedFix": "Apply a consistent policy to explicit paths or document the host filesystem boundary precisely.",
+      "requiredVerification": "Use synthetic path parsing cases for both entry points, and validate behavior on Windows without real secrets."
+    }
+  ],
+  "observations": [
+    {
+      "id": "AUD-007-API003",
+      "category": "API",
+      "kind": "observation",
+      "title": "Consumer WASM assets differ from this release candidate",
+      "severity": "info",
+      "status": "accepted",
+      "releaseBlocking": false,
+      "evidence": [
+        "AUD-007-evidence/inventory-check.log",
+        "wasm-profiles.json"
+      ],
+      "reproduction": "Compare the consumer asset metadata and feature manifests against the candidate.",
+      "expected": "Before downstream deployment, verify module exports and exact bytes against its chosen version.",
+      "observed": "The current wallet-tool consumer pins different WASM bytes and expects additional exports.",
+      "impact": "Passing native tests does not certify a drop-in browser update.",
+      "recommendedFix": "Review and update the consumer pins with its own release.",
+      "requiredVerification": "Require an import-and-call check for all consumer entry points."
+    },
+    {
+      "id": "AUD-007-SEC005",
+      "category": "SEC",
+      "kind": "observation",
+      "title": "Native and browser secret protection have documented platform boundaries",
+      "severity": "info",
+      "status": "accepted",
+      "releaseBlocking": false,
+      "evidence": [
+        "SECURITY.md",
+        "crates/mnemocode-cli/src/os/windows.rs:144"
+      ],
+      "reproduction": "Compare the host operating-system safeguards with the stated secret-lifetime contract.",
+      "expected": "The release describes the guarantees it actually enforces.",
+      "observed": "Native locking is best effort. Selected large and temporary buffers are outside the lock guarantee. Windows prints a general LocalDumps caveat rather than reading the active machine policy.",
+      "impact": "Neither a library audit nor successful probe scans establish that all secret copies are locked or erased.",
+      "recommendedFix": "Keep these qualifications visible and distinguish observed OS settings from generic descriptions.",
+      "requiredVerification": "Test platform-specific claims on supported operating systems."
+    },
+    {
+      "id": "AUD-007-BLD005",
+      "category": "BLD",
+      "kind": "observation",
+      "title": "Historical standalone executable has no accompanying notice file",
+      "severity": "info",
+      "status": "accepted",
+      "releaseBlocking": false,
+      "evidence": [
+        "AUD-007-evidence/candidate-smoke.log",
+        "xtask/src/release.rs:111"
+      ],
+      "reproduction": "Run verify-executable on the preserved candidate.",
+      "expected": "Distribution of a native release includes its companion notices.",
+      "observed": "Eight runtime items pass. The check fails on the missing companion in that historical directory. The packaging code writes it.",
+      "impact": "The historical binary by itself is unsuitable for distributing as a complete release.",
+      "recommendedFix": "Distribute the output of the packaging operation and verify both files.",
+      "requiredVerification": "Repeat verify-executable on the packaged pair."
+    }
+  ],
+  "remediation": [
+    {
+      "id": "AUD-007-BLD001",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "xtask/src/release.rs: test a_draft_holds_exactly_the_files_of_a_release; sign checks the tag's commit against GitHub's and runs gh attestation verify with --signer-workflow, --source-ref, --source-digest and --deny-self-hosted-runners for every file and SHA256SUMS"
+      ]
+    },
+    {
+      "id": "AUD-007-API001",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "crates/mnemocode-wasm/src/cards.rs: test the_hidden_qr_switch_keeps_the_ordinary_choice (through the settings the sheets are drawn with)"
+      ]
+    },
+    {
+      "id": "AUD-007-BLD002",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "xtask/src/code_rules/deps.rs: test the_ts_repository_beside_is_one_git_names_as_its_own_top"
+      ]
+    },
+    {
+      "id": "AUD-007-SEC001",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "crates/mnemocode/src/backup/record.rs: test a_record_hides_its_codes_from_debug",
+        "crates/mnemocode/src/recovery/backup_check.rs: test a_written_backup_hides_itself_and_its_dates_from_debug"
+      ]
+    },
+    {
+      "id": "AUD-007-SEC002",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "crates/mnemocode-cli/tests/two_terminals.rs: test a_decoded_phrase_stays_off_a_second_terminal_on_standard_output (fails without the fix)"
+      ]
+    },
+    {
+      "id": "AUD-007-SEC003",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "crates/mnemocode-cli/src/os/swap.rs: test zram_is_safe_only_without_a_backing_device (missing device folder, missing attribute, none, a disk, unreadable attribute)"
+      ]
+    },
+    {
+      "id": "AUD-007-SEC004",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "crates/mnemocode-cli/tests/protections.rs: test a_failed_command_still_reports_memory_it_could_not_lock"
+      ]
+    },
+    {
+      "id": "AUD-007-FUN001",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "crates/mnemocode-embroidery/src/phrase.rs: test a_format_1_legend_typed_with_its_threads_reads_as_without_them",
+        "docs/MANUAL_RECOVERY.md helper: a format 1 legend typed with a DMC column reads (the reviewed helper refused it)",
+        "crates/mnemocode-cli/tests/ts_transcripts.rs: test the_bundled_guide_is_the_guide_of_the_documentation"
+      ]
+    },
+    {
+      "id": "AUD-007-FUN002",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "crates/mnemocode-embroidery/src/fabric.rs: test a_range_of_few_stitches_is_never_upside_down_or_untypable (counts 11 to 40)",
+        "crates/mnemocode-wasm/src/embroidery.rs: test the_narrowest_picture_offers_only_widths_that_are_taken_when_typed"
+      ]
+    },
+    {
+      "id": "AUD-007-FUN003",
+      "status": "fixed",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": null,
+      "evidence": [
+        "crates/mnemocode-embroidery/src/picture.rs: span computes in u64; test the_spans_of_a_very_long_side_cover_it_in_order (run on 64-bit hosts only, where the old arithmetic did not overflow either)"
+      ],
+      "note": "Not verified on wasm32: the test runs on 64-bit hosts, where the old arithmetic did not overflow either."
+    },
+    {
+      "id": "AUD-007-API002",
+      "status": "accepted",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "crates/mnemocode-wasm/src/embroidery.rs: test a_pattern_pdf_is_admitted_up_to_the_limit_of_the_command_line",
+        "docs/LIBRARY.md"
+      ],
+      "note": "Accepted: the binding refuses a PDF over stitchPdfMaxBytes (64 MiB, the command line's limit) before scanning it, but wasm-bindgen copies every byte argument into WebAssembly memory before the function runs; the page checks the file's size against stitchPdfMaxBytes before reading the file, as docs/LIBRARY.md at 74b03e9 says."
+    },
+    {
+      "id": "AUD-007-DOC001",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "docs/SEEDSTITCH.md states that format 2 sees a thread's place in DMC's order only",
+        "crates/mnemocode-embroidery/src/legend.rs: test a_misread_thread_is_noticed_only_where_its_place_moves"
+      ]
+    },
+    {
+      "id": "AUD-007-DOC002",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "docs/CLI.md: the script stops at the first failure; its digest line accepted the matching file and refused the target missing (an unrelated valid asset present), renamed and changed; its fingerprint line refused an unrelated key and accepted the key published at github.com/hobby-eng.gpg"
+      ]
+    },
+    {
+      "id": "AUD-007-DOC003",
+      "status": "verified",
+      "fixCommit": "137cf8f1bce5b08ced6e29e063bb9cb0aae9d83c",
+      "verificationCommit": "137cf8f1bce5b08ced6e29e063bb9cb0aae9d83c",
+      "evidence": [
+        "docs/COVERAGE.md: 81.07% of lines on Linux x86-64 at 74b03e9, by crate, with the command and exclusions",
+        "README.md, Source layout and review"
+      ]
+    },
+    {
+      "id": "AUD-007-BLD003",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "xtask/src/release.rs: test the_distribution_notices_exist; pack_pages copies the notices into dist/wasm"
+      ]
+    },
+    {
+      "id": "AUD-007-BLD004",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "xtask/src/action_pins.rs: test a_missing_pin_table_fails_where_required_and_other_rules_still_run"
+      ]
+    },
+    {
+      "id": "AUD-007-UI001",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "crates/mnemocode-embroidery/src/fabric.rs: test each_offered_sheet_is_the_sheet_of_its_chart"
+      ]
+    },
+    {
+      "id": "AUD-007-FUN004",
+      "status": "fixed",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": null,
+      "evidence": [
+        "crates/mnemocode-embroidery/src/legend.rs: test a_phrase_explained_by_two_rows_names_no_row (the explanation helper; no read() fixture with two explaining rows)"
+      ],
+      "note": "Not verified through read(): no public fixture with two row explanations of one phrase; the explanation helper is tested."
+    },
+    {
+      "id": "AUD-007-DOC004",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "SECURITY.md: Windows reminds of LocalDumps and does not read the setting"
+      ]
+    },
+    {
+      "id": "AUD-007-DOC005",
+      "status": "verified",
+      "fixCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "verificationCommit": "74b03e9501b7f1d0ba40bb6bc193aeccc23e0109",
+      "evidence": [
+        "crates/mnemocode-cli/src/input.rs: tests network_paths_are_told_from_local_long_forms and an_option_naming_a_network_path_is_refused_as_an_answer_is; SECURITY.md states the boundary of mounted shares"
+      ]
+    }
+  ],
+  "limitations": [
+    "Hundreds-of-templates suites explicitly excluded, including the 468-case QR layout matrix, ignored page_qr permutations and expensive large_exports. cargo xtask features would enable ignored suites. No mass PDF or page-image rendering was run.",
+    "Fresh cross-platform native execution, full release CI, duplicate Docker image builds, signed tag verification and public release signing were not performed. No tag was created.",
+    "Coverage at the inspected source snapshot has no complete record. Historical 64.21% line coverage is partial and cannot be reported as final release coverage.",
+    "One public input corpus plus focused regressions cannot establish the absence of all secret copies or layout defects. Physical print/scan behavior, Windows live policy and the complete downstream browser UI were not exercised.",
+    "Inventory coverage counts tracked files by digest. Static review and tests focus on the source paths recorded here. A file digest is not a line-by-line semantic review.",
+    "Large or interrupted checks retain their true exit status. Results from tests run more than once must not be added."
+  ],
+  "historicalEvidence": {
+    "applicability": "Historical evidence only. Matching commit trees do not independently reproduce the executable or the complete dirty-tree build.",
+    "executedTestAssertionsSummary": {
+      "passedAcrossTestSummaries": 253,
+      "failedAcrossTestSummaries": 0,
+      "overlapWithCurrent": true
+    },
+    "wasm": "The earlier continuation sums to 253 passed and zero failed across 28 test-result lines with seven ignored entries. Historical checks report 770 returns, 172 reference secrets, and a 28-row stack check. Three earlier WASM/glue SHA-256 pairs match the fresh partial run exactly. That run recorded zero remaining matches after release in six ABI checks before the thermal stop. It did not finish the complete acceptance scan.",
+    "historicalGate": "The last continuation reports a missing cargo-audit executable. The new RustSec check ran successfully. Earlier transcripts include failed and retried operations.",
+    "priorAudit": "AUD-001 records six medium and eight low issues verified fixed and one low issue deferred. This audit does not close the deferred QR time bound."
+  },
+  "execution": {
+    "browser-card-verified": {
+      "exitCode": 1,
+      "guardStop": null,
+      "logSha256": "235b33d40a0e304458567a37db83bc232728bb68d6d98c80a704899c464594e2",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "browser-smoke": {
+      "exitCode": null,
+      "guardStop": "No safe admission window within 90 seconds (temperature, memory or swap pressure)",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "candidate-smoke": {
+      "exitCode": 1,
+      "guardStop": null,
+      "logSha256": "ce84807fc2c43f97596449feef369e100f40af2212fe3d25f115b2fe35c2fbec",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "code-gate": {
+      "exitCode": 1,
+      "guardStop": null,
+      "logSha256": "0f4a58e6737c0ade86140bb887935f4acbd42386963ff4d86847acbe118a907a",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "copies": {
+      "exitCode": 0,
+      "guardStop": null,
+      "logSha256": "6099251994b7baec3b6a98269388c0d8326ab368c05aad5880833604edd32006",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "dprint-pinned": {
+      "exitCode": null,
+      "guardStop": "No safe admission window within 90 seconds (temperature, memory or swap pressure)",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "dprint": {
+      "exitCode": 1,
+      "guardStop": null,
+      "logSha256": "9ae79c04dbaf78037b0ae318e0949f1f4e14710dcbbfe1893ed8215ac5ad9e4c",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "format-docs-final": {
+      "exitCode": 0,
+      "guardStop": null,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "format": {
+      "exitCode": 0,
+      "guardStop": null,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "fresh-workspace": {
+      "exitCode": null,
+      "guardStop": "No safe admission window within 90 seconds (temperature, memory or swap pressure)",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "inventory-check": {
+      "exitCode": 0,
+      "guardStop": null,
+      "logSha256": "b848f2cf926e2b472b4762ae626cb79c59f6d37c90f29a400288f6789906ccb0",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "legend": {
+      "exitCode": 0,
+      "guardStop": null,
+      "logSha256": "14b04930a5c5fbc2e18456cb8b5ad33597bd5eedf152409431f5a876b76c5741",
+      "testsPassed": 1,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "markdown": {
+      "exitCode": 0,
+      "guardStop": null,
+      "logSha256": "72bee831ac2e5f6a13eb557feba72f78c3cb8a99890233e6067121cc75e86f91",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "notices": {
+      "exitCode": 0,
+      "guardStop": null,
+      "logSha256": "ffb95df2c8006b3836b6bf8b62a766f3514337e8f65876b68dbb78fd73a6ea8f",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "pack-linux": {
+      "exitCode": null,
+      "guardStop": "No safe admission window within 90 seconds (temperature, memory or swap pressure)",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "pinned-recorders": {
+      "exitCode": 0,
+      "guardStop": null,
+      "logSha256": "69a726239b9481d3d87cb5f78b3fd4b2d4953e59b4b2d90ea8b8d588d9db3e84",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "pins": {
+      "exitCode": 0,
+      "guardStop": null,
+      "logSha256": "2b0934385af938816fd6e907b861d4efe3fa82c46b79bf93796eb9e7c1271953",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "regular-hidden-layout": {
+      "exitCode": 0,
+      "guardStop": null,
+      "logSha256": "388f97ce53e17283030543525fb7bdbf2ded10bc01e87aea453e59f4af6f76ac",
+      "testsPassed": 1,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "rustsec": {
+      "exitCode": 0,
+      "guardStop": null,
+      "logSha256": "47442c92bbc42eedac89c55b42e647e648b6bc29ac2657e853d7d27f2e4bef1b",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "test-bin-mnemocode-cards": {
+      "exitCode": null,
+      "guardStop": "No safe admission window within 90 seconds (temperature, memory or swap pressure)",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "test-bin-mnemocode-cli": {
+      "exitCode": 255,
+      "guardStop": "Thermal guard: suspended for three minutes",
+      "logSha256": "d0c402290512b24009473c0c40dacd19e95607dbc17e6d2aad79c3c501826244",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "test-bin-mnemocode-embroidery": {
+      "exitCode": null,
+      "guardStop": "No safe admission window within 90 seconds (temperature, memory or swap pressure)",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "test-bin-mnemocode": {
+      "exitCode": 255,
+      "guardStop": "Thermal guard: suspended for three minutes",
+      "logSha256": "05d3c1c2d86fdb4b476d7d27135e6c2ab207a937bcb29032fccf00fb06748184",
+      "testsPassed": 23,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "test-bin-xtask": {
+      "exitCode": 0,
+      "guardStop": null,
+      "logSha256": "3301460f3aceed89359ca37ee11b661969b671670e989ae793ca9de757e9c619",
+      "testsPassed": 25,
+      "testsFailed": 0,
+      "testsIgnored": 1
+    },
+    "wasm-verify": {
+      "exitCode": 255,
+      "guardStop": null,
+      "logSha256": "48e31ac856deed6f0bf2a994f3a509e5756a16e912d7e883a3abc3ebca9bdadb",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "workspace-final-window": {
+      "exitCode": 124,
+      "guardStop": null,
+      "logSha256": "d7544948656c38a3782dad8c5048b9b0fd3dc4bcf9f64ac627eedbe5bde14f0b",
+      "testsPassed": 483,
+      "testsFailed": 0,
+      "testsIgnored": 8
+    },
+    "workspace-last-targets": {
+      "exitCode": 255,
+      "guardStop": "Thermal guard: suspended for three minutes",
+      "logSha256": "d7b7763d713408e083afec338d24ef1a5c87e38fd0f47c1f108b6bb0d3cecf5c",
+      "testsPassed": 25,
+      "testsFailed": 0,
+      "testsIgnored": 1
+    },
+    "workspace-remaining": {
+      "exitCode": 124,
+      "guardStop": null,
+      "logSha256": "a1a7bb8ada29807437e75b70e6bfce704bc49de02f2755f437410c0031adf771",
+      "testsPassed": 96,
+      "testsFailed": 0,
+      "testsIgnored": 4
+    },
+    "workspace-tail": {
+      "exitCode": 255,
+      "guardStop": null,
+      "logSha256": "22bf3ab140dc59125fda790eb59bb9e63ad71946a39b0822e313476df81036f5",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "workspace-tests-prepressure": {
+      "exitCode": 255,
+      "guardStop": "system memory reserve / sustained pressure",
+      "logSha256": "c4a9beec9502e425d756a3b52fa0d24d8039a68f066bc140d4668d01145904cc",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "workspace-tests-prepressure2": {
+      "exitCode": 255,
+      "guardStop": "system memory reserve / sustained pressure",
+      "logSha256": "c6130a742ab811c31d47a015162560654daeac37c0231153b41648084b9ce45f",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    },
+    "workspace-tests": {
+      "exitCode": 255,
+      "guardStop": "system memory reserve / sustained pressure",
+      "logSha256": "c82ba81864d9733f2b0d3b257e8db05452803d33bb7ca8f71a225aa6598169db",
+      "testsPassed": 0,
+      "testsFailed": 0,
+      "testsIgnored": 0
+    }
+  },
+  "resources": {
+    "memoryMaxMiB": 3200,
+    "memoryHighMiB": 2500,
+    "swapBudgetMiB": 0,
+    "minimumObservedHostAvailableMiB": 5938,
+    "maximumSampledHostTemperatureC": 100.0,
+    "sampleSeconds": 2,
+    "freezeAtC": 90,
+    "resumeAtC": 85
+  },
+  "decision": "hold",
+  "ordinaryWorkspaceTests": {
+    "completedNamedTargets": 37,
+    "totalTargets": 40,
+    "workspaceProfileArtifactMatches": 25,
+    "crateSelectedTargets": 12,
+    "passed": 604,
+    "failed": 0,
+    "ignored": 13,
+    "completedDoctestSummaries": 0,
+    "doctestCommandCompleted": false,
+    "countsDeduplicatedByCrateAndTarget": true,
+    "targetsWithoutCompleteFreshSummary": [
+      "mnemocode-cli/ts_transcripts",
+      "mnemocode-embroidery/mnemocode_embroidery",
+      "sskr-0.12.0/sskr"
+    ]
+  },
+  "remediationNotes": [
+    "The fixes are in 74b03e9, the first commit after the reviewed 4760919; it also carries the reviewed working-tree changes (comments only, and docs/RELEASING.md). The coverage record is 137cf8f.",
+    "Verification at 74b03e9 on Linux x86-64: cargo test --locked --workspace (682 passed, 14 ignored), cargo test --locked -p mnemocode-wasm --all-features (14 passed), Clippy for Linux, Windows, macOS and wasm32, rustdoc, and the code-rules, copies, markdown, notices, action-pins and dprint gates.",
+    "Documentation edit after the audit: the browser check was a Node.js script; the repository admits no Node.js (TOOL-01), so it moved to the local evidence (AUD-007-evidence/browser-smoke.mjs) and its two scenarios are Rust tests named in docs/audits/AUD-007-harnesses/README.md."
+  ]
+}

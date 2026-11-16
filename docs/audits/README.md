@@ -7,3 +7,4 @@ record; the harnesses that made its evidence stay beside it.
 | Report | Date | Scope | Result |
 | ------ | ---- | ----- | ------ |
 | [AUD-001](AUD-001-2026-11-02.md) | 2026-11-02 | Full scope of the port before 0.2.0, at `b677647`; fixes in `17da862` | No critical or high finding; 6 medium and 8 low verified fixed, 1 low deferred |
+| [AUD-007](AUD-007-2026-11-16.md) | 2026-11-16 | 0.2.0 candidate at `4760919`, embroidery, QR, native and WASM release; fixes in `74b03e9`, coverage in `137cf8f` | Two release blockers; 17 findings verified fixed, 2 low fixed without their full check, 1 medium accepted. [JSON](AUD-007-2026-11-16.json) |
