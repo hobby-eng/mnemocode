@@ -110,7 +110,7 @@ pub(crate) fn recovery_dates_prompt(word_count: Option<usize>) -> String {
 fn dates_question(word_count: Option<usize>, patterns: bool) -> String {
     if patterns {
         format!(
-            "Dates ({}{DATE_FORMAT_TEXT}, ? for what is forgotten, separated by spaces):",
+            "Dates that mask the seed phrase ({}{DATE_FORMAT_TEXT}, ? for what is forgotten, separated by spaces):",
             most_dates(word_count)
         )
     } else {

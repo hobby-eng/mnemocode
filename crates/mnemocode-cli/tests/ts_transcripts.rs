@@ -24,11 +24,11 @@ const RECORDED: &str = include_str!("../../../vectors/ts-0.1.0/transcripts-v1.js
 /// What TS's help says that differs here, each by a decision of PLAN.md's "Parity with TS 0.1.0":
 /// images need no other program, a missing folder is made, each text input has its own limit, and
 /// re-encode asks the new backup first; the stitch command is new, and Decode reads the stitch PDF.
-const WRITTEN_IN: [(&str, &str); 39] = [
-    // The guide's section 6 names who replaces a last word now: Encode's option and a pattern.
+const WRITTEN_IN: [(&str, &str); 41] = [
+    // The guide's section 6 names who replaces a last word now: Encode's option.
     (
-        "This historical mode replaced the last word of a legacy result to make its\nchecksum valid. Information was lost.",
-        "This mode replaces the last word of a legacy result to make its checksum valid,\nas `encode --legacy-valid-last-word` and a cross-stitch pattern masked with the\nOriginal Seedshift do. Information was lost.",
+        "This historical mode replaced the last word of a legacy result to make its\nchecksum valid. Information was lost. Subtract shifts modulo 2048 from the\nfirst n-1 words; the stored last word cannot uniquely recover the original.",
+        "This mode replaces the last word of a legacy result to make its checksum valid,\nas `encode --legacy-valid-last-word` does. Information was lost. Subtract shifts\nmodulo 2048 from the first n-1 words; the stored last word cannot uniquely\nrecover the original.",
     ),
     // The consolidated recovery menu names its current entry in validation errors too.
     (
@@ -119,9 +119,18 @@ const WRITTEN_IN: [(&str, &str); 39] = [
         "The BIP39 passphrase of the wallet, if it has one; the file is secret.\n",
         "The BIP39 passphrase of the wallet, if it has one; the file is secret.\n\n          The file may be up to 4 KiB.\n",
     ),
+    // A share file may be a pattern's PDF or hold legend lines; a share's legend says its mode.
     (
-        "A file of shares, one per line or with ; between them; may be\n          repeated.\n",
-        "A file of shares, one per line or with ; between them; may be\n          repeated.\n\n          Each file may be up to 64 KiB.\n",
+        "A file of shares, one per line or with ; between them; may be\n          repeated.\n\n          Use - to read standard input once. ur:sskr/..., Bytewords, word\n          numbers, Unicode codes, colors or colors as Unicode codes are detected\n          automatically; ? marks an unreadable element.\n",
+        "A file of shares, one per line or with ; between them; may be\n          repeated.\n\n          Each file may be up to 64 KiB; the PDF of a cross-stitch pattern of a\n          share, up to 64 MiB, gives the share that its legend holds.\n\n          Use - to read standard input once. ur:sskr/..., Bytewords, word\n          numbers, Unicode codes, colors, colors as Unicode codes and the legend\n          lines of patterns of shares are detected automatically; ? marks an\n          unreadable element.\n",
+    ),
+    (
+        "A PDF cannot be read; save the QR code as a PNG image first.\n",
+        "A PDF cannot be read; save the QR code as a PNG image first.\n\n          A QR code of the legend line of a cross-stitch pattern of a share is\n          read too.\n",
+    ),
+    (
+        "The mode and the dates are not stored in the shares; give the same\n          ones as for the split.\n",
+        "The mode and the dates are not stored in the shares; give the same\n          ones as for the split. The legend of a cross-stitch pattern says\n          whether its phrase was masked, and a restore that says otherwise is\n          refused.\n",
     ),
     (
         "Encrypt the list with a passphrase of 12 characters or more, read from\n          a file.\n",

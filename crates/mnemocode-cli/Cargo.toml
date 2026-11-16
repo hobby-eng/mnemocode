@@ -49,7 +49,7 @@ mnemocode-cards = { workspace = true, features = [
   "template-material-switch",
   "template-material-kitchen",
 ] }
-mnemocode-embroidery.workspace = true
+mnemocode-embroidery = { workspace = true, features = ["sskr"] }
 getrandom.workspace = true
 zeroize.workspace = true
 

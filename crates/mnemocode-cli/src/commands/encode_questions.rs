@@ -172,12 +172,6 @@ pub(crate) const WEAK: &str = "weak: only disguised, anyone with MnemoCode reads
 pub(crate) enum Takes {
     /// Either transformation.
     Either,
-    /// Either, but the original's last word is not kept: its note and the `warning` above the
-    /// answers say so, so that the owner remembers the real one.
-    LastWordLost {
-        note: &'static str,
-        warning: &'static str,
-    },
     /// Only MnemoCode Seedshift, whose result is a valid phrase again, as standard shares and the
     /// legend of a pattern need: the original stays in its place, greyed, with `why`. `unmasked`
     /// says what no Seedshift leaves.
@@ -197,22 +191,10 @@ pub(crate) fn ask_seedshift(
     takes: Takes,
 ) -> Result<Option<Mode>, Stop> {
     let mut choices = super::backup_questions::seedshift_choices();
-    let mut lines = vec![MASKS.to_owned()];
+    // One line and the link, the same for every backup; a greyed answer says why in its note.
+    let lines = vec![MASKS.to_owned()];
     let unmasked = match takes {
-        Takes::Either => {
-            lines.push(CHECKSUMS.to_owned());
-            WEAK
-        }
-        Takes::LastWordLost { note, warning } => {
-            for choice in choices
-                .iter_mut()
-                .filter(|choice| choice.value == Mode::SeedshiftLegacy)
-            {
-                choice.note = Some(note.to_owned());
-            }
-            lines.push(warning.to_owned());
-            WEAK
-        }
+        Takes::Either => WEAK,
         Takes::MnemoCodeOnly { unmasked, why } => {
             for choice in choices
                 .iter_mut()
@@ -226,7 +208,6 @@ pub(crate) fn ask_seedshift(
     };
     let mut none = Choice::noted("No Seedshift", unmasked, Mode::Direct);
     if required {
-        lines.push(ALWAYS_MASKED.to_owned());
         none.enabled = false;
         none.note = Some("not for this form, which would show the seed phrase itself".to_owned());
     }
@@ -246,6 +227,10 @@ pub(crate) enum Place {
     Legend,
     /// That line as a QR code image.
     LegendQr,
+    /// The legend lines of a pattern's shares, one to a line.
+    ShareLegends,
+    /// Those lines as QR code images, one to a share.
+    ShareLegendQr,
     ShareFile,
     QrImage,
     QrFolder,
@@ -262,6 +247,8 @@ impl Place {
             Self::Record => "text that Decode reads back",
             Self::Legend => "the legend line, which Decode reads back",
             Self::LegendQr => "the legend line in a PNG file that Decode reads back",
+            Self::ShareLegends => "every share's legend line, one to a line",
+            Self::ShareLegendQr => "one PNG per share's legend, in a new folder",
             Self::ShareFile => "one share per line",
             Self::QrImage => "a PNG file that Decode reads back",
             Self::QrFolder => "one PNG per share, in a new folder",
@@ -273,7 +260,10 @@ impl Place {
 
     /// Whether it is a QR code image, which asks how the QR code shows its data.
     const fn is_qr(self) -> bool {
-        matches!(self, Self::QrImage | Self::LegendQr | Self::QrFolder)
+        matches!(
+            self,
+            Self::QrImage | Self::LegendQr | Self::QrFolder | Self::ShareLegendQr
+        )
     }
 
     const fn name(self) -> &'static str {
@@ -281,6 +271,8 @@ impl Place {
             Self::Record => "a record file",
             Self::Legend => "a text file",
             Self::LegendQr => "a QR code image",
+            Self::ShareLegends => "a text file",
+            Self::ShareLegendQr => "QR code images",
             Self::ShareFile => "a text file",
             Self::QrImage => "a QR code image",
             Self::QrFolder => "QR code images",
@@ -297,6 +289,8 @@ impl Place {
             Self::ShareFile => ("--output", output_file("mnemocode-shares.txt")?),
             Self::QrImage => ("--qr", output_file(QR_FILE)?),
             Self::LegendQr => ("--qr", output_file(LEGEND_QR_FILE)?),
+            Self::ShareLegends => ("--output", output_file(LEGEND_FILE)?),
+            Self::ShareLegendQr => ("--qr-dir", new_folder("cross-stitch-legend-qr")?),
             Self::QrFolder => ("--qr-dir", new_folder("mnemocode-share-qr")?),
             Self::Cards(form) => {
                 return ask_cards("mnemocode-cards", false, qr_hidden, &|options| {
@@ -376,9 +370,24 @@ pub(crate) fn ask_shares(
     if format.has_cards() {
         places.push(Place::ShareCards(format));
     }
+    Ok(share_places(set, &places)?.map(|mut options| {
+        options.extend(["--share-format".to_owned(), format.name().to_owned()]);
+        options
+    }))
+}
+
+/// Where the shares of a pattern go, besides the patterns themselves: their legend lines as text
+/// and as QR code images.
+pub(crate) fn ask_pattern_shares(set: ShareSetChoice) -> Result<Option<Vec<String>>, Stop> {
+    share_places(set, &[Place::ShareLegends, Place::ShareLegendQr])
+}
+
+/// The options of the share `set`, then of the `places` its shares are saved to, as asked; none for
+/// back.
+fn share_places(set: ShareSetChoice, places: &[Place]) -> Result<Option<Vec<String>>, Stop> {
     let Some(outputs) = ask_destination(
         "Where should the shares be saved? The screen shows them in any case.",
-        &places,
+        places,
     )?
     else {
         return Ok(None);
@@ -388,8 +397,6 @@ pub(crate) fn ask_shares(
         set.threshold().to_string(),
         "--shares".to_owned(),
         set.count().to_string(),
-        "--share-format".to_owned(),
-        format.name().to_owned(),
     ];
     options.extend(outputs);
     Ok(Some(options))
@@ -407,8 +414,10 @@ enum SetAnswer {
 pub(crate) fn shares_explanation() -> Explanation {
     Explanation {
         lines: vec![
-            "Shares in this form; restoring gives it back.".to_owned(),
-            "Fewer cannot restore it, but still show its length.".to_owned(),
+            "The seed phrase is split into shares, each written in the form you chose."
+                .to_owned(),
+            "Enough of them, such as any 2 of 3, restore it; one share alone tells only how many words it has."
+                .to_owned(),
         ],
         more: vec![readme_link("splitting-a-mnemonic-into-shares")],
     }
@@ -421,7 +430,6 @@ pub(crate) fn ask_share_set(
     question: &str,
     explanation: &Explanation,
     with_no: bool,
-    closed: Option<&str>,
 ) -> Result<Option<Option<ShareSetChoice>>, Stop> {
     let mut choices = Vec::new();
     if with_no {
@@ -443,21 +451,8 @@ pub(crate) fn ask_share_set(
         &format!("type the numbers, up to {MAX_SHARES} shares"),
         SetAnswer::Other,
     ));
-    // A backup that cannot be split keeps the question, its sets greyed, and says why.
-    let mut explanation = explanation.clone();
-    if let Some(why) = closed {
-        for choice in choices
-            .iter_mut()
-            .filter(|choice| !matches!(choice.value, SetAnswer::No))
-        {
-            choice.enabled = false;
-        }
-        explanation
-            .lines
-            .push(format!("Not for this backup: {why}."));
-    }
     Ok(
-        match ask_list(question, "Shares", &choices, Some(&explanation))? {
+        match ask_list(question, "Shares", &choices, Some(explanation))? {
             None => None,
             Some(SetAnswer::No) => Some(None),
             Some(SetAnswer::Set(set)) => Some(Some(set)),
@@ -570,7 +565,7 @@ pub(crate) fn ask_heir_sheet(mode: Mode) -> Result<Option<Option<&'static str>>,
     let mut lines =
         vec!["A printed page on how to restore the backup; it holds no secret.".to_owned()];
     if !possible {
-        lines.push("Not for this backup: no sheet leads through a replaced last word.".to_owned());
+        lines.push("A backup whose last word was replaced has no sheet for heirs.".to_owned());
     }
     let explanation = Explanation {
         lines,
@@ -710,7 +705,6 @@ pub(crate) fn ask_splitting() -> Result<Option<EncodingAnswers>, Stop> {
         "How many shares, and how many of them restore the seed phrase?",
         &explanation,
         false,
-        None,
     )?;
     let Some(Some(set)) = set else {
         return Ok(None);

@@ -37,15 +37,19 @@ const EXAMPLE_ORDERED_ENTROPY: [u8; 32] = [
     0x1f, 0xa0, 0x00, 0x40, 0x0f, 0xd0, 0x00, 0x20, 0x07, 0xe8, 0x00, 0x10, 0x03, 0xf4, 0x00, 0x09,
 ];
 
-/// The check of 16 zero bytes in each format and masking: format 1 and 2, masked with either
-/// Seedshift and not, computed with Python's hashlib.
-const DOMAIN_CHECKS: [(Masking, bool, [u8; 4]); 6] = [
+/// The check of 16 zero bytes in each format and masking: format 1 and 2, a whole backup masked with
+/// either Seedshift and not, and a share masked and not, computed with Python's hashlib.
+const DOMAIN_CHECKS: [(Masking, bool, [u8; 4]); 10] = [
     (Masking::Seedshift, false, [0x22, 0xbe, 0xc2, 0x2d]),
     (Masking::Unmasked, false, [0x4b, 0x0a, 0x75, 0xea]),
     (Masking::Seedshift, true, [0xb9, 0xc6, 0xe3, 0xb7]),
     (Masking::Unmasked, true, [0xaa, 0xb9, 0x27, 0xfb]),
-    (Masking::SeedshiftLegacy, false, [0x1d, 0x57, 0xf6, 0xb0]),
-    (Masking::SeedshiftLegacy, true, [0x99, 0x81, 0xd8, 0xd4]),
+    (Masking::SeedshiftLegacy, false, [0x3c, 0xa9, 0xe6, 0x2d]),
+    (Masking::SeedshiftLegacy, true, [0x81, 0x90, 0x92, 0x74]),
+    (Masking::Share, false, [0x48, 0x37, 0x6b, 0x33]),
+    (Masking::Share, true, [0xb7, 0xbc, 0x17, 0x1a]),
+    (Masking::ShareUnmasked, false, [0x0f, 0x4b, 0x83, 0x3c]),
+    (Masking::ShareUnmasked, true, [0xa3, 0x17, 0x59, 0xc5]),
 ];
 
 /// The startup case of the row, before any secret is asked.
@@ -139,26 +143,75 @@ mod tests {
     const VOID: &str = "void come effort suffer camp survey warrior heavy shoot primary clutch crush \
                         open amazing screen patrol group space point ten exist slush involve unfold";
 
-    // The original Seedshift in a legend: read back as the record of a replaced last word, which
-    // Decode undoes with the dates into every last word the owner may have had, the real one among
-    // them.
+    /// The legend line that hides `entropy` in the sample picture.
+    fn line_of(entropy: &crate::phrase::LegendEntropy) -> mnemocode::secret::SecretText {
+        let grid = crate::picture::grid(&crate::sample::gradient_png(), 120).unwrap();
+        let hidden = crate::hide::hide(&grid, entropy, &mut Counting(0)).unwrap();
+        crate::legend::line(hidden.rows()).unwrap()
+    }
+
+    // The original Seedshift in a legend keeps every word, the last one too: it reads back as the
+    // record of the masked words themselves.
     #[test]
-    fn a_legend_of_the_original_seedshift_reads_back_with_its_last_word_open() {
+    fn a_legend_of_the_original_seedshift_reads_back_with_every_word() {
         let void = Phrase::parse(VOID).unwrap();
         let dates = [mnemocode::dates::parse_date("23-09-2026").unwrap()];
         let entropy = crate::phrase::legend_entropy(&void, Mode::SeedshiftLegacy, &dates).unwrap();
-        let grid = crate::picture::grid(&crate::sample::gradient_png(), 120).unwrap();
-        let hidden = crate::hide::hide(&grid, &entropy, &mut Counting(0)).unwrap();
-        let line = crate::legend::line(hidden.rows()).unwrap();
+        let line = line_of(&entropy);
         let read = crate::phrase::record_of_legend(line.as_str())
             .unwrap()
             .unwrap();
+        let masked = mnemocode::backup::Backup::encode(
+            &void,
+            &dates,
+            mnemocode::forms::Form::Indexes,
+            Mode::SeedshiftLegacy,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            read.record().as_str(),
+            masked.backup.record().unwrap().as_str()
+        );
+    }
+
+    // A share in each legend: one alone is refused by Decode's reading as a share, not a backup,
+    // and any two of three give the phrase back.
+    #[cfg(feature = "sskr")]
+    #[test]
+    fn any_two_of_three_share_legends_give_the_phrase_back() {
+        use mnemocode::sskr::restore::ShareSet;
+        let void = Phrase::parse(VOID).unwrap();
+        let entropies =
+            crate::phrase::share_entropies(&void, (Mode::Direct, &[]), (2, 3), &mut Counting(7))
+                .unwrap();
+        let lines: Vec<_> = entropies.iter().map(line_of).collect();
+        assert!(matches!(
+            crate::phrase::record_of_legend(lines[0].as_str()),
+            Err(crate::phrase::SeedStitchError::Share)
+        ));
+        let shares: Vec<_> = lines
+            .iter()
+            .map(|line| {
+                let read = crate::phrase::share_of_legend(line.as_str())
+                    .unwrap()
+                    .unwrap();
+                assert!(!read.masked && !read.corrected);
+                read.share.ur()
+            })
+            .collect();
+        for pair in [[0, 1], [0, 2], [1, 2]] {
+            let texts = pair.map(|at| shares[at].as_str());
+            let phrase = ShareSet::combine_phrase(&texts).unwrap();
+            assert_eq!(phrase.text().as_str(), VOID);
+        }
+        assert!(ShareSet::combine_phrase(&[shares[1].as_str()]).is_err());
+        // A whole backup's legend holds no share.
+        let whole = crate::phrase::legend_entropy(&void, Mode::Direct, &[]).unwrap();
         assert!(
-            read.record()
-                .as_str()
-                .starts_with("MNC1:seedshift-legacy-valid:indexes:"),
-            "{}",
-            read.record().as_str()
+            crate::phrase::share_of_legend(line_of(&whole).as_str())
+                .unwrap()
+                .is_none()
         );
     }
 

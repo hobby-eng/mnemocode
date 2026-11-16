@@ -219,7 +219,16 @@ The menu asks for the fabric: Aida 14 unless you choose 11, 16 or 18, or linen o
 
 Decode needs the legend and, for a masked phrase, the dates, not the picture. Give it the pattern's PDF (In a cross-stitch pattern, or `--input-file` with the PDF): the PDF keeps the legend line, compressed where no viewer shows it. Or type the legend. Type each row from the top as the symbol's number, a colon and its stitches: `28:1725 25:2163 57:3275 …`. A small pattern, too small for the phrase otherwise, also uses the order of its rows, and its line names each row's DMC number between them: `15:407:38 23:703:169 …`. The PDF shows the symbols; [the SeedStitch format](docs/SEEDSTITCH.md#the-symbols) numbers them 1 to 70, and `--output` saves the legend already typed out. A single mistyped row is corrected: Decode names the row to check on paper, or asks you to check them all where a change of any of several rows gives the same phrase. A legend of the usual form typed with the DMC numbers that its key prints reads too.
 
-A pattern is a new backup like the others: it also offers the legend line as a text file, a QR code image of it, the copies on the screen and the sheet for heirs (`--output`, `--qr`, `--show-original`, `--show-masked-words`, `--heir-sheet`). It is not split into Shamir shares. **Only the Original Seedshift loses a word in a pattern**: it keeps 11 of 12 words, or 23 of 24, since a legend holds a valid seed phrase and the last word is replaced as [`--legacy-valid-last-word`](#transformation-modes) replaces it. Remember your seed phrase's real last word. No sheet for heirs is made for such a pattern.
+A pattern is a new backup like the others: it also offers the legend line as a text file, a QR code image of it, the copies on the screen and the sheet for heirs (`--output`, `--qr`, `--show-original`, `--show-masked-words`, `--heir-sheet`). Either Seedshift keeps every word of the phrase in the legend.
+
+A pattern can also be split into [Shamir shares](#splitting-a-mnemonic-into-shares): choose a set such as 2 of 3 at "Split it into Shamir shares?", or give `--threshold` and `--shares`. MnemoCode makes one pattern per share from the same picture, numbered `share-1-pattern.pdf`, `share-2-pattern.pdf` and so on in a new folder (`--pdf-dir`). The embroideries look almost the same; their legends differ. Restore from shares reads any threshold of them back: give each pattern's PDF or type its legend line. `--output` saves every share's legend line, one per line, and `--qr-dir` a QR code image of each. Decode recognises a share's pattern and sends it to the restore. A share holds 5 bytes more than the phrase, so its pattern needs a few more threads; with too few, MnemoCode asks for another picture or size.
+
+```bash
+mnemocode stitch --ask-secrets --picture cat.jpg --threshold 2 --shares 3 \
+  --pdf-dir cat-patterns --output legends.txt
+mnemocode sskr-combine --share-file cat-patterns/share-1-pattern.pdf \
+  --share-file cat-patterns/share-3-pattern.pdf --ask-secrets
+```
 
 Treat the legend like an encoded backup: with the dates, or alone where the phrase is not masked, it gives the phrase. Keep the legend page or the legend line. A finished embroidery holds the same counts, but counting thousands of stitches by hand is no practical way back.
 

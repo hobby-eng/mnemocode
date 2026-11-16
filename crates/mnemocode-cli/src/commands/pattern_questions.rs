@@ -11,7 +11,7 @@ use mnemocode_embroidery::picture::{self, DEFAULT_WIDTH};
 use super::asking::{ask_list, ask_list_at};
 use super::encode_questions::file_questions;
 use super::given::PATH_LIMIT;
-use super::output_questions::{claim_read, input_file, output_file};
+use super::output_questions::{claim_read, input_file, new_folder, output_file};
 use crate::gate::Stop;
 use crate::input::read_picture;
 use crate::terminal::{Choice, Chosen, Explanation, LineQuestion, ask_line};
@@ -75,6 +75,11 @@ pub(crate) fn ask_pattern_own() -> Result<Option<Vec<String>>, Stop> {
 /// The pattern's PDF, named in the task's folder; none for back.
 pub(crate) fn pattern_file() -> Result<Option<Vec<String>>, Stop> {
     Ok(output_file(PATTERN_FILE)?.map(|pdf| vec!["--pdf".to_owned(), pdf]))
+}
+
+/// A new folder for the patterns of the shares, a PDF each, in the task's folder; none for back.
+pub(crate) fn pattern_folder() -> Result<Option<Vec<String>>, Stop> {
+    Ok(new_folder("cross-stitch-patterns")?.map(|folder| vec!["--pdf-dir".to_owned(), folder]))
 }
 
 /// A picture as the menu read it: its path and its upright size in pixels.

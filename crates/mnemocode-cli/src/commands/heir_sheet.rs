@@ -104,6 +104,21 @@ impl HeirRoute for MenuRoute {
         ]
     }
 
+    fn restore_patterns(&self, mode: Mode, threshold: usize, dates: Option<&str>) -> Vec<String> {
+        vec![
+            format!(
+                "Choose \"{}\". To \"{SHARE_SEEDSHIFT_QUESTION}\" answer \"{}\".",
+                shown_entry(RESTORE),
+                share_seedshift_label(mode)
+            ),
+            format!(
+                "Give the PDFs of any {threshold} patterns, one at a time, or type their legend lines, separated by \"{}\"{}. MnemoCode shows the seed phrase.",
+                mnemocode::sskr::typed::SHARE_SEPARATOR,
+                then_dates(dates)
+            ),
+        ]
+    }
+
     fn read_pattern(&self, dates: Option<&str>) -> Vec<String> {
         vec![
             format!(

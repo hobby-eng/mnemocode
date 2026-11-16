@@ -8,7 +8,7 @@ const OWN_0_4: HelpOption = HelpOption {
     value: Some("MODE"),
     summary: "seedshift when the phrase was masked before splitting",
     details: &[
-        "The mode and the dates are not stored in the shares; give the same ones as for the split.",
+        "The mode and the dates are not stored in the shares; give the same ones as for the split. The legend of a cross-stitch pattern says whether its phrase was masked, and a restore that says otherwise is refused.",
     ],
 };
 

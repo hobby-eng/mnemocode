@@ -114,10 +114,28 @@ pub(crate) fn print_lines(lines: &[ReportLine]) {
 fn share_ask<'h>(prompt: &str, what: &str, hints: &'h dyn crate::terminal::Hints) -> Ask<'h> {
     Ask {
         text_file: Some(SHARE_FILE),
+        // A pattern of a share gives its legend line, which holds the share.
+        pattern_pdf: true,
         hints: Some(hints),
         pasted_line_break: Some(SHARE_SEPARATOR_BYTE),
         ..secret_ask(prompt, what, SHARE_SET_LIMIT)
     }
+}
+
+/// The shares of `answer`, each legend line of a pattern taken for the share it holds, checked as
+/// [`ShareInput::shares_of_answer`] checks them: alone, or `adding` them to those typed. A legend
+/// whose phrase is masked, or not, where `masked` says otherwise is refused.
+fn shares_in(
+    input: &ShareInput,
+    answer: &str,
+    (adding, masked): (bool, Option<bool>),
+) -> Result<Vec<String>, String> {
+    let legends =
+        super::stitch::shares_of_legends(answer, masked).map_err(|stop| stop.message())?;
+    let answer = legends.as_ref().map_or(answer, SecretText::as_str);
+    input
+        .shares_of_answer(answer, adding)
+        .map_err(|error| error.to_string())
 }
 
 /// The shares typed, kept in memory while one of them is typed again, left out or joined by more,
@@ -130,23 +148,29 @@ pub(crate) struct TypedShares {
     pub(crate) input: ShareInput,
     /// Whether the last share came from a QR code image, so that the next is offered from one too.
     from_qr: bool,
+    /// Whether the restore takes the phrase as masked, which a pattern's legend must agree with;
+    /// none where the shares are only written again.
+    masked: Option<bool>,
 }
 
 impl TypedShares {
-    /// No shares yet.
-    fn new() -> Self {
+    /// No shares yet, of a phrase `masked` or not where a restore says so.
+    fn new(masked: Option<bool>) -> Self {
         Self {
             input: ShareInput::new(DECODE_ENTRY),
             from_qr: false,
+            masked,
         }
     }
 
     /// The shares after `first`, one given where another question asked (Decode): it is checked as
     /// a typed share is, shown when it came from a QR code image, and the others are asked for when
     /// the restore finds it too few.
-    pub(crate) fn starting_with(first: &FirstShare) -> Result<Self, Stop> {
-        let mut shares = Self::new();
-        let parts = shares.input.shares_of_answer(first.text.as_str(), false)?;
+    pub(crate) fn starting_with(first: &FirstShare, masked: Option<bool>) -> Result<Self, Stop> {
+        let mut shares = Self::new(masked);
+        let legends = super::stitch::shares_of_legends(first.text.as_str(), masked)?;
+        let first_text = legends.as_ref().unwrap_or(&first.text);
+        let parts = shares.input.shares_of_answer(first_text.as_str(), false)?;
         shares.input.add(&parts)?;
         if first.from_qr {
             shares.from_qr = true;
@@ -157,26 +181,35 @@ impl TypedShares {
     }
 
     /// The shares of the options, the files and the QR images.
-    fn given(parsed: &Parsed) -> Result<Self, Stop> {
+    fn given(parsed: &Parsed, masked: Option<bool>) -> Result<Self, Stop> {
         let files = values(parsed, "share-file");
         if files.iter().filter(|path| **path == "-").count() > 1 {
             return Err(ShareSourceError::StandardInputOnce.into());
         }
-        let mut shares = Self::new();
+        let mut shares = Self::new(masked);
         shares.input.add(&values(parsed, "share"))?;
         for path in files {
-            let text = if path == "-" {
-                read_input_text(path, "The text input", SHARE_SET_LIMIT)?
-            } else {
-                read_input_path(Path::new(path), SHARE_FILE, SHARE_SET_LIMIT, false)?
+            // A pattern's PDF gives the legend line it keeps.
+            let pattern = match path {
+                "-" => None,
+                path => crate::input::pattern_legend(Path::new(path))?,
             };
+            let text = match pattern {
+                Some(line) => line,
+                None if path == "-" => read_input_text(path, "The text input", SHARE_SET_LIMIT)?,
+                None => read_input_path(Path::new(path), SHARE_FILE, SHARE_SET_LIMIT, false)?,
+            };
+            let legends = super::stitch::shares_of_legends(text.as_str(), masked)?;
+            let text = legends.unwrap_or(text);
             let parts = shares.input.shares_of_text(&text, "The file holds")?;
             shares.input.add(&parts)?;
         }
         for path in values(parsed, "share-qr") {
+            let text = read_qr_path(Path::new(path), false)?;
+            let legend = super::stitch::shares_of_legends(text.as_str(), masked)?;
             shares
                 .input
-                .add(&[read_qr_path(Path::new(path), false)?.as_str()])?;
+                .add(&[legend.as_ref().unwrap_or(&text).as_str()])?;
         }
         if shares.input.list().is_empty() {
             return Err(ShareSourceError::NoShare.into());
@@ -184,13 +217,14 @@ impl TypedShares {
         Ok(shares)
     }
 
-    /// Asks on the private screen or reads the options.
-    pub(crate) fn read(parsed: &Parsed) -> Result<Self, Stop> {
+    /// Asks on the private screen or reads the options; a restore says whether it takes the phrase
+    /// as `masked`.
+    pub(crate) fn read(parsed: &Parsed, masked: Option<bool>) -> Result<Self, Stop> {
         if !is_on(parsed, "ask-secrets") {
-            return Self::given(parsed);
+            return Self::given(parsed, masked);
         }
         assert_asked_not_given(parsed, &SHARE_SOURCE_OPTIONS)?;
-        let mut shares = Self::new();
+        let mut shares = Self::new(masked);
         shares.ask_all()?;
         Ok(shares)
     }
@@ -206,7 +240,10 @@ impl TypedShares {
         let prompt = format!("Shamir shares or text file path ({}):", share_answer_hint());
         let ask = share_ask(&prompt, "the shares or their text file path", &hints);
         let input = &self.input;
-        let texts = secret_until(&ask, |answer: &str| input.shares_of_answer(answer, false))?;
+        let masked = self.masked;
+        let texts = secret_until(&ask, |answer: &str| {
+            shares_in(input, answer, (false, masked))
+        })?;
         self.from_qr = false;
         self.input.replace_all(&texts)?;
         self.retype_unreadable()
@@ -232,7 +269,10 @@ impl TypedShares {
         let prompt = format!("More shares or text file path ({}):", separator_hint());
         let ask = share_ask(&prompt, "the shares to add", &hints);
         let input = &self.input;
-        secret_until(&ask, |answer: &str| input.shares_of_answer(answer, true))
+        let masked = self.masked;
+        secret_until(&ask, |answer: &str| {
+            shares_in(input, answer, (true, masked))
+        })
     }
 
     /// The next share read from a QR code image, or more shares typed, as the person chooses;
@@ -251,9 +291,7 @@ impl TypedShares {
                 |answer: &str| -> Result<Vec<String>, String> {
                     let text =
                         read_qr_path(&dropped_path(answer), true).map_err(|stop| stop.message())?;
-                    input
-                        .shares_of_answer(text.as_str(), true)
-                        .map_err(|error| error.to_string())
+                    shares_in(input, text.as_str(), (true, self.masked))
                 },
             )?;
             if let Some(texts) = texts {
@@ -318,11 +356,9 @@ impl TypedShares {
                 pasted_line_break: None,
                 ..share_ask(&prompt, &what, &hints)
             };
-            let input = &self.input;
+            let (input, masked) = (&self.input, self.masked);
             let text = secret_until(&ask, |answer: &str| -> Result<String, String> {
-                let mut parts = input
-                    .shares_of_answer(answer, false)
-                    .map_err(|error| error.to_string())?;
+                let mut parts = shares_in(input, answer, (false, masked))?;
                 if parts.len() != 1 {
                     return Err(
                         "Give one share here, or a text file containing just that share."

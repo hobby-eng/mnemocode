@@ -373,9 +373,10 @@ pub(crate) fn ask_encoded_backup(question: BackupQuestion<'_>) -> Result<ReadBac
     let mut problem = None;
     loop {
         let text = source.next(problem.take())?;
-        // A SeedStitch legend stands for the record of the masked phrase it holds.
-        let text = match super::stitch::record_of_legend(text.as_str()) {
-            Ok(record) => record.unwrap_or(text),
+        // A SeedStitch legend stands for the record of the masked phrase it holds, or for its share.
+        let (read, typed) = match super::stitch::text_of_legend(text.as_str()) {
+            Ok(Some(read)) => (read, Some(text)),
+            Ok(None) => (text, None),
             Err(stop @ Stop::Refused(_)) => {
                 question_ended();
                 problem = Some(stop.message());
@@ -383,7 +384,11 @@ pub(crate) fn ask_encoded_backup(question: BackupQuestion<'_>) -> Result<ReadBac
             }
             Err(stop) => return Err(stop),
         };
-        match checked_backup(&text, question, &source)? {
+        match checked_backup(&read, question, &source)? {
+            // The legend goes to the restore as typed, which checks what it says of Seedshift.
+            Ok(ReadBackup::Share(_, from_qr)) if let Some(typed) = typed => {
+                return Ok(ReadBackup::Share(typed, from_qr));
+            }
             Ok(read) => return Ok(read),
             Err(Again(reason)) => {
                 // What was kept for the questions about these codes goes with them.

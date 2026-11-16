@@ -546,7 +546,7 @@ fn configure_rejects_conflicting_options_and_requires_private_input() {
             written.contains("Use --configure with --ask-secrets"),
             "{written}"
         );
-        assert!(!written.contains("Dates ("), "{written}");
+        assert!(!written.contains("Dates that mask"), "{written}");
     }
 }
 

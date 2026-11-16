@@ -598,8 +598,8 @@ pub(super) const SHARE_FILE: HelpOption = HelpOption {
     value: Some("PATH"),
     summary: "A file of shares, one per line or with ; between them; may be repeated",
     details: &[
-        "Each file may be up to 64 KiB.",
-        "Use - to read standard input once. ur:sskr/..., Bytewords, word numbers, Unicode codes, colors or colors as Unicode codes are detected automatically; ? marks an unreadable element.",
+        "Each file may be up to 64 KiB; the PDF of a cross-stitch pattern of a share, up to 64 MiB, gives the share that its legend holds.",
+        "Use - to read standard input once. ur:sskr/..., Bytewords, word numbers, Unicode codes, colors, colors as Unicode codes and the legend lines of patterns of shares are detected automatically; ? marks an unreadable element.",
     ],
 };
 
@@ -607,7 +607,10 @@ pub(super) const SHARE_QR: HelpOption = HelpOption {
     flag: "--share-qr",
     value: Some("PNG"),
     summary: "A QR code of one share in a PNG image; may be repeated",
-    details: &["A PDF cannot be read; save the QR code as a PNG image first."],
+    details: &[
+        "A PDF cannot be read; save the QR code as a PNG image first.",
+        "A QR code of the legend line of a cross-stitch pattern of a share is read too.",
+    ],
 };
 
 pub(super) const ASK_SECRETS_2: HelpOption = HelpOption {

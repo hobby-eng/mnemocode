@@ -462,7 +462,7 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
     if let Some(refusal) = repair_refusal(settings.mode, settings.wallet.check.is_some()) {
         return Err(ExportError::Refused(refusal.to_owned()).into());
     }
-    let shares = TypedShares::read(parsed)?;
+    let shares = TypedShares::read(parsed, None)?;
     let mut r = settings.with_shares(shares, false);
     let mut output = ExportOutput {
         given,

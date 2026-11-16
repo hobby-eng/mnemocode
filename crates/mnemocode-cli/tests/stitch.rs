@@ -256,47 +256,32 @@ fn a_pattern_saves_and_shows_what_every_new_backup_does() {
     );
 }
 
-// The original Seedshift in a pattern: every word but the last is kept, the warning says so, and
-// Decode gives every last word the owner may have had, the real phrase among them. No sheet for
-// heirs leads through a replaced last word.
+// The original Seedshift in a pattern keeps every word, the last one too: no warning, Decode gives
+// the phrase itself, and the sheet for heirs is made as for any pattern.
 #[test]
-fn a_pattern_of_the_original_seedshift_keeps_all_but_the_last_word() {
+fn a_pattern_of_the_original_seedshift_keeps_every_word() {
     let folder = with_picture("stitch-original");
-    let legacy = [
-        "--mode",
-        "seedshift-legacy",
-        "--picture",
-        PICTURE,
-        "--stitches-across",
-        "120",
-    ];
     let made = run(
         &folder,
-        &stitch(
-            &[
-                &legacy[..],
-                &["--pdf", "pattern.pdf", "--output", "legend.txt"],
-            ]
-            .concat(),
-        ),
+        &stitch(&[
+            "--mode",
+            "seedshift-legacy",
+            "--picture",
+            PICTURE,
+            "--stitches-across",
+            "120",
+            "--pdf",
+            "pattern.pdf",
+            "--output",
+            "legend.txt",
+            "--heir-sheet",
+            "heirs.pdf",
+        ]),
     );
     let errors = String::from_utf8_lossy(&made.stderr);
     assert_eq!(made.status.code(), Some(0), "{errors}");
-    assert!(
-        errors.contains("Only the Original Seedshift loses a word")
-            && errors.contains("keeps 11 of the 12 words")
-            && errors.contains("real last word"),
-        "{errors}"
-    );
-    // What Encode says of a replaced last word: the link, and the words it names with the
-    // result, in the stream that holds the legend.
-    assert!(errors.contains("#transformation-modes"), "{errors}");
-    let result = if errors.contains("Legend line") {
-        errors.clone().into_owned()
-    } else {
-        String::from_utf8_lossy(&made.stdout).into_owned()
-    };
-    assert!(result.contains("decoding lists the candidates"), "{result}");
+    assert!(!errors.contains("last word"), "{errors}");
+    assert!(read(&folder, "heirs.pdf").starts_with(PDF_START));
     let decoded = run(
         &folder,
         &[
@@ -314,17 +299,136 @@ fn a_pattern_of_the_original_seedshift_keeps_all_but_the_last_word() {
         "{}",
         String::from_utf8_lossy(&decoded.stderr)
     );
-    assert_eq!(output.lines().count(), 128, "{output}");
-    assert!(output.contains(PUBLIC_MNEMONIC), "{output}");
+    assert_eq!(output.matches(PUBLIC_MNEMONIC).count(), 1, "{output}");
+    assert!(!output.contains("candidates"), "{output}");
+}
+
+/// Restores the public phrase from the shares of patterns in `files`, text files of legend lines or
+/// the patterns' PDFs; its exit code and what it wrote.
+fn restored(folder: &Path, files: &[&str]) -> (Option<i32>, String) {
+    let mut args = vec!["sskr-combine", "--mode", "seedshift", "--dates-file", DATES];
+    for file in files {
+        args.extend(["--share-file", file]);
+    }
+    let output = run(folder, &args);
+    let written = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    (output.status.code(), written)
+}
+
+// One pattern a Shamir share, all from the same picture: any two of three restore the phrase, from
+// their legend lines or from their PDFs, and one alone does not.
+#[test]
+fn any_two_of_three_patterns_of_shares_restore_the_phrase() {
+    let folder = with_picture("stitch-shares");
+    let output = run(
+        &folder,
+        &stitch(&[
+            "--picture",
+            PICTURE,
+            "--threshold",
+            "2",
+            "--shares",
+            "3",
+            "--pdf-dir",
+            "patterns",
+            "--output",
+            "legends.txt",
+            "--qr-dir",
+            "legend-qr",
+        ]),
+    );
+    let shown = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(output.status.code(), Some(0), "{shown}");
+    assert!(shown.contains("Share 3 of 3"), "{shown}");
+    for place in 1..=3 {
+        let pdf = read(&folder, &format!("patterns/share-{place}-pattern.pdf"));
+        assert!(pdf.starts_with(PDF_START));
+        assert!(
+            folder
+                .join(format!("legend-qr/share-{place}-qr.png"))
+                .is_file()
+        );
+    }
+    let legends = String::from_utf8(read(&folder, "legends.txt")).expect("text");
+    let lines: Vec<&str> = legends.lines().collect();
+    assert_eq!(lines.len(), 3);
+    assert!(lines[0] != lines[1] && lines[1] != lines[2]);
+    fs::write(
+        folder.join("two.txt"),
+        format!("{}\n{}\n", lines[0], lines[2]),
+    )
+    .expect("written");
+    let (code, written) = restored(&folder, &["two.txt"]);
+    assert_eq!(code, Some(0), "{written}");
+    assert!(written.contains(PUBLIC_MNEMONIC), "{written}");
+    let pdfs = [
+        "patterns/share-2-pattern.pdf",
+        "patterns/share-3-pattern.pdf",
+    ];
+    let (code, written) = restored(&folder, &pdfs);
+    assert_eq!(code, Some(0), "{written}");
+    assert!(written.contains(PUBLIC_MNEMONIC), "{written}");
+    fs::write(folder.join("one.txt"), lines[1]).expect("written");
+    let (code, written) = restored(&folder, &["one.txt"]);
+    assert_ne!(code, Some(0), "{written}");
+    assert!(!written.contains(PUBLIC_MNEMONIC), "{written}");
+    // A legend copied from the screen, wrapped over several lines, is one share again.
+    let rows: Vec<&str> = lines[1].split(' ').collect();
+    let (top, rest) = rows.split_at(rows.len() / 2);
+    let wrapped = format!(
+        "\u{feff}{}\n{}\n{}\n",
+        top.join(" "),
+        rest.join(" "),
+        lines[0]
+    );
+    fs::write(folder.join("wrapped.txt"), wrapped).expect("written");
+    let (code, written) = restored(&folder, &["wrapped.txt"]);
+    assert_eq!(code, Some(0), "{written}");
+    assert!(written.contains(PUBLIC_MNEMONIC), "{written}");
+    // The legends say that Seedshift masked the phrase: a restore without it is refused.
+    let output = run(
+        &folder,
+        &[
+            "sskr-combine",
+            "--mode",
+            "direct",
+            "--share-file",
+            "two.txt",
+        ],
+    );
+    let written = String::from_utf8_lossy(&output.stderr);
+    assert_ne!(output.status.code(), Some(0), "{written}");
+    assert!(written.contains("masked with Seedshift"), "{written}");
+}
+
+// With shares every pattern has its own files: the options of one pattern are refused, and so are
+// those of shares without a set, all before the phrase is read.
+#[test]
+fn the_options_of_one_pattern_and_of_shares_do_not_mix() {
+    let folder = with_picture("stitch-share-options");
+    let set = ["--picture", PICTURE, "--threshold", "2", "--shares", "3"];
     assert_refused(
         &folder,
-        &stitch(
-            &[
-                &legacy[..],
-                &["--pdf", "heirs-pattern.pdf", "--heir-sheet", "heirs.pdf"],
-            ]
-            .concat(),
-        ),
-        "sheet",
+        &stitch(&[&set[..], &["--pdf", "p.pdf"]].concat()),
+        "not --pdf",
+    );
+    assert_refused(&folder, &stitch(&set), "--pdf-dir PATH");
+    assert_refused(
+        &folder,
+        &stitch(&["--picture", PICTURE, "--pdf-dir", "patterns"]),
+        "add --threshold and --shares",
+    );
+    assert_refused(
+        &folder,
+        &stitch(&[&set[..], &["--pdf-dir", "p", "--mode", "seedshift-legacy"]].concat()),
+        "",
     );
 }

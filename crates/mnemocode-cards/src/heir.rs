@@ -530,6 +530,14 @@ pub enum HeirBackup {
         /// How many words the seed phrase has.
         words: usize,
     },
+    /// Shamir shares of the seed phrase, one in the legend of each cross-stitch pattern.
+    #[cfg(feature = "sskr")]
+    PatternShares {
+        /// How many of the patterns restore the seed phrase.
+        threshold: usize,
+        /// How many patterns were made.
+        count: usize,
+    },
     /// Shamir shares of the seed phrase.
     #[cfg(feature = "sskr")]
     Shares {
@@ -567,6 +575,12 @@ pub trait HeirRoute {
     fn decode(&self, mode: Mode, words: usize, dates: Option<&str>) -> Vec<String>;
     /// The steps that open the restore from shares and type `threshold` of them, then `dates`.
     fn restore(&self, mode: Mode, threshold: usize, dates: Option<&str>) -> Vec<String>;
+    /// The steps that restore the seed phrase from `threshold` cross-stitch patterns, a share each,
+    /// in `mode`, then `dates`: by default those of [`HeirRoute::restore`].
+    #[cfg(feature = "sskr")]
+    fn restore_patterns(&self, mode: Mode, threshold: usize, dates: Option<&str>) -> Vec<String> {
+        self.restore(mode, threshold, dates)
+    }
     /// The steps that read the legend of a cross-stitch pattern back, then `dates`.
     fn read_pattern(&self, dates: Option<&str>) -> Vec<String> {
         vec![
@@ -657,6 +671,20 @@ fn backup_words(backup: HeirBackup, mode: Mode) -> Result<BackupWords, HeirError
                     format!("The backup: {PATTERN_LOOK}."),
                     format!("The seed phrase has {words} words."),
                 ],
+                plain_phrase: false,
+                trouble: vec![PATTERN_TROUBLE.to_owned()],
+            })
+        }
+        #[cfg(feature = "sskr")]
+        HeirBackup::PatternShares { threshold, count } => {
+            if !is_recorded_quorum(threshold, count) {
+                return Err(HeirError::Quorum);
+            }
+            mode.check_split()?;
+            Ok(BackupWords {
+                needs: vec![format!(
+                    "Any {threshold} of the {count} cross-stitch patterns in DMC threads; the table of each one's threads, the floss key, holds a Shamir share in its rows' symbols and stitch counts."
+                )],
                 plain_phrase: false,
                 trouble: vec![PATTERN_TROUBLE.to_owned()],
             })
@@ -881,6 +909,10 @@ pub fn heir_sheet_text(
             }
             HeirBackup::Pattern { .. } => {
                 steps.extend(route.read_pattern(typed_dates.as_deref()));
+            }
+            #[cfg(feature = "sskr")]
+            HeirBackup::PatternShares { threshold, .. } => {
+                steps.extend(route.restore_patterns(mode, threshold, typed_dates.as_deref()));
             }
             #[cfg(feature = "sskr")]
             HeirBackup::Shares { threshold, .. } => {

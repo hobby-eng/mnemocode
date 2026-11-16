@@ -3,7 +3,7 @@
 use super::super::{CommandHelp, HelpGroup, HelpOption};
 use super::options::{
     ASK_SECRETS, DATES, DATES_FILE, HEIR_SHEET, HEIR_SHEET_SIZE, MNEMONIC, MNEMONIC_FILE, QR,
-    QR_HIDDEN, QR_TEXT, SHOW_MASKED_WORDS, SHOW_ORIGINAL,
+    QR_HIDDEN, QR_TEXT, SHARES, SHOW_MASKED_WORDS, SHOW_ORIGINAL, THRESHOLD,
 };
 
 const MODE: HelpOption = HelpOption {
@@ -12,7 +12,7 @@ const MODE: HelpOption = HelpOption {
     summary: "seedshift (default), seedshift-legacy or direct",
     details: &[
         "seedshift masks the phrase with the dates, as Encode does; Decode asks for them. direct hides the phrase itself, for one protected some other way: anyone who knows MnemoCode reads it from the legend.",
-        "seedshift-legacy is the original Seedshift, whose result usually fails the checksum: the pattern keeps every word but the last, which is replaced as --legacy-valid-last-word replaces it. Remember the seed phrase's real last word; Decode offers the possible ones. No sheet for heirs.",
+        "seedshift-legacy is the original Seedshift: the pattern keeps every masked word, and Decode asks for the same dates. It cannot be split into shares.",
     ],
 };
 const PICTURE: HelpOption = HelpOption {
@@ -47,7 +47,23 @@ const OUTPUT: HelpOption = HelpOption {
     flag: "--output",
     value: Some("PATH"),
     summary: "Also save the legend as Decode reads it back, one line of text",
-    details: &[],
+    details: &["With --shares, every share's legend line, one to a line."],
+};
+const PDF_DIR: HelpOption = HelpOption {
+    flag: "--pdf-dir",
+    value: Some("NEW_FOLDER"),
+    summary: "With --shares, save one pattern a share in a new folder",
+    details: &[
+        "Files are share-1-pattern.pdf, share-2-pattern.pdf and so on, all from the same picture, so that they look alike. The folder holds every share: keep the patterns apart. A taken folder name is numbered, never replaced.",
+    ],
+};
+const LEGEND_QR_DIR: HelpOption = HelpOption {
+    flag: "--qr-dir",
+    value: Some("NEW_FOLDER"),
+    summary: "With --shares, save each share's legend line as a PNG QR image in a new folder",
+    details: &[
+        "Files are share-1-qr.png, share-2-qr.png and so on; sskr-combine --share-qr reads them. --qr-hidden and --qr-text apply to each.",
+    ],
 };
 
 pub(in super::super) const PAGE: CommandHelp = CommandHelp {
@@ -55,8 +71,9 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
     about: &[
         "Masks an English BIP39 phrase with dates, as seedshift mode does, unless --mode direct, and hides it in the legend of a cross-stitch pattern made from a picture: the symbol of each thread and the last digits of its count of stitches (SeedStitch). The pattern is an ordinary chart in DMC threads; nothing on it names MnemoCode.",
         "Decode reads the legend back without the picture: type its rows as each symbol's number, a colon and the stitches, from the top, then give the dates if it asks for them. A pattern too small for the phrase otherwise uses the rows' order too, and each row names its DMC number between them, as 15:407:38. Decode also reads the pattern's PDF itself, which keeps the legend line where no viewer shows it: decode --input-file pattern.pdf.",
+        "With --threshold and --shares the phrase is split into Shamir shares (SSKR), as sskr-split splits it, and each share is hidden in a pattern of its own, all made from the same picture. sskr-combine restores the phrase from any threshold of them: their PDFs, their legend lines or their QR images. A share holds 5 bytes more than the phrase, so its pattern needs a few more threads.",
     ],
-    usage: "(--configure --ask-secrets | --picture <PATH> --pdf <PATH> [OPTIONS] (--ask-secrets | --mnemonic-file <PATH>))",
+    usage: "(--configure --ask-secrets | --picture <PATH> (--pdf <PATH> | --threshold <N> --shares <M> --pdf-dir <NEW_FOLDER>) [OPTIONS] (--ask-secrets | --mnemonic-file <PATH>))",
     groups: &[
         HelpGroup {
             heading: "The phrase and the dates:",
@@ -73,6 +90,10 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
         HelpGroup {
             heading: "The pattern:",
             options: &[&[&PICTURE, &STITCHES_ACROSS, &FABRIC, &PDF]],
+        },
+        HelpGroup {
+            heading: "Shamir shares, a pattern each (see mnemocode help sskr-combine to restore):",
+            options: &[&[&THRESHOLD, &SHARES, &PDF_DIR, &LEGEND_QR_DIR]],
         },
         HelpGroup {
             heading: "What else is saved and shown, as for every new backup:",
@@ -96,6 +117,10 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
         (
             "mnemocode stitch --ask-secrets --picture cat.jpg --pdf cat-pattern.pdf",
             "A pattern of 200 stitches across",
+        ),
+        (
+            "mnemocode stitch --ask-secrets --picture cat.jpg --threshold 2 --shares 3 --pdf-dir cat-patterns",
+            "Three patterns, any two of which restore the phrase",
         ),
         (
             "mnemocode decode --ask-secrets",

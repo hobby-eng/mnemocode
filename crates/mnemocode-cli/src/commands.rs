@@ -53,6 +53,8 @@ pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) struct Command {
     /// Its name.
     pub(crate) name: &'static str,
+    /// What its private screen is headed with: the menu's name of the task.
+    pub(crate) title: &'static str,
     /// The options it takes, by the groups they are kept in.
     pub(crate) options: &'static [&'static [&'static str]],
     /// Whether it takes or shows a secret: it then runs behind the gate, on the private screen.
@@ -88,6 +90,8 @@ const BACKUP_OPTIONS: &[&[&str]] = &[
 pub(crate) const COMMANDS: [Command; 14] = [
     Command {
         name: "qr-open",
+
+        title: "Read a hidden QR record",
         options: &[&hidden_qr::OPEN_OPTIONS],
         secret: true,
         run: Run::Options(hidden_qr::open),
@@ -95,6 +99,8 @@ pub(crate) const COMMANDS: [Command; 14] = [
     },
     Command {
         name: "qr-hide",
+
+        title: "Hide a record in a QR code",
         options: &[&hidden_qr::OPTIONS],
         secret: true,
         run: Run::Options(hidden_qr::run),
@@ -102,6 +108,8 @@ pub(crate) const COMMANDS: [Command; 14] = [
     },
     Command {
         name: "encode",
+
+        title: "Encode",
         options: &[&configure::OPTIONS],
         secret: true,
         run: Run::Ruling(encode::run),
@@ -109,6 +117,8 @@ pub(crate) const COMMANDS: [Command; 14] = [
     },
     Command {
         name: "decode",
+
+        title: "Decode",
         options: &[&decode::OPTIONS],
         secret: true,
         run: Run::Options(decode::run),
@@ -116,6 +126,8 @@ pub(crate) const COMMANDS: [Command; 14] = [
     },
     Command {
         name: "re-encode",
+
+        title: "Re-encode",
         options: &[
             &re_encode::OLD_OPTIONS,
             &wallet_options::WALLET_EVIDENCE_OPTIONS,
@@ -126,6 +138,8 @@ pub(crate) const COMMANDS: [Command; 14] = [
     },
     Command {
         name: "recover-date",
+
+        title: "Recovery",
         options: &[&recover_date::OPTIONS],
         secret: true,
         run: Run::Options(recover_date::run),
@@ -133,6 +147,8 @@ pub(crate) const COMMANDS: [Command; 14] = [
     },
     Command {
         name: "recover-word",
+
+        title: "Recovery",
         options: &[&recover_word::OPTIONS],
         secret: true,
         run: Run::Options(recover_word::run),
@@ -140,6 +156,8 @@ pub(crate) const COMMANDS: [Command; 14] = [
     },
     Command {
         name: "sskr-combine",
+
+        title: "Restore from shares",
         options: &[&sskr_combine::OPTIONS],
         secret: true,
         run: Run::Options(sskr_combine::run),
@@ -147,6 +165,8 @@ pub(crate) const COMMANDS: [Command; 14] = [
     },
     Command {
         name: "sskr-export",
+
+        title: "Restore from shares",
         options: &[
             &sskr_export::OPTIONS,
             &wallet_options::WALLET_EVIDENCE_OPTIONS,
@@ -159,6 +179,8 @@ pub(crate) const COMMANDS: [Command; 14] = [
     },
     Command {
         name: "sskr-split",
+
+        title: "Split into shares",
         options: &[&sskr_split::OPTIONS, &cards::CARD_OPTIONS, &["card-layout"]],
         secret: true,
         run: Run::Options(sskr_split::run),
@@ -166,6 +188,8 @@ pub(crate) const COMMANDS: [Command; 14] = [
     },
     Command {
         name: "stitch",
+
+        title: "Embroidery",
         options: &[&configure::OPTIONS, &stitch::OPTIONS],
         secret: true,
         run: Run::Ruling(stitch::run),
@@ -173,6 +197,8 @@ pub(crate) const COMMANDS: [Command; 14] = [
     },
     Command {
         name: "preview",
+
+        title: "Preview cards",
         options: &[&preview::OPTIONS],
         secret: false,
         run: Run::Options(preview::run),
@@ -180,6 +206,8 @@ pub(crate) const COMMANDS: [Command; 14] = [
     },
     Command {
         name: "table",
+
+        title: "Word lookup",
         options: &[&table::OPTIONS],
         secret: false,
         run: Run::Options(table::run),
@@ -187,6 +215,8 @@ pub(crate) const COMMANDS: [Command; 14] = [
     },
     Command {
         name: "self-test",
+
+        title: "Self-test",
         options: &[],
         secret: false,
         run: Run::SelfTest(self_test::run),

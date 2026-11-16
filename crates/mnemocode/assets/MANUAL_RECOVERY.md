@@ -145,8 +145,10 @@ and SHA-256, so use the helper `manual_seedstitch.py` of section 7 on a trusted
 offline computer. It prints the word numbers and says whether the phrase is
 masked. A masked phrase is then reversed with its dates as mode `seedshift`
 (sections 2 to 4, or `manual_seedshift.py`), or, where the helper says the Original
-Seedshift masked it, as mode `seedshift-legacy-valid` (section 6); an unmasked one
-is the phrase itself.
+Seedshift masked it, as mode `seedshift-legacy` (section 5); an unmasked one
+is the phrase itself. A pattern of a Shamir share gives the share's bytes instead:
+enough shares of the set restore the phrase with an SSKR tool, and then the dates
+undo the mask as above.
 If the line does not read, a row was misread: check each symbol and count against
 the key. MnemoCode itself corrects one misread row.
 
@@ -283,9 +285,9 @@ because ((4 - 1 + 23) mod 2048) + 1 = 27. MnemoCode Seedshift instead ends in 37
 ## 6. Replaced legacy last word: mode `seedshift-legacy-valid`
 
 This mode replaces the last word of a legacy result to make its checksum valid,
-as `encode --legacy-valid-last-word` and a cross-stitch pattern masked with the
-Original Seedshift do. Information was lost. Subtract shifts modulo 2048 from the
-first n-1 words; the stored last word cannot uniquely recover the original.
+as `encode --legacy-valid-last-word` does. Information was lost. Subtract shifts
+modulo 2048 from the first n-1 words; the stored last word cannot uniquely
+recover the original.
 
 List every last word that completes those recovered first words with a valid
 BIP39 checksum. There are 128, 64, 32, 16 or 8 possibilities for 12, 15, 18,
@@ -366,9 +368,9 @@ Save the following code as `manual_seedstitch.py` and run it the same way. It
 takes the legend line, each row as `symbol:stitches` or `symbol:DMC:stitches` from
 the top of the key down, on one line or several, ended by an empty line; or the
 path of the pattern's PDF, which keeps the line. It prints the word numbers and
-whether they are masked with Seedshift. It does
-not correct a misread row; check the rows instead. Its output is recovery
-material, so clear it when finished.
+whether they are masked with Seedshift, or, for a pattern of a Shamir share, the
+share's bytes. It does not correct a misread row; check the rows instead. Its
+output is recovery material, so clear it when finished.
 
 ```python
 import hashlib
@@ -376,7 +378,18 @@ import os
 import re
 import zlib
 
-LENGTHS = {16: 12, 20: 15, 24: 18, 28: 21, 32: 24}
+# What a legend may hold: its domain's ending, its lengths in bytes with the phrase's words, and
+# what it is.
+ENTROPY = {16: 12, 20: 15, 24: 18, 28: 21, 32: 24}
+WORDS = {17: 12, 21: 15, 25: 18, 29: 21, 33: 24}
+SHARE = {21: 12, 25: 15, 29: 18, 33: 21, 37: 24}
+DOMAINS = [
+    (b"", ENTROPY, "masked with Seedshift: undo it with the dates"),
+    (b" unmasked", ENTROPY, "not masked: these are the phrase's own words"),
+    (b" original", WORDS, "masked with the Original Seedshift: undo it as section 5 says"),
+    (b" share", SHARE, "one Shamir share of a phrase masked with Seedshift"),
+    (b" share unmasked", SHARE, "one Shamir share of the phrase itself"),
+]
 
 
 def line_of_pdf(path):
@@ -453,20 +466,15 @@ def readings(ordered):
         n = n * (70 - i) + ranks[i]
         if ordered:
             n = n * (len(rows) - i) + places[i]
-    version = b"2" if ordered else b"1"
-    domains = {
-        b"MnemoCode embroidery " + version: "masked with Seedshift: undo it with the dates",
-        b"MnemoCode embroidery " + version + b" legacy": "masked with the Original Seedshift, its last word replaced: undo it as section 6 says; the real last word is the owner's",
-        b"MnemoCode embroidery " + version + b" unmasked": "not masked: these are the phrase's own words",
-    }
+    domain = b"MnemoCode embroidery " + (b"2" if ordered else b"1")
     found = []
-    for length, words in LENGTHS.items():
-        payload = n % (1 << (8 * length + 32))
-        entropy = (payload >> 32).to_bytes(length, "big")
-        check = (payload & 0xFFFFFFFF).to_bytes(4, "big")
-        for domain, meaning in domains.items():
-            if hashlib.sha256(domain + bytes([length]) + entropy).digest()[:4] == check:
-                found.append((entropy, words, meaning))
+    for ending, lengths, meaning in DOMAINS:
+        for length, words in lengths.items():
+            payload = n % (1 << (8 * length + 32))
+            held = (payload >> 32).to_bytes(length, "big")
+            check = (payload & 0xFFFFFFFF).to_bytes(4, "big")
+            if hashlib.sha256(domain + ending + bytes([length]) + held).digest()[:4] == check:
+                found.append((held, words, ending, meaning))
     return found
 
 
@@ -476,13 +484,22 @@ if not found and len(rows[0]) == 3:
     found = readings(False)
 if len(found) != 1:
     raise ValueError("The legend does not read: check each row's symbol, thread and stitches.")
-entropy, words, meaning = found[0]
-checksum_bits = words // 3
-bits = f"{int.from_bytes(entropy, 'big'):0{len(entropy) * 8}b}"
-bits += f"{hashlib.sha256(entropy).digest()[0] >> (8 - checksum_bits):0{checksum_bits}b}"
-numbers = [int(bits[k:k + 11], 2) + 1 for k in range(0, len(bits), 11)]
-print("Word numbers:", " ".join(str(number) for number in numbers))
-print("The phrase is", meaning)
+held, words, ending, meaning = found[0]
+bits = f"{int.from_bytes(held, 'big'):0{len(held) * 8}b}"
+if ending.startswith(b" share"):
+    # Header and value as SSKR writes a share; enough shares of the set restore the phrase.
+    print("Share bytes:", held.hex())
+    print("The legend holds", meaning, "of", words, "words")
+else:
+    if ending == b" original":
+        if int(bits[11 * words:] or "0", 2):
+            raise ValueError("The legend does not read: check each row's symbol, thread and stitches.")
+    else:
+        checksum_bits = words // 3
+        bits += f"{hashlib.sha256(held).digest()[0] >> (8 - checksum_bits):0{checksum_bits}b}"
+    numbers = [int(bits[k:k + 11], 2) + 1 for k in range(0, 11 * words, 11)]
+    print("Word numbers:", " ".join(str(number) for number in numbers))
+    print("The phrase is", meaning)
 ```
 
 For the example of section 1, it prints the numbers above and says that the phrase

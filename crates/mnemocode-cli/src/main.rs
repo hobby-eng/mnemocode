@@ -182,7 +182,7 @@ fn run_command_line(argv: &[String], protection: &mut Protection) -> Result<(), 
         Run::SelfTest(run) => run(protection),
     };
     if command.secret {
-        return gate::run_secret(protection, &parsed, command.name, true, body);
+        return gate::run_secret(protection, &parsed, command.title, true, body);
     }
     body(protection)?;
     output::report_renamed();

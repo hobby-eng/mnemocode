@@ -397,8 +397,13 @@ pub(crate) fn assert_private_file_sources(parsed: &Parsed) -> Result<(), ArgsErr
 
 /// The options that name a file to save, and those that name a new folder to save into.
 pub(crate) const FILE_OUTPUTS: [&str; 5] = ["output", "pdf", "qr", "heir-sheet", "candidates-file"];
-pub(crate) const FOLDER_OUTPUTS: [&str; 4] =
-    ["cards-dir", "images-dir", "word-lists-dir", "qr-dir"];
+pub(crate) const FOLDER_OUTPUTS: [&str; 5] = [
+    "cards-dir",
+    "images-dir",
+    "word-lists-dir",
+    "qr-dir",
+    "pdf-dir",
+];
 
 /// The label of an option in a sentence; "unknown option" for any other name.
 pub(crate) fn option_label(key: &str) -> &'static str {
@@ -419,7 +424,7 @@ pub(crate) fn option_value(key: &str) -> String {
 }
 
 /// How each option is named in a sentence (TS 0.1.0's OPTION_LABELS).
-const OPTION_LABELS: [(&str, &str); 100] = [
+const OPTION_LABELS: [(&str, &str); 101] = [
     ("card-name", "card name"),
     ("card-role", "card role"),
     ("card-company", "card company"),
@@ -497,6 +502,7 @@ const OPTION_LABELS: [(&str, &str); 100] = [
     ("fabric", "fabric count"),
     ("page-size", "page size"),
     ("pdf", "PDF output file"),
+    ("pdf-dir", "pattern PDF output folder"),
     ("picture", "picture file"),
     ("progress-every", "progress interval"),
     ("qr", "QR output file"),

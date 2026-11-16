@@ -140,6 +140,7 @@ pub(crate) const fn folder_taken(key: &str) -> &'static str {
             "The image folder already exists. Choose a new folder for the exported images."
         }
         b"word-lists-dir" => "Choose a new folder for the word-list set.",
+        b"pdf-dir" => "Choose a new folder for the patterns of the shares.",
         _ => "Choose a new folder for the share QR images.",
     }
 }

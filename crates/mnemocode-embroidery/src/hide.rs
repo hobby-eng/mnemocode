@@ -13,7 +13,7 @@ use zeroize::Zeroizing;
 
 use crate::color::Lab;
 use crate::dmc::{THREADS, Thread};
-use crate::legend::{self, ENTROPY_LENGTHS, Masking, ONE_DIGIT_FROM, Row, TWO_DIGITS_FROM};
+use crate::legend::{self, Masking, ONE_DIGIT_FROM, Row, TWO_DIGITS_FROM};
 use crate::pattern::Pattern;
 use crate::phrase::LegendEntropy;
 use crate::picture::Grid;
@@ -171,7 +171,7 @@ pub fn hide(
 ) -> Result<Hidden, HideError> {
     let masking = entropy.masking();
     let entropy = entropy.bytes();
-    if !ENTROPY_LENGTHS.contains(&entropy.len()) {
+    if !masking.lengths().contains(&entropy.len()) {
         return Err(HideError::NotAnEntropy);
     }
     let needed = legend::payload_bits(entropy.len()) as f64;

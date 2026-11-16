@@ -18,5 +18,10 @@ sha2.workspace = true
 zeroize.workspace = true
 zune-jpeg.workspace = true
 
+[features]
+default = []
+# Patterns of SSKR shares, one share to a legend: written and read back as shares.
+sskr = ["mnemocode/sskr"]
+
 [lints]
 workspace = true

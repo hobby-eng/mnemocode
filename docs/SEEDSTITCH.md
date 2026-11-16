@@ -1,6 +1,7 @@
 # SeedStitch, formats 1 and 2
 
-SeedStitch hides the entropy of a BIP39 phrase in the legend of a cross-stitch pattern. The pattern
+SeedStitch hides a BIP39 phrase in the legend of a cross-stitch pattern: its entropy, its masked
+word numbers, or one Shamir share of it. The pattern
 is an ordinary chart made from any picture: DMC threads, a symbol for each thread, a count of
 stitches for each. The phrase lies in which symbol each row of the legend was given and in the
 last digits of its stitch count. Format 2 adds the order of the rows. A legend is read back alone:
@@ -9,7 +10,9 @@ the picture, the chart and the finished embroidery are not needed.
 The format is public, so anyone who knows it can read a legend. MnemoCode therefore masks the
 phrase with [Seedshift](SEEDSHIFT_CONSTRUCTION.md) dates and asks for them when it reads the legend
 back. Only where the person chooses, for a phrase protected some other way, does it hide the phrase
-itself. The check tells a reader which, so dates are asked for only where they were used.
+itself. The check tells a reader which, so dates are asked for only where they were used. A
+share's legend says the same of the phrase its set holds, and the restore from shares holds to
+it.
 
 MnemoCode writes format 1 wherever it holds the phrase, since its legend lists the threads by DMC
 number as most charts do. Format 2 is for patterns too small or too plain for format 1, such as 60
@@ -57,19 +60,28 @@ before one that corrects a misread row.
 6. The number `N` is built from the last row up, starting from 0: for row `i`, first
    `N = N * m_i + d_i` where `m_i` is above 1, then `N = N * (71 - i) + q_i`, and in format 2 then
    `N = N * (n + 1 - i) + p_i`, `n` being the number of rows.
-7. For each entropy length `L` of 16, 20, 24, 28 and 32 bytes, take `P = N mod 2^(8L + 32)`. Its
-   upper `8L` bits, as `L` bytes most significant first, are the candidate entropy `E`; its lower 32
+7. For each domain below and each length `L` it takes, take `P = N mod 2^(8L + 32)`. Its upper
+   `8L` bits, as `L` bytes most significant first, are what the legend may hold, `E`; its lower 32
    bits, as 4 bytes most significant first, are the check `C`. The length is right when `C` equals
-   the first 4 bytes of SHA-256 of a domain, then the one byte `L`, then `E`. The domain is the
-   ASCII text `MnemoCode embroidery 1` for a phrase masked with MnemoCode Seedshift,
-   `MnemoCode embroidery 1 legacy` for one masked with the Original Seedshift, and
-   `MnemoCode embroidery 1 unmasked` for the phrase itself; in format 2 the `1` is a `2`.
-8. Exactly one length, with one domain, must be right. `E` is the entropy of a BIP39 phrase of 12,
-   15, 18, 21 or 24 words; its checksum word follows from it as BIP39 defines. The domain says
-   whether the phrase is masked, and with which Seedshift: only then are the dates asked for. The
-   Original Seedshift's result usually fails the checksum, so its last word was replaced by one
-   that keeps it, as `encode --legacy-valid-last-word` does: undoing the dates gives every word
-   but the last, and every last word the owner may have had, of which the owner knows the real one.
+   the first 4 bytes of SHA-256 of the domain, then the one byte `L`, then `E`. The domains are
+   ASCII texts; in format 2 their `1` is a `2`:
+   - `MnemoCode embroidery 1` for a phrase masked with MnemoCode Seedshift, and
+     `MnemoCode embroidery 1 unmasked` for the phrase itself: `L` is 16, 20, 24, 28 or 32 bytes,
+     the phrase's entropy.
+   - `MnemoCode embroidery 1 original` for a phrase masked with the Original Seedshift: `L` is 17,
+     21, 25, 29 or 33 bytes, the number of each masked word from 0 to 2047 in 11 bits, most
+     significant first, the last byte filled with zero bits.
+   - `MnemoCode embroidery 1 share` for a Shamir share of a phrase masked with MnemoCode Seedshift,
+     and `MnemoCode embroidery 1 share unmasked` for a share of the phrase itself: `L` is 21, 25,
+     29, 33 or 37 bytes, the share as SSKR writes it, its 5 bytes of header and its value.
+8. Exactly one length, with one domain, must be right. The domain says whether the phrase is
+   masked, and with which Seedshift: only then are the dates asked for. No domain followed by the
+   byte of one of its lengths begins another domain followed by one of that domain's lengths, so
+   one hash never stands for two readings. A phrase's entropy gives a
+   BIP39 phrase of 12, 15, 18, 21 or 24 words, its checksum word following as BIP39 defines. The
+   Original Seedshift's result usually fails the checksum, so its words are kept whole: every one,
+   the last too, and the filling bits must be zero. A share gives no phrase alone: any threshold of
+   the shares of its set restore it, as SSKR restores shares, each read from its own legend.
 
 ### A row read wrong
 
@@ -84,8 +96,8 @@ number that names another thread makes the legend fail to read where it changes 
 reads as before where it keeps it, so a misread DMC number is not always noticed. With one row
 misread in one of these ways the true phrase is always among the results, so a wrong phrase cannot
 come out alone; the risk lies in mistakes the search does not cover, such as two rows wrong or a row
-left out, which pass the check about once in 95,000: a legend of 28 rows is tried some 15,000 ways,
-each against a check of 32 bits in three domains.
+left out, which pass the check about once in 11,000: a legend of 28 rows is tried some 15,000 ways,
+each against a check of 32 bits for each of the five domains and their five lengths.
 
 ## Writing a legend
 

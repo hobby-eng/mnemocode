@@ -239,8 +239,8 @@ pub(crate) fn encoded_input_from_question(parsed: &Parsed) -> Result<SecretText,
 
 fn encoded_input_at(parsed: &Parsed, regular_only: bool) -> Result<SecretText, Stop> {
     let text = encoded_text(parsed, regular_only)?;
-    // A SeedStitch legend stands for the record of the masked phrase it holds.
-    Ok(super::stitch::record_of_legend(text.as_str())?.unwrap_or(text))
+    // A SeedStitch legend stands for the record of the masked phrase it holds, or for its share.
+    Ok(super::stitch::text_of_legend(text.as_str())?.unwrap_or(text))
 }
 
 /// The text of --input, --input-file or --qr-file, as given.
@@ -461,7 +461,7 @@ pub(crate) fn most_dates(word_count: Option<usize>) -> String {
 /// The question for the dates of a phrase of `word_count` words.
 pub(crate) fn dates_prompt(word_count: Option<usize>) -> String {
     format!(
-        "Dates ({}{DATE_FORMAT_TEXT}, separated by spaces):",
+        "Dates that mask the seed phrase ({}{DATE_FORMAT_TEXT}, separated by spaces):",
         most_dates(word_count)
     )
 }
@@ -608,11 +608,11 @@ mod tests {
         assert!(input_format("6").is_err());
         assert_eq!(
             dates_prompt(Some(12)),
-            "Dates (up to 4, DD-MM-YYYY, separated by spaces):"
+            "Dates that mask the seed phrase (up to 4, DD-MM-YYYY, separated by spaces):"
         );
         assert_eq!(
             dates_prompt(None),
-            "Dates (DD-MM-YYYY, separated by spaces):"
+            "Dates that mask the seed phrase (DD-MM-YYYY, separated by spaces):"
         );
     }
 }

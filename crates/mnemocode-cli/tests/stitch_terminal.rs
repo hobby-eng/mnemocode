@@ -39,6 +39,28 @@ fn file(name: &str) -> PathBuf {
     Path::new(env!("CARGO_TARGET_TMPDIR")).join(name)
 }
 
+/// The menu's Embroidery up to the size of the pattern: the questions of every new backup,
+/// MnemoCode Seedshift with `dates`, then the pattern's own, the `picture` and Aida 14.
+fn at_the_pattern_size(picture: &Path, dates: &str) -> Session {
+    let mut session = Session::start(PROGRAM, &[]);
+    session.wait_for("What do you want to do?");
+    session.press("1");
+    session.wait_for("Which form should the seed phrase take?");
+    session.press("6");
+    session.wait_for("Use Seedshift?");
+    session.wait_for("only they turn it back");
+    session.press("1");
+    session.wait_for("DD-MM-YYYY, separated by spaces):");
+    session.wait_for(" to cancel");
+    session.press(&format!("{dates}\r"));
+    session.wait_for("Picture file name");
+    session.press(&format!("{}\r", picture.display()));
+    session.wait_for("Which fabric?");
+    session.press("\r");
+    session.wait_for("How large, on Aida 14?");
+    session
+}
+
 #[test]
 fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen() {
     // The picture bears the pattern's usual name: the pattern takes the next numbered one rather
@@ -49,29 +71,13 @@ fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen(
     let picture = folder.join("cross-stitch-pattern.pdf");
     fs::write(&picture, mnemocode_embroidery::sample::gradient_png()).expect("a picture");
     let pdf = folder.join("cross-stitch-pattern_1.pdf");
-    let mut session = Session::start(PROGRAM, &[]);
-    session.wait_for("What do you want to do?");
-    session.press("1");
-    session.wait_for("Which form should the seed phrase take?");
-    session.press("6");
-    // The questions of every new backup; the original Seedshift says that the pattern keeps
-    // every word but the last.
-    session.wait_for("Use Seedshift?");
-    session.wait_for("Only the Original Seedshift loses a word here");
-    session.wait_for("keeps all but the last word: remember it");
-    session.press("1");
-    session.wait_for("DD-MM-YYYY, separated by spaces):");
-    session.wait_for(" to cancel");
-    session.press("23-09-2026 22-09-2026 21-09-2026 20-09-2026 19-09-2026\r");
-    // Then the pattern's own: the picture, the fabric and the size.
-    session.wait_for("Picture file name");
-    session.press(&format!("{}\r", picture.display()));
     // Aida 14 first, then the sizes, each with the stitches that the picture of 240 by 160 pixels
     // takes in it inside the print margin, A4 turned to hold it larger; a width in centimetres
     // within the picture's own.
-    session.wait_for("Which fabric?");
-    session.press("\r");
-    session.wait_for("How large, on Aida 14?");
+    let mut session = at_the_pattern_size(
+        &picture,
+        "23-09-2026 22-09-2026 21-09-2026 20-09-2026 19-09-2026",
+    );
     session.wait_for("A4, 21 x 29.7 cm");
     session.wait_for("152 x 101 stitches, 27.6 x 18.3 cm");
     session.press("6");
@@ -80,10 +86,10 @@ fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen(
     session.press("5\r");
     session.wait_for("Type a number of centimetres from 7.3 to 43.7.");
     session.press("21.9\r");
-    // Back in the common block: shares greyed, the copies on the screen, the sheet for heirs, and
-    // last where it is saved, the folder of the task's files asked once for the pattern's PDF.
+    // Back in the common block: shares, the copies on the screen, the sheet for heirs, and last
+    // where it is saved, the folder of the task's files asked once for the pattern's PDF.
     session.wait_for("Split it into Shamir shares?");
-    session.wait_for("a pattern's legend holds one seed phrase, not shares");
+    session.wait_for("2 of 3");
     session.press("1");
     session.wait_for("Also show the original seed phrase, before Seedshift?");
     session.press("1");
@@ -113,6 +119,48 @@ fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen(
     let outside = written.rsplit(LEAVE_PRIVATE_SCREEN).next().expect("a part");
     assert!(!outside.contains("abandon"), "{outside}");
     assert!(!outside.contains("23-09-2026"), "{outside}");
+}
+
+// Shares in the menu's embroidery: the same block of questions, a set chosen, and one pattern a
+// share saved in a new folder of the task's folder, with their legend lines in one text file.
+#[test]
+fn the_menu_makes_a_pattern_a_share() {
+    let folder = file("menu-stitch-shares");
+    let _absent = fs::remove_dir_all(&folder);
+    fs::create_dir_all(&folder).expect("a folder");
+    let picture = folder.join("picture.png");
+    fs::write(&picture, mnemocode_embroidery::sample::gradient_png()).expect("a picture");
+    let mut session = at_the_pattern_size(&picture, "23-09-2026");
+    session.press("1");
+    session.wait_for("Split it into Shamir shares?");
+    session.press("2");
+    session.wait_for("Also show the original seed phrase, before Seedshift?");
+    session.press("1");
+    session.wait_for("Also show the Seedshift phrase as English words?");
+    session.press("1");
+    session.wait_for("Instructions for your heirs?");
+    session.press("1");
+    session.wait_for("Where should the shares be saved?");
+    session.wait_for("every share's legend line, one to a line");
+    session.press(" ");
+    session.press("\r");
+    session.wait_for("Folder for the files");
+    session.press(&format!("{}\r", folder.display()));
+    session.wait_for(" to cancel");
+    session.press(&format!("{PHRASE}\r"));
+    session.wait_for("Share 3 of 3");
+    // The three legends take more than a screen, turned page by page.
+    session.wait_for("Enter done");
+    session.press("\r");
+    let written = cleared_and_quit(session);
+    for place in 1..=3 {
+        let pattern = folder.join(format!("cross-stitch-patterns/share-{place}-pattern.pdf"));
+        assert!(fs::read(&pattern).expect("a pattern").starts_with(b"%PDF-"));
+    }
+    let legends = fs::read_to_string(folder.join("cross-stitch-legend.txt")).expect("legends");
+    assert_eq!(legends.lines().count(), 3, "{legends}");
+    let outside = written.rsplit(LEAVE_PRIVATE_SCREEN).next().expect("a part");
+    assert!(!outside.contains("abandon"), "{outside}");
 }
 
 #[test]

@@ -12,15 +12,12 @@ use super::asking::ask_list;
 use super::encode::ORIGINAL_COPY_FORM;
 use super::encode_questions::{
     EncodingAnswers, Place, Takes, ask_copy_destination, ask_heir_sheet, ask_original_copy,
-    ask_seedshift, ask_share_set, ask_shares, heir_sheet_files, shares_explanation,
+    ask_pattern_shares, ask_seedshift, ask_share_set, ask_shares, heir_sheet_files,
+    shares_explanation,
 };
 use super::given::format_number;
 use crate::gate::Stop;
 use crate::terminal::{Choice, Explanation};
-
-/// What a pattern made with the original Seedshift keeps, said where it is chosen and with the
-/// result.
-pub(crate) const LAST_WORD_WARNING: &str = "Only the Original Seedshift loses a word here: a pattern then keeps 11 of 12 words, or 23 of 24. Remember your seed phrase's real last word.";
 
 /// Options that a way asks or names for itself; none for back.
 type Own = fn() -> Result<Option<Vec<String>>, Stop>;
@@ -35,41 +32,11 @@ pub(crate) enum Way {
 }
 
 impl Way {
-    /// Which Seedshift it takes. A legend holds the entropy of a valid phrase, which the original
-    /// Seedshift's result usually is not: its last word is replaced, and the owner keeps the real
-    /// one.
-    const fn takes(self) -> Takes {
-        match self {
-            Self::Form(_) => Takes::Either,
-            Self::Embroidery => Takes::LastWordLost {
-                note: "keeps all but the last word: remember it",
-                warning: LAST_WORD_WARNING,
-            },
-        }
-    }
-
-    /// The mode its backup is made in for `mode` chosen: a pattern's original Seedshift replaces
-    /// the last word, which no sheet for heirs leads through.
-    fn kept(self, mode: Mode) -> Mode {
-        match self {
-            Self::Form(_) => mode,
-            Self::Embroidery => mode.with_valid_last_word().unwrap_or(mode),
-        }
-    }
-
     /// Whether it is always masked: unmasked, the form would show the seed phrase itself.
     const fn always_masked(self) -> bool {
         match self {
             Self::Form(form) => form.always_masked(),
             Self::Embroidery => false,
-        }
-    }
-
-    /// Why it cannot be split into Shamir shares; none where it can.
-    const fn unsplittable(self) -> Option<&'static str> {
-        match self {
-            Self::Form(_) => None,
-            Self::Embroidery => Some("a pattern's legend holds one seed phrase, not shares"),
         }
     }
 
@@ -124,7 +91,7 @@ impl Way {
 /// The new backup made the `way` chosen: the common block, with the way's own questions after the
 /// dates; the command line and the dates kept apart from it, or none for back.
 pub(crate) fn ask_new_backup(way: Way) -> Result<Option<EncodingAnswers>, Stop> {
-    let Some(mode) = ask_seedshift("Use Seedshift?", way.always_masked(), way.takes())? else {
+    let Some(mode) = ask_seedshift("Use Seedshift?", way.always_masked(), Takes::Either)? else {
         return Ok(None);
     };
     let dates = super::given::ask_encoding_dates(mode)?;
@@ -134,7 +101,7 @@ pub(crate) fn ask_new_backup(way: Way) -> Result<Option<EncodingAnswers>, Stop> 
     // The original Seedshift cannot be split into shares (mnemocode encode --help).
     let set = if mode.capabilities().split {
         let question = "Split it into Shamir shares?";
-        match ask_share_set(question, &shares_explanation(), true, way.unsplittable())? {
+        match ask_share_set(question, &shares_explanation(), true)? {
             Some(set) => set,
             None => return Ok(None),
         }
@@ -146,7 +113,7 @@ pub(crate) fn ask_new_backup(way: Way) -> Result<Option<EncodingAnswers>, Stop> 
     let Some(shown) = ask_copies(mode, set.is_some(), words_already)? else {
         return Ok(None);
     };
-    let Some(heir_size) = ask_heir_sheet(way.kept(mode))? else {
+    let Some(heir_size) = ask_heir_sheet(mode)? else {
         return Ok(None);
     };
     // Where it is saved comes last, just before the seed phrase; then the files the answers
@@ -168,13 +135,24 @@ pub(crate) fn ask_new_backup(way: Way) -> Result<Option<EncodingAnswers>, Stop> 
                 run
             })
         }
-        // Its sets are greyed: a pattern is never split.
-        (Some(_), Way::Embroidery) => None,
+        // One pattern to a share, from the same picture.
+        (Some(set), Way::Embroidery) => ask_pattern_shares(set)?.map(|shares| {
+            let mut run = way.command(mode);
+            run.extend(own);
+            run.extend(shares);
+            run
+        }),
     };
     let Some(mut run) = run else {
         return Ok(None);
     };
-    let Some(files) = way.pattern_only(super::pattern_questions::pattern_file)? else {
+    // A pattern's PDF, or with shares a new folder of one PDF a share.
+    let pattern = if set.is_some() {
+        super::pattern_questions::pattern_folder
+    } else {
+        super::pattern_questions::pattern_file
+    };
+    let Some(files) = way.pattern_only(pattern)? else {
         return Ok(None);
     };
     let Some(heirs) = heir_sheet_files(heir_size)? else {
@@ -221,7 +199,7 @@ fn ask_masked_words(words_already: bool) -> Result<Option<bool>, Stop> {
     if words_already {
         yes.enabled = false;
         yes.note = Some("the backup is these words already".to_owned());
-        lines.push("Not for this backup: its codes are the masked words.".to_owned());
+        lines.push("Your backup is written in these masked words already.".to_owned());
     }
     let explanation = (!lines.is_empty()).then_some(Explanation {
         lines,

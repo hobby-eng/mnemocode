@@ -715,8 +715,8 @@ fn use_restored_shares(
         CandidatesFile::check_listable(settings.wallet.passphrase())?;
     }
     let shares = match first {
-        Some(first) => TypedShares::starting_with(first)?,
-        None => TypedShares::read(parsed)?,
+        Some(first) => TypedShares::starting_with(first, Some(settings.mode.masked()))?,
+        None => TypedShares::read(parsed, Some(settings.mode.masked()))?,
     };
     let mut r = settings.with_shares(shares, target.is_some());
     if let Some(target) = &mut target {

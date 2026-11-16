@@ -37,7 +37,7 @@ use crate::terminal::result::result_header;
 use crate::terminal::{Channel, NoticeKind, clear_private_screen, notice};
 
 /// The numbers that a share count or a threshold may be, each on its own.
-const SHARE_RANGE: WholeRange = WholeRange::new(MIN_THRESHOLD as u64, MAX_SHARES as u64);
+pub(crate) const SHARE_RANGE: WholeRange = WholeRange::new(MIN_THRESHOLD as u64, MAX_SHARES as u64);
 
 /// What only a plain backup takes, refused with --sskr.
 pub(crate) const ENCODE_PLAIN_ONLY_OPTIONS: [&str; 4] =

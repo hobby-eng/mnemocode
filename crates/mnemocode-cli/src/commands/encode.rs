@@ -245,7 +245,7 @@ fn print_result(
 }
 
 /// What became of the last word in the legacy mode, in TS's sentences for standard error.
-pub(crate) fn legacy_sentences(encoding: &Encoding) -> Result<Vec<String>, Stop> {
+fn legacy_sentences(encoding: &Encoding) -> Result<Vec<String>, Stop> {
     let english = |indexes: &[u16]| Form::English.codes(indexes);
     // The last of the words: a single index is no phrase that a form writes.
     let last = |indexes: &[u16]| -> Result<String, Stop> {

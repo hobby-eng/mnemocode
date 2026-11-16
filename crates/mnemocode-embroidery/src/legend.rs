@@ -23,6 +23,12 @@ pub use symbols::{Glyph, SYMBOLS, Shape, Symbol};
 
 /// The entropy lengths of phrases of 12, 15, 18, 21 and 24 words, in bytes.
 pub const ENTROPY_LENGTHS: [usize; 5] = [16, 20, 24, 28, 32];
+/// The bytes of 12 to 24 word numbers of 11 bits each, packed: the original Seedshift's result,
+/// whose last word is usually no phrase's checksum, kept whole.
+pub const WORD_LENGTHS: [usize; 5] = [17, 21, 25, 29, 33];
+/// The bytes of an SSKR share of a phrase of 12 to 24 words: 5 bytes of the set, then a value as
+/// long as the phrase's entropy.
+pub const SHARE_LENGTHS: [usize; 5] = [21, 25, 29, 33, 37];
 /// The bytes of the check.
 const CHECK_BYTES: usize = 4;
 /// What a legend's phrase is, which the domain its check's hash starts with says, so that a reader
@@ -33,9 +39,13 @@ pub enum Masking {
     Seedshift,
     /// The phrase itself, for one protected some other way: anyone who knows the format reads it.
     Unmasked,
-    /// Masked with the original Seedshift's dates, its last word replaced by one that keeps the
-    /// checksum: Decode asks for the dates and offers every last word the owner may have had.
+    /// Masked with the original Seedshift's dates, every word number kept: Decode asks for them.
     SeedshiftLegacy,
+    /// One SSKR share of a phrase masked with MnemoCode Seedshift: restored from shares, with the
+    /// dates.
+    Share,
+    /// One SSKR share of the phrase itself.
+    ShareUnmasked,
 }
 
 impl Masking {
@@ -46,17 +56,39 @@ impl Masking {
             (Self::Unmasked, false) => b"MnemoCode embroidery 1 unmasked",
             (Self::Seedshift, true) => b"MnemoCode embroidery 2",
             (Self::Unmasked, true) => b"MnemoCode embroidery 2 unmasked",
-            (Self::SeedshiftLegacy, false) => b"MnemoCode embroidery 1 legacy",
-            (Self::SeedshiftLegacy, true) => b"MnemoCode embroidery 2 legacy",
+            (Self::SeedshiftLegacy, false) => b"MnemoCode embroidery 1 original",
+            (Self::SeedshiftLegacy, true) => b"MnemoCode embroidery 2 original",
+            (Self::Share, false) => b"MnemoCode embroidery 1 share",
+            (Self::Share, true) => b"MnemoCode embroidery 2 share",
+            (Self::ShareUnmasked, false) => b"MnemoCode embroidery 1 share unmasked",
+            (Self::ShareUnmasked, true) => b"MnemoCode embroidery 2 share unmasked",
         }
+    }
+
+    /// The lengths in bytes of what a legend of it holds.
+    #[must_use]
+    pub const fn lengths(self) -> &'static [usize] {
+        match self {
+            Self::Seedshift | Self::Unmasked => &ENTROPY_LENGTHS,
+            Self::SeedshiftLegacy => &WORD_LENGTHS,
+            Self::Share | Self::ShareUnmasked => &SHARE_LENGTHS,
+        }
+    }
+
+    /// Whether it is one share of a set, which restores the phrase only with others.
+    #[must_use]
+    pub const fn is_share(self) -> bool {
+        matches!(self, Self::Share | Self::ShareUnmasked)
     }
 }
 
 /// Every masking a reader tries.
-const MASKINGS: [Masking; 3] = [
+const MASKINGS: [Masking; 5] = [
     Masking::Seedshift,
     Masking::Unmasked,
     Masking::SeedshiftLegacy,
+    Masking::Share,
+    Masking::ShareUnmasked,
 ];
 /// The most rows a legend has: one for each symbol.
 pub const MAX_ROWS: usize = SYMBOLS.len();
@@ -613,6 +645,13 @@ fn counts(rows: &[Row]) -> Vec<u32> {
     rows.iter().map(|r| r.stitches).collect()
 }
 
+/// What `rows` hold read exactly as they are, and its masking, no row taken as misread: the first
+/// step of [`read`], without its search.
+#[must_use]
+pub fn read_exactly(rows: &[Row]) -> Option<(SecretBytes, Masking)> {
+    entropy_by_counts(rows)
+}
+
 /// The entropy `rows` hold read by the digit rule of their own counts, and its masking, the working
 /// copy wiped.
 fn entropy_by_counts(rows: &[Row]) -> Option<(SecretBytes, Masking)> {
@@ -694,15 +733,15 @@ fn entropy_of(rows: &[Row], moduli: &[u32]) -> Option<(SecretBytes, Masking)> {
     }
     drop((ranks, places, left));
     let mut passing = None;
-    for length in ENTROPY_LENGTHS {
-        let payload = n.low_be_bytes("an embroidery's payload", payload_bits(length));
-        let (entropy, sum) = payload.split_at(length);
-        for masking in MASKINGS {
-            if equal_bytes(sum, &check(entropy, masking, ordered)) {
+    for masking in MASKINGS {
+        for &length in masking.lengths() {
+            let payload = n.low_be_bytes("an embroidery's payload", payload_bits(length));
+            let (held, sum) = payload.split_at(length);
+            if equal_bytes(sum, &check(held, masking, ordered)) {
                 if passing.is_some() {
                     return None;
                 }
-                passing = Some((SecretBytes::copy_of("a phrase's entropy", entropy), masking));
+                passing = Some((SecretBytes::copy_of("what a legend holds", held), masking));
             }
         }
     }
@@ -848,7 +887,7 @@ mod tests {
                 assert_eq!(&*read, entropy);
                 assert_eq!(as_read, masking);
             }
-            _ => panic!("not read"),
+            other => panic!("{masking:?} of {} bytes not read: {other:?}", entropy.len()),
         }
     }
 
@@ -878,11 +917,48 @@ mod tests {
         ));
     }
 
+    // No domain, its length byte and what it holds is another domain's: a domain ends where the
+    // byte of a length begins. The length 32 is a space, which every longer domain has next.
+    #[test]
+    fn no_domain_and_length_read_as_another_one() {
+        for ordered in [false, true] {
+            for short in MASKINGS {
+                for &length in short.lengths() {
+                    for long in MASKINGS {
+                        let (short_domain, long_domain) =
+                            (short.domain(ordered), long.domain(ordered));
+                        let Some(rest) = long_domain.strip_prefix(short_domain) else {
+                            continue;
+                        };
+                        if rest.first().copied() != u8::try_from(length).ok() {
+                            continue;
+                        }
+                        // What follows the longer domain is its own length byte, then what it holds.
+                        let held = length - (rest.len() - 1) - 1;
+                        assert!(
+                            !long.lengths().contains(&held),
+                            "{short:?} of {length} bytes reads as {long:?} of {held}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Entropies of the shortest and the longest length that `masking` takes.
+    fn entropies_of(masking: Masking) -> [Vec<u8>; 2] {
+        let lengths = masking.lengths();
+        let longest = lengths[lengths.len() - 1];
+        let published = hex(VOID_COME).into_iter().cycle().take(longest).collect();
+        [published, vec![0x7f; lengths[0]]]
+    }
+
     #[test]
     fn a_written_legend_reads_back_as_its_entropy() {
-        for entropy in [hex(VOID_COME), vec![0x7f; 16]] {
-            for masking in MASKINGS {
-                let rows = written_as(&entropy, masking, &counts_for(25), (12_345, false));
+        for masking in MASKINGS {
+            for entropy in entropies_of(masking) {
+                // Rows enough for the longest share, of 24 words.
+                let rows = written_as(&entropy, masking, &counts_for(32), (12_345, false));
                 assert_reads(&rows, &entropy, masking);
             }
         }
@@ -890,9 +966,9 @@ mod tests {
 
     #[test]
     fn a_legend_in_its_rows_order_reads_back_and_never_as_format_1() {
-        for entropy in [hex(VOID_COME), vec![0x7f; 16]] {
-            for masking in MASKINGS {
-                let rows = written_as(&entropy, masking, &counts_for(20), (54_321, true));
+        for masking in MASKINGS {
+            for entropy in entropies_of(masking) {
+                let rows = written_as(&entropy, masking, &counts_for(26), (54_321, true));
                 assert_reads(&rows, &entropy, masking);
                 // Without its threads the order is lost, and format 1 does not read the rows.
                 let plain: Vec<Row> = rows.iter().map(|r| Row { thread: None, ..*r }).collect();
