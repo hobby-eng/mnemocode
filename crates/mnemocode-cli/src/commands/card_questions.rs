@@ -11,8 +11,7 @@ use mnemocode_cards::text_rules::{HIDE_MARKER, MAX_CARD_TEXT_LENGTH};
 
 use super::asking::{ask_list, ask_warned};
 use super::cards::PROFILE_OPTIONS;
-use super::encode_questions::file_questions;
-use super::output_questions::{ask_new_folder, ask_output_file};
+use super::output_questions::{new_folder, output_file};
 use crate::gate::Stop;
 use crate::terminal::{Choice, Chosen, Explanation, LineQuestion, ask_line, readme_link};
 
@@ -172,7 +171,7 @@ fn ask_card_files(base: &str, shares: bool) -> Result<Option<CardFiles>, Stop> {
         .map(|format| vec!["--image-format".to_owned(), format.to_owned()])
         .unwrap_or_default();
     let CardLayout::Sheets(size) = layout else {
-        let Some(folder) = ask_new_folder(base)? else {
+        let Some(folder) = new_folder(base)? else {
             return Ok(None);
         };
         let mut options = vec!["--cards-dir".to_owned(), folder];
@@ -197,13 +196,13 @@ fn ask_card_files(base: &str, shares: bool) -> Result<Option<CardFiles>, Stop> {
     size_options.extend(turn);
     let mut options = Vec::new();
     if kind == FileKind::Pdf {
-        let path = ask_output_file(file_questions::PDF, &format!("{base}.pdf"))?;
+        let path = output_file(&format!("{base}.pdf"))?;
         let Some(path) = path else {
             return Ok(None);
         };
         options.extend(["--pdf".to_owned(), path]);
     } else {
-        let Some(folder) = ask_new_folder(&format!("{base}-images"))? else {
+        let Some(folder) = new_folder(&format!("{base}-images"))? else {
             return Ok(None);
         };
         options.extend(["--images-dir".to_owned(), folder]);
@@ -397,9 +396,11 @@ fn ask_card_details(
 /// Printable cards: how the cards are saved in files named after `base`, the design, a QR code on
 /// each sheet, and the details on them, which `fit` checks as the command will. Separate business
 /// cards never carry a QR code. `shares`: the cards of Shamir shares, one set per share.
+/// `qr_hidden`: how a QR code image chosen already shows its data, which the sheets' follows.
 pub(crate) fn ask_cards(
     base: &str,
     shares: bool,
+    qr_hidden: Option<bool>,
     fit: &dyn Fn(&[String]) -> Result<(), Stop>,
 ) -> Result<Option<Vec<String>>, Stop> {
     let Some(files) = ask_card_files(base, shares)? else {
@@ -408,7 +409,28 @@ pub(crate) fn ask_cards(
     let Some(design) = ask_design(false, !files.sheets)? else {
         return Ok(None);
     };
-    let qr = if files.sheets {
+    let qr = if let (true, Some(hidden)) = (files.sheets, qr_hidden) {
+        // The QR code image settled how a QR code shows its data: the sheets carry the same.
+        let same = if hidden {
+            "the same as the image: your contact; MnemoCode reads the codes"
+        } else {
+            "the same as the image: the backup codes"
+        };
+        let choices = [
+            // --qr-hidden is given already, with the image.
+            Choice::noted("Yes", same, 1),
+            Choice::noted("No QR", "the cards alone", 0_u8),
+        ];
+        match ask_list(
+            "Add the QR code to the sheets too?",
+            "QR code",
+            &choices,
+            None,
+        )? {
+            Some(qr) => qr,
+            None => return Ok(None),
+        }
+    } else if files.sheets {
         let choices = [
             Choice::noted(
                 "Ordinary QR",

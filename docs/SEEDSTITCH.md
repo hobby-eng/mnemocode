@@ -61,11 +61,15 @@ before one that corrects a misread row.
    upper `8L` bits, as `L` bytes most significant first, are the candidate entropy `E`; its lower 32
    bits, as 4 bytes most significant first, are the check `C`. The length is right when `C` equals
    the first 4 bytes of SHA-256 of a domain, then the one byte `L`, then `E`. The domain is the
-   ASCII text `MnemoCode embroidery 1` for a phrase masked with Seedshift, and
+   ASCII text `MnemoCode embroidery 1` for a phrase masked with MnemoCode Seedshift,
+   `MnemoCode embroidery 1 legacy` for one masked with the Original Seedshift, and
    `MnemoCode embroidery 1 unmasked` for the phrase itself; in format 2 the `1` is a `2`.
 8. Exactly one length, with one domain, must be right. `E` is the entropy of a BIP39 phrase of 12,
    15, 18, 21 or 24 words; its checksum word follows from it as BIP39 defines. The domain says
-   whether the phrase is masked: only then are the Seedshift dates asked for.
+   whether the phrase is masked, and with which Seedshift: only then are the dates asked for. The
+   Original Seedshift's result usually fails the checksum, so its last word was replaced by one
+   that keeps it, as `encode --legacy-valid-last-word` does: undoing the dates gives every word
+   but the last, and every last word the owner may have had, of which the owner knows the real one.
 
 ### A row read wrong
 
@@ -80,8 +84,8 @@ number that names another thread makes the legend fail to read where it changes 
 reads as before where it keeps it, so a misread DMC number is not always noticed. With one row
 misread in one of these ways the true phrase is always among the results, so a wrong phrase cannot
 come out alone; the risk lies in mistakes the search does not cover, such as two rows wrong or a row
-left out, which pass the check about once in 140,000: a legend of 28 rows is tried some 15,000 ways,
-each against a check of 32 bits in two domains.
+left out, which pass the check about once in 95,000: a legend of 28 rows is tried some 15,000 ways,
+each against a check of 32 bits in three domains.
 
 ## Writing a legend
 

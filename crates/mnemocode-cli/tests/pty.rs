@@ -497,10 +497,11 @@ fn menu_seedshift_dates_are_asked_before_other_settings_and_cancel_privately() {
         session.wait_for("DD-MM-YYYY, separated by spaces):");
         session.wait_for(" to cancel");
         session.press("23-09-2026\r");
+        // The original Seedshift is never split: its next question is the copy on the screen.
         session.wait_for(if version == "1" {
             "Split it into Shamir shares?"
         } else {
-            "Where should the result be saved?"
+            "Also show the original seed phrase, before Seedshift?"
         });
         session.press("\x03");
         session.wait_for("What do you want to do?");
@@ -574,11 +575,11 @@ fn the_old_backup_is_not_asked_under_the_heading_of_the_new_one() {
     session.press("3");
     session.wait_for("Split it into Shamir shares?");
     session.press("1");
-    session.wait_for("Where should the result be saved?");
-    // Nothing ticked: the screen only.
-    session.press("\r");
     session.wait_for("Instructions for your heirs?");
     session.press("1");
+    // Where it is saved comes last; nothing ticked: the screen only.
+    session.wait_for("Where should the result be saved?");
+    session.press("\r");
     session.wait_for("Encoded seed phrase, record or text file path:");
     let written = session.written();
     let last_page = written.rsplit("\x1b[2J").next().expect("a page");
@@ -587,8 +588,9 @@ fn the_old_backup_is_not_asked_under_the_heading_of_the_new_one() {
     session.end();
 }
 
-#[test]
-fn a_detail_of_a_card_is_taken_as_it_is_typed() {
+/// The menu at the last question of a new color backup without Seedshift, shares or a sheet for
+/// heirs: where it is saved.
+fn at_where_a_color_backup_is_saved() -> Session {
     let mut session = Session::start(PROGRAM, &[]);
     session.wait_for("What do you want to do?");
     session.press("1");
@@ -598,15 +600,26 @@ fn a_detail_of_a_card_is_taken_as_it_is_typed() {
     session.press("3");
     session.wait_for("Split it into Shamir shares?");
     session.press("1");
+    session.wait_for("Instructions for your heirs?");
+    session.press("1");
     session.wait_for("Where should the result be saved?");
-    // Printable cards, ticked alone: with cards offered, the QR image is not, so they are second.
-    session.press("2");
+    session
+}
+
+#[test]
+fn a_detail_of_a_card_is_taken_as_it_is_typed() {
+    let mut session = at_where_a_color_backup_is_saved();
+    // Printable cards, ticked alone: third, after the record file and the QR code image, which
+    // every new backup offers.
+    session.press("3");
     session.press("\r");
     session.wait_for("Which kind of file?");
     session.press("1");
     session.wait_for("How should the cards be laid out?");
     session.press("4");
-    session.wait_for("Name of the new folder");
+    // The one folder of the task's files, asked the first time one is saved: Enter keeps the
+    // folder the program started in.
+    session.wait_for("Folder for the files");
     session.press("\r");
     session.wait_for("Which card design?");
     session.press("5");
@@ -817,6 +830,38 @@ fn the_questions_under_an_encoded_result_keep_its_beginning() {
 }
 
 fn exit_menu(mut session: Session) {
+    session.wait_for("What do you want to do?");
+    session.press("q");
+    let (status, written) = session.end();
+    assert_eq!(status, 0, "{written}");
+}
+
+// One choice of how a QR code shows its data, as --qr-hidden makes it for every QR code: with a
+// QR code image ticked beside cards, the sheets follow the image's choice instead of asking again.
+#[test]
+fn cards_beside_a_qr_code_image_follow_its_hidden_choice() {
+    let mut session = at_where_a_color_backup_is_saved();
+    // The QR code image and the cards, ticked together.
+    session.press("2");
+    session.press("3");
+    session.press("\r");
+    session.wait_for("Folder for the files");
+    session.press("\r");
+    session.wait_for("What should the QR code show?");
+    session.press("2");
+    session.wait_for("Public text");
+    session.press("Design studio\r");
+    session.wait_for("Which kind of file?");
+    session.press("1");
+    session.wait_for("How should the cards be laid out?");
+    session.press("1");
+    session.wait_for("How should the sheets be turned?");
+    session.press("1");
+    session.wait_for("Which card design?");
+    session.press("1");
+    session.wait_for("Add the QR code to the sheets too?");
+    session.wait_for("the same as the image: your contact");
+    session.press("\x03");
     session.wait_for("What do you want to do?");
     session.press("q");
     let (status, written) = session.end();

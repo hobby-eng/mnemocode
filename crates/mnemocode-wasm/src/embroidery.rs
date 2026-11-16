@@ -72,7 +72,9 @@ impl StitchPattern {
 impl StitchPattern {
     /// `phrase`, masked with `dates` (a typed line) by Seedshift, hidden in the legend of a pattern
     /// of `picture` (PNG, JPEG or WebP), `stitchesAcross` wide (0: 200). `mode` may be left out, or
-    /// is "seedshift" or "direct" (the phrase itself, no dates, readable by anyone). Refused as the
+    /// is "seedshift", "direct" (the phrase itself, no dates, readable by anyone) or
+    /// "seedshift-legacy": the legend then keeps every word but the last, replaced to keep the
+    /// checksum, and the page must tell the person to remember the real last word. Refused as the
     /// library refuses its inputs, and where the picture has too few colors to hold the phrase.
     #[wasm_bindgen(constructor)]
     pub fn new(

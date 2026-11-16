@@ -31,7 +31,7 @@ use crate::commands::encode_questions::{
 use crate::commands::menu_entries::{
     self, Guide, MENU_GUIDE, MenuEntry, PHRASE_WORDS_QUESTION, TYPED_SOURCE, phrase_words_answer,
 };
-use crate::commands::output_questions::{ask_output_file, forget_claimed, input_file};
+use crate::commands::output_questions::{forget_claimed, input_file, output_file};
 use crate::commands::pattern_questions::PATTERN_FILE;
 use crate::commands::wallet_question::{Asker, WalletAnswer, ask_wallet_evidence_by};
 use crate::commands::{help, named, self_test};
@@ -163,7 +163,7 @@ fn ask_source() -> Result<Option<Vec<String>>, Stop> {
     );
     // The legend line that a pattern's PDF keeps, which Decode reads from the file itself.
     let pattern = Choice::noted(
-        "In a cross-stitch pattern",
+        crate::commands::menu_entries::PATTERN_SOURCE,
         "the PDF file that Encode saved",
         Source::Pattern,
     );
@@ -519,7 +519,7 @@ fn preview_action() -> Result<Action, Stop> {
         return Ok(Action::Back);
     };
     let file = format!("{SAMPLE_FILE_BASE}.pdf");
-    let Some(path) = ask_output_file(file_questions::PDF, &file)? else {
+    let Some(path) = output_file(&file)? else {
         return Ok(Action::Back);
     };
     let mut run = line(&["preview"]);

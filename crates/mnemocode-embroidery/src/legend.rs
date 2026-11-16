@@ -33,6 +33,9 @@ pub enum Masking {
     Seedshift,
     /// The phrase itself, for one protected some other way: anyone who knows the format reads it.
     Unmasked,
+    /// Masked with the original Seedshift's dates, its last word replaced by one that keeps the
+    /// checksum: Decode asks for the dates and offers every last word the owner may have had.
+    SeedshiftLegacy,
 }
 
 impl Masking {
@@ -43,12 +46,18 @@ impl Masking {
             (Self::Unmasked, false) => b"MnemoCode embroidery 1 unmasked",
             (Self::Seedshift, true) => b"MnemoCode embroidery 2",
             (Self::Unmasked, true) => b"MnemoCode embroidery 2 unmasked",
+            (Self::SeedshiftLegacy, false) => b"MnemoCode embroidery 1 legacy",
+            (Self::SeedshiftLegacy, true) => b"MnemoCode embroidery 2 legacy",
         }
     }
 }
 
 /// Every masking a reader tries.
-const MASKINGS: [Masking; 2] = [Masking::Seedshift, Masking::Unmasked];
+const MASKINGS: [Masking; 3] = [
+    Masking::Seedshift,
+    Masking::Unmasked,
+    Masking::SeedshiftLegacy,
+];
 /// The most rows a legend has: one for each symbol.
 pub const MAX_ROWS: usize = SYMBOLS.len();
 /// The most stitches a row may count.

@@ -494,3 +494,36 @@ fn a_quorum_that_no_set_has_is_refused_and_each_that_a_restore_reads_is_kept() {
             .contains("The share format must be one of:")
     );
 }
+
+// A cross-stitch pattern is a backup the sheet names like the others: what it looks like, how many
+// words it holds, the steps that read its legend back with the dates, and what to do when a row
+// was misread.
+#[test]
+fn a_sheet_names_a_cross_stitch_pattern_and_how_its_legend_is_read() {
+    let text = text_of(HeirSheetFacts {
+        backup: HeirBackup::Pattern { words: 12 },
+        mode: Mode::Seedshift,
+        dates: 2,
+    });
+    assert!(
+        text.needs[0].contains("a cross-stitch pattern"),
+        "{:?}",
+        text.needs
+    );
+    assert_eq!(text.needs[1], "The seed phrase has 12 words.");
+    assert!(text.needs[2].contains("The owner's 2 secret dates"));
+    let steps = text.steps.join(" ");
+    assert!(steps.contains("legend line"), "{steps}");
+    assert!(steps.contains("the secret dates"), "{steps}");
+    assert!(text.trouble.contains("misread row"), "{}", text.trouble);
+    // Without dates, none are asked.
+    let plain = text_of(direct(HeirBackup::Pattern { words: 24 }));
+    assert!(!plain.steps.join(" ").contains("dates"));
+    assert!(
+        heir_sheet_text(
+            &WalletTool::new(),
+            &direct(HeirBackup::Pattern { words: 13 })
+        )
+        .is_err()
+    );
+}

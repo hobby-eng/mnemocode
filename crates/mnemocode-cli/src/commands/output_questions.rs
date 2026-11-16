@@ -1,8 +1,9 @@
-//! The files and folders that the questions name for saving (MnemoCode TS 0.1.0's
-//! `cli/output-questions.ts`): a new file or folder to write, checked at once where it can be
-//! written, each claimed for one task of an entry so that a second task cannot take its place.
+//! The files and folders that a task saves: every one in one folder, asked once, the first time
+//! something is saved, the folder MnemoCode started in by default. Each takes its usual name, or
+//! the next numbered one, and is claimed for the task so that no second file takes its place.
 
 use std::fmt;
+use std::path::Path;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use mnemocode::refusal::Refusal;
@@ -12,8 +13,8 @@ use super::resolved;
 use crate::gate::Stop;
 use crate::input::dropped_path;
 use crate::os::{self, FileLook};
-use crate::output::{OutputError, check_new_file, check_new_folder, paths_overlap};
-use crate::terminal::{Chosen, LineQuestion, ask_line};
+use crate::output::{OutputError, check_new_file, check_new_folder, numbered_name, paths_overlap};
+use crate::terminal::{self, Chosen, LineQuestion, ask_line};
 
 /// What the limits of a file are named in.
 const MEBIBYTE: usize = 1024 * 1024;
@@ -21,7 +22,6 @@ const MEBIBYTE: usize = 1024 * 1024;
 /// Why a typed name cannot be used.
 #[derive(Debug)]
 pub(crate) enum NameError {
-    Taken,
     Dash,
     Blank,
     Option,
@@ -32,14 +32,17 @@ pub(crate) enum NameError {
     NoFile,
     MayNotRead,
     TooLarge(usize),
+    /// The folder for the files does not exist.
+    NoSuchFolder,
+    /// The folder for the files is a file.
+    NotAFolder,
+    /// The folder for the files may not be written.
+    FolderUnwritable,
 }
 
 impl fmt::Display for NameError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::Taken => {
-                "Another file of this task has this name or this folder; choose another one."
-            }
             Self::Dash => "- is no file name here; type the name of a file.",
             Self::Blank => {
                 "That name is blank; type a name, or press Enter alone for the one shown."
@@ -54,6 +57,9 @@ impl fmt::Display for NameError {
             Self::Folder => "That is a folder; type the name of a file in it.",
             Self::NoFile => "That is no ordinary file; type the name of the file.",
             Self::MayNotRead => "MnemoCode may not read that file.",
+            Self::NoSuchFolder => "There is no such folder; type the name of one that exists.",
+            Self::NotAFolder => "That is no folder; type the name of a folder.",
+            Self::FolderUnwritable => "MnemoCode may not write in that folder; choose another one.",
             Self::TooLarge(limit) => {
                 return write!(
                     f,
@@ -77,10 +83,12 @@ impl Refusal for NameError {
             Self::NoFile => "cli.output-questions.no-ordinary-file-type-name-file",
             Self::MayNotRead => "cli.output-questions.mnemo-code-may-not-read-file",
             Self::TooLarge(_) => "cli.output-questions.file-larger-than-cannot-one",
-            Self::Taken => "cli.output-questions.another-file-task-name-folder-choose-another-one",
             Self::Dash => "cli.output-questions.dash-path-refused",
             Self::Blank => "cli.output-questions.blank-path-refused",
             Self::Option => "cli.output-questions.name-starts-would-read-as-option-type-before",
+            Self::NoSuchFolder => "cli.output-questions.no-such-folder",
+            Self::NotAFolder => "cli.output-questions.not-a-folder",
+            Self::FolderUnwritable => "cli.output-questions.folder-unwritable",
             Self::Output(error) => error.code(),
         }
     }
@@ -95,9 +103,19 @@ fn claimed() -> MutexGuard<'static, Vec<String>> {
     CLAIMED.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Forgets the files and folders that an earlier entry, or an earlier backup, claimed.
+/// The folder that every file of the task goes to, once it is asked.
+static FOLDER: Mutex<Option<String>> = Mutex::new(None);
+
+/// The folder; a poisoned lock holds a name, which stays usable.
+fn chosen_folder() -> MutexGuard<'static, Option<String>> {
+    FOLDER.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// Forgets the files and folders that an earlier entry, or an earlier backup, claimed, and the
+/// folder it saved in.
 pub(crate) fn forget_claimed() {
     claimed().clear();
+    chosen_folder().take();
 }
 
 /// Claims `path`, a file that the task reads, so that no file it saves is given its name, which the
@@ -140,54 +158,93 @@ pub(crate) fn input_file(answer: &str, limit: usize) -> Result<String, NameError
     }
 }
 
-/// Asks with `check` for a name, `fallback` by default, claimed once it passes; none when the person
-/// goes back with Escape.
-fn ask_claimed(
-    question: &str,
-    label: &str,
-    fallback: &str,
-    check: impl Fn(&str) -> Result<(), OutputError>,
-) -> Result<Option<String>, Stop> {
+/// What the question of the folder says above it.
+const SAVED_HERE: &str = "Every file of this task is saved in this folder under its usual name: the backup, its QR code, cards, a pattern, the sheet for heirs. A name already there gets a number.";
+
+/// The folder that every file of the task goes to: asked once, the folder MnemoCode started in by
+/// default; none when the person goes back.
+fn task_folder() -> Result<Option<String>, Stop> {
+    if let Some(folder) = chosen_folder().clone() {
+        return Ok(Some(folder));
+    }
+    let here = terminal::environment().current.as_ref().map_or_else(
+        || ".".to_owned(),
+        |path| path.to_string_lossy().into_owned(),
+    );
     let how = LineQuestion {
-        fallback: Some(fallback),
+        fallback: Some(&here),
+        what: Some("the name of a folder that exists"),
+        warning: Some(SAVED_HERE),
         limit: PATH_LIMIT,
         ..LineQuestion::default()
     };
-    let answer = ask_line(question, label, how, |answer: &str| {
+    let answer = ask_line("Folder for the files", "Folder", how, |answer: &str| {
         let path = typed_path(answer)?;
-        // Checked first, as it says the most: the command would refuse the pair.
-        if claimed()
-            .iter()
-            .any(|earlier| paths_overlap(earlier, &path))
-        {
-            return Err(NameError::Taken);
+        let folder = resolved(&path);
+        match os::look_at_file(&folder) {
+            Ok(FileLook::Folder) if os::may_write(&folder) => Ok(path),
+            Ok(FileLook::Folder) => Err(NameError::FolderUnwritable),
+            Ok(FileLook::Nothing) => Err(NameError::NoSuchFolder),
+            _ => Err(NameError::NotAFolder),
         }
-        check(&path).map_err(NameError::Output)?;
-        claimed().push(path.clone());
-        Ok(path)
     })?;
     match answer {
-        Chosen::One(path) => Ok(Some(path)),
+        Chosen::One(folder) => {
+            *chosen_folder() = Some(folder.clone());
+            Ok(Some(folder))
+        }
         Chosen::Back => Ok(None),
         Chosen::Cancelled => Err(Stop::Cancelled),
     }
 }
 
-/// Asks for the name of a file to save, `fallback` by default, until it can be used: its folder
-/// exists and may be written, and the name is no folder. A file of that name may exist: the command
-/// saves under the next numbered name. None when the person goes back with Escape.
-pub(crate) fn ask_output_file(question: &str, fallback: &str) -> Result<Option<String>, Stop> {
-    ask_claimed(question, "File", fallback, |path| {
-        check_new_file(path, true)
-    })
+/// `name` in the task's folder, or its first numbered name that no other file of the task takes,
+/// claimed once `check` passes it; none when the person goes back from the folder's question.
+fn claimed_in_folder(
+    name: &str,
+    folder: bool,
+    check: impl Fn(&str) -> Result<(), OutputError>,
+) -> Result<Option<String>, Stop> {
+    let Some(place) = task_folder()? else {
+        return Ok(None);
+    };
+    let first = Path::new(&place).join(name).to_string_lossy().into_owned();
+    let mut number = 0;
+    loop {
+        let path = if number == 0 {
+            first.clone()
+        } else {
+            numbered_name(&first, number, folder)
+        };
+        if !claimed()
+            .iter()
+            .any(|earlier| paths_overlap(earlier, &path))
+        {
+            match check(&path) {
+                Ok(()) => {
+                    claimed().push(path.clone());
+                    return Ok(Some(path));
+                }
+                Err(error) if number >= MAX_NUMBERED => return Err(NameError::Output(error).into()),
+                // A name that cannot be used there, such as a folder of that name: the next one.
+                Err(_) => {}
+            }
+        }
+        number += 1;
+    }
 }
 
-/// Asks for the name of a new folder to save into, `fallback` by default, until it can be used.
-pub(crate) fn ask_new_folder(fallback: &str) -> Result<Option<String>, Stop> {
-    ask_claimed(
-        "Name of the new folder",
-        "Folder",
-        fallback,
-        check_new_folder,
-    )
+/// The most numbered names tried for one file before its refusal is said.
+const MAX_NUMBERED: usize = 99;
+
+/// A file to save, `name` in the task's folder. A file of that name may exist: the command saves
+/// under the next numbered name. None when the person goes back.
+pub(crate) fn output_file(name: &str) -> Result<Option<String>, Stop> {
+    claimed_in_folder(name, false, |path| check_new_file(path, true))
+}
+
+/// A new folder to save into, `name` in the task's folder; the command numbers it where one is
+/// there already. None when the person goes back.
+pub(crate) fn new_folder(name: &str) -> Result<Option<String>, Stop> {
+    claimed_in_folder(name, true, check_new_folder)
 }

@@ -202,7 +202,7 @@ fn within(parent: &Path, child: &Path) -> bool {
 }
 
 /// File copies use `_number` before their ending; folder copies retain `-number`.
-fn numbered_name(path: &str, number: usize, folder: bool) -> String {
+pub(crate) fn numbered_name(path: &str, number: usize, folder: bool) -> String {
     let trimmed = path.trim_end_matches(['/', std::path::MAIN_SEPARATOR]);
     let name_start = trimmed
         .rfind(['/', std::path::MAIN_SEPARATOR])

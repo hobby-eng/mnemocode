@@ -125,6 +125,8 @@ pub(crate) const QUIT: MenuEntry = entry('q', "Quit", "Leave MnemoCode.", "quit"
 
 /// The answer of the menu that types an encoded seed phrase in, which the sheet for heirs names.
 pub(crate) const TYPED_SOURCE: &str = "Type or paste it";
+/// The answer of the menu that reads a cross-stitch pattern's PDF, which the sheet for heirs names.
+pub(crate) const PATTERN_SOURCE: &str = "In a cross-stitch pattern";
 /// The question of how many words the typed codes stand for.
 pub(crate) const PHRASE_WORDS_QUESTION: &str = "How many words does the seed phrase have?";
 

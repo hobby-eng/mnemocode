@@ -16,6 +16,7 @@ A seed phrase written on paper is easy to recognise, and whoever finds it can ta
 
 - **Another form.** The words were written as numbers (each word's place in the list), as short codes of digits and letters, or as color codes such as `#1EAB91`, sometimes printed on cards that look like ordinary design samples.
 - **Secret dates (Seedshift).** The words were masked with one or more dates meaningful to the owner, such as a birthday. Their year, month and day shift the words along the BIP39 list: with 23-09-2026, "abandon" becomes "wool". Use the owner's dates to undo the shift. MnemoCode Seedshift gives a valid seed phrase even for wrong dates; the Original Seedshift may instead report a checksum error. A valid checksum does not confirm the owner's wallet. The dates have nothing to do with today, the backup date or the day you open the wallet. They are written nowhere; the owner may have left a hint on the sheet.
+- **A cross-stitch pattern.** The words were hidden in the table of threads, the floss key, of an ordinary cross-stitch pattern: in each row's symbol and in the last digits of its count of stitches. The pattern's PDF holds them too.
 - **Shamir shares.** The backup was split into several shares, kept in different places. A certain number of different shares, for example any 3 of 5, restore it. Fewer are not enough to restore the phrase, but still show details such as how many shares are needed and how long the phrase is. Keep every share private.
 
 MnemoCode undoes all of this on your computer, without the internet.
@@ -46,6 +47,7 @@ Start the verified executable in a terminal. If double-clicking opens a terminal
 
 - Printed cards end with a few codes that belong to nothing. The sheet says how many words the seed phrase has, or how many codes each share has: type only the codes from the first card on. When MnemoCode asks how many words the seed phrase has, give the number from the sheet.
 - Shares are typed one after another, separated by a semicolon (`;`).
+- A cross-stitch pattern is read from its PDF: in Decode choose "In a cross-stitch pattern" and give the file. Without the PDF, type the floss key from the top, each row as its symbol's number, a colon and its stitches, such as `28:1725 25:2163`; a small pattern also names each row's DMC number between them, such as `15:407:38`.
 - When MnemoCode asks for "Dates", type the secret dates as day-month-year, such as `23-09-2026`, separated by spaces.
 - What you type is shown so that you can check it. When you press Enter at the end, the screen is cleared again.
 

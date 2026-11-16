@@ -1,14 +1,18 @@
 //! The help of `mnemocode stitch`.
 
 use super::super::{CommandHelp, HelpGroup, HelpOption};
-use super::options::{ASK_SECRETS, DATES, DATES_FILE, MNEMONIC, MNEMONIC_FILE};
+use super::options::{
+    ASK_SECRETS, DATES, DATES_FILE, HEIR_SHEET, HEIR_SHEET_SIZE, MNEMONIC, MNEMONIC_FILE, QR,
+    QR_HIDDEN, QR_TEXT, SHOW_MASKED_WORDS, SHOW_ORIGINAL,
+};
 
 const MODE: HelpOption = HelpOption {
     flag: "--mode",
     value: Some("NAME"),
-    summary: "seedshift (default) or direct",
+    summary: "seedshift (default), seedshift-legacy or direct",
     details: &[
-        "seedshift masks the phrase with the dates, as Encode does; Decode asks for them. direct hides the phrase itself, for one protected some other way: anyone who knows MnemoCode reads it from the legend. The original Seedshift does not fit: its result usually fails the checksum.",
+        "seedshift masks the phrase with the dates, as Encode does; Decode asks for them. direct hides the phrase itself, for one protected some other way: anyone who knows MnemoCode reads it from the legend.",
+        "seedshift-legacy is the original Seedshift, whose result usually fails the checksum: the pattern keeps every word but the last, which is replaced as --legacy-valid-last-word replaces it. Remember the seed phrase's real last word; Decode offers the possible ones. No sheet for heirs.",
     ],
 };
 const PICTURE: HelpOption = HelpOption {
@@ -68,7 +72,20 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
         },
         HelpGroup {
             heading: "The pattern:",
-            options: &[&[&PICTURE, &STITCHES_ACROSS, &FABRIC, &PDF, &OUTPUT]],
+            options: &[&[&PICTURE, &STITCHES_ACROSS, &FABRIC, &PDF]],
+        },
+        HelpGroup {
+            heading: "What else is saved and shown, as for every new backup:",
+            options: &[&[
+                &OUTPUT,
+                &QR,
+                &QR_HIDDEN,
+                &QR_TEXT,
+                &SHOW_ORIGINAL,
+                &SHOW_MASKED_WORDS,
+                &HEIR_SHEET,
+                &HEIR_SHEET_SIZE,
+            ]],
         },
     ],
     asks: Some(&[

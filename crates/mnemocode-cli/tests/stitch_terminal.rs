@@ -41,20 +41,29 @@ fn file(name: &str) -> PathBuf {
 
 #[test]
 fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen() {
-    let picture = file("gradient.png");
+    // The picture bears the pattern's usual name: the pattern takes the next numbered one rather
+    // than be saved over its own picture.
+    let folder = file("menu-stitch");
+    let _absent = fs::remove_dir_all(&folder);
+    fs::create_dir_all(&folder).expect("a folder");
+    let picture = folder.join("cross-stitch-pattern.pdf");
     fs::write(&picture, mnemocode_embroidery::sample::gradient_png()).expect("a picture");
-    let pdf = file("menu-pattern.pdf");
-    let _absent = fs::remove_file(&pdf);
+    let pdf = folder.join("cross-stitch-pattern_1.pdf");
     let mut session = Session::start(PROGRAM, &[]);
     session.wait_for("What do you want to do?");
     session.press("1");
     session.wait_for("Which form should the seed phrase take?");
     session.press("6");
+    // The questions of every new backup; the original Seedshift says that the pattern keeps
+    // every word but the last.
     session.wait_for("Use Seedshift?");
+    session.wait_for("Only the Original Seedshift loses a word here");
+    session.wait_for("keeps all but the last word: remember it");
     session.press("1");
     session.wait_for("DD-MM-YYYY, separated by spaces):");
     session.wait_for(" to cancel");
     session.press("23-09-2026 22-09-2026 21-09-2026 20-09-2026 19-09-2026\r");
+    // Then the pattern's own: the picture, the fabric and the size.
     session.wait_for("Picture file name");
     session.press(&format!("{}\r", picture.display()));
     // Aida 14 first, then the sizes, each with the stitches that the picture of 240 by 160 pixels
@@ -71,11 +80,22 @@ fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen(
     session.press("5\r");
     session.wait_for("Type a number of centimetres from 7.3 to 43.7.");
     session.press("21.9\r");
-    session.wait_for("PDF file name");
-    // The pattern may not be saved over its own picture: the name is asked again.
-    session.press(&format!("{}\r", picture.display()));
-    session.wait_for("Another file of this task has this name");
-    session.press(&format!("{}\r", pdf.display()));
+    // Back in the common block: shares greyed, the copies on the screen, the sheet for heirs, and
+    // last where it is saved, the folder of the task's files asked once for the pattern's PDF.
+    session.wait_for("Split it into Shamir shares?");
+    session.wait_for("a pattern's legend holds one seed phrase, not shares");
+    session.press("1");
+    session.wait_for("Also show the original seed phrase, before Seedshift?");
+    session.press("1");
+    session.wait_for("Also show the Seedshift phrase as English words?");
+    session.press("1");
+    session.wait_for("Instructions for your heirs?");
+    session.press("1");
+    session.wait_for("Where should the result be saved?");
+    session.wait_for("the legend line, which Decode reads back");
+    session.press("\r");
+    session.wait_for("Folder for the files");
+    session.press(&format!("{}\r", folder.display()));
 
     // Dates were already entered; only the phrase remains, with checksum retry.
     session.wait_for(" to cancel");

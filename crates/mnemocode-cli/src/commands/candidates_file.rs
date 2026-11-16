@@ -19,7 +19,7 @@ use mnemocode::secret::{SecretBytes, SecretText};
 
 use super::asking::secret_until;
 use super::given::PATH_LIMIT;
-use super::output_questions::{ask_output_file, forget_claimed};
+use super::output_questions::{forget_claimed, output_file};
 use super::saving::{ResultName, save_output};
 use crate::args::{Parsed, is_on, option_label, value};
 use crate::gate::Stop;
@@ -142,7 +142,7 @@ enum ListProtection {
 /// screen. The answers as the options of the command; none when the person goes back with Escape.
 pub(crate) fn ask_candidate_list() -> Result<Option<Vec<String>>, Stop> {
     forget_claimed();
-    let Some(path) = ask_output_file("File name", "candidates.age")? else {
+    let Some(path) = output_file("candidates.age")? else {
         return Ok(None);
     };
     let asked = ListQuestion {

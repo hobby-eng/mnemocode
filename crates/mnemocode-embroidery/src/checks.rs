@@ -37,13 +37,15 @@ const EXAMPLE_ORDERED_ENTROPY: [u8; 32] = [
     0x1f, 0xa0, 0x00, 0x40, 0x0f, 0xd0, 0x00, 0x20, 0x07, 0xe8, 0x00, 0x10, 0x03, 0xf4, 0x00, 0x09,
 ];
 
-/// The check of 16 zero bytes in each format and masking: format 1 and 2, masked and not, computed
-/// with Python's hashlib.
-const DOMAIN_CHECKS: [(Masking, bool, [u8; 4]); 4] = [
+/// The check of 16 zero bytes in each format and masking: format 1 and 2, masked with either
+/// Seedshift and not, computed with Python's hashlib.
+const DOMAIN_CHECKS: [(Masking, bool, [u8; 4]); 6] = [
     (Masking::Seedshift, false, [0x22, 0xbe, 0xc2, 0x2d]),
     (Masking::Unmasked, false, [0x4b, 0x0a, 0x75, 0xea]),
     (Masking::Seedshift, true, [0xb9, 0xc6, 0xe3, 0xb7]),
     (Masking::Unmasked, true, [0xaa, 0xb9, 0x27, 0xfb]),
+    (Masking::SeedshiftLegacy, false, [0x1d, 0x57, 0xf6, 0xb0]),
+    (Masking::SeedshiftLegacy, true, [0x99, 0x81, 0xd8, 0xd4]),
 ];
 
 /// The startup case of the row, before any secret is asked.
@@ -129,6 +131,36 @@ impl Random for Counting {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use mnemocode::bip39::phrase::Phrase;
+    use mnemocode::modes::Mode;
+
+    /// Trezor's published 24-word test vector.
+    const VOID: &str = "void come effort suffer camp survey warrior heavy shoot primary clutch crush \
+                        open amazing screen patrol group space point ten exist slush involve unfold";
+
+    // The original Seedshift in a legend: read back as the record of a replaced last word, which
+    // Decode undoes with the dates into every last word the owner may have had, the real one among
+    // them.
+    #[test]
+    fn a_legend_of_the_original_seedshift_reads_back_with_its_last_word_open() {
+        let void = Phrase::parse(VOID).unwrap();
+        let dates = [mnemocode::dates::parse_date("23-09-2026").unwrap()];
+        let entropy = crate::phrase::legend_entropy(&void, Mode::SeedshiftLegacy, &dates).unwrap();
+        let grid = crate::picture::grid(&crate::sample::gradient_png(), 120).unwrap();
+        let hidden = crate::hide::hide(&grid, &entropy, &mut Counting(0)).unwrap();
+        let line = crate::legend::line(hidden.rows()).unwrap();
+        let read = crate::phrase::record_of_legend(line.as_str())
+            .unwrap()
+            .unwrap();
+        assert!(
+            read.record()
+                .as_str()
+                .starts_with("MNC1:seedshift-legacy-valid:indexes:"),
+            "{}",
+            read.record().as_str()
+        );
+    }
 
     #[test]
     fn the_row_passes_at_startup_and_in_full() {

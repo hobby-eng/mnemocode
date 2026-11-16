@@ -144,7 +144,9 @@ Turning the line into word numbers takes arithmetic on numbers of about 90 digit
 and SHA-256, so use the helper `manual_seedstitch.py` of section 7 on a trusted
 offline computer. It prints the word numbers and says whether the phrase is
 masked. A masked phrase is then reversed with its dates as mode `seedshift`
-(sections 2 to 4, or `manual_seedshift.py`); an unmasked one is the phrase itself.
+(sections 2 to 4, or `manual_seedshift.py`), or, where the helper says the Original
+Seedshift masked it, as mode `seedshift-legacy-valid` (section 6); an unmasked one
+is the phrase itself.
 If the line does not read, a row was misread: check each symbol and count against
 the key. MnemoCode itself corrects one misread row.
 
@@ -280,8 +282,9 @@ because ((4 - 1 + 23) mod 2048) + 1 = 27. MnemoCode Seedshift instead ends in 37
 
 ## 6. Replaced legacy last word: mode `seedshift-legacy-valid`
 
-This historical mode replaced the last word of a legacy result to make its
-checksum valid. Information was lost. Subtract shifts modulo 2048 from the
+This mode replaces the last word of a legacy result to make its checksum valid,
+as `encode --legacy-valid-last-word` and a cross-stitch pattern masked with the
+Original Seedshift do. Information was lost. Subtract shifts modulo 2048 from the
 first n-1 words; the stored last word cannot uniquely recover the original.
 
 List every last word that completes those recovered first words with a valid
@@ -453,6 +456,7 @@ def readings(ordered):
     version = b"2" if ordered else b"1"
     domains = {
         b"MnemoCode embroidery " + version: "masked with Seedshift: undo it with the dates",
+        b"MnemoCode embroidery " + version + b" legacy": "masked with the Original Seedshift, its last word replaced: undo it as section 6 says; the real last word is the owner's",
         b"MnemoCode embroidery " + version + b" unmasked": "not masked: these are the phrase's own words",
     }
     found = []

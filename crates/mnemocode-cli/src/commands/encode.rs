@@ -245,7 +245,7 @@ fn print_result(
 }
 
 /// What became of the last word in the legacy mode, in TS's sentences for standard error.
-fn legacy_sentences(encoding: &Encoding) -> Result<Vec<String>, Stop> {
+pub(crate) fn legacy_sentences(encoding: &Encoding) -> Result<Vec<String>, Stop> {
     let english = |indexes: &[u16]| Form::English.codes(indexes);
     // The last of the words: a single index is no phrase that a form writes.
     let last = |indexes: &[u16]| -> Result<String, Stop> {
@@ -545,7 +545,7 @@ fn save_sheet_qr(
 }
 
 /// A QR image written where a save asks, its image read back first (qr::png).
-fn write_qr(parsed: &Parsed, text: &str, path: &str) -> Result<(), FileError> {
+pub(crate) fn write_qr(parsed: &Parsed, text: &str, path: &str) -> Result<(), FileError> {
     let image = super::hidden_qr::image(parsed, text).map_err(super::share_output::step_failed)?;
     os::publish_new_file(&resolved(path), &image)
 }

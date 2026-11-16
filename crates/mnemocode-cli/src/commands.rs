@@ -20,6 +20,7 @@ pub(crate) mod help;
 pub(crate) mod hidden_qr;
 mod marked_search;
 pub(crate) mod menu_entries;
+mod new_backup;
 pub(crate) mod output_questions;
 pub(crate) mod pattern_questions;
 pub(crate) mod preview;

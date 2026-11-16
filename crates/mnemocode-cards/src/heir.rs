@@ -525,6 +525,11 @@ pub enum HeirBackup {
         /// How many words the seed phrase has.
         words: usize,
     },
+    /// The seed phrase in the legend of a cross-stitch pattern (SeedStitch).
+    Pattern {
+        /// How many words the seed phrase has.
+        words: usize,
+    },
     /// Shamir shares of the seed phrase.
     #[cfg(feature = "sskr")]
     Shares {
@@ -562,9 +567,25 @@ pub trait HeirRoute {
     fn decode(&self, mode: Mode, words: usize, dates: Option<&str>) -> Vec<String>;
     /// The steps that open the restore from shares and type `threshold` of them, then `dates`.
     fn restore(&self, mode: Mode, threshold: usize, dates: Option<&str>) -> Vec<String>;
+    /// The steps that read the legend of a cross-stitch pattern back, then `dates`.
+    fn read_pattern(&self, dates: Option<&str>) -> Vec<String> {
+        vec![
+            "Open Decode and give it the pattern's PDF, or type its legend line.".to_owned(),
+            dates.map_or_else(
+                || "The program shows the seed phrase.".to_owned(),
+                |dates| format!("When the program asks, type {dates}. It shows the seed phrase."),
+            ),
+        ]
+    }
     /// What to do when a digit of a date cannot be read.
     fn date_digit_help(&self) -> Option<String>;
 }
+
+/// How a cross-stitch pattern that holds the phrase looks, so that an heir recognises it.
+const PATTERN_LOOK: &str = "a cross-stitch pattern in DMC threads; the table of its threads, the floss key, holds the seed phrase in each row's symbol and stitch count";
+/// The advice for a legend that does not read.
+const PATTERN_TROUBLE: &str =
+    "One misread row of the floss key is corrected; check the rows against the paper.";
 
 /// How each encoded form looks, so that an heir recognises the backup.
 fn encoded_look(form: Form) -> String {
@@ -627,6 +648,17 @@ fn backup_words(backup: HeirBackup, mode: Mode) -> Result<BackupWords, HeirError
                 needs: vec![format!("The backup: {}.", encoded_look(form)), printed],
                 plain_phrase: false,
                 trouble: Vec::new(),
+            })
+        }
+        HeirBackup::Pattern { words } => {
+            check_word_count(words)?;
+            Ok(BackupWords {
+                needs: vec![
+                    format!("The backup: {PATTERN_LOOK}."),
+                    format!("The seed phrase has {words} words."),
+                ],
+                plain_phrase: false,
+                trouble: vec![PATTERN_TROUBLE.to_owned()],
             })
         }
         #[cfg(feature = "sskr")]
@@ -846,6 +878,9 @@ pub fn heir_sheet_text(
         match backup {
             HeirBackup::Encoded { words, .. } => {
                 steps.extend(route.decode(mode, words, typed_dates.as_deref()));
+            }
+            HeirBackup::Pattern { .. } => {
+                steps.extend(route.read_pattern(typed_dates.as_deref()));
             }
             #[cfg(feature = "sskr")]
             HeirBackup::Shares { threshold, .. } => {

@@ -80,7 +80,7 @@ supports up to 70 rows. A 568-byte contact
 was a QR-capacity stress case, not a promise that its long fields fit as printed card text.
 
 To make a QR from an existing legend, use `qr-hide --input-file legend.txt --qr legend-qr.png`.
-The `stitch` command does not currently offer a direct hidden-QR output option. The hidden legend
+`stitch --qr legend.png --qr-hidden` saves one as it makes the pattern. The hidden legend
 contains the recovery instructions, not an embedded copy of the pattern image.
 
 ## Size, layout and reading a printed QR

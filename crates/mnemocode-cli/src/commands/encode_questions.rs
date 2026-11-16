@@ -14,9 +14,8 @@ use mnemocode_embroidery::legend::EXAMPLE as LEGEND_EXAMPLE;
 use super::asking::{ask_checks, ask_list};
 use super::card_questions::ask_cards;
 use super::cards::color_cards_fit_of;
-use super::encode::ORIGINAL_COPY_FORM;
 use super::given::{PATH_LIMIT, format_number};
-use super::output_questions::{ask_new_folder, ask_output_file};
+use super::output_questions::{new_folder, output_file};
 use super::share_output::share_cards_fit_of;
 use crate::gate::Stop;
 use crate::terminal::{
@@ -33,6 +32,10 @@ pub(crate) const RECORD_FILE: &str = "mnemocode-record.txt";
 pub(crate) const QR_FILE: &str = "mnemocode-qr.png";
 /// The sheet for heirs by default.
 pub(crate) const HEIR_SHEET_FILE: &str = "mnemocode-heirs.pdf";
+/// The legend line of a cross-stitch pattern by default, its name saying nothing of what it holds.
+const LEGEND_FILE: &str = "cross-stitch-legend.txt";
+/// Its QR code image by default.
+const LEGEND_QR_FILE: &str = "cross-stitch-legend.png";
 /// The first question of a new backup.
 const FORM_QUESTION: &str = "Which form should the seed phrase take?";
 /// The notes of the sheet's sizes, as the menu offers them.
@@ -43,7 +46,6 @@ const HEIR_SHEET_SIZES: [(&str, &str, &str); 2] = [
 /// The name of a question for each kind of file.
 pub(crate) mod file_questions {
     pub(crate) const PDF: &str = "PDF file name";
-    pub(crate) const TEXT: &str = "Text file name";
     pub(crate) const RECORD: &str = "Record file name";
     pub(crate) const QR: &str = "QR code file name";
     pub(crate) const PICTURE: &str = "Picture file name (PNG, JPEG or WebP)";
@@ -170,47 +172,65 @@ pub(crate) const WEAK: &str = "weak: only disguised, anyone with MnemoCode reads
 pub(crate) enum Takes {
     /// Either transformation.
     Either,
+    /// Either, but the original's last word is not kept: its note and the `warning` above the
+    /// answers say so, so that the owner remembers the real one.
+    LastWordLost {
+        note: &'static str,
+        warning: &'static str,
+    },
     /// Only MnemoCode Seedshift, whose result is a valid phrase again, as standard shares and the
-    /// legend of a pattern need. `unmasked` says what no Seedshift leaves.
-    MnemoCodeOnly { unmasked: &'static str },
+    /// legend of a pattern need: the original stays in its place, greyed, with `why`. `unmasked`
+    /// says what no Seedshift leaves.
+    MnemoCodeOnly {
+        unmasked: &'static str,
+        why: &'static str,
+    },
 }
 
-/// Whether Seedshift is used and which, on one screen: MnemoCode Seedshift, the original where the
-/// backup `takes` it, and none unless the form is always masked (`required`); none means back.
-/// Where only MnemoCode Seedshift is left, nothing is asked.
+/// Whether Seedshift is used and which, on one screen for every new backup: MnemoCode Seedshift,
+/// the original and none, always in this order. An answer the backup cannot take stays greyed with
+/// its reason: the original where it `takes` only MnemoCode's, none where the form is always
+/// masked (`required`). None means back.
 pub(crate) fn ask_seedshift(
     question: &str,
     required: bool,
     takes: Takes,
 ) -> Result<Option<Mode>, Stop> {
     let mut choices = super::backup_questions::seedshift_choices();
-    let mut lines = Vec::new();
-    lines.push(if required { ALWAYS_MASKED } else { MASKS }.to_owned());
+    let mut lines = vec![MASKS.to_owned()];
     let unmasked = match takes {
         Takes::Either => {
             lines.push(CHECKSUMS.to_owned());
             WEAK
         }
-        Takes::MnemoCodeOnly { unmasked } => {
-            choices.retain(|choice| choice.value == Mode::Seedshift);
-            lines.push(
-                "Only MnemoCode Seedshift here: the original's result usually fails the checksum."
-                    .to_owned(),
-            );
+        Takes::LastWordLost { note, warning } => {
+            for choice in choices
+                .iter_mut()
+                .filter(|choice| choice.value == Mode::SeedshiftLegacy)
+            {
+                choice.note = Some(note.to_owned());
+            }
+            lines.push(warning.to_owned());
+            WEAK
+        }
+        Takes::MnemoCodeOnly { unmasked, why } => {
+            for choice in choices
+                .iter_mut()
+                .filter(|choice| choice.value != Mode::Seedshift)
+            {
+                choice.enabled = false;
+                choice.note = Some(why.to_owned());
+            }
             unmasked
         }
     };
-    if !required {
-        choices.push(Choice::noted("No Seedshift", unmasked, Mode::Direct));
+    let mut none = Choice::noted("No Seedshift", unmasked, Mode::Direct);
+    if required {
+        lines.push(ALWAYS_MASKED.to_owned());
+        none.enabled = false;
+        none.note = Some("not for this form, which would show the seed phrase itself".to_owned());
     }
-    if let [only] = choices.as_slice() {
-        return Ok(Some(only.value));
-    }
-    let question = if required {
-        "Which Seedshift?"
-    } else {
-        question
-    };
+    choices.push(none);
     let explanation = Explanation {
         lines,
         more: vec![readme_link("transformation-modes")],
@@ -220,8 +240,12 @@ pub(crate) fn ask_seedshift(
 
 /// A place a result may go, besides the screen.
 #[derive(Clone, Copy)]
-enum Place {
+pub(crate) enum Place {
     Record,
+    /// The legend line of a cross-stitch pattern, as Decode reads it back.
+    Legend,
+    /// That line as a QR code image.
+    LegendQr,
     ShareFile,
     QrImage,
     QrFolder,
@@ -236,6 +260,8 @@ impl Place {
     const fn note(self) -> &'static str {
         match self {
             Self::Record => "text that Decode reads back",
+            Self::Legend => "the legend line, which Decode reads back",
+            Self::LegendQr => "the legend line in a PNG file that Decode reads back",
             Self::ShareFile => "one share per line",
             Self::QrImage => "a PNG file that Decode reads back",
             Self::QrFolder => "one PNG per share, in a new folder",
@@ -245,18 +271,16 @@ impl Place {
         }
     }
 
-    /// Whether a QR code goes with the cards' questions, not one of its own.
+    /// Whether it is a QR code image, which asks how the QR code shows its data.
     const fn is_qr(self) -> bool {
-        matches!(self, Self::QrImage | Self::QrFolder)
-    }
-
-    const fn is_cards(self) -> bool {
-        matches!(self, Self::Cards(_) | Self::ShareCards(_))
+        matches!(self, Self::QrImage | Self::LegendQr | Self::QrFolder)
     }
 
     const fn name(self) -> &'static str {
         match self {
             Self::Record => "a record file",
+            Self::Legend => "a text file",
+            Self::LegendQr => "a QR code image",
             Self::ShareFile => "a text file",
             Self::QrImage => "a QR code image",
             Self::QrFolder => "QR code images",
@@ -264,26 +288,23 @@ impl Place {
         }
     }
 
-    /// Asks where it goes; none when the person goes back.
-    fn ask(self) -> Result<Option<Vec<String>>, Stop> {
+    /// Asks where it goes; none when the person goes back. `qr_hidden`: how a QR code image ticked
+    /// before it shows its data, which cards then follow rather than ask again.
+    fn ask(self, qr_hidden: Option<bool>) -> Result<Option<Vec<String>>, Stop> {
         let (option, path) = match self {
-            Self::Record => (
-                "--output",
-                ask_output_file(file_questions::RECORD, RECORD_FILE)?,
-            ),
-            Self::ShareFile => (
-                "--output",
-                ask_output_file(file_questions::TEXT, "mnemocode-shares.txt")?,
-            ),
-            Self::QrImage => ("--qr", ask_output_file(file_questions::QR, QR_FILE)?),
-            Self::QrFolder => ("--qr-dir", ask_new_folder("mnemocode-share-qr")?),
+            Self::Record => ("--output", output_file(RECORD_FILE)?),
+            Self::Legend => ("--output", output_file(LEGEND_FILE)?),
+            Self::ShareFile => ("--output", output_file("mnemocode-shares.txt")?),
+            Self::QrImage => ("--qr", output_file(QR_FILE)?),
+            Self::LegendQr => ("--qr", output_file(LEGEND_QR_FILE)?),
+            Self::QrFolder => ("--qr-dir", new_folder("mnemocode-share-qr")?),
             Self::Cards(form) => {
-                return ask_cards("mnemocode-cards", false, &|options| {
+                return ask_cards("mnemocode-cards", false, qr_hidden, &|options| {
                     color_cards_fit_of(options, form)
                 });
             }
             Self::ShareCards(format) => {
-                return ask_cards("mnemocode-share-cards", true, &|options| {
+                return ask_cards("mnemocode-share-cards", true, qr_hidden, &|options| {
                     share_cards_fit_of(options, format)
                 });
             }
@@ -305,16 +326,9 @@ impl Place {
 /// Asks where the result goes besides the screen, as a checklist: every ticked place, then
 /// its own questions; none ticked keeps the result on the screen only.
 fn ask_destination(question: &str, places: &[Place]) -> Result<Option<Vec<String>>, Stop> {
-    let offered: Vec<Place> = if places.iter().any(|place| place.is_cards()) {
-        places
-            .iter()
-            .copied()
-            .filter(|place| !place.is_qr())
-            .collect()
-    } else {
-        places.to_vec()
-    };
-    let choices: Vec<Choice<Place>> = offered
+    // Every place stays in the list: a QR code image too beside cards, which ask on their own
+    // whether a sheet also carries one.
+    let choices: Vec<Choice<Place>> = places
         .iter()
         .map(|place| Choice::noted(&upper_first(place.name()), place.note(), *place))
         .collect();
@@ -322,10 +336,15 @@ fn ask_destination(question: &str, places: &[Place]) -> Result<Option<Vec<String
         return Ok(None);
     };
     let mut options = Vec::new();
+    // One choice of how a QR code shows its data, which --qr-hidden makes for every QR code.
+    let mut qr_hidden = None;
     for place in asks {
-        let Some(asked) = place.ask()? else {
+        let Some(asked) = place.ask(qr_hidden)? else {
             return Ok(None);
         };
+        if place.is_qr() {
+            qr_hidden = Some(asked.iter().any(|option| option == "--qr-hidden"));
+        }
         options.extend(asked);
     }
     Ok(Some(options))
@@ -339,25 +358,12 @@ fn upper_first(text: &str) -> String {
     })
 }
 
-fn ask_copy_destination(form: Form, mode: Mode) -> Result<Option<Vec<String>>, Stop> {
-    let mut places = vec![Place::Record, Place::QrImage];
-    if form.has_cards() {
-        places.push(Place::Cards(form));
-    }
-    let Some(destination) = ask_destination(
+/// Where one copy of a backup is saved besides the screen: a checklist of `places`.
+pub(crate) fn ask_copy_destination(places: &[Place]) -> Result<Option<Vec<String>>, Stop> {
+    ask_destination(
         "Where should the result be saved? The screen shows it in any case.",
-        &places,
-    )?
-    else {
-        return Ok(None);
-    };
-    let mut run: Vec<String> = ["encode", "--ask-secrets", "--format"]
-        .map(str::to_owned)
-        .to_vec();
-    run.push(format_number(form).to_string());
-    run.extend(["--mode".to_owned(), mode.id().to_owned()]);
-    run.extend(destination);
-    Ok(Some(run))
+        places,
+    )
 }
 
 /// Where the shares go, written in `format`.
@@ -415,6 +421,7 @@ pub(crate) fn ask_share_set(
     question: &str,
     explanation: &Explanation,
     with_no: bool,
+    closed: Option<&str>,
 ) -> Result<Option<Option<ShareSetChoice>>, Stop> {
     let mut choices = Vec::new();
     if with_no {
@@ -436,8 +443,21 @@ pub(crate) fn ask_share_set(
         &format!("type the numbers, up to {MAX_SHARES} shares"),
         SetAnswer::Other,
     ));
+    // A backup that cannot be split keeps the question, its sets greyed, and says why.
+    let mut explanation = explanation.clone();
+    if let Some(why) = closed {
+        for choice in choices
+            .iter_mut()
+            .filter(|choice| !matches!(choice.value, SetAnswer::No))
+        {
+            choice.enabled = false;
+        }
+        explanation
+            .lines
+            .push(format!("Not for this backup: {why}."));
+    }
     Ok(
-        match ask_list(question, "Shares", &choices, Some(explanation))? {
+        match ask_list(question, "Shares", &choices, Some(&explanation))? {
             None => None,
             Some(SetAnswer::No) => Some(None),
             Some(SetAnswer::Set(set)) => Some(Some(set)),
@@ -493,7 +513,7 @@ fn ask_other_share_set() -> Result<Option<ShareSetChoice>, Stop> {
 }
 
 /// One opt-in original-copy question for masked backups and shares; the default shows none.
-fn ask_original_copy(mode: Mode, shares: bool) -> Result<Option<bool>, Stop> {
+pub(crate) fn ask_original_copy(mode: Mode, shares: bool) -> Result<Option<bool>, Stop> {
     let masked = mode.masked();
     let question = if masked {
         "Also show the original seed phrase, before Seedshift?"
@@ -535,33 +555,42 @@ fn ask_original_copy(mode: Mode, shares: bool) -> Result<Option<bool>, Stop> {
     )
 }
 
-/// The optional sheet that tells heirs how to restore the backup, where a backup made in `mode` can
-/// have one.
-pub(crate) fn ask_heir_sheet(mode: Mode) -> Result<Option<Vec<String>>, Stop> {
-    if !mode.capabilities().heir_sheet {
-        return Ok(Some(Vec::new()));
-    }
-    let mut choices = vec![Choice::new("No", "")];
+/// Whether a sheet that tells heirs how to restore the backup is made, and its size: asked of every
+/// backup, Yes greyed where one made in `mode` can have none. `Some(None)` for none, none for
+/// back. Its file is named with the others, last (heir_sheet_files).
+pub(crate) fn ask_heir_sheet(mode: Mode) -> Result<Option<Option<&'static str>>, Stop> {
+    let possible = mode.capabilities().heir_sheet;
+    let mut choices = vec![Choice::new("No", None)];
     for (size, name, note) in HEIR_SHEET_SIZES {
-        choices.push(Choice::noted(&format!("Yes, {name}"), note, size));
+        let mut yes = Choice::noted(&format!("Yes, {name}"), note, Some(size));
+        // A replaced last word keeps the question, its answers greyed: no sheet leads through it.
+        yes.enabled = possible;
+        choices.push(yes);
+    }
+    let mut lines =
+        vec!["A printed page on how to restore the backup; it holds no secret.".to_owned()];
+    if !possible {
+        lines.push("Not for this backup: no sheet leads through a replaced last word.".to_owned());
     }
     let explanation = Explanation {
-        lines: vec!["A printed page on how to restore the backup; it holds no secret.".to_owned()],
+        lines,
         more: vec![readme_link("instructions-for-heirs")],
     };
-    let Some(size) = ask_list(
+    ask_list(
         "Instructions for your heirs?",
         "Heirs",
         &choices,
         Some(&explanation),
-    )?
-    else {
-        return Ok(None);
-    };
-    if size.is_empty() {
+    )
+}
+
+/// The options of the sheet for heirs of `size`, its file named in the task's folder; none for
+/// back.
+pub(crate) fn heir_sheet_files(size: Option<&str>) -> Result<Option<Vec<String>>, Stop> {
+    let Some(size) = size else {
         return Ok(Some(Vec::new()));
-    }
-    let Some(path) = ask_output_file(file_questions::PDF, HEIR_SHEET_FILE)? else {
+    };
+    let Some(path) = output_file(HEIR_SHEET_FILE)? else {
         return Ok(None);
     };
     Ok(Some(vec![
@@ -632,92 +661,23 @@ pub(crate) fn ask_form() -> Result<Option<Form>, Stop> {
 /// Non-secret command arguments and separately owned dates from the private screen.
 pub(crate) type EncodingAnswers = (Vec<String>, SecretVec<Date>);
 
-/// Asks the new backup's settings and keeps its dates outside the command arguments.
+/// Asks the new backup's settings in `form`, as every new backup is asked them, and keeps its dates
+/// outside the command arguments.
 pub(crate) fn ask_encoding_in(form: Form) -> Result<Option<EncodingAnswers>, Stop> {
-    let Some(mode) = ask_seedshift("Use Seedshift?", form.always_masked(), Takes::Either)? else {
-        return Ok(None);
-    };
-    let dates = super::given::ask_encoding_dates(mode)?;
-    // The Original Seedshift cannot be split into shares (mnemocode encode --help).
-    let set = if mode.capabilities().split {
-        match ask_share_set("Split it into Shamir shares?", &shares_explanation(), true)? {
-            Some(set) => set,
-            None => return Ok(None),
-        }
-    } else {
-        None
-    };
-    let run = match set {
-        None => ask_copy_destination(form, mode)?,
-        Some(set) => ask_shares(set, ShareFormat::mirroring(form))?.map(|shares| {
-            let mut run: Vec<String> = ["encode", "--sskr", "--ask-secrets", "--mode"]
-                .map(str::to_owned)
-                .to_vec();
-            run.push(mode.id().to_owned());
-            run.extend(shares);
-            run
-        }),
-    };
-    let Some(mut run) = run else {
-        return Ok(None);
-    };
-    if set.is_some() || mode.masked() {
-        let Some(copy) = ask_original_copy(mode, set.is_some())? else {
-            return Ok(None);
-        };
-        if copy {
-            run.extend(["--show-original".to_owned(), ORIGINAL_COPY_FORM.to_owned()]);
-        }
-    }
-    // Codes in words show the masked words already; shares never do.
-    if mode.masked() && (set.is_some() || !form.written_in_words()) {
-        let Some(show_words) = ask_list(
-            "Also show the Seedshift phrase as English words?",
-            "Decoy words",
-            &[
-                Choice::noted("No", "keep only the codes or shares", false),
-                Choice::noted("Yes", "the masked phrase; the dates are still needed", true),
-            ],
-            None,
-        )?
-        else {
-            return Ok(None);
-        };
-        if show_words {
-            run.push("--show-masked-words".to_owned());
-        }
-    }
-    let Some(heirs) = ask_heir_sheet(mode)? else {
-        return Ok(None);
-    };
-    run.extend(heirs);
-    Ok(Some((run, dates)))
+    super::new_backup::ask_new_backup(super::new_backup::Way::Form(form))
 }
 
 /// Protected setup for the menu entry that creates standard SSKR shares.
 pub(crate) fn ask_splitting() -> Result<Option<EncodingAnswers>, Stop> {
     let shares = Takes::MnemoCodeOnly {
         unmasked: "the shares alone restore it",
+        why: "not for standard shares, which split a valid seed phrase",
     };
     let Some(mode) = ask_seedshift("Use Seedshift before splitting?", false, shares)? else {
         return Ok(None);
     };
     let dates = super::given::ask_encoding_dates(mode)?;
-    let explanation = Explanation {
-        lines: vec![
-            "Standard SSKR shares of the seed phrase itself, which other SSKR tools read."
-                .to_owned(),
-        ],
-        more: vec![readme_link("splitting-a-mnemonic-into-shares")],
-    };
-    let set = ask_share_set(
-        "How many shares, and how many of them restore the seed phrase?",
-        &explanation,
-        false,
-    )?;
-    let Some(Some(set)) = set else {
-        return Ok(None);
-    };
+    // Its own question, after the dates, as every new backup asks its way's.
     let choices = [
         Choice::noted(
             "Words",
@@ -739,16 +699,41 @@ pub(crate) fn ask_splitting() -> Result<Option<EncodingAnswers>, Stop> {
     else {
         return Ok(None);
     };
+    let explanation = Explanation {
+        lines: vec![
+            "Standard SSKR shares of the seed phrase itself, which other SSKR tools read."
+                .to_owned(),
+        ],
+        more: vec![readme_link("splitting-a-mnemonic-into-shares")],
+    };
+    let set = ask_share_set(
+        "How many shares, and how many of them restore the seed phrase?",
+        &explanation,
+        false,
+        None,
+    )?;
+    let Some(Some(set)) = set else {
+        return Ok(None);
+    };
+    // The rest of the block, in its order: the copies on the screen, the sheet for heirs, and
+    // last where the shares are saved.
+    let Some(shown) = super::new_backup::ask_copies(mode, true, false)? else {
+        return Ok(None);
+    };
+    let Some(heir_size) = ask_heir_sheet(mode)? else {
+        return Ok(None);
+    };
     let Some(shares) = ask_shares(set, format)? else {
         return Ok(None);
     };
-    let Some(heirs) = ask_heir_sheet(mode)? else {
+    let Some(heirs) = heir_sheet_files(heir_size)? else {
         return Ok(None);
     };
     let mut run = ["encode", "--sskr", "--ask-secrets", "--mode", mode.id()]
         .map(str::to_owned)
         .to_vec();
     run.extend(shares);
+    run.extend(shown);
     run.extend(heirs);
     Ok(Some((run, dates)))
 }

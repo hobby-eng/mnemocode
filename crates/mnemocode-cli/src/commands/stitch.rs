@@ -5,6 +5,8 @@
 use std::fmt;
 use std::path::Path;
 
+use mnemocode::backup::Backup;
+use mnemocode::forms::Form;
 use mnemocode::modes::{DateWords, Mode};
 use mnemocode::refusal::Refusal;
 use mnemocode::secret::SecretText;
@@ -15,36 +17,50 @@ use mnemocode_embroidery::{chart, legend, phrase};
 
 use super::asking::{AfterFailure, after_failure, value_until};
 use super::configure::asked_options;
+use super::encode::{
+    legacy_sentences, masked_words_requested, original_copy_requested, print_masked_words,
+    print_original_copy, write_qr,
+};
 use super::encode_questions::file_questions;
 use super::given::{PATH_LIMIT, check_date_input, given_mode, phrase_and_dates};
+use super::heir_sheet::{save_heir_sheet, validate_heir_sheet_options};
 use super::output_questions::input_file;
 use super::pattern_questions::ask_size;
 use super::resolved;
 use super::saving::{ResultName, save_output};
+use super::share_output::report_qr_verified;
 use crate::args::{Parsed, integer_option, is_on, value};
 use crate::gate::Stop;
 use crate::input::read_picture;
 use crate::os::{self, SystemRandom};
 use crate::output::{report_renamed, shown_path};
-use crate::terminal::result::{print, result_header};
+use crate::terminal::result::{print, print_sentence, result_header};
 use crate::terminal::{
-    self, Choice, NoticeKind, TEXT_WIDTH, clear_private_screen, lasting_warning, notice, saved,
-    wrap_text,
+    self, Choice, NoticeKind, TEXT_WIDTH, clear_private_screen, lasting_warning, more_line, notice,
+    saved, wrap_text,
 };
+use mnemocode_cards::heir::{HeirBackup, HeirSheetFacts};
 
-/// The options `stitch` takes.
-pub(crate) const OPTIONS: [&str; 11] = [
+/// The options `stitch` takes: those of every new backup, then the pattern's own.
+pub(crate) const OPTIONS: [&str; 18] = [
     "mode",
     "mnemonic",
     "mnemonic-file",
     "ask-secrets",
     "date",
     "dates-file",
+    "output",
+    "qr",
+    "qr-hidden",
+    "qr-text",
+    "show-original",
+    "show-masked-words",
+    "heir-sheet",
+    "heir-sheet-size",
     "picture",
     "stitches-across",
     "fabric",
     "pdf",
-    "output",
 ];
 
 /// The refusals of SeedStitch in the command line.
@@ -193,6 +209,18 @@ fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> 
     // Masked unless the person says otherwise, as before --mode was there.
     let mode = phrase::legend_mode(given_mode(parsed)?.unwrap_or(Mode::Seedshift))?;
     check_date_input(parsed, mode, DateWords::Codes)?;
+    // What every new backup may ask for, checked before a secret is read, as Encode checks it.
+    super::hidden_qr::validate(parsed)?;
+    let original_copy = original_copy_requested(parsed)?;
+    let masked_words = masked_words_requested(parsed, mode)?;
+    validate_heir_sheet_options(parsed)?;
+    // The original Seedshift's last word is replaced in a legend, and no sheet leads through that.
+    let legacy = mode == Mode::SeedshiftLegacy;
+    if parsed.contains_key("heir-sheet") {
+        mode.with_valid_last_word()
+            .unwrap_or(mode)
+            .check_heir_sheet()?;
+    }
     let mut source = Source {
         path: path.to_owned(),
         width,
@@ -262,18 +290,59 @@ fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> 
         ),
         NoticeKind::Info,
     );
+    // The masked phrase in words, made only where it is shown or a replaced last word is told.
+    let masked = (masked_words || legacy)
+        .then(|| Backup::encode(&phrase, &dates, Form::English, mode, legacy))
+        .transpose()?;
+    // Named by the mode the legend keeps: a replaced last word, for the original Seedshift.
+    if let (true, Some(masked)) = (masked_words, &masked) {
+        print_masked_words(masked.backup.text()?.as_str(), masked.backup.mode());
+    }
+    if let (true, Some(masked)) = (legacy, &masked) {
+        // As Encode says of a replaced last word, on the private screen as there: the word it
+        // names is the one the legend drops. Then what it means for a pattern.
+        terminal::error_line(&more_line("transformation-modes"));
+        for sentence in legacy_sentences(masked)? {
+            print_sentence(&sentence);
+        }
+        let words = phrase.len();
+        lasting_warning(&format!(
+            "Only the Original Seedshift loses a word in a pattern: it keeps {} of the {words} words. Remember your seed phrase's real last word.",
+            words - 1
+        ));
+    }
+    if original_copy {
+        print_original_copy(phrase.text().as_str());
+    }
+    let facts = HeirSheetFacts {
+        backup: HeirBackup::Pattern {
+            words: phrase.len(),
+        },
+        mode,
+        dates: dates.len(),
+    };
+    save_pattern(parsed, (&pdf, line.as_str()), &facts)
+}
+
+/// Saves the pattern's `pdf` and what the options name besides: the legend `line` as text and as a
+/// QR code, and the sheet for heirs of `facts`, as every new backup saves them.
+fn save_pattern(
+    parsed: &Parsed,
+    (pdf, line): (&[u8], &str),
+    facts: &HeirSheetFacts,
+) -> Result<(), Stop> {
     let mut outputs = parsed.clone();
     let saved_pdf = save_output(
         &mut outputs,
         "pdf",
         ResultName::one("The pattern"),
-        |path| os::publish_new_file(&resolved(path), &pdf),
+        |path| os::publish_new_file(&resolved(path), pdf),
     )?;
     if let Some(path) = saved_pdf {
         saved(&format!("Saved pattern: {}", shown_path(&path)));
     }
     let text = SecretText::build("a SeedStitch legend", line.len() + 1, |filler| {
-        filler.push_str(line.as_str())?;
+        filler.push_str(line)?;
         filler.push('\n')
     })?;
     let saved_line = save_output(
@@ -288,6 +357,17 @@ fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> 
             shown_path(&path)
         ));
     }
+    let qr_saved = save_output(&mut outputs, "qr", ResultName::one("The QR code"), |path| {
+        write_qr(parsed, line, path)
+    })?;
+    if let Some(path) = qr_saved {
+        report_qr_verified(1);
+        saved(&format!(
+            "Saved QR code (the legend line): {}",
+            shown_path(&path)
+        ));
+    }
+    save_heir_sheet(&mut outputs, facts)?;
     report_renamed();
     Ok(())
 }

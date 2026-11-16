@@ -19,7 +19,8 @@ use super::backup_questions::{
     share_seedshift_label,
 };
 use super::menu_entries::{
-    DECODE, PHRASE_WORDS_QUESTION, RECOVER, RESTORE, TYPED_SOURCE, phrase_words_answer, shown_entry,
+    DECODE, PATTERN_SOURCE, PHRASE_WORDS_QUESTION, RECOVER, RESTORE, TYPED_SOURCE,
+    phrase_words_answer, shown_entry,
 };
 use super::resolved;
 use super::saving::{ResultName, save_output};
@@ -99,6 +100,19 @@ impl HeirRoute for MenuRoute {
                 "Type any {threshold} shares, separated by \"{}\"{}. MnemoCode shows the seed phrase.",
                 mnemocode::sskr::typed::SHARE_SEPARATOR,
                 then_dates(dates)
+            ),
+        ]
+    }
+
+    fn read_pattern(&self, dates: Option<&str>) -> Vec<String> {
+        vec![
+            format!(
+                "Choose \"{}\", then \"{PATTERN_SOURCE}\" and give its PDF, or \"{TYPED_SOURCE}\" and type its legend line.",
+                shown_entry(DECODE)
+            ),
+            dates.map_or_else(
+                || "MnemoCode shows the seed phrase.".to_owned(),
+                |dates| format!("When MnemoCode asks, type {dates}. It shows the seed phrase."),
             ),
         ]
     }

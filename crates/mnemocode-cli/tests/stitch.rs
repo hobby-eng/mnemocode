@@ -87,13 +87,6 @@ fn the_options_and_the_picture_are_refused_before_the_phrase_is_read() {
         &stitch(&["--picture", "photos", "--pdf", "p.pdf"]),
         "must be a regular file",
     );
-    // The original Seedshift's result is no valid phrase, which a legend holds.
-    let original = ["--mode", "seedshift-legacy", "--picture", PICTURE];
-    assert_refused(
-        &folder,
-        &stitch(&[&original[..], &["--pdf", "p.pdf"]].concat()),
-        "masked with MnemoCode Seedshift, or the phrase itself",
-    );
 }
 
 /// The pattern here is for linen stitched over one thread, which only the cover and the skeins
@@ -192,4 +185,146 @@ fn the_legend_saved_reads_back_as_the_phrase_and_a_mistyped_row_is_named() {
     let errors = decoded_legend(&folder, ("legend.txt", true));
     let named = format!("Row {} of the legend did not fit", place + 1);
     assert!(errors.contains(&named), "{errors}");
+}
+
+// A pattern is a new backup like any other: the legend line as text, a QR code of it, the copies
+// on the screen and the sheet for heirs, as Encode saves and shows them.
+#[test]
+fn a_pattern_saves_and_shows_what_every_new_backup_does() {
+    let folder = with_picture("stitch-common");
+    let shown = run(
+        &folder,
+        &stitch(&[
+            "--picture",
+            PICTURE,
+            "--stitches-across",
+            "120",
+            "--pdf",
+            "pattern.pdf",
+            "--output",
+            "legend.txt",
+            "--qr",
+            "legend.png",
+            "--show-original",
+            "words",
+            "--show-masked-words",
+            "--heir-sheet",
+            "heirs.pdf",
+        ]),
+    );
+    let errors = String::from_utf8_lossy(&shown.stderr);
+    assert_eq!(shown.status.code(), Some(0), "{errors}");
+    let output = String::from_utf8_lossy(&shown.stdout);
+    assert!(
+        output.contains(PUBLIC_MNEMONIC),
+        "the original copy: {output}"
+    );
+    assert!(
+        output.contains("Seedshift phrase"),
+        "the masked words: {output}"
+    );
+    assert!(read(&folder, "heirs.pdf").starts_with(PDF_START));
+    // The QR code holds the legend line, which Decode reads back as the phrase.
+    let qr = run(
+        &folder,
+        &["decode", "--qr-file", "legend.png", "--dates-file", DATES],
+    );
+    assert_eq!(
+        qr.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&qr.stderr)
+    );
+    assert!(String::from_utf8_lossy(&qr.stdout).contains(PUBLIC_MNEMONIC));
+    decoded_legend(&folder, ("legend.txt", true));
+    // Masked words need Seedshift, as in Encode; refused before the phrase is read.
+    assert_refused(
+        &folder,
+        &[
+            "stitch",
+            "--mnemonic-file",
+            PHRASE,
+            "--picture",
+            PICTURE,
+            "--pdf",
+            "direct.pdf",
+            "--mode",
+            "direct",
+            "--show-masked-words",
+        ],
+        "Seedshift",
+    );
+}
+
+// The original Seedshift in a pattern: every word but the last is kept, the warning says so, and
+// Decode gives every last word the owner may have had, the real phrase among them. No sheet for
+// heirs leads through a replaced last word.
+#[test]
+fn a_pattern_of_the_original_seedshift_keeps_all_but_the_last_word() {
+    let folder = with_picture("stitch-original");
+    let legacy = [
+        "--mode",
+        "seedshift-legacy",
+        "--picture",
+        PICTURE,
+        "--stitches-across",
+        "120",
+    ];
+    let made = run(
+        &folder,
+        &stitch(
+            &[
+                &legacy[..],
+                &["--pdf", "pattern.pdf", "--output", "legend.txt"],
+            ]
+            .concat(),
+        ),
+    );
+    let errors = String::from_utf8_lossy(&made.stderr);
+    assert_eq!(made.status.code(), Some(0), "{errors}");
+    assert!(
+        errors.contains("Only the Original Seedshift loses a word")
+            && errors.contains("keeps 11 of the 12 words")
+            && errors.contains("real last word"),
+        "{errors}"
+    );
+    // What Encode says of a replaced last word: the link, and the words it names with the
+    // result, in the stream that holds the legend.
+    assert!(errors.contains("#transformation-modes"), "{errors}");
+    let result = if errors.contains("Legend line") {
+        errors.clone().into_owned()
+    } else {
+        String::from_utf8_lossy(&made.stdout).into_owned()
+    };
+    assert!(result.contains("decoding lists the candidates"), "{result}");
+    let decoded = run(
+        &folder,
+        &[
+            "decode",
+            "--input-file",
+            "legend.txt",
+            "--dates-file",
+            DATES,
+        ],
+    );
+    let output = String::from_utf8_lossy(&decoded.stdout);
+    assert_eq!(
+        decoded.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&decoded.stderr)
+    );
+    assert_eq!(output.lines().count(), 128, "{output}");
+    assert!(output.contains(PUBLIC_MNEMONIC), "{output}");
+    assert_refused(
+        &folder,
+        &stitch(
+            &[
+                &legacy[..],
+                &["--pdf", "heirs-pattern.pdf", "--heir-sheet", "heirs.pdf"],
+            ]
+            .concat(),
+        ),
+        "sheet",
+    );
 }

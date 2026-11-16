@@ -28,7 +28,7 @@ pub enum SeedStitchError {
     NotRead,
     /// Changes of different rows read as different phrases.
     Ambiguous,
-    /// The mode is the original Seedshift, whose result a legend cannot hold.
+    /// The mode is one that only a replaced last word gives, which is no phrase to hide.
     Mode,
 }
 
@@ -45,7 +45,7 @@ impl fmt::Display for SeedStitchError {
                 "The legend reads in more than one way: more than one row may be wrong. Check each row against the paper.",
             ),
             Self::Mode => f.write_str(
-                "A pattern holds a phrase masked with MnemoCode Seedshift, or the phrase itself: the original Seedshift's result usually fails the checksum, and a legend holds only a valid phrase.",
+                "A pattern holds a phrase masked with either Seedshift, or the phrase itself; seedshift-legacy-valid names a result whose last word was replaced already.",
             ),
         }
     }
@@ -111,7 +111,31 @@ impl LegendEntropy {
 ///
 /// [`SeedStitchError::Backup`] for the dates Seedshift refuses, as Encode refuses them.
 pub fn masked_entropy(phrase: &Phrase, dates: &[Date]) -> Result<LegendEntropy, SeedStitchError> {
-    let encoding = Backup::encode(phrase, dates, Form::Indexes, Mode::Seedshift, false)
+    shifted_entropy(phrase, dates, Masking::Seedshift)
+}
+
+/// The entropy of `phrase` masked with `dates` by the original Seedshift, its last word replaced by
+/// one that keeps the checksum, as `encode --legacy-valid-last-word` does: the legend keeps every
+/// word but the last, which the owner remembers.
+///
+/// # Errors
+///
+/// [`SeedStitchError::Backup`] for the dates Seedshift refuses, as Encode refuses them.
+pub fn legacy_entropy(phrase: &Phrase, dates: &[Date]) -> Result<LegendEntropy, SeedStitchError> {
+    shifted_entropy(phrase, dates, Masking::SeedshiftLegacy)
+}
+
+/// The entropy of `phrase` shifted with `dates` as `masking` says.
+fn shifted_entropy(
+    phrase: &Phrase,
+    dates: &[Date],
+    masking: Masking,
+) -> Result<LegendEntropy, SeedStitchError> {
+    let (mode, valid_last_word) = match masking {
+        Masking::SeedshiftLegacy => (Mode::SeedshiftLegacy, true),
+        Masking::Seedshift | Masking::Unmasked => (Mode::Seedshift, false),
+    };
+    let encoding = Backup::encode(phrase, dates, Form::Indexes, mode, valid_last_word)
         .map_err(SeedStitchError::Backup)?;
     let mut indexes: Vec<usize> = encoding
         .backup
@@ -123,10 +147,7 @@ pub fn masked_entropy(phrase: &Phrase, dates: &[Date]) -> Result<LegendEntropy, 
     indexes.zeroize();
     masked
         .and_then(|masked| masked.entropy())
-        .map(|entropy| LegendEntropy {
-            entropy,
-            masking: Masking::Seedshift,
-        })
+        .map(|entropy| LegendEntropy { entropy, masking })
         .map_err(SeedStitchError::Phrase)
 }
 
@@ -145,15 +166,16 @@ pub fn unmasked_entropy(phrase: &Phrase) -> Result<LegendEntropy, SeedStitchErro
         .map_err(SeedStitchError::Phrase)
 }
 
-/// `mode` where a pattern can hold its result: MnemoCode Seedshift, or none.
+/// `mode` where a pattern can hold its result: either Seedshift, or none. The original's result
+/// keeps every word but the last (`legacy_entropy`).
 ///
 /// # Errors
 ///
-/// [`SeedStitchError::Mode`] for the original Seedshift.
+/// [`SeedStitchError::Mode`] for a mode that only a replaced last word gives.
 pub const fn legend_mode(mode: Mode) -> Result<Mode, SeedStitchError> {
     match mode {
-        Mode::Seedshift | Mode::Direct => Ok(mode),
-        _ => Err(SeedStitchError::Mode),
+        Mode::Seedshift | Mode::Direct | Mode::SeedshiftLegacy => Ok(mode),
+        Mode::SeedshiftLegacyValid => Err(SeedStitchError::Mode),
     }
 }
 
@@ -161,7 +183,8 @@ pub const fn legend_mode(mode: Mode) -> Result<Mode, SeedStitchError> {
 ///
 /// # Errors
 ///
-/// [`SeedStitchError::Mode`] for the original Seedshift; [`SeedStitchError::Backup`] for dates.
+/// [`SeedStitchError::Mode`] for a mode that only a replaced last word gives;
+/// [`SeedStitchError::Backup`] for dates.
 pub fn legend_entropy(
     phrase: &Phrase,
     mode: Mode,
@@ -172,6 +195,7 @@ pub fn legend_entropy(
         .map_err(|refusal| SeedStitchError::Backup(refusal.into()))?;
     match mode {
         Mode::Direct => unmasked_entropy(phrase),
+        Mode::SeedshiftLegacy => legacy_entropy(phrase, dates),
         _ => masked_entropy(phrase, dates),
     }
 }
@@ -291,6 +315,7 @@ fn record_of_line(text: &str) -> Result<LineRecord, SeedStitchError> {
     let mode = match masking {
         Masking::Seedshift => Mode::Seedshift,
         Masking::Unmasked => Mode::Direct,
+        Masking::SeedshiftLegacy => Mode::SeedshiftLegacyValid,
     };
     let backup = Backup::of(&indexes, Form::Indexes, mode);
     indexes.zeroize();
@@ -369,12 +394,17 @@ mod tests {
         let masked = legend_entropy(&void, Mode::Seedshift, &date).unwrap();
         assert_eq!(masked.masking(), Masking::Seedshift);
         assert_ne!(&**masked.bytes(), &**own.bytes());
-        for original in [Mode::SeedshiftLegacy, Mode::SeedshiftLegacyValid] {
-            assert_eq!(
-                legend_entropy(&void, original, &date).unwrap_err().code(),
-                "embroidery.phrase.mode"
-            );
-        }
+        // The original Seedshift keeps every word but the last, replaced to keep the checksum; a
+        // record whose last word was replaced already is no phrase to hide.
+        let original = legend_entropy(&void, Mode::SeedshiftLegacy, &date).unwrap();
+        assert_eq!(original.masking(), Masking::SeedshiftLegacy);
+        assert_ne!(&**original.bytes(), &**masked.bytes());
+        assert_eq!(
+            legend_entropy(&void, Mode::SeedshiftLegacyValid, &date)
+                .unwrap_err()
+                .code(),
+            "embroidery.phrase.mode"
+        );
     }
 
     #[test]

@@ -6,8 +6,7 @@ use mnemocode::forms::hints::BIP39;
 
 use super::{Action, joined, line};
 use crate::commands::asking::ask_list;
-use crate::commands::encode_questions::file_questions;
-use crate::commands::output_questions::{ask_new_folder, ask_output_file};
+use crate::commands::output_questions::{new_folder, output_file};
 use crate::gate::Stop;
 use crate::terminal::{self, Choice, Chosen, LineQuestion, ask_line};
 
@@ -81,7 +80,7 @@ fn table_export_action() -> Result<Action, Stop> {
     };
     let file = match export {
         Export::Set => {
-            let Some(folder) = ask_new_folder("mnemocode-recovery-pack")? else {
+            let Some(folder) = new_folder("mnemocode-recovery-pack")? else {
                 return Ok(Action::Back);
             };
             return Ok(Action::run(joined(
@@ -92,7 +91,7 @@ fn table_export_action() -> Result<Action, Stop> {
         Export::Guide => "mnemocode-manual-recovery.md".to_owned(),
         Export::List(format) => format!("bip39-{format}.txt"),
     };
-    let Some(path) = ask_output_file(file_questions::TEXT, &file)? else {
+    let Some(path) = output_file(&file)? else {
         return Ok(Action::Back);
     };
     let mut run = match export {

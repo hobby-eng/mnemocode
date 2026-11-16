@@ -24,7 +24,12 @@ const RECORDED: &str = include_str!("../../../vectors/ts-0.1.0/transcripts-v1.js
 /// What TS's help says that differs here, each by a decision of PLAN.md's "Parity with TS 0.1.0":
 /// images need no other program, a missing folder is made, each text input has its own limit, and
 /// re-encode asks the new backup first; the stitch command is new, and Decode reads the stitch PDF.
-const WRITTEN_IN: [(&str, &str); 38] = [
+const WRITTEN_IN: [(&str, &str); 39] = [
+    // The guide's section 6 names who replaces a last word now: Encode's option and a pattern.
+    (
+        "This historical mode replaced the last word of a legacy result to make its\nchecksum valid. Information was lost.",
+        "This mode replaces the last word of a legacy result to make its checksum valid,\nas `encode --legacy-valid-last-word` and a cross-stitch pattern masked with the\nOriginal Seedshift do. Information was lost.",
+    ),
     // The consolidated recovery menu names its current entry in validation errors too.
     (
         "These are the codes of an encoded seed phrase, not its words: Decode numbers, codes or colors back into a seed phrase reads them, with ? for each unread code.",

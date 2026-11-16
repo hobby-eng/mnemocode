@@ -9,9 +9,9 @@ use mnemocode_embroidery::fabric::{self, DEFAULT_FABRIC, DETAILED_ACROSS, FABRIC
 use mnemocode_embroidery::picture::{self, DEFAULT_WIDTH};
 
 use super::asking::{ask_list, ask_list_at};
-use super::encode_questions::{Takes, WEAK, ask_seedshift, file_questions};
+use super::encode_questions::file_questions;
 use super::given::PATH_LIMIT;
-use super::output_questions::{ask_output_file, claim_read, input_file};
+use super::output_questions::{claim_read, input_file, output_file};
 use crate::gate::Stop;
 use crate::input::read_picture;
 use crate::terminal::{Choice, Chosen, Explanation, LineQuestion, ask_line};
@@ -30,13 +30,14 @@ enum Size {
     Stitches,
 }
 
-/// The questions of a cross-stitch pattern; stitch's command line, or none for back.
+/// The questions of a cross-stitch pattern: those of every new backup, with the pattern's own.
 pub(crate) fn ask_pattern() -> Result<Option<super::encode_questions::EncodingAnswers>, Stop> {
-    let masked = Takes::MnemoCodeOnly { unmasked: WEAK };
-    let Some(mode) = ask_seedshift("Use Seedshift?", false, masked)? else {
-        return Ok(None);
-    };
-    let dates = super::given::ask_encoding_dates(mode)?;
+    super::new_backup::ask_new_backup(super::new_backup::Way::Embroidery)
+}
+
+/// The pattern's own questions, after the dates: the picture, the fabric and the size; stitch's
+/// options for them, or none for back. Its PDF is named last (pattern_file).
+pub(crate) fn ask_pattern_own() -> Result<Option<Vec<String>>, Stop> {
     let Some((picture, widths)) = ask_picture()? else {
         return Ok(None);
     };
@@ -63,19 +64,17 @@ pub(crate) fn ask_pattern() -> Result<Option<super::encode_questions::EncodingAn
     let Some(across) = ask_size(picture.size, widths, fabric)? else {
         return Ok(None);
     };
-    let Some(pdf) = ask_output_file(file_questions::PDF, PATTERN_FILE)? else {
-        return Ok(None);
-    };
-    let mut run: Vec<String> = ["stitch", "--ask-secrets", "--mode", mode.id()]
-        .map(str::to_owned)
-        .to_vec();
-    run.extend(["--picture".to_owned(), picture.path]);
+    let mut run = vec!["--picture".to_owned(), picture.path];
     run.extend(["--stitches-across".to_owned(), across.to_string()]);
     if fabric != DEFAULT_FABRIC {
         run.extend(["--fabric".to_owned(), fabric.option()]);
     }
-    run.extend(["--pdf".to_owned(), pdf]);
-    Ok(Some((run, dates)))
+    Ok(Some(run))
+}
+
+/// The pattern's PDF, named in the task's folder; none for back.
+pub(crate) fn pattern_file() -> Result<Option<Vec<String>>, Stop> {
+    Ok(output_file(PATTERN_FILE)?.map(|pdf| vec!["--pdf".to_owned(), pdf]))
 }
 
 /// A picture as the menu read it: its path and its upright size in pixels.
