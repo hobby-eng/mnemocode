@@ -33,6 +33,7 @@ Start with the [README](../README.md) to choose a task. Its sections follow the 
 | [Releasing](RELEASING.md)                        | Maintainer checks, signed tags, draft signing and publication   |
 | [Design and decisions](design/README.md)         | Architecture, platform protections, crate choices and decisions |
 | [Audit index](audits/README.md)                  | Reports and their original scope, source identities and limits  |
+| [Test coverage](COVERAGE.md)                     | Line coverage on Linux by crate, the command and its limits     |
 | [Changelog](../CHANGELOG.md)                     | Version-by-version changes                                      |
 | [0.2.0 release notes](releases/v0.2.0.md)        | What 0.2.0 changes, in short                                    |
 | [Third-party notices](../THIRD_PARTY_NOTICES.md) | Dependencies, artwork and attribution                           |

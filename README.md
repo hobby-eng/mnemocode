@@ -507,7 +507,7 @@ The `mnemocode` crate provides transformations, recovery, shares and wallet chec
 
 ## Source layout and review
 
-See the [architecture](docs/ARCHITECTURE.md), [audit index](docs/audits/README.md) and [release procedure](docs/RELEASING.md). CI checks source, tests and platform input handling; release workflows build and check the executables.
+See the [architecture](docs/ARCHITECTURE.md), [audit index](docs/audits/README.md) and [release procedure](docs/RELEASING.md). CI checks source, tests and platform input handling; release workflows build and check the executables. The tests cover 81.07% of the source lines of MnemoCode's own crates on Linux x86-64 (2026-11-16, commit `74b03e9`); [test coverage](docs/COVERAGE.md) gives each crate and what the figure leaves out.
 
 ## Provenance and license
 
