@@ -22,10 +22,7 @@ use zeroize::Zeroizing;
 use super::asking::{AfterFailure, after_failure, value_until};
 use super::backup_questions::SHARE_SEEDSHIFT_QUESTION;
 use super::configure::asked_options;
-use super::encode::{
-    masked_words_requested, original_copy_requested, print_masked_words, print_original_copy,
-    write_qr,
-};
+use super::encode::{masked_words_requested, original_copy_requested, write_qr};
 use super::encode_questions::file_questions;
 use super::given::{PATH_LIMIT, check_date_input, given_mode, phrase_and_dates};
 use super::heir_sheet::{save_heir_sheet, validate_heir_sheet_options};
@@ -40,10 +37,10 @@ use crate::gate::Stop;
 use crate::input::read_picture;
 use crate::os::{self, Folder, SystemRandom};
 use crate::output::{report_renamed, shown_path};
-use crate::terminal::result::{print, result_header};
+use crate::terminal::result::{phrase_grid, print, result_header};
 use crate::terminal::{
-    self, Choice, NoticeKind, TEXT_WIDTH, clear_private_screen, lasting_warning, notice, saved,
-    wrap_text,
+    self, Channel, Choice, NoticeKind, TEXT_WIDTH, clear_private_screen, hint, lasting_warning,
+    notice, saved, wrap_text,
 };
 use mnemocode_cards::heir::{HeirBackup, HeirSheetFacts};
 
@@ -331,14 +328,24 @@ fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> 
         .collect::<Result<Vec<_>, _>>()?;
     // The result is a step of its own: the questions are cleared away (CORE-39).
     clear_private_screen();
-    show_patterns(&hidden, &grid, &lines, set);
-    if masked_words {
-        let masked = Backup::encode(&phrase, &dates, Form::English, mode, false)?;
-        print_masked_words(masked.backup.text()?.as_str(), mode);
-    }
-    if original_copy {
-        print_original_copy(phrase.text().as_str());
-    }
+    let masked = if masked_words {
+        Some(
+            Backup::encode(&phrase, &dates, Form::English, mode, false)?
+                .backup
+                .text()?,
+        )
+    } else {
+        None
+    };
+    let original = original_copy.then(|| phrase.text());
+    show_result(
+        (&hidden, &lines),
+        (set, mode.masked()),
+        (
+            masked.as_ref().map(SecretText::as_str),
+            original.as_ref().map(SecretText::as_str),
+        ),
+    );
     let backup = match set {
         None => HeirBackup::Pattern {
             words: phrase.len(),
@@ -356,84 +363,100 @@ fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> 
     }
 }
 
-/// Shows the legend `lines` of the patterns `hidden` made from `grid`: one of the whole backup, or
-/// one a share of `set`.
-fn show_patterns(
-    hidden: &[Hidden],
-    grid: &Grid,
-    lines: &[SecretText],
-    set: Option<(usize, usize)>,
+/// A heading of the result, a blank line above it.
+fn heading(channel: Channel, text: &str) -> [String; 2] {
+    [
+        String::new(),
+        terminal::paint(channel, terminal::style::STRONG, text),
+    ]
+}
+
+/// Shows the result, each part under its heading with room between them: the phrase after
+/// Seedshift and the original phrase where `masked` and `original` give them, then the legend
+/// `lines` of the patterns `hidden`, one of the whole backup or one a share of `set`, read back with
+/// the dates where `dated`. The files saved are named below it.
+fn show_result(
+    (hidden, lines): (&[Hidden], &[SecretText]),
+    (set, dated): (Option<(usize, usize)>, bool),
+    (masked, original): (Option<&str>, Option<&str>),
 ) {
     let channel = terminal::secret_channel();
-    let (Some(first), Some(moved)) = (hidden.first(), hidden.iter().map(Hidden::moved).max())
-    else {
+    let Some(first) = hidden.first() else {
         return;
     };
-    let apart = hidden
-        .iter()
-        .map(|one| one.pattern().seen_difference(grid))
-        .fold(0.0, f64::max);
-    let mut facts = Vec::new();
+    let mut facts = vec![(
+        "Pattern",
+        format!(
+            "{} by {} stitches, {} threads",
+            first.pattern().width(),
+            first.pattern().height(),
+            first.rows().len()
+        ),
+    )];
     if let Some((threshold, count)) = set {
         facts.push((
             "Shares",
             format!("any {threshold} of {count}, a pattern each"),
         ));
     }
-    facts.push(("Rows", first.rows().len().to_string()));
-    facts.push((
-        "Pattern",
-        format!(
-            "{} by {} stitches, {moved} moved to set the counts",
-            first.pattern().width(),
-            first.pattern().height(),
-        ),
-    ));
-    facts.push((
-        "Looks like the picture",
-        format!("{apart:.1} apart, seen from a little distance"),
-    ));
-    let title = if set.is_some() {
-        "SeedStitch shares"
-    } else {
-        "SeedStitch legend"
-    };
-    result_header(title, &facts, channel);
-    for (place, line) in lines.iter().enumerate() {
-        let heading = match set {
-            None => {
-                "Legend line: keep it, in this exact order, or the PDF that holds it".to_owned()
-            }
-            Some((_, count)) => format!(
-                "Share {} of {count}: its legend line, in this exact order, or its PDF",
-                place + 1
-            ),
-        };
+    result_header("Embroidery", &facts, channel);
+    // The phrases go where a phrase always goes, the codes where the codes do; on a terminal both
+    // are the private screen.
+    if let Some(words) = masked {
         print(
-            channel,
-            &[terminal::paint(channel, terminal::style::STRONG, &heading)],
+            Channel::Output,
+            &heading(Channel::Output, "Seed phrase after Seedshift"),
         );
-        print(channel, &wrap_text(line.as_str(), TEXT_WIDTH));
+        print(Channel::Output, &phrase_grid(words, Channel::Output));
+        hint("Only your dates turn these words back into the wallet's seed phrase.");
+    }
+    if let Some(phrase) = original {
+        print(
+            Channel::Output,
+            &heading(Channel::Output, "Original seed phrase"),
+        );
+        print(Channel::Output, &phrase_grid(phrase, Channel::Output));
+        notice(
+            "Keep the original phrase apart from the patterns.",
+            NoticeKind::Warning,
+        );
+    }
+    let title = match set {
+        None => "Legend line: keep it, in this exact order, or the PDF that holds it",
+        Some(_) if masked.is_some() => "That phrase split into Shamir shares",
+        Some(_) => "The seed phrase split into Shamir shares",
+    };
+    print(channel, &heading(channel, title));
+    for (place, line) in lines.iter().enumerate() {
+        if let Some((_, count)) = set {
+            print(
+                channel,
+                &heading(channel, &format!("Share {} of {count}", place + 1)),
+            );
+        }
+        let rows: Vec<String> = wrap_text(line.as_str(), TEXT_WIDTH - 2)
+            .iter()
+            .map(|row| format!("  {row}"))
+            .collect();
+        print(channel, &rows);
     }
     // Format 2, whose rows' order holds part of the phrase, names each row's thread.
     let named = hidden
         .iter()
         .any(|one| one.rows().iter().any(|row| row.thread().is_some()));
     let row = if named {
-        "Each word is a row of the floss key from the top: its symbol's number, its DMC number and its stitches, colons between them."
+        "Each item is a floss key row from the top: symbol number, DMC number, stitches."
     } else {
-        "Each pair is a row of the floss key from the top: its symbol's number, a colon and its stitches."
+        "Each pair is a floss key row from the top: symbol number, stitches."
     };
     let reader = match set {
         None => "Decode reads the line back".to_owned(),
-        Some((threshold, _)) => {
-            format!("Restore from shares reads any {threshold} of the lines or PDFs back")
-        }
+        Some((threshold, _)) => format!("Restore from shares reads any {threshold} back"),
     };
-    notice(
-        &format!("{row} {reader}, with the dates where Seedshift masked the phrase."),
-        NoticeKind::Info,
-    );
+    let dates = if dated { ", with your dates" } else { "" };
+    print(channel, &[String::new()]);
+    notice(&format!("{row} {reader}{dates}."), NoticeKind::Info);
+    print(channel, &heading(channel, "Saved files"));
 }
 
 /// The legend `lines` as a text file, one to a line.

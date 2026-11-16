@@ -1,6 +1,6 @@
 //! The questions of every new backup, one block in one order: Seedshift, its dates, Shamir shares,
-//! the copies on the screen, the sheet for heirs, and last, before the seed phrase, where it is
-//! saved, with the folder of its files asked once. A way of hiding adds its own questions after the
+//! the sheet for heirs, and last, before the seed phrase, where it is saved, with the folder of its
+//! files asked once. A masked backup shows the phrase after Seedshift without a question. A way of hiding adds its own questions after the
 //! dates and its own places; it never drops or moves one of the block. An answer it cannot take
 //! stays greyed in its place, with the reason.
 
@@ -8,16 +8,12 @@ use mnemocode::forms::Form;
 use mnemocode::modes::Mode;
 use mnemocode::sskr::forms::ShareFormat;
 
-use super::asking::ask_list;
-use super::encode::ORIGINAL_COPY_FORM;
 use super::encode_questions::{
-    EncodingAnswers, Place, Takes, ask_copy_destination, ask_heir_sheet, ask_original_copy,
-    ask_pattern_shares, ask_seedshift, ask_share_set, ask_shares, heir_sheet_files,
-    shares_explanation,
+    EncodingAnswers, Place, Takes, ask_copy_destination, ask_heir_sheet, ask_pattern_shares,
+    ask_seedshift, ask_share_set, ask_shares, heir_sheet_files, shares_explanation,
 };
 use super::given::format_number;
 use crate::gate::Stop;
-use crate::terminal::{Choice, Explanation};
 
 /// Options that a way asks or names for itself; none for back.
 type Own = fn() -> Result<Option<Vec<String>>, Stop>;
@@ -110,9 +106,7 @@ pub(crate) fn ask_new_backup(way: Way) -> Result<Option<EncodingAnswers>, Stop> 
     };
     // Codes in words are the masked words already; shares never are.
     let words_already = set.is_none() && way.written_in_words();
-    let Some(shown) = ask_copies(mode, set.is_some(), words_already)? else {
-        return Ok(None);
-    };
+    let shown = shown_masked_words(mode, words_already);
     let Some(heir_size) = ask_heir_sheet(mode)? else {
         return Ok(None);
     };
@@ -164,54 +158,12 @@ pub(crate) fn ask_new_backup(way: Way) -> Result<Option<EncodingAnswers>, Stop> 
     Ok(Some((run, dates)))
 }
 
-/// The copies on the screen, as every new backup asks them: the original phrase where it is masked
-/// or `shared`, and the masked phrase in words where it is masked; their options, none for back.
-pub(crate) fn ask_copies(
-    mode: Mode,
-    shared: bool,
-    words_already: bool,
-) -> Result<Option<Vec<String>>, Stop> {
-    let mut shown = Vec::new();
-    if shared || mode.masked() {
-        let Some(copy) = ask_original_copy(mode, shared)? else {
-            return Ok(None);
-        };
-        if copy {
-            shown.extend(["--show-original".to_owned(), ORIGINAL_COPY_FORM.to_owned()]);
-        }
+/// The phrase after Seedshift, which every masked backup shows on the screen without a question,
+/// unless its codes are those words already; the phrase itself is seen as it is typed.
+pub(crate) fn shown_masked_words(mode: Mode, words_already: bool) -> Vec<String> {
+    if mode.masked() && !words_already {
+        vec!["--show-masked-words".to_owned()]
+    } else {
+        Vec::new()
     }
-    if mode.masked() {
-        let Some(show_words) = ask_masked_words(words_already)? else {
-            return Ok(None);
-        };
-        if show_words {
-            shown.push("--show-masked-words".to_owned());
-        }
-    }
-    Ok(Some(shown))
-}
-
-/// Whether the masked phrase is also shown in English words; Yes greyed where the backup is those
-/// words already.
-fn ask_masked_words(words_already: bool) -> Result<Option<bool>, Stop> {
-    let mut yes = Choice::noted("Yes", "the masked phrase; the dates are still needed", true);
-    let mut lines = Vec::new();
-    if words_already {
-        yes.enabled = false;
-        yes.note = Some("the backup is these words already".to_owned());
-        lines.push("Your backup is written in these masked words already.".to_owned());
-    }
-    let explanation = (!lines.is_empty()).then_some(Explanation {
-        lines,
-        more: Vec::new(),
-    });
-    ask_list(
-        "Also show the Seedshift phrase as English words?",
-        "Decoy words",
-        &[
-            Choice::noted("No", "keep only the codes or shares", false),
-            yes,
-        ],
-        explanation.as_ref(),
-    )
 }

@@ -497,11 +497,11 @@ fn menu_seedshift_dates_are_asked_before_other_settings_and_cancel_privately() {
         session.wait_for("DD-MM-YYYY, separated by spaces):");
         session.wait_for(" to cancel");
         session.press("23-09-2026\r");
-        // The original Seedshift is never split: its next question is the copy on the screen.
+        // The original Seedshift is never split: its next question is the sheet for heirs.
         session.wait_for(if version == "1" {
             "Split it into Shamir shares?"
         } else {
-            "Also show the original seed phrase, before Seedshift?"
+            "Instructions for your heirs?"
         });
         session.press("\x03");
         session.wait_for("What do you want to do?");
@@ -841,16 +841,17 @@ fn exit_menu(mut session: Session) {
 #[test]
 fn cards_beside_a_qr_code_image_follow_its_hidden_choice() {
     let mut session = at_where_a_color_backup_is_saved();
-    // The QR code image and the cards, ticked together.
+    // The QR code image and the cards, ticked together: how the QR code shows its data comes
+    // right after them, before the folder.
     session.press("2");
     session.press("3");
-    session.press("\r");
-    session.wait_for("Folder for the files");
     session.press("\r");
     session.wait_for("What should the QR code show?");
     session.press("2");
     session.wait_for("Public text");
     session.press("Design studio\r");
+    session.wait_for("Folder for the files");
+    session.press("\r");
     session.wait_for("Which kind of file?");
     session.press("1");
     session.wait_for("How should the cards be laid out?");

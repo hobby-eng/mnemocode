@@ -391,6 +391,13 @@ fn pattern_answer(answer: &str, pattern_pdf: bool) -> Result<Option<SecretText>,
     }
 }
 
+/// The local folder that `answer` names as a path, made absolute; none for any other answer.
+pub(crate) fn folder_answer(answer: &str) -> Option<PathBuf> {
+    let path = path_of_answer(answer).ok().flatten()?;
+    let resolved = local_resolved(&path).ok()?;
+    matches!(os::look_at_file(&resolved), Ok(os::FileLook::Folder)).then_some(resolved)
+}
+
 /// A file dragged into a terminal as its path: the quotes or backslashes a terminal adds removed,
 /// and a leading ~ expanded. Backslashes on Windows separate folders and stay as typed.
 pub(crate) fn dropped_path(answer: &str) -> PathBuf {
@@ -495,6 +502,10 @@ pub(crate) struct Ask<'h> {
     pub(crate) text_file: Option<&'static str>,
     /// Take a pattern's PDF at such a path as the legend line it keeps.
     pub(crate) pattern_pdf: bool,
+    /// Pass the path of a local folder on as it is typed, for the caller to read.
+    pub(crate) folders: bool,
+    /// A line above the prompt that says what the answer may be.
+    pub(crate) note: Option<String>,
     /// The answer that Enter alone gives, which the prompt names.
     pub(crate) fallback: Option<String>,
 }
@@ -566,6 +577,11 @@ pub(crate) fn ask_until<T, E: std::fmt::Display>(
                 terminal::error_line(&line);
             }
         }
+        if let Some(note) = &ask.note {
+            for line in notice_lines(note, NoticeKind::Info) {
+                terminal::error_line(&line);
+            }
+        }
         let reading = read_answer(ask, secret)?;
         let leave = if secret { "stop" } else { "go back" };
         match reading {
@@ -583,6 +599,7 @@ pub(crate) fn ask_until<T, E: std::fmt::Display>(
             },
             Reading::Answer(text) => {
                 let read = match ask.text_file {
+                    Some(_) if ask.folders && folder_answer(&text).is_some() => Ok(text),
                     Some(name) => match pattern_answer(&text, ask.pattern_pdf) {
                         Ok(Some(line)) => Ok(line),
                         Ok(None) => answered_text(&text, name, ask.limit),
@@ -615,6 +632,8 @@ pub(crate) fn secret_ask<'h>(prompt: &str, what: &str, limit: usize) -> Ask<'h> 
         echo: on_private_screen(),
         text_file: None,
         pattern_pdf: false,
+        folders: false,
+        note: None,
         fallback: None,
     }
 }

@@ -112,7 +112,7 @@ impl HeirRoute for MenuRoute {
                 share_seedshift_label(mode)
             ),
             format!(
-                "Give the PDFs of any {threshold} patterns, one at a time, or type their legend lines, separated by \"{}\"{}. MnemoCode shows the seed phrase.",
+                "Give the folder that holds the PDFs of any {threshold} patterns, copied into one folder, or type their legend lines, separated by \"{}\"{}. MnemoCode shows the seed phrase.",
                 mnemocode::sskr::typed::SHARE_SEPARATOR,
                 then_dates(dates)
             ),

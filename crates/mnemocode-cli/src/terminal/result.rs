@@ -52,8 +52,19 @@ pub(crate) fn phrase_lines(phrase: &str, channel: Channel) -> Option<Vec<String>
     if !can_redraw(channel) {
         return None;
     }
+    let mut lines = phrase_grid(phrase, channel);
+    lines.push(paint(channel, style::MUTED, "On one line, for copying:"));
+    lines.push(phrase.to_owned());
+    Some(lines)
+}
+
+/// The words of `phrase` numbered in rows on a terminal, or the phrase as it is elsewhere.
+pub(crate) fn phrase_grid(phrase: &str, channel: Channel) -> Vec<String> {
+    if !can_redraw(channel) {
+        return vec![phrase.to_owned()];
+    }
     let words: Vec<&str> = phrase.split(' ').collect();
-    let mut lines: Vec<String> = words
+    words
         .chunks(WORDS_PER_ROW)
         .enumerate()
         .map(|(row, items)| {
@@ -78,10 +89,7 @@ pub(crate) fn phrase_lines(phrase: &str, channel: Channel) -> Option<Vec<String>
                 .collect();
             format!("{ROW_INDENT}{}", cells.join(&" ".repeat(WORD_GAP)))
         })
-        .collect();
-    lines.push(paint(channel, style::MUTED, "On one line, for copying:"));
-    lines.push(phrase.to_owned());
-    Some(lines)
+        .collect()
 }
 
 /// Prints `phrase` as [`phrase_lines`] lays it out, or as it is where `channel` is no terminal.

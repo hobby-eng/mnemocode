@@ -220,7 +220,7 @@ fn a_pattern_saves_and_shows_what_every_new_backup_does() {
         "the original copy: {output}"
     );
     assert!(
-        output.contains("Seedshift phrase"),
+        output.contains("Seed phrase after Seedshift"),
         "the masked words: {output}"
     );
     assert!(read(&folder, "heirs.pdf").starts_with(PDF_START));

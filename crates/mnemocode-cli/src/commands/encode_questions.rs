@@ -306,19 +306,13 @@ impl Place {
         let Some(path) = path else {
             return Ok(None);
         };
-        let mut options = vec![option.to_owned(), path];
-        if self.is_qr() {
-            let Some(chosen) = super::hidden_qr::ask_options()? else {
-                return Ok(None);
-            };
-            options.extend(chosen);
-        }
-        Ok(Some(options))
+        Ok(Some(vec![option.to_owned(), path]))
     }
 }
 
-/// Asks where the result goes besides the screen, as a checklist: every ticked place, then
-/// its own questions; none ticked keeps the result on the screen only.
+/// Asks where the result goes besides the screen, as a checklist: then how a QR code shows its
+/// data where one is ticked, then every ticked place's own questions, the folder among them; none
+/// ticked keeps the result on the screen only.
 fn ask_destination(question: &str, places: &[Place]) -> Result<Option<Vec<String>>, Stop> {
     // Every place stays in the list: a QR code image too beside cards, which ask on their own
     // whether a sheet also carries one.
@@ -330,15 +324,20 @@ fn ask_destination(question: &str, places: &[Place]) -> Result<Option<Vec<String
         return Ok(None);
     };
     let mut options = Vec::new();
-    // One choice of how a QR code shows its data, which --qr-hidden makes for every QR code.
+    // How a QR code shows its data comes right after the places, before the folder: one choice,
+    // which --qr-hidden makes for every QR code.
     let mut qr_hidden = None;
+    if asks.iter().any(|place| place.is_qr()) {
+        let Some(chosen) = super::hidden_qr::ask_options()? else {
+            return Ok(None);
+        };
+        qr_hidden = Some(chosen.iter().any(|option| option == "--qr-hidden"));
+        options.extend(chosen);
+    }
     for place in asks {
         let Some(asked) = place.ask(qr_hidden)? else {
             return Ok(None);
         };
-        if place.is_qr() {
-            qr_hidden = Some(asked.iter().any(|option| option == "--qr-hidden"));
-        }
         options.extend(asked);
     }
     Ok(Some(options))
@@ -507,49 +506,6 @@ fn ask_other_share_set() -> Result<Option<ShareSetChoice>, Stop> {
     Ok(Some(ShareSetChoice::of(threshold, count)?))
 }
 
-/// One opt-in original-copy question for masked backups and shares; the default shows none.
-pub(crate) fn ask_original_copy(mode: Mode, shares: bool) -> Result<Option<bool>, Stop> {
-    let masked = mode.masked();
-    let question = if masked {
-        "Also show the original seed phrase, before Seedshift?"
-    } else {
-        "Also show the original seed phrase beside the shares?"
-    };
-    let line = format!(
-        "{}{}",
-        if masked {
-            "Before Seedshift; no dates needed. "
-        } else {
-            ""
-        },
-        if shares {
-            "No shares needed. Keep it apart from the shares."
-        } else {
-            "Keep it apart from the encoded backup."
-        }
-    );
-    ask_list(
-        question,
-        "Copy",
-        &[
-            Choice::noted(
-                "No",
-                if shares {
-                    "only the shares"
-                } else {
-                    "only the encoded result"
-                },
-                false,
-            ),
-            Choice::noted("Yes, show the words", "for visual checking", true),
-        ],
-        Some(&Explanation {
-            lines: vec![line],
-            more: Vec::new(),
-        }),
-    )
-}
-
 /// Whether a sheet that tells heirs how to restore the backup is made, and its size: asked of every
 /// backup, Yes greyed where one made in `mode` can have none. `Some(None)` for none, none for
 /// back. Its file is named with the others, last (heir_sheet_files).
@@ -711,9 +667,7 @@ pub(crate) fn ask_splitting() -> Result<Option<EncodingAnswers>, Stop> {
     };
     // The rest of the block, in its order: the copies on the screen, the sheet for heirs, and
     // last where the shares are saved.
-    let Some(shown) = super::new_backup::ask_copies(mode, true, false)? else {
-        return Ok(None);
-    };
+    let shown = super::new_backup::shown_masked_words(mode, false);
     let Some(heir_size) = ask_heir_sheet(mode)? else {
         return Ok(None);
     };

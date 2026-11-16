@@ -93,6 +93,9 @@ struct Picture {
 fn ask_picture() -> Result<Option<(Picture, WholeRange)>, Stop> {
     let how = LineQuestion {
         what: Some("the name of a PNG, JPEG or WebP file"),
+        note: Some(
+            "MnemoCode makes a cross-stitch chart from this picture and hides the seed phrase in the chart's floss key. A photograph with smooth shades works best.",
+        ),
         limit: PATH_LIMIT,
         ..LineQuestion::default()
     };

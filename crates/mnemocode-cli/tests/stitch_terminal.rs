@@ -91,10 +91,6 @@ fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen(
     session.wait_for("Split it into Shamir shares?");
     session.wait_for("2 of 3");
     session.press("1");
-    session.wait_for("Also show the original seed phrase, before Seedshift?");
-    session.press("1");
-    session.wait_for("Also show the Seedshift phrase as English words?");
-    session.press("1");
     session.wait_for("Instructions for your heirs?");
     session.press("1");
     session.wait_for("Where should the result be saved?");
@@ -113,6 +109,9 @@ fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen(
     session.wait_for("up to 4, DD-MM-YYYY");
     session.wait_for(" to cancel");
     session.press("23-09-2026\r");
+    // The phrase after Seedshift, then the legend and the files saved, on one screen.
+    session.wait_for("Seed phrase after Seedshift");
+    session.wait_for("Saved files");
     let written = cleared_and_quit(session);
     let saved = fs::read(&pdf).expect("the pattern");
     assert!(saved.starts_with(b"%PDF-"));
@@ -134,10 +133,6 @@ fn the_menu_makes_a_pattern_a_share() {
     session.press("1");
     session.wait_for("Split it into Shamir shares?");
     session.press("2");
-    session.wait_for("Also show the original seed phrase, before Seedshift?");
-    session.press("1");
-    session.wait_for("Also show the Seedshift phrase as English words?");
-    session.press("1");
     session.wait_for("Instructions for your heirs?");
     session.press("1");
     session.wait_for("Where should the shares be saved?");
@@ -148,8 +143,11 @@ fn the_menu_makes_a_pattern_a_share() {
     session.press(&format!("{}\r", folder.display()));
     session.wait_for(" to cancel");
     session.press(&format!("{PHRASE}\r"));
-    session.wait_for("Share 3 of 3");
-    // The three legends take more than a screen, turned page by page.
+    // The phrase after Seedshift first, then its shares; they take more than a screen, turned
+    // page by page.
+    session.wait_for("Seed phrase after Seedshift");
+    session.wait_for("That phrase split into Shamir shares");
+    session.wait_for("Share 1 of 3");
     session.wait_for("Enter done");
     session.press("\r");
     let written = cleared_and_quit(session);
@@ -295,4 +293,66 @@ fn the_menu_s_decode_reads_the_phrase_from_a_pattern_s_pdf() {
     session.press("23-09-2026\r");
     session.wait_for("abandon");
     cleared_and_quit(session);
+}
+
+// Restore from shares takes the folder of the patterns: what it holds is listed, the shares of its
+// one set are chosen at once, and with the dates they give the phrase back.
+#[test]
+fn a_folder_of_share_patterns_restores_the_phrase() {
+    let folder = file("restore-from-folder");
+    let _absent = fs::remove_dir_all(&folder);
+    fs::create_dir_all(&folder).expect("a folder");
+    fs::write(
+        folder.join("picture.png"),
+        mnemocode_embroidery::sample::gradient_png(),
+    )
+    .expect("a picture");
+    fs::write(folder.join("phrase.txt"), format!("{PHRASE}\n")).expect("a phrase");
+    fs::write(folder.join("dates.txt"), "23-09-2026\n").expect("the dates");
+    let made = std::process::Command::new(PROGRAM)
+        .current_dir(&folder)
+        .args([
+            "stitch",
+            "--mnemonic-file",
+            "phrase.txt",
+            "--dates-file",
+            "dates.txt",
+            "--picture",
+            "picture.png",
+            "--threshold",
+            "2",
+            "--shares",
+            "3",
+            "--pdf-dir",
+            "patterns",
+        ])
+        .output()
+        .expect("the patterns");
+    assert!(made.status.success(), "{made:?}");
+    // A copy of a pattern and a file that is no pattern change nothing.
+    fs::copy(
+        folder.join("patterns/share-2-pattern.pdf"),
+        folder.join("patterns/copy.pdf"),
+    )
+    .expect("a copy");
+    fs::write(folder.join("patterns/notes.pdf"), "%PDF-1.4 nothing").expect("a file");
+    let mut session = Session::start(PROGRAM, &[]);
+    session.wait_for("What do you want to do?");
+    session.press("5");
+    session.wait_for("Was Seedshift used before it was split?");
+    session.press("2");
+    session.wait_for("copy them into one folder first");
+    session.wait_for(" to cancel");
+    session.press(&format!("{}\r", folder.join("patterns").display()));
+    session.wait_for("Restore from these patterns?");
+    session.wait_for("share-3-pattern.pdf: share 3");
+    session.wait_for("1 other PDF file holds no legend that reads.");
+    session.wait_for("Use shares 1, 2, 3");
+    session.press("\r");
+    session.wait_for(" to cancel");
+    session.press("23-09-2026\r");
+    session.wait_for(PHRASE);
+    let written = cleared_and_quit(session);
+    let outside = written.rsplit(LEAVE_PRIVATE_SCREEN).next().expect("a part");
+    assert!(!outside.contains("abandon"), "{outside}");
 }

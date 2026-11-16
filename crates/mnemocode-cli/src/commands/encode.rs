@@ -179,16 +179,19 @@ pub(crate) fn masked_words_requested(parsed: &Parsed, mode: Mode) -> Result<bool
 pub(crate) fn print_masked_words(words: &str, mode: Mode) {
     let facts = [
         ("Mode", mode.id().to_owned()),
-        ("Content", "Masked phrase (decoy)".to_owned()),
+        (
+            "Content",
+            "your seed phrase masked with your dates".to_owned(),
+        ),
     ];
-    if !result_header("Seedshift phrase", &facts, Channel::Output) {
+    if !result_header("Seed phrase after Seedshift", &facts, Channel::Output) {
         print(
             Channel::Output,
-            &["Seedshift phrase (masked, not the original wallet phrase):".to_owned()],
+            &["Seed phrase after Seedshift (not the wallet's own phrase):".to_owned()],
         );
     }
     print_phrase(words, Channel::Output);
-    hint("These words need the original dates to recover the wallet seed phrase.");
+    hint("Only your dates turn these words back into the wallet's seed phrase.");
 }
 
 /// The original phrase, for checking it by eye.

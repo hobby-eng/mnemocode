@@ -122,6 +122,26 @@ fn share_ask<'h>(prompt: &str, what: &str, hints: &'h dyn crate::terminal::Hints
     }
 }
 
+/// What one answer to a question for shares gave.
+enum SharesAnswer {
+    /// The shares typed or read from a file.
+    Texts(Vec<String>),
+    /// A folder of patterns, to look in.
+    Folder(std::path::PathBuf),
+}
+
+/// The shares of `answer`, as [`shares_in`] reads them, or the folder of patterns it names.
+fn shares_or_folder(
+    input: &ShareInput,
+    answer: &str,
+    told: (bool, Option<bool>),
+) -> Result<SharesAnswer, String> {
+    match crate::input::folder_answer(answer) {
+        Some(folder) => Ok(SharesAnswer::Folder(folder)),
+        None => shares_in(input, answer, told).map(SharesAnswer::Texts),
+    }
+}
+
 /// The shares of `answer`, each legend line of a pattern taken for the share it holds, checked as
 /// [`ShareInput::shares_of_answer`] checks them: alone, or `adding` them to those typed. A legend
 /// whose phrase is masked, or not, where `masked` says otherwise is refused.
@@ -237,13 +257,20 @@ impl TypedShares {
     /// Asks for every share in one answer, in place of any typed before.
     fn ask_all(&mut self) -> Result<(), Stop> {
         let hints = share_word_hints();
-        let prompt = format!("Shamir shares or text file path ({}):", share_answer_hint());
-        let ask = share_ask(&prompt, "the shares or their text file path", &hints);
-        let input = &self.input;
-        let masked = self.masked;
-        let texts = secret_until(&ask, |answer: &str| {
-            shares_in(input, answer, (false, masked))
-        })?;
+        let prompt = format!(
+            "Shamir shares, or the path of a file or folder ({}):",
+            share_answer_hint()
+        );
+        let ask = Ask {
+            folders: true,
+            note: Some(super::pattern_folder::FOLDER_NOTE.to_owned()),
+            ..share_ask(
+                &prompt,
+                "the shares or the path of their file or folder",
+                &hints,
+            )
+        };
+        let texts = self.shares_or_patterns(&ask, false)?;
         self.from_qr = false;
         self.input.replace_all(&texts)?;
         self.retype_unreadable()
@@ -266,13 +293,36 @@ impl TypedShares {
     fn type_more(&mut self) -> Result<Vec<String>, Stop> {
         self.from_qr = false;
         let hints = share_word_hints();
-        let prompt = format!("More shares or text file path ({}):", separator_hint());
-        let ask = share_ask(&prompt, "the shares to add", &hints);
+        let prompt = format!(
+            "More shares, or the path of a file or folder ({}):",
+            separator_hint()
+        );
+        let ask = Ask {
+            folders: true,
+            note: Some(super::pattern_folder::FOLDER_NOTE.to_owned()),
+            ..share_ask(&prompt, "the shares to add", &hints)
+        };
+        self.shares_or_patterns(&ask, true)
+    }
+
+    /// The shares of an answer to `ask`, `adding` them to those typed or not; a folder named is
+    /// looked in for patterns of shares, which the person confirms, or the question comes again.
+    fn shares_or_patterns(&self, ask: &Ask<'_>, adding: bool) -> Result<Vec<String>, Stop> {
         let input = &self.input;
         let masked = self.masked;
-        secret_until(&ask, |answer: &str| {
-            shares_in(input, answer, (true, masked))
-        })
+        loop {
+            let answer = secret_until(ask, |answer: &str| {
+                shares_or_folder(input, answer, (adding, masked))
+            })?;
+            match answer {
+                SharesAnswer::Texts(texts) => return Ok(texts),
+                SharesAnswer::Folder(folder) => {
+                    if let Some(texts) = super::pattern_folder::folder_shares(&folder, masked)? {
+                        return Ok(texts);
+                    }
+                }
+            }
+        }
     }
 
     /// The next share read from a QR code image, or more shares typed, as the person chooses;

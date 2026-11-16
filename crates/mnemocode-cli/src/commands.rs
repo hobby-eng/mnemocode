@@ -22,6 +22,7 @@ mod marked_search;
 pub(crate) mod menu_entries;
 mod new_backup;
 pub(crate) mod output_questions;
+mod pattern_folder;
 pub(crate) mod pattern_questions;
 pub(crate) mod preview;
 pub(crate) mod re_encode;

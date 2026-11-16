@@ -649,7 +649,9 @@ pub(crate) struct LineQuestion<'a> {
     pub(crate) optional: Option<&'a str>,
     /// What to type, for the line after an empty answer.
     pub(crate) what: Option<&'a str>,
-    /// Why the question is asked, above it.
+    /// What the question is for, above it.
+    pub(crate) note: Option<&'a str>,
+    /// Why the question is asked, above it, as a warning.
     pub(crate) warning: Option<&'a str>,
     /// The longest answer in bytes.
     pub(crate) limit: usize,
@@ -674,7 +676,12 @@ fn ask_line_once<E: Display>(
     check: &mut impl FnMut(&str) -> Result<String, E>,
 ) -> Result<LineStep, Interrupted> {
     let prompt_width = shown_width(shown);
-    let warned = warning.map_or_else(Vec::new, |text| notice_lines(text, NoticeKind::Warning));
+    let mut warned = how
+        .note
+        .map_or_else(Vec::new, |text| notice_lines(text, NoticeKind::Info));
+    if let Some(text) = warning {
+        warned.extend(notice_lines(text, NoticeKind::Warning));
+    }
     let mut above = vec![String::new()];
     above.extend(warned.iter().cloned());
     above.push(shown.to_owned());
