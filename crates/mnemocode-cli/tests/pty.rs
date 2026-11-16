@@ -846,9 +846,10 @@ fn cards_beside_a_qr_code_image_follow_its_hidden_choice() {
     session.press("2");
     session.press("3");
     session.press("\r");
-    session.wait_for("What should the QR code show?");
-    session.press("2");
-    session.wait_for("Public text");
+    session.wait_for("What should a phone show when it scans the QR code?");
+    session.wait_for("Never put your dates or anything private here.");
+    session.press("4");
+    session.wait_for("A phone shows these words as they are.");
     session.press("Design studio\r");
     session.wait_for("Folder for the files");
     session.press("\r");

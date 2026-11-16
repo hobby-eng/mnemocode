@@ -137,8 +137,12 @@ fn the_menu_makes_a_pattern_a_share() {
     session.press("1");
     session.wait_for("Where should the shares be saved?");
     session.wait_for("every share's legend line, one to a line");
-    session.press(" ");
+    session.press("1");
+    session.press("2");
     session.press("\r");
+    // A business card that MnemoCode invents is what a phone shows of each QR code.
+    session.wait_for("What should a phone show when it scans the QR code?");
+    session.press("1");
     session.wait_for("Folder for the files");
     session.press(&format!("{}\r", folder.display()));
     session.wait_for(" to cancel");
@@ -157,6 +161,10 @@ fn the_menu_makes_a_pattern_a_share() {
     }
     let legends = fs::read_to_string(folder.join("cross-stitch-legend.txt")).expect("legends");
     assert_eq!(legends.lines().count(), 3, "{legends}");
+    for place in 1..=3 {
+        let image = folder.join(format!("cross-stitch-legend-qr/share-{place}-qr.png"));
+        assert!(fs::read(&image).expect("a QR code").starts_with(b"\x89PNG"));
+    }
     let outside = written.rsplit(LEAVE_PRIVATE_SCREEN).next().expect("a part");
     assert!(!outside.contains("abandon"), "{outside}");
 }

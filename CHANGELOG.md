@@ -17,6 +17,7 @@ MnemoCode is now written in Rust. Each system gets one executable with nothing e
 ### Hidden QR records
 
 - PDF and PNG exports can carry a hidden QR record (`--qr-hidden`): ordinary scanners show the printed contact or a chosen text (`--qr-text`), and MnemoCode reads back the exact backup codes or share. `qr-hide` wraps an existing record, `qr-open` extracts it unchanged, and the browser binding does both. [Hidden QR records](docs/HIDDEN_QR.md) describes the format and its limits.
+- In the menu, a QR code image shows a phone a business card that MnemoCode invents unless another answer is chosen: your own business card, typed on one line, a web link, a short text, or the backup codes themselves.
 
 ### Wallet checks
 
