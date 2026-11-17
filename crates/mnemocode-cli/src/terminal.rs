@@ -601,6 +601,35 @@ pub(crate) fn escape_hint(action: &str) -> String {
     )
 }
 
+/// Whether the menu's task is asking: Escape leaves it for the main menu, and Shift+Tab goes back
+/// to its step before.
+static STEPS_BACK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// Whether Escape left a task for the main menu, rather than Ctrl+C ending the program.
+static TO_MENU: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Starts or ends a task of the menu, whose questions Shift+Tab steps back through.
+pub(crate) fn set_steps_back(on: bool) {
+    STEPS_BACK.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether the questions asked now belong to a task of the menu.
+pub(crate) fn steps_back() -> bool {
+    STEPS_BACK.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Notes that Escape leaves the task for the main menu; the question then ends as cancelled.
+pub(crate) fn leave_to_menu() {
+    TO_MENU.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether the task ended for the main menu, the note forgotten.
+pub(crate) fn take_to_menu() -> bool {
+    TO_MENU.swap(false, std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The keys of a task of the menu, under its questions.
+pub(crate) const STEP_KEYS: &str = "Shift+Tab back · Esc menu";
+
 /// Says that the command was cancelled.
 pub(crate) fn cancelled() {
     hint(CANCELLED_MESSAGE);

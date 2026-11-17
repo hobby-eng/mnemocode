@@ -52,7 +52,7 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
     Ok(())
 }
 
-/// What a phone shows when it scans a QR code image of a backup.
+/// What a QR scanner shows of a QR code image of a backup.
 #[derive(Clone, Copy)]
 enum Shown {
     /// A contact that MnemoCode invents.
@@ -70,7 +70,7 @@ enum Shown {
 /// The longest public text a person types.
 const PUBLIC_TEXT_LIMIT: usize = 400;
 
-/// What a phone shows when it scans the QR code, asked until a public text is given or the backup
+/// What a QR scanner shows of the QR code, asked until a public text is given or the backup
 /// codes chosen: the options of the QR code image, or none for back.
 pub(crate) fn ask_options() -> Result<Option<Vec<String>>, Stop> {
     let choices = [
@@ -92,19 +92,19 @@ pub(crate) fn ask_options() -> Result<Option<Vec<String>>, Stop> {
         Choice::noted("A short text", "any words you choose", Shown::Text),
         Choice::noted(
             "Nothing hidden",
-            "a phone shows the backup codes themselves",
+            "a scanner shows the backup codes themselves",
             Shown::Codes,
         ),
     ];
     let explanation = Explanation {
         lines: vec![
-            "A phone that scans the QR code shows only this; MnemoCode reads your backup, hidden in the same code. Never put your dates or anything private here.".to_owned(),
+            "A QR scanner shows only this; MnemoCode reads your backup, hidden in the same code. Never put your dates or anything private here.".to_owned(),
         ],
         more: vec![readme_link("qr-codes-with-hidden-records")],
     };
     loop {
         let Some(shown) = ask_list(
-            "What should a phone show when it scans the QR code?",
+            "What should a QR scanner show?",
             "QR code",
             &choices,
             Some(&explanation),
@@ -118,12 +118,12 @@ pub(crate) fn ask_options() -> Result<Option<Vec<String>>, Stop> {
             Shown::OwnCard => ask_own_card()?,
             Shown::Link => ask_public(
                 ("Web address", "Web link"),
-                "A phone offers to open this address. Choose one that says nothing about you, such as a shop or a museum.",
+                "A QR scanner offers to open this address. Choose one that says nothing about you, such as a shop or a museum.",
                 web_link,
             )?,
             Shown::Text => ask_public(
                 ("Text", "Text"),
-                "A phone shows these words as they are.",
+                "A QR scanner shows these words as they are.",
                 |text| Ok(text.to_owned()),
             )?,
         };
@@ -147,7 +147,7 @@ fn business_card(given: &CardProfile) -> Result<String, Stop> {
 fn ask_own_card() -> Result<Option<String>, Stop> {
     ask_public(
         ("Name; company; phone; email", "Business card"),
-        "A phone shows these as a contact card. Separate them with semicolons, such as: Anna Berg; Linden Studio; +49 30 1234567; anna@linden.studio. Leave any out and MnemoCode invents it.",
+        "A QR scanner shows these as a contact card. Separate them with semicolons, such as: Anna Berg; Linden Studio; +49 30 1234567; anna@linden.studio. Leave any out and MnemoCode invents it.",
         |typed| {
             let parts: Vec<&str> = typed.split(';').map(str::trim).collect();
             if parts.len() > 4 {
@@ -194,13 +194,13 @@ fn ask_public(
         label,
         LineQuestion {
             note: Some(note),
-            what: Some("the text a phone shows"),
+            what: Some("the text a QR scanner shows"),
             limit: PUBLIC_TEXT_LIMIT,
             ..LineQuestion::default()
         },
         |typed: &str| {
             if typed.trim().is_empty() {
-                Err("Type the text a phone shows.".to_owned())
+                Err("Type the text a QR scanner shows.".to_owned())
             } else {
                 check(typed.trim())
             }

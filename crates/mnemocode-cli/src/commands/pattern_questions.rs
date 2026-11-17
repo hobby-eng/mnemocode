@@ -38,11 +38,7 @@ pub(crate) fn ask_pattern() -> Result<Option<super::encode_questions::EncodingAn
 /// The pattern's own questions, after the dates: the picture, the fabric and the size; stitch's
 /// options for them, or none for back. Its PDF is named last (pattern_file).
 pub(crate) fn ask_pattern_own() -> Result<Option<Vec<String>>, Stop> {
-    let Some((picture, widths)) = ask_picture()? else {
-        return Ok(None);
-    };
-    // The pattern may not be saved over its own picture.
-    claim_read(&picture.path);
+    use super::new_backup::{answered, run_steps};
     let fabrics: Vec<Choice<Fabric>> = FABRICS
         .iter()
         .map(|&fabric| {
@@ -58,10 +54,29 @@ pub(crate) fn ask_pattern_own() -> Result<Option<Vec<String>>, Stop> {
             Choice::noted(&fabric.short_name(), &note, fabric)
         })
         .collect();
-    let Some(fabric) = ask_list("Which fabric?", "Fabric", &fabrics, None)? else {
-        return Ok(None);
-    };
-    let Some(across) = ask_size(picture.size, widths, fabric)? else {
+    let mut chosen = None;
+    let mut fabric = DEFAULT_FABRIC;
+    let mut across = 0;
+    // The picture, the fabric and the size, Shift+Tab going back a step.
+    let done = run_steps(3, |step| {
+        Ok(match step {
+            0 => answered(ask_picture()?.map(|(picture, widths)| {
+                // The pattern may not be saved over its own picture.
+                claim_read(&picture.path);
+                chosen = Some((picture, widths));
+            })),
+            1 => answered(
+                ask_list("Which fabric?", "Fabric", &fabrics, None)?.map(|asked| fabric = asked),
+            ),
+            _ => match &chosen {
+                Some((picture, widths)) => {
+                    answered(ask_size(picture.size, *widths, fabric)?.map(|asked| across = asked))
+                }
+                None => super::new_backup::Answered::Back,
+            },
+        })
+    })?;
+    let Some((picture, _)) = chosen.filter(|_| done) else {
         return Ok(None);
     };
     let mut run = vec!["--picture".to_owned(), picture.path];

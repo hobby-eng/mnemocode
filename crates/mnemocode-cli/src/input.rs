@@ -391,6 +391,12 @@ fn pattern_answer(answer: &str, pattern_pdf: bool) -> Result<Option<SecretText>,
     }
 }
 
+/// `path` made absolute where it names a local folder; none otherwise.
+pub(crate) fn local_folder(path: &Path) -> Option<PathBuf> {
+    let resolved = local_resolved(path).ok()?;
+    matches!(os::look_at_file(&resolved), Ok(os::FileLook::Folder)).then_some(resolved)
+}
+
 /// The local folder that `answer` names as a path, made absolute; none for any other answer.
 pub(crate) fn folder_answer(answer: &str) -> Option<PathBuf> {
     let path = path_of_answer(answer).ok().flatten()?;
@@ -477,6 +483,8 @@ enum Reading {
     Answer(SecretText),
     Empty,
     Back,
+    /// Shift+Tab, in a task of the menu.
+    Previous,
     Unusable(String),
     Ended,
     Cancelled,
@@ -522,6 +530,7 @@ fn read_answer(ask: &Ask<'_>, secret: bool) -> Result<Reading, InputError> {
             echo: ask.echo,
             limit: ask.limit,
             escape_goes_back: true,
+            previous: terminal::steps_back(),
             prompt_width: text_width(&shown),
             pasted_line_break: ask.pasted_line_break,
             hints: Some(&hints),
@@ -542,6 +551,7 @@ fn read_answer(ask: &Ask<'_>, secret: bool) -> Result<Reading, InputError> {
         }
         LineOutcome::Ended => Reading::Ended,
         LineOutcome::Back { .. } => Reading::Back,
+        LineOutcome::Previous { .. } => Reading::Previous,
         LineOutcome::Cancelled => Reading::Cancelled,
         LineOutcome::Refused { reason, .. } => Reading::Unusable(reason.message()),
     })
@@ -582,10 +592,20 @@ pub(crate) fn ask_until<T, E: std::fmt::Display>(
                 terminal::error_line(&line);
             }
         }
+        // A blank line keeps what is said above apart from the line typed into.
+        if warning.is_some() || ask.note.is_some() {
+            terminal::error_line("");
+        }
         let reading = read_answer(ask, secret)?;
         let leave = if secret { "stop" } else { "go back" };
         match reading {
             Reading::Ended | Reading::Cancelled => return Ok(Err(Left::Cancelled)),
+            // In a task of the menu Escape leaves for the main menu, and Shift+Tab goes back.
+            Reading::Back if terminal::steps_back() => {
+                terminal::leave_to_menu();
+                return Ok(Err(Left::Cancelled));
+            }
+            Reading::Previous => return Ok(Err(Left::Back)),
             Reading::Back if secret => return Ok(Err(Left::Cancelled)),
             Reading::Back => return Ok(Err(Left::Back)),
             Reading::Unusable(reason) => warning = Some(reason),

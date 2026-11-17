@@ -300,8 +300,13 @@ pub(crate) enum EditKey {
     Home,
     End,
     Delete,
+    /// Shift+Tab, which edits nothing: the step before, in the menu's tasks.
+    Previous,
     Other,
 }
+
+/// The final byte of Shift+Tab's sequence, ESC [ Z.
+const BACK_TAB: u8 = b'Z';
 
 /// Which editing key sent the sequence of `introducer`, `parameters` and `last`.
 pub(crate) fn edit_key_of(introducer: u8, parameters: &str, last: u8) -> EditKey {
@@ -313,6 +318,9 @@ pub(crate) fn edit_key_of(introducer: u8, parameters: &str, last: u8) -> EditKey
             key::END => EditKey::End,
             _ => EditKey::Other,
         };
+    }
+    if last == BACK_TAB && parameters.is_empty() {
+        return EditKey::Previous;
     }
     let mut parts = parameters.split(';');
     let code = parts.next().unwrap_or_default();
@@ -405,6 +413,8 @@ pub(crate) enum Key {
     Enter,
     /// Escape, q, Q, Ctrl+D or the end of the input: back.
     Back,
+    /// Shift+Tab: the step before, in the menu's tasks.
+    Previous,
     /// Ctrl+C.
     Cancel,
     Digit(u8),
@@ -466,6 +476,7 @@ fn sequence_key(introducer: u8, parameters: &str, last: u8) -> Key {
     match edit_key_of(introducer, parameters, last) {
         EditKey::Home => return Key::Home,
         EditKey::End => return Key::End,
+        EditKey::Previous => return Key::Previous,
         _ => {}
     }
     // Only an arrow key without parameters counts.

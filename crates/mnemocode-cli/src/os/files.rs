@@ -235,17 +235,18 @@ pub(crate) fn look_at_file(path: &Path) -> io::Result<FileLook> {
     })
 }
 
-/// The ordinary files directly in `folder` whose names end in .pdf, in any case, sorted by name:
-/// its subfolders and links are left out.
-pub(crate) fn pdf_files(folder: &Path) -> io::Result<Vec<PathBuf>> {
+/// The ordinary files directly in `folder` whose names end in one of `endings`, in any case, sorted
+/// by name: its subfolders and links are left out.
+pub(crate) fn files_ending(folder: &Path, endings: &[&str]) -> io::Result<Vec<PathBuf>> {
     let mut found = Vec::new();
     for entry in fs::read_dir(folder)? {
         let entry = entry?;
-        let pdf = entry
-            .path()
-            .extension()
-            .is_some_and(|ending| ending.eq_ignore_ascii_case("pdf"));
-        if pdf && entry.file_type()?.is_file() {
+        let named = entry.path().extension().is_some_and(|ending| {
+            endings
+                .iter()
+                .any(|wanted| ending.eq_ignore_ascii_case(wanted))
+        });
+        if named && entry.file_type()?.is_file() {
             found.push(entry.path());
         }
     }

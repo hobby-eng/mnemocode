@@ -26,7 +26,11 @@ impl Hints for InputHints<'_> {
             .filter(|hint| length > 0 || hint.shown_at_once())
             .map_or_else(Vec::new, |hint| hint.rows(typed, length, columns));
         let action = if self.secret { "cancel" } else { "go back" };
-        if columns > "Press Esc to ".len() + action.len() {
+        if super::steps_back() {
+            if columns > super::STEP_KEYS.len() {
+                rows.push(paint(Channel::Error, style::MUTED, super::STEP_KEYS));
+            }
+        } else if columns > "Press Esc to ".len() + action.len() {
             rows.push(escape_hint(action));
         }
         rows

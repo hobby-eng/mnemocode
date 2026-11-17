@@ -13,8 +13,8 @@ use mnemocode::secret::SecretBytes;
 
 use super::answer::{Hints, TypedAnswer, Unusable};
 use super::keys::{
-    ESCAPE_DELAY_MS, Interrupted, Keys, PASTE_GAP_MS, edit_after_escape, key, may_be_late_sequence,
-    read_late_sequence,
+    ESCAPE_DELAY_MS, EditKey, Interrupted, Keys, PASTE_GAP_MS, edit_after_escape, key,
+    may_be_late_sequence, read_late_sequence,
 };
 
 /// How a line is read.
@@ -25,6 +25,8 @@ pub(crate) struct LineOptions<'h> {
     pub(crate) limit: usize,
     /// Escape alone goes back, as in the menu; otherwise it does nothing.
     pub(crate) escape_goes_back: bool,
+    /// Whether Shift+Tab ends the answer for the step before.
+    pub(crate) previous: bool,
     /// The width of the prompt before the answer, which starts at the left edge.
     pub(crate) prompt_width: usize,
     /// What a line break inside a paste becomes: a space or ";"; without it the line ends there.
@@ -42,6 +44,11 @@ pub(crate) enum LineOutcome {
     /// Escape went back; the row of the cursor after the abandoned answer, counted from the
     /// prompt's first row, so that the caller erases what it wrapped onto.
     Back {
+        /// The row of the cursor after it.
+        row: usize,
+    },
+    /// Shift+Tab went to the step before; the row of the cursor, as for [`LineOutcome::Back`].
+    Previous {
         /// The row of the cursor after it.
         row: usize,
     },
@@ -144,8 +151,15 @@ fn edit(
                     escape_ignored = Some(Instant::now());
                     continue;
                 }
-                if let Some(edit) = edit_after_escape(keys)? {
-                    answer.edit(edit);
+                match edit_after_escape(keys)? {
+                    Some(EditKey::Previous) if options.previous => {
+                        answer.move_to_end();
+                        return Ok(Ok(Some(LineOutcome::Previous {
+                            row: answer.row_from_prompt(),
+                        })));
+                    }
+                    Some(edit) => answer.edit(edit),
+                    None => {}
                 }
                 Ok(())
             }

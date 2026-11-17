@@ -45,7 +45,7 @@ const HEIR_SHEET_SIZES: [(&str, &str, &str); 2] = [
 ];
 /// The name of a question for each kind of file.
 pub(crate) mod file_questions {
-    pub(crate) const PDF: &str = "PDF file name";
+    pub(crate) const PDF: &str = "Folder of the patterns, or one pattern's PDF";
     pub(crate) const RECORD: &str = "Record file name";
     pub(crate) const QR: &str = "QR code file name";
     pub(crate) const PICTURE: &str = "Picture file name (PNG, JPEG or WebP)";
@@ -92,24 +92,24 @@ fn form_texts(form: Form) -> (&'static str, String) {
     match form {
         Form::English => (
             "English words",
-            "the seed phrase itself, masked with your dates".to_owned(),
+            "looks like an ordinary seed phrase".to_owned(),
         ),
         Form::Indexes => (
             "Word numbers",
-            "its place in the BIP39 word list, masked with your dates".to_owned(),
+            "a number from 1 to 2048 for each word".to_owned(),
         ),
         Form::Unicode => (
             "Unicode codes",
-            "four-digit hexadecimal codes of the Chinese BIP39 words".to_owned(),
+            "a code of four digits and letters for each word".to_owned(),
         ),
         Form::ColorsUnicode => (
             "Colors as text",
-            "the colors written as Unicode codes, no font needed".to_owned(),
+            "colors written as codes of four characters".to_owned(),
         ),
         Form::Colors => (
             "Colors",
             format!(
-                "color codes, {} for the whole seed phrase",
+                "{} colors for the whole seed phrase",
                 mnemocode::forms::colors::COLOR_COUNTS_TEXT
             ),
         ),
@@ -220,7 +220,7 @@ pub(crate) fn ask_seedshift(
 }
 
 /// A place a result may go, besides the screen.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Place {
     Record,
     /// The legend line of a cross-stitch pattern, as Decode reads it back.
@@ -320,27 +320,35 @@ fn ask_destination(question: &str, places: &[Place]) -> Result<Option<Vec<String
         .iter()
         .map(|place| Choice::noted(&upper_first(place.name()), place.note(), *place))
         .collect();
-    let Some(asks) = ask_checks(question, "Output", &choices, &[])? else {
-        return Ok(None);
-    };
-    let mut options = Vec::new();
-    // How a QR code shows its data comes right after the places, before the folder: one choice,
-    // which --qr-hidden makes for every QR code.
-    let mut qr_hidden = None;
-    if asks.iter().any(|place| place.is_qr()) {
-        let Some(chosen) = super::hidden_qr::ask_options()? else {
+    // Shift+Tab after the list, at the QR code or a place's own question, comes back to it with
+    // its ticks, the files those claimed given back.
+    let mut ticked = vec![false; places.len()];
+    let start = super::output_questions::claims_now();
+    'list: loop {
+        super::output_questions::claims_back_to(start);
+        let Some(asks) = ask_checks(question, "Output", &choices, &ticked)? else {
             return Ok(None);
         };
-        qr_hidden = Some(chosen.iter().any(|option| option == "--qr-hidden"));
-        options.extend(chosen);
+        ticked = places.iter().map(|place| asks.contains(place)).collect();
+        let mut options = Vec::new();
+        // How a QR code shows its data comes right after the places, before the folder: one
+        // choice, which --qr-hidden makes for every QR code.
+        let mut qr_hidden = None;
+        if asks.iter().any(|place| place.is_qr()) {
+            let Some(chosen) = super::hidden_qr::ask_options()? else {
+                continue 'list;
+            };
+            qr_hidden = Some(chosen.iter().any(|option| option == "--qr-hidden"));
+            options.extend(chosen);
+        }
+        for place in asks {
+            let Some(asked) = place.ask(qr_hidden)? else {
+                continue 'list;
+            };
+            options.extend(asked);
+        }
+        return Ok(Some(options));
     }
-    for place in asks {
-        let Some(asked) = place.ask(qr_hidden)? else {
-            return Ok(None);
-        };
-        options.extend(asked);
-    }
-    Ok(Some(options))
 }
 
 /// `text` with its first letter in upper case: "A record file".
@@ -583,7 +591,7 @@ pub(crate) fn ask_encoding() -> Result<Option<Vec<String>>, Stop> {
         example: Some(sample),
         ..Choice::noted(
             "Embroidery",
-            "hidden in a cross-stitch pattern, masked with your dates",
+            "hidden in a cross-stitch pattern made from your picture",
             Made::Embroidery,
         )
     });
@@ -618,18 +626,15 @@ pub(crate) fn ask_encoding_in(form: Form) -> Result<Option<EncodingAnswers>, Sto
     super::new_backup::ask_new_backup(super::new_backup::Way::Form(form))
 }
 
-/// Protected setup for the menu entry that creates standard SSKR shares.
+/// Protected setup for the menu entry that creates standard SSKR shares, in the steps of every new
+/// backup; Shift+Tab goes back a step.
 pub(crate) fn ask_splitting() -> Result<Option<EncodingAnswers>, Stop> {
+    use super::new_backup::{Answered, answered, named_file, run_steps};
     let shares = Takes::MnemoCodeOnly {
         unmasked: "the shares alone restore it",
         why: "not for standard shares, which split a valid seed phrase",
     };
-    let Some(mode) = ask_seedshift("Use Seedshift before splitting?", false, shares)? else {
-        return Ok(None);
-    };
-    let dates = super::given::ask_encoding_dates(mode)?;
-    // Its own question, after the dates, as every new backup asks its way's.
-    let choices = [
+    let formats = [
         Choice::noted(
             "Words",
             "Bytewords, such as tuna next keep gyro ...",
@@ -641,15 +646,6 @@ pub(crate) fn ask_splitting() -> Result<Option<EncodingAnswers>, Stop> {
             ShareFormat::Ur,
         ),
     ];
-    let Some(format) = ask_list(
-        "How should each share be written?",
-        "Shares as",
-        &choices,
-        None,
-    )?
-    else {
-        return Ok(None);
-    };
     let explanation = Explanation {
         lines: vec![
             "Standard SSKR shares of the seed phrase itself, which other SSKR tools read."
@@ -657,31 +653,64 @@ pub(crate) fn ask_splitting() -> Result<Option<EncodingAnswers>, Stop> {
         ],
         more: vec![readme_link("splitting-a-mnemonic-into-shares")],
     };
-    let set = ask_share_set(
-        "How many shares, and how many of them restore the seed phrase?",
-        &explanation,
-        false,
-    )?;
-    let Some(Some(set)) = set else {
+    let mut mode = Mode::Seedshift;
+    let mut dates = mnemocode::secret::SecretVec::new(Vec::new());
+    let mut format = ShareFormat::Words;
+    let mut set = None;
+    let mut heir_size = None;
+    let mut saved = Vec::new();
+    let mut heirs = Vec::new();
+    let done = run_steps(7, |step| {
+        Ok(match step {
+            0 => answered(
+                ask_seedshift("Use Seedshift before splitting?", false, shares)?
+                    .map(|chosen| mode = chosen),
+            ),
+            1 => super::new_backup::dates_step(mode, &mut dates)?,
+            // Its own question, after the dates, as every new backup asks its way's.
+            2 => answered(
+                ask_list(
+                    "How should each share be written?",
+                    "Shares as",
+                    &formats,
+                    None,
+                )?
+                .map(|chosen| format = chosen),
+            ),
+            3 => match ask_share_set(
+                "How many shares, and how many of them restore the seed phrase?",
+                &explanation,
+                false,
+            )? {
+                Some(Some(chosen)) => {
+                    set = Some(chosen);
+                    Answered::Next
+                }
+                _ => Answered::Back,
+            },
+            4 => answered(ask_heir_sheet(mode)?.map(|size| heir_size = size)),
+            // Last, where the shares are saved.
+            5 => match set {
+                Some(set) => answered(ask_shares(set, format)?.map(|chosen| saved = chosen)),
+                None => Answered::Back,
+            },
+            _ => {
+                let (files, step) = named_file(|| heir_sheet_files(heir_size))?;
+                if let Some(files) = files {
+                    heirs = files;
+                }
+                step
+            }
+        })
+    })?;
+    if !done {
         return Ok(None);
-    };
-    // The rest of the block, in its order: the copies on the screen, the sheet for heirs, and
-    // last where the shares are saved.
-    let shown = super::new_backup::shown_masked_words(mode, false);
-    let Some(heir_size) = ask_heir_sheet(mode)? else {
-        return Ok(None);
-    };
-    let Some(shares) = ask_shares(set, format)? else {
-        return Ok(None);
-    };
-    let Some(heirs) = heir_sheet_files(heir_size)? else {
-        return Ok(None);
-    };
+    }
     let mut run = ["encode", "--sskr", "--ask-secrets", "--mode", mode.id()]
         .map(str::to_owned)
         .to_vec();
-    run.extend(shares);
-    run.extend(shown);
+    run.extend(saved);
+    run.extend(super::new_backup::shown_masked_words(mode, false));
     run.extend(heirs);
     Ok(Some((run, dates)))
 }

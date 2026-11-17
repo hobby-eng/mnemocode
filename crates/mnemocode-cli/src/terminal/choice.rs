@@ -276,6 +276,14 @@ fn back_from_list<T>(drawn: &[String], above: usize) -> Chosen<T> {
     Chosen::Back
 }
 
+/// Escape in a task of the menu: the list is left as cancelled, for the main menu.
+fn to_menu_from_list<T>(drawn: &[String], above: usize) -> Chosen<T> {
+    redraw_from(rows_of(drawn) + above);
+    question_ended();
+    super::leave_to_menu();
+    Chosen::Cancelled
+}
+
 fn draw_choices<T>(
     choices: &[Choice<T>],
     selected: usize,
@@ -300,6 +308,9 @@ fn key_hint<T>(choices: &[Choice<T>], quit: &str) -> String {
     } else {
         String::new()
     };
+    if super::steps_back() {
+        return format!("↑ ↓ choose · Enter selects{range} · {}", super::STEP_KEYS);
+    }
     format!("↑ ↓ choose · Enter selects{range} · Esc {quit}")
 }
 
@@ -503,7 +514,9 @@ pub(crate) fn choose_from<T: Clone>(
         // skeleton remains separate. Key decoding, drawing and leaving behavior are shared.
         let index = match read_key(&mut keys)? {
             Key::Cancel => return Ok(Chosen::Cancelled),
+            Key::Back if super::steps_back() => return Ok(to_menu_from_list(&drawn, above())),
             Key::Back => return Ok(back_from_list(&drawn, above())),
+            Key::Previous if super::steps_back() => return Ok(back_from_list(&drawn, above())),
             Key::Enter => selected,
             key @ (Key::Digit(_) | Key::Letter(_)) => {
                 let Some(chosen) = shortcut_place(choices, key) else {
@@ -535,6 +548,12 @@ fn checklist_hint<T>(choices: &[Choice<T>], quit: &str) -> String {
     } else {
         format!(" or {}", shortcuts_in_words(&keys))
     };
+    if super::steps_back() {
+        return format!(
+            "↑ ↓ choose · Space{tick} ticks · Enter confirms · {}",
+            super::STEP_KEYS
+        );
+    }
     format!("↑ ↓ choose · Space{tick} ticks · Enter confirms · Esc {quit}")
 }
 
@@ -591,7 +610,9 @@ pub(crate) fn choose_many<T: Clone>(
     loop {
         match read_key(&mut keys)? {
             Key::Cancel => return Ok(Chosen::Cancelled),
+            Key::Back if super::steps_back() => return Ok(to_menu_from_list(&drawn, above())),
             Key::Back => return Ok(back_from_list(&drawn, above())),
+            Key::Previous if super::steps_back() => return Ok(back_from_list(&drawn, above())),
             Key::Enter => break,
             Key::Space => ticked[selected] = !ticked[selected],
             key @ (Key::Digit(_) | Key::Letter(_)) => {
@@ -682,6 +703,10 @@ fn ask_line_once<E: Display>(
     if let Some(text) = warning {
         warned.extend(notice_lines(text, NoticeKind::Warning));
     }
+    // A blank line keeps what is said above apart from the line typed into.
+    if !warned.is_empty() {
+        warned.push(String::new());
+    }
     let mut above = vec![String::new()];
     above.extend(warned.iter().cloned());
     above.push(shown.to_owned());
@@ -701,6 +726,7 @@ fn ask_line_once<E: Display>(
             echo: true,
             limit: how.limit,
             escape_goes_back: true,
+            previous: super::steps_back(),
             prompt_width,
             pasted_line_break: None,
             hints: how.hints,
@@ -714,7 +740,12 @@ fn ask_line_once<E: Display>(
     };
     let text = match outcome {
         LineOutcome::Cancelled => return Ok(LineStep::Cancelled),
-        LineOutcome::Back { row } => {
+        LineOutcome::Back { row } if super::steps_back() => {
+            erase(row);
+            super::leave_to_menu();
+            return Ok(LineStep::Cancelled);
+        }
+        LineOutcome::Previous { row } | LineOutcome::Back { row } => {
             erase(row);
             return Ok(LineStep::Back);
         }

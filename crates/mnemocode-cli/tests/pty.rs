@@ -483,7 +483,7 @@ fn menu_seedshift_dates_are_asked_before_other_settings_and_cancel_privately() {
         session.wait_for("Use Seedshift?");
         session.press(version);
         session.wait_for("DD-MM-YYYY, separated by spaces):");
-        session.wait_for(" to cancel");
+        session.wait_for("Shift+Tab back · Esc menu");
         let before_dates = session.written().to_owned();
         assert!(
             !before_dates.contains("Split it into Shamir shares?"),
@@ -495,7 +495,7 @@ fn menu_seedshift_dates_are_asked_before_other_settings_and_cancel_privately() {
         );
         session.press("not-a-date\r");
         session.wait_for("DD-MM-YYYY, separated by spaces):");
-        session.wait_for(" to cancel");
+        session.wait_for("Shift+Tab back · Esc menu");
         session.press("23-09-2026\r");
         // The original Seedshift is never split: its next question is the sheet for heirs.
         session.wait_for(if version == "1" {
@@ -521,7 +521,7 @@ fn share_creation_asks_its_dates_immediately_after_seedshift() {
     session.wait_for("Use Seedshift before splitting?");
     session.press("1");
     session.wait_for("DD-MM-YYYY, separated by spaces):");
-    session.wait_for(" to cancel");
+    session.wait_for("Shift+Tab back · Esc menu");
     assert!(!session.written().contains("How many shares, and how many"));
     session.press("\x1b");
     exit_menu(session);
@@ -846,10 +846,10 @@ fn cards_beside_a_qr_code_image_follow_its_hidden_choice() {
     session.press("2");
     session.press("3");
     session.press("\r");
-    session.wait_for("What should a phone show when it scans the QR code?");
+    session.wait_for("What should a QR scanner show?");
     session.wait_for("Never put your dates or anything private here.");
     session.press("4");
-    session.wait_for("A phone shows these words as they are.");
+    session.wait_for("A QR scanner shows these words as they are.");
     session.press("Design studio\r");
     session.wait_for("Folder for the files");
     session.press("\r");

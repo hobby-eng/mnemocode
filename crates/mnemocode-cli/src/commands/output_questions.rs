@@ -118,6 +118,35 @@ pub(crate) fn forget_claimed() {
     chosen_folder().take();
 }
 
+/// What the task has claimed at a step of its questions, to go back to.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Claims {
+    names: usize,
+    folder: bool,
+}
+
+/// What the task has claimed now.
+pub(crate) fn claims_now() -> Claims {
+    Claims {
+        names: claimed().len(),
+        folder: chosen_folder().is_some(),
+    }
+}
+
+/// Gives back what the task claimed after `at`: the names, and the folder where it was asked
+/// since, so that a step asked again finds them free.
+pub(crate) fn claims_back_to(at: Claims) {
+    claimed().truncate(at.names);
+    if !at.folder {
+        chosen_folder().take();
+    }
+}
+
+/// Whether the folder of the task's files was asked already.
+pub(crate) fn folder_chosen() -> bool {
+    chosen_folder().is_some()
+}
+
 /// Claims `path`, a file that the task reads, so that no file it saves is given its name, which the
 /// command would refuse.
 pub(crate) fn claim_read(path: &str) {
@@ -159,7 +188,7 @@ pub(crate) fn input_file(answer: &str, limit: usize) -> Result<String, NameError
 }
 
 /// What the question of the folder says above it.
-const SAVED_HERE: &str = "Every file of this task is saved in this folder under its usual name: the backup, its QR code, cards, a pattern, the sheet for heirs. A name already there gets a number.";
+const SAVED_HERE: &str = "Every file of this task is saved in this folder. Files already in it are never replaced: a new file whose name is taken gets a number at the end, such as cross-stitch-pattern_1.pdf.";
 
 /// The folder that every file of the task goes to: asked once, the folder MnemoCode started in by
 /// default; none when the person goes back.
@@ -174,7 +203,7 @@ fn task_folder() -> Result<Option<String>, Stop> {
     let how = LineQuestion {
         fallback: Some(&here),
         what: Some("the name of a folder that exists"),
-        warning: Some(SAVED_HERE),
+        note: Some(SAVED_HERE),
         limit: PATH_LIMIT,
         ..LineQuestion::default()
     };

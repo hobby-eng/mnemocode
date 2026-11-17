@@ -245,6 +245,17 @@ fn encoded_input_at(parsed: &Parsed, regular_only: bool) -> Result<SecretText, S
 
 /// The text of --input, --input-file or --qr-file, as given.
 fn encoded_text(parsed: &Parsed, regular_only: bool) -> Result<SecretText, Stop> {
+    // A folder of patterns or shares' QR codes gives its one backup, or the shares the person
+    // confirms.
+    if let (None, Some(path), None) = (
+        value(parsed, "input"),
+        value(parsed, "input-file"),
+        value(parsed, "qr-file"),
+    ) && path != "-"
+        && let Some(folder) = crate::input::local_folder(Path::new(path))
+    {
+        return super::pattern_folder::folder_backup(&folder, is_on(parsed, "ask-secrets"));
+    }
     // A pattern's PDF gives the legend line it keeps; with a QR image as well, it is refused below
     // as any second source is.
     if let (None, Some(path), None) = (
@@ -493,14 +504,19 @@ fn ask_known_dates(word_count: Option<usize>) -> Result<Asked<SecretVec<Date>>, 
 }
 
 /// Asks dates immediately after a protected Seedshift choice; direct mode needs none.
-pub(crate) fn ask_encoding_dates(mode: Mode) -> Result<SecretVec<Date>, Stop> {
+pub(crate) fn ask_encoding_dates(mode: Mode) -> Result<Option<SecretVec<Date>>, Stop> {
     if !mode.masked() {
-        return Ok(SecretVec::new(Vec::new()));
+        return Ok(Some(SecretVec::new(Vec::new())));
     }
     loop {
-        let dates = ask_known_dates(None)?.map_err(|_| Stop::Cancelled)?;
+        let dates = match ask_known_dates(None)? {
+            Ok(dates) => dates,
+            // Shift+Tab in a task of the menu: back to the question before.
+            Err(Left::Back) => return Ok(None),
+            Err(Left::Cancelled) => return Err(Stop::Cancelled),
+        };
         match mode.check_date_count(dates.len(), false, DateWords::Codes) {
-            Ok(()) => return Ok(dates),
+            Ok(()) => return Ok(Some(dates)),
             Err(error) => {
                 crate::terminal::notice(&error.to_string(), crate::terminal::NoticeKind::Warning)
             }

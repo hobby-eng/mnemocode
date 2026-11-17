@@ -46,7 +46,7 @@ The Encode menu (including Embroidery) asks for the Seedshift version and immedi
 
 On the private screen, the fields for Shamir shares, forgotten words and encoded backups also accept a local text file path. Enter the path directly or drag the file into the terminal; no source selection is needed. MnemoCode reads its exported share files and MNC1 records unchanged. Paths with spaces may be quoted, and local `file:///` links work. Prefix a filename without an extension with `./`. The field for shares also takes a pattern's PDF, or the path of a folder of patterns: MnemoCode reads every PDF directly in it, lists the patterns of shares it finds, grouped by set, and restores from the set you choose. It only reads the folder.
 
-Escape at a secret-input prompt cancels the current action. When started from the menu, it returns to that menu; it does not quit MnemoCode. Ctrl+C also cancels. A standalone cancelled command ends with exit code 130.
+Escape at a secret-input prompt cancels the current action. When started from the menu, it returns to that menu; it does not quit MnemoCode. In the questions of a menu task, Escape returns to the main menu at every question, and Shift+Tab goes back to the question before. Ctrl+C also cancels. A standalone cancelled command ends with exit code 130.
 
 Control and text-direction characters in displayed paths are replaced with U+FFFD; the actual filesystem names are unchanged. A command preview containing such characters is omitted, with a warning.
 

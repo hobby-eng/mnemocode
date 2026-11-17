@@ -488,7 +488,7 @@ Damaged backup codes use `decode`; damaged share codes use `sskr-combine` or `ss
 
 ## Quit
 
-Choose Quit, press `q`, or press Escape at the main menu to leave MnemoCode. At a task question, Escape goes back or cancels that action. After a result, follow the prompt: it may offer Escape to quit, while a repeated word lookup returns to the menu. Ctrl+C cancels the current operation.
+Choose Quit, press `q`, or press Escape at the main menu to leave MnemoCode. At a task's question, Shift+Tab goes back to the question before, keeping the answers before it, and Escape returns to the main menu; each question names these keys under it. An answer changed after going back replaces the old one. After a result, follow the prompt: it may offer Escape to quit, while a repeated word lookup returns to the menu. Ctrl+C cancels the current operation.
 
 ## Compatibility and safety notes
 

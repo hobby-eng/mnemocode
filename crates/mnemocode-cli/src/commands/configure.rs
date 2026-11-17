@@ -62,7 +62,11 @@ pub(crate) fn asked_options(
         return Ok((parsed.clone(), None));
     }
     super::output_questions::forget_claimed();
-    let (arguments, dates) = ask()?.ok_or(Stop::Cancelled)?;
+    // The menu's task asked here: Shift+Tab goes back a step, Escape ends it for the main menu.
+    crate::terminal::set_steps_back(true);
+    let asked = ask();
+    crate::terminal::set_steps_back(false);
+    let (arguments, dates) = asked?.ok_or(Stop::Cancelled)?;
     let mut fresh = args::parse_arguments(&arguments[1..])?;
     let needs = crate::output::preflight(&mut fresh)?;
     protection.rule_writes(&needs.folders);

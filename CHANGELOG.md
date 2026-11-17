@@ -17,7 +17,7 @@ MnemoCode is now written in Rust. Each system gets one executable with nothing e
 ### Hidden QR records
 
 - PDF and PNG exports can carry a hidden QR record (`--qr-hidden`): ordinary scanners show the printed contact or a chosen text (`--qr-text`), and MnemoCode reads back the exact backup codes or share. `qr-hide` wraps an existing record, `qr-open` extracts it unchanged, and the browser binding does both. [Hidden QR records](docs/HIDDEN_QR.md) describes the format and its limits.
-- In the menu, a QR code image shows a phone a business card that MnemoCode invents unless another answer is chosen: your own business card, typed on one line, a web link, a short text, or the backup codes themselves.
+- In the menu, a QR code image shows a QR scanner a business card that MnemoCode invents unless another answer is chosen: your own business card, typed on one line, a web link, a short text, or the backup codes themselves.
 
 ### Wallet checks
 
@@ -37,6 +37,7 @@ MnemoCode is now written in Rust. Each system gets one executable with nothing e
 - The README follows the order of the menu, with paired command examples and an index of the documentation. Each menu task and recovery choice shows its own explanation and a link to its section.
 - Re-encode asks for the new backup before the old one: the new backup's dates first, then its outputs, which are checked and write-restricted before the old phrase is typed.
 - The menu numbers the self-test 0, the command list s and Quit q, and asks where to save Encode's result as a checklist, the QR code image beside cards too; the sheets then carry the same kind of QR code as the image, ordinary or with hidden data.
+- In a menu task, Shift+Tab goes back to the question before and Escape returns to the main menu; the keys are named under each question.
 - Every new backup asks the same questions in the same order, whatever form it takes: Seedshift, its dates, the form's own questions, Shamir shares, the sheet for heirs, and last, just before the seed phrase, where to save it. An answer a form cannot take stays greyed with the reason. The menu no longer asks whether to show the original phrase or the phrase after Seedshift: the phrase is seen as it is typed, and a masked result always shows the phrase after Seedshift.
 - The menu no longer asks for each file's name: after where to save, it asks once for a folder, the one MnemoCode started in unless another is typed, and each file takes its usual name, numbered where one is there already.
 - A new backup asks whether to use Seedshift and which on one screen: MnemoCode Seedshift, Original Seedshift or No Seedshift. Where only MnemoCode Seedshift fits, as for shares, the original stays greyed; for a form that is always masked, No Seedshift does.

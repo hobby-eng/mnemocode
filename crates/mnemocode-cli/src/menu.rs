@@ -164,7 +164,7 @@ fn ask_source() -> Result<Option<Vec<String>>, Stop> {
     // The legend line that a pattern's PDF keeps, which Decode reads from the file itself.
     let pattern = Choice::noted(
         crate::commands::menu_entries::PATTERN_SOURCE,
-        "the PDF file that Encode saved",
+        "a pattern's PDF, or the folder of the patterns",
         Source::Pattern,
     );
     // Two samples share the room beside the labels, with what stands between them.
@@ -185,6 +185,9 @@ fn ask_source() -> Result<Option<Vec<String>>, Stop> {
         &[typed, record, qr, pattern],
         None,
     )?;
+    // Patterns, often several shares, are read from their folder: the one MnemoCode started in
+    // unless another is named.
+    let pattern = matches!(source, Some(Source::Pattern));
     let (question, fallback, limit, option) = match source {
         None => return Ok(None),
         Some(Source::Typed) => return Ok(ask_phrase_words()?.map(words_option)),
@@ -202,13 +205,23 @@ fn ask_source() -> Result<Option<Vec<String>>, Stop> {
             "--input-file",
         ),
     };
+    let here = crate::terminal::environment().current.as_ref().map_or_else(
+        || ".".to_owned(),
+        |path| path.to_string_lossy().into_owned(),
+    );
     let how = LineQuestion {
-        fallback: Some(fallback),
+        fallback: Some(if pattern { &here } else { fallback }),
+        note: pattern.then_some(
+            "Give the folder that holds the patterns, or one pattern's PDF. If they are in different places, copy them into one folder first.",
+        ),
         limit: crate::commands::given::PATH_LIMIT,
         ..LineQuestion::default()
     };
     Ok(
         match ask_line(question, "File", how, |answer: &str| {
+            if pattern && let Some(folder) = crate::input::folder_answer(answer) {
+                return Ok(folder.to_string_lossy().into_owned());
+            }
             input_file(answer, limit)
         })? {
             Chosen::One(path) => Some(vec![option.to_owned(), path]),
@@ -802,9 +815,17 @@ pub(crate) fn run(protection: &mut Protection) -> Result<(), Stop> {
         guide = ENTRIES[selected].name.guide;
         redraw_answer_record(&heading_lines(closure.as_ref(), guide), answer_mark());
         forget_claimed();
-        let action = match again.take() {
-            Some(lookup) => table::lookup_action(lookup)?,
-            None => (ENTRIES[selected].action)()?,
+        // In the task's questions Shift+Tab goes back a step and Escape to this menu.
+        crate::terminal::set_steps_back(true);
+        let asked = match again.take() {
+            Some(lookup) => table::lookup_action(lookup),
+            None => (ENTRIES[selected].action)(),
+        };
+        crate::terminal::set_steps_back(false);
+        let action = match asked {
+            Ok(action) => action,
+            Err(Stop::Cancelled) if crate::terminal::take_to_menu() => Action::Back,
+            Err(stop) => return Err(stop),
         };
         match action {
             Action::Quit => return Ok(()),
