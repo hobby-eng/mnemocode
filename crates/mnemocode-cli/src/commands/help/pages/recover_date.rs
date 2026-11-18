@@ -96,6 +96,6 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
         ),
     ],
     notes: Some(&[
-        "Quote the patterns, as in \"??-09-2026\" or \"05|15-09-2026\", so that the shell neither expands ? nor reads | as a pipe.",
+        "Date patterns go on the private screen or in --dates-file, never on the command line. A shell command that writes the file must quote them, as in printf '%s\\n' '??-09-2026' > date-patterns.txt, so that the shell neither expands ? nor reads | as a pipe.",
     ]),
 };

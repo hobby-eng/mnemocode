@@ -40,7 +40,7 @@ Other target names and the canonical build are described in [Releasing](RELEASIN
 
 `mnemocode --help` lists commands. `mnemocode <command> --help` describes the options and examples; `-h` gives a short summary. In a source checkout, replace `mnemocode` with `target/release/mnemocode`.
 
-The Encode menu (including Embroidery) asks for the Seedshift version and immediately asks for its dates, before the remaining settings. Choosing no Seedshift skips dates. Dates stay on the private screen and are never added to the command preview. The equivalent `encode --configure --ask-secrets` (optionally `--format`) or `stitch --configure --ask-secrets` asks the same settings. Plain `--ask-secrets` with explicit settings keeps its existing phrase-then-dates order. On Linux, the socket filter is active while paths are being selected; file writes stay open until output preflight, then are restricted to the selected folders before the seed phrase is read. Available protections differ by platform and are reported on the private screen.
+The Encode menu (including Embroidery) asks for the Seedshift version and immediately asks for its dates, before the remaining settings. Choosing no Seedshift skips dates. Dates stay on the private screen and are never added to the command preview. The equivalent `encode --configure --ask-secrets` (optionally `--format`, or `--sskr` as the menu's Split into shares runs it) or `stitch --configure --ask-secrets` asks the same settings. Plain `--ask-secrets` with explicit settings keeps its existing phrase-then-dates order. On Linux, the socket filter is active while paths are being selected; file writes stay open until output preflight, then are restricted to the selected folders before the seed phrase is read. Available protections differ by platform and are reported on the private screen.
 
 ## Input files and limits
 
@@ -66,7 +66,7 @@ Refusal cannot remove text already entered in shell history or process arguments
 
 For headless operations, `--dates-file PATH` reads whitespace-separated dates; `recover-date` also accepts its `?` patterns there. Re-encode uses `--old-dates-file PATH` for the old backup and `--dates-file PATH` for the new one; an Original Seedshift backup that MnemoCode wrote takes the last word Encode named from `--last-word-file PATH`. These three options also accept `-`. Only one material source may read standard input in a command. Do not combine these date/final-word files with `--ask-secrets`, which asks for those answers itself. Protect and keep date files yourself: dates are not added to encoded records.
 
-Each text input has its own limit, which `--help` names: 256 bytes for a seed phrase, 128 for dates, 4 KiB for a passphrase or a date pattern, 32 KiB for a `recover-word` pattern, 64 KiB for encoded input or a set of shares, as an answer or a file. A QR image may be up to 16 MiB, 4096 pixels on either side and 2 megapixels (2,097,152 pixels), with up to 8 bits per sample: a screen of 1920 × 1080 fits, and the QR images that MnemoCode saves are 720 px; crop a photograph or a page image to the code. The picture of a cross-stitch pattern may be a PNG, JPEG or WebP file of up to 40 MiB and 60 megapixels, and a pattern's PDF is read up to 64 MiB. Larger inputs are refused. An image is read whole, and Ctrl+C acts when that reading ends: an image of noise can keep it for seconds. A multiline paste is one answer: words, codes and dates may be on separate lines; separate shares become semicolon-separated.
+Each text input has its own limit, which `--help` names: 256 bytes for a seed phrase, 128 for dates, 4 KiB for a passphrase or a date pattern, 32 KiB for a `recover-word` pattern, 64 KiB for encoded input or a set of shares, as an answer or a file. A QR image may be up to 16 MiB, 4096 pixels on either side and 2 megapixels (2,097,152 pixels), with up to 8 bits per sample: a screen of 1920 × 1080 fits, and the QR images that MnemoCode saves are 720 px; crop a photograph or a page image to the code. The picture of a cross-stitch pattern may be a PNG, JPEG or WebP file of up to 40 MiB and 60 megapixels, and a pattern's PDF is read up to 64 MiB. A folder is read with the folders inside it, up to 6 levels down: only its files ending in .pdf, .png, .jpg or .jpeg, at most 1,024 of them, each up to 64 MiB; links are not followed. Larger inputs are refused. An image is read whole, and Ctrl+C acts when that reading ends: an image of noise can keep it for seconds. A multiline paste is one answer: words, codes and dates may be on separate lines; separate shares become semicolon-separated.
 
 ## Public command examples
 
@@ -149,7 +149,7 @@ A fingerprint is a short filter, not proof of recovery. For real material, the p
 
 The pairs above read saved codes or QR images. Saved codes do not name their mode: give `--mode`, and `--format` when detection is ambiguous. For printed cards with decoys, `--words` limits the real backup to its original phrase length.
 
-A folder is read with the folders inside it. Decode lists every backup and set of shares it finds, with the kind of codes and the files: with `--ask-secrets` you choose one, and without it a folder of several is refused with that list, so give the file of one or narrow the search with `--find all|patterns|qr|cards`. One found alone is read at once. Where `--find` names a kind that the folder lacks, a script is refused; with `--ask-secrets` what the folder holds instead is listed, and nothing is read until you choose it. With the word count, the mode and the form given, nothing is asked:
+A folder is read with the folders inside it. Decode lists every backup and set of shares it finds, with the kind of codes and the files: with `--ask-secrets` you choose one, and without it a folder of several is refused with that list, so give the file of one or narrow the search with `--find all|patterns|qr|cards`. One found alone is read at once. A single file of a share, such as one pattern's PDF, finds the rest of its set in its own folder. Where `--find` names a kind that the folder lacks, a script is refused; with `--ask-secrets` what the folder holds instead is listed, and nothing is read until you choose it. With the word count, the mode and the form given, nothing is asked:
 
 ```bash
 # A folder searched for printed cards: a 12-word Seedshift backup in colors.
@@ -297,7 +297,7 @@ Without `--table-format`, the default number/English/Unicode-code table uses tab
 
 **Full set**, or `table --word-lists-dir PATH`, saves all four numbered tables and `manual-recovery.md` together in a new folder. An existing folder is kept; MnemoCode chooses a numbered folder name.
 
-The guide explains date sorting, the repeating year/month/day shifts, modular addition and subtraction, MnemoCode Seedshift's shorter last-word modulus, checksum calculation, exact and corrected legacy modes, and decoding colors. It includes a standalone Python helper that needs no MnemoCode installation. Print the full mapping too. Combining SSKR shares still requires a compatible SSKR implementation.
+The guide explains reading printed cards, color codes, Color Unicode and cross-stitch legends, date sorting, the repeating year/month/day shifts, modular addition and subtraction, MnemoCode Seedshift's shorter last-word modulus, checksum calculation, and the Original Seedshift both as the original program writes it and as MnemoCode writes it, with a last word that passes the checksum. It includes standalone Python helpers, for the phrase and for a cross-stitch legend, that need no MnemoCode installation. Print the full mapping too. Combining SSKR shares still requires a compatible SSKR implementation.
 
 ## Representation details
 
@@ -305,12 +305,14 @@ The guide explains date sorting, the repeating year/month/day shifts, modular ad
 
 The [format table](../README.md#backup-formats) lists names and numbers. Input syntax differs by form:
 
-| Form          | Accepted separators                                                                                            |
-| ------------- | -------------------------------------------------------------------------------------------------------------- |
-| Word numbers  | Spaces or commas; joined numbers are ambiguous and refused                                                     |
-| Word Unicode  | Four hexadecimal digits per code, separated or joined                                                          |
-| Colors        | Separated codes, joined `#RRGGBB` codes, or one joined `RRGGBB` line                                           |
-| Color Unicode | Two four-digit Private Use Area codes per color, separated or joined, or the Private Use characters themselves |
+| Form                | Accepted separators                                                                                            |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| English words       | Spaces or line breaks between words                                                                            |
+| Word numbers        | Spaces or commas; joined numbers are ambiguous and refused                                                     |
+| Word Unicode        | Four hexadecimal digits per code, separated or joined                                                          |
+| Colors              | Separated codes, joined `#RRGGBB` codes, or one joined `RRGGBB` line                                           |
+| Color Unicode       | Two four-digit Private Use Area codes per color, separated or joined, or the Private Use characters themselves |
+| Cross-stitch legend | Rows from the top as `symbol:stitches`, or `symbol:DMC:stitches` in format 2, separated by spaces or lines     |
 
 Color Unicode needs no special font when written as hexadecimal text.
 
@@ -324,19 +326,22 @@ For `decode` and `recover-date`, `--format` is usually optional. MnemoCode picks
 
 ## Card options
 
-| Option                         | Result                                                                                                |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `--template ID`                | The design, by name or number                                                                         |
-| `--pdf PATH`                   | The whole collection as one PDF                                                                       |
-| `--cards-dir NEW_FOLDER`       | [One file per card](../README.md#individual-business-cards); for shares, one file or folder per share |
-| `--images-dir NEW_FOLDER`      | The collection pages as PNG images                                                                    |
-| `--image-format png\|jpg`      | The image format for `--images-dir` and `--cards-dir`                                                 |
-| `--page-size`, `--orientation` | See [Page sizes](../README.md#page-sizes)                                                             |
-| `--card-qr`                    | One QR code on the collection sheet                                                                   |
-| `--card-qr-png`                | That QR code also as a PNG image beside the PDF or in the image folder                                |
-| `--title TEXT`                 | The collection title; by default it is the studio name                                                |
-| `--cards`                      | Color cards in the terminal                                                                           |
-| `--qr PATH`                    | A separate QR code as a PNG image                                                                     |
+| Option                                     | Result                                                                                                |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `--template ID`                            | The design, by name or number                                                                         |
+| `--pdf PATH`                               | The whole collection as one PDF                                                                       |
+| `--cards-dir NEW_FOLDER`                   | [One file per card](../README.md#individual-business-cards); for shares, one file or folder per share |
+| `--images-dir NEW_FOLDER`                  | The collection pages as PNG images                                                                    |
+| `--image-format png\|jpg`                  | The image format for `--images-dir` and `--cards-dir`                                                 |
+| `--page-size`, `--orientation`             | See [Page sizes](../README.md#page-sizes)                                                             |
+| `--card-qr`                                | One QR code on the collection sheet                                                                   |
+| `--card-qr-png`                            | That QR code also as a PNG image beside the PDF or in the image folder                                |
+| `--qr-hidden`                              | The QR code's record hidden behind a contact or `--qr-text`; see [Hidden QR records](HIDDEN_QR.md)    |
+| `--qr-text TEXT`                           | The public text of a separate hidden QR PNG                                                           |
+| `--card-layout qr\|collection\|individual` | For shares: how each share is printed; see [Share cards](SSKR.md#share-cards)                         |
+| `--title TEXT`                             | The collection title; by default it is the studio name                                                |
+| `--cards`                                  | Color cards in the terminal                                                                           |
+| `--qr PATH`                                | A separate QR code as a PNG image                                                                     |
 
 Replace random identity fields with `--card-name`, `--card-role`, `--card-company`, `--card-email`, `--card-phone`, `--card-website` and `--card-location`. Names accept Latin letters, spaces, apostrophes and hyphens. Characters missing from the font and text that does not fit are refused before any secret is asked or read. `--studio-name` names the collection studio; material sheets print `--card-name` as the recipient. [Identity defaults](card-identities.md) describes the generated values.
 
@@ -456,6 +461,7 @@ Before processing data, MnemoCode runs its startup self-test: quick checks witho
 - Date patterns, marked codes and shares, word searches, candidate lists, written-backup checks and wallet evidence.
 - Addresses of all twelve coins, heir-sheet text, share-card and card-set content, word hints and re-encoding.
 - Published SSKR Bytewords and refusals of incomplete quorums, duplicates, mixed sets and corrupt checksums.
+- The SeedStitch example legends of both formats, one misread row corrected and two refused, and the hidden QR record format.
 
 If a check fails, the command stops:
 
@@ -474,7 +480,7 @@ For the full self-test, including PDF rendering:
 mnemocode self-test
 ```
 
-The full self-test includes the startup self-test plus every phrase length/format/mode combination, date sorting, the public test file, 24 English BIP39 seed vectors, wallet-assisted searches, the marked-code search, encrypted candidate lists and the candidate list writer, joint share/date repair, share split and restore, every coin vector, actual heir-sheet/card/QR exports with all artwork and fonts, and card pages read back as drawing steps. Each feature gets a refusal case too. Finished groups show their times, followed by an overall result.
+The full self-test includes the startup self-test plus every phrase length/format/mode combination, date sorting, the public test file, 24 English BIP39 seed vectors, wallet-assisted searches, the marked-code search, encrypted candidate lists and the candidate list writer, joint share/date repair, share split and restore, every coin vector, actual heir-sheet/card/QR exports, a cross-stitch pattern made from a picture with its legend read back from the PDF, a hidden QR record written and read back, with all artwork and fonts, and card pages read back as drawing steps. Each feature gets a refusal case too. Finished groups show their times, followed by an overall result.
 
 The public test data is in [`vectors/mnemocode-v1.json`](../vectors/mnemocode-v1.json). It contains only well-known test phrases.
 
@@ -488,10 +494,16 @@ The question is a checklist: Space ticks a destination, Enter confirms, and the 
 result in any case. Nothing ticked keeps it on the screen only; ticking printable cards alone
 saves the cards without a record file.
 
-Unicode codes, colors as text and colors offer printable cards. Their card questions also ask
-whether to include QR output, so the destination menu omits a separate QR choice. English words,
-word numbers and standard shares offer standalone QR images directly. Explicit `--qr` and
-`--qr-dir` command-line options remain available regardless of the menu choices.
+The checklist offers a record file and, for Unicode codes, colors as text and colors, printable
+cards; shares offer a text file and, in those three forms, printable cards; a cross-stitch pattern
+offers a PDF pattern and a text file of its legend line (for shares, PDF patterns and a text file of
+every legend line). Printable cards and PDF patterns start ticked. A QR code is never in the
+checklist; it has its own question, "Add a QR code?". With sheets of cards it follows the card
+design and offers seven answers: no QR code, or an ordinary one or one with hidden data, each on the
+cards only, on the cards and as a PNG file, or as a PNG file only. With separate business cards or
+without cards it offers no QR code, an ordinary QR code or one with hidden data, saved as a PNG file
+(one per share for shares). Explicit `--qr` and `--qr-dir` command-line options remain available
+regardless of the menu choices.
 
 ## Copying the displayed backup
 

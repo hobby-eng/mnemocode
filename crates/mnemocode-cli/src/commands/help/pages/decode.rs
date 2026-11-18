@@ -16,7 +16,7 @@ const OWN_FIND: HelpOption = HelpOption {
     value: Some("all|patterns|qr|cards"),
     summary: "What a folder given as --input-file is searched for",
     details: &[
-        "Decode reads every file in the folder and in the folders inside it, and lists each backup and each set of shares it finds: all of them, the default, or only cross-stitch patterns, QR codes or printed cards. With --ask-secrets the person chooses one where several are complete. Where the folder holds none of the kind named, a script is refused; with --ask-secrets the rest is listed, and nothing is read until the person chooses it.",
+        "Decode reads the files ending in .pdf, .png, .jpg or .jpeg in the folder and in the folders inside it, up to 6 levels down and 1,024 files, and lists each backup and each set of shares it finds: all of them, the default, or only cross-stitch patterns, QR codes or printed cards. With --ask-secrets the person chooses one where several are complete. Where the folder holds none of the kind named, a script is refused; with --ask-secrets the rest is listed, and nothing is read until the person chooses it.",
     ],
 };
 const OWN_1_0: HelpOption = HelpOption {

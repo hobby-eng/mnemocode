@@ -73,7 +73,8 @@ Ctrl+C cleans up temporary export folders. Other termination or power loss can l
 
 - `.mnemocode-export-…`
 - `.mnemocode-images-…`
-- `.mnemocode-share-qr-…`
+- `.mnemocode-pattern-…`
+- `.qr-codes-…`
 - `.card-collection-…`
 - `.sskr-cards-…`
 

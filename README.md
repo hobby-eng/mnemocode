@@ -3,10 +3,10 @@
 [![CI](https://github.com/hobby-eng/mnemocode/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hobby-eng/mnemocode/actions/workflows/ci.yml)
 [![Release](https://github.com/hobby-eng/mnemocode/actions/workflows/release.yml/badge.svg)](https://github.com/hobby-eng/mnemocode/actions/workflows/release.yml)
 [![RustSec audit](https://github.com/hobby-eng/mnemocode/actions/workflows/audit.yml/badge.svg)](https://github.com/hobby-eng/mnemocode/actions/workflows/audit.yml)
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#provenance-and-license)
 [![Build provenance: GitHub attestations](https://img.shields.io/badge/build%20provenance-GitHub%20attestations-2ea44f)](https://github.com/hobby-eng/mnemocode/attestations)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#provenance-and-license)
 
-This README describes MnemoCode 0.2.0, the Rust version. Until 0.2.0 is released, the published executables are in the [TypeScript repository](https://github.com/hobby-eng/mnemocode_typescript/releases). Existing MnemoCode records and shares remain readable.
+This README describes MnemoCode 0.2.0, the Rust version; its executables are on the [releases page](https://github.com/hobby-eng/mnemocode/releases). Records and shares of earlier versions remain readable.
 
 MnemoCode writes a wallet seed phrase (a BIP39 mnemonic) as numbers, Unicode codes or colors, or hides it in the legend of a cross-stitch pattern. You can mask it with dates, divide it into Shamir shares, print it on cards, or search for missing recovery material. It works offline as a command-line program, Rust library or WebAssembly module.
 
@@ -90,7 +90,7 @@ These are formats selected by `--format`, not separate commands:
 | `colors-unicode` / `4` | Two four-digit Unicode codes for each color                                |
 | `colors` / `5`         | `#RRGGBB` codes: 8, 10, 12, 14 or 16 for 12, 15, 18, 21 or 24 words        |
 
-English words and word numbers require Seedshift in the menu, command line and library. Unicode codes and colors can be used without dates. Colors may be reordered, but every real color code is needed; word codes must keep their order. The 12- and 24-word color forms are compatible with BIP39Colors. Color Unicode is MnemoCode's text format, also accepted as Private Use characters. [Representation details](docs/CLI.md#representation-details) explain separators and copying.
+English words and word numbers require Seedshift in the menu, command line and library. Unicode codes and colors can be used without dates. Colors may be reordered, but every real color code is needed; word codes must keep their order. The 12- and 24-word color forms are compatible with BIP39Colors. Color Unicode is MnemoCode's text format, also accepted as Private Use characters. A cross-stitch pattern keeps the phrase in its legend instead, made by `stitch` or Embroidery in the menu, not by `--format`: see [Embroidery](#embroidery). [Representation details](docs/CLI.md#representation-details) explain separators and copying.
 
 ### Transformation modes
 
@@ -253,7 +253,7 @@ For scripts, `--old-mode`, `--old-format` and `--old-dates-file` describe the in
 
 ## 3. Decode
 
-Read pasted codes, a text file, a QR PNG, the legend of a [cross-stitch pattern](#embroidery) or the files of [printed cards](#cards-and-qr-codes), or give a folder: Decode reads it with the folders inside it and lists every backup and set of shares it finds, with the kind of codes and the files, and you choose one (**Autodetect** in the menu; `--find` narrows the search). With Seedshift, enter the original dates to recover the original words. For damaged codes or dates, use the corresponding [recovery option](#6-recovery).
+Read pasted codes, a text file, a QR PNG, the legend of a [cross-stitch pattern](#embroidery) or the files of [printed cards](#cards-and-qr-codes), or give a folder: Decode reads it with the folders inside it and lists every backup and set of shares it finds, with the kind of codes and the files, and you choose one (**Autodetect** in the menu; `--find` narrows the search). A folder is searched up to 6 levels down, its files ending in .pdf, .png, .jpg or .jpeg, at most 1,024; a single file of a share finds the rest of its set in its folder. With Seedshift, enter the original dates to recover the original words. For damaged codes or dates, use the corresponding [recovery option](#6-recovery).
 
 The [Encode examples](#make-a-backup-and-read-it-back) read records back directly; the [card and QR examples](#cards-and-qr-codes) give the mode and format needed for a headerless QR. To read Unicode codes copied into your own text file:
 
@@ -279,7 +279,7 @@ The private screen also accepts Shamir shares and opens share restoration, keepi
 
 A file from `encode --output` holds only the codes, as the screen shows them: no mode, format or dates. Keep the mode; when the format cannot be determined unambiguously, give `--format` too. With `--sskr`, an output file holds one share per line. A record saved by an earlier version has the form `MNC1:<mode>:<format>:<data>` and still reads: options that conflict with its header are refused, and on the private screen you can choose to use the header's values.
 
-For Original Seedshift codes that MnemoCode wrote, Decode asks for the last word Encode named; Re-encode reads it from `--last-word-file` in scripts. Without it, Decode shows the one or two phrases the codes give, each with its fingerprint. Wrong dates or mistyped codes can still give a wrong phrase; a word outside the BIP39 list is a separate input error.
+For Original Seedshift codes that MnemoCode wrote, Decode, Re-encode and Restore from shares ask for the last word Encode named, or read it from `--last-word-file` in scripts. Without it, Decode shows the one or two phrases the codes give, each with its fingerprint. Wrong dates or mistyped codes can still give a wrong phrase; a word outside the BIP39 list is a separate input error.
 
 <a id="splitting-a-mnemonic-into-shares"></a>
 
@@ -326,7 +326,7 @@ mnemocode sskr-export --share-file unicode-shares.txt --format unicode \
 
 ## 5. Restore from shares
 
-Supply at least the threshold number of distinct shares from the same set. Paste them one per line or separated by `;`, give a text file, or read the shares' QR PNGs. Duplicate copies of one share do not count as extra members.
+Supply at least the threshold number of distinct shares from the same set. Paste them one per line or separated by `;`, give a text file, the shares' QR PNGs, the files of share cards or patterns, or a folder that holds them: MnemoCode reads it with the folders inside it and takes the shares of one set together. Duplicate copies of one share do not count as extra members.
 
 ```bash
 # Enter standard shares privately, without Seedshift.

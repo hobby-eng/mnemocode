@@ -47,6 +47,7 @@ Start the verified executable in a terminal. If double-clicking opens a terminal
 
 - Printed cards end with a few codes that belong to nothing. The sheet says how many words the seed phrase has, or how many codes each share has: type only the codes from the first card on. When MnemoCode asks how many words the seed phrase has, give the number from the sheet.
 - Shares are typed one after another, separated by a semicolon (`;`).
+- If you have the files of the cards (PDF, PNG or JPEG), of the patterns or of QR codes, for example on a USB stick, Decode reads the codes from them: choose "Autodetect" and give the folder that holds them.
 - A cross-stitch pattern is read from its PDF: in Decode choose "In a cross-stitch pattern" and give the file. Without the PDF, type the floss key from the top, each row as its symbol's number, a colon and its stitches, such as `28:1725 25:2163`; a small pattern also names each row's DMC number between them, such as `15:407:38`.
 - Patterns of shares go to "Restore a seed phrase from Shamir shares". Where it asks for shares, give the folder that holds their PDFs: copy the PDFs into one folder first if they are in different places. MnemoCode names the shares it found and goes on to the restore. You can also give one pattern's PDF at a time, or type the floss keys, one pattern after another, separated by a semicolon.
 - When MnemoCode asks for the dates that mask the seed phrase, type the secret dates as day-month-year, such as `23-09-2026`, separated by spaces.

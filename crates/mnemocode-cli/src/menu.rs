@@ -105,7 +105,7 @@ fn encode_action() -> Result<Action, Stop> {
 /// Entry 2, a backup made before encoded again: where it is and how it was masked, as Decode asks
 /// it. Re-encode asks the rest on its private screen.
 fn re_encode_action() -> Result<Action, Stop> {
-    let old = ask_backup_source("--old-mode")?;
+    let old = ask_backup_source("--old-mode")?.map(without_find);
     Ok(Action::of(
         old.map(|old| joined(&["re-encode", "--ask-secrets"], old)),
     ))
@@ -263,6 +263,21 @@ fn names_its_mode(options: &[String]) -> bool {
         && !options.iter().any(|option| option == "--words")
 }
 
+/// `options` of a source without --find, which Decode alone takes: Re-encode and recover-date list
+/// whatever a folder holds.
+fn without_find(options: Vec<String>) -> Vec<String> {
+    let mut kept = Vec::with_capacity(options.len());
+    let mut parts = options.into_iter();
+    while let Some(part) = parts.next() {
+        if part == "--find" {
+            parts.next();
+        } else {
+            kept.push(part);
+        }
+    }
+    kept
+}
+
 /// Where an encoded backup is and how it was masked, as options with its mode under `mode_flag`;
 /// none for back. A record file names its mode; a QR code or typed codes do not, unless a whole
 /// record is typed: the command itself asks for codes that name no mode.
@@ -417,7 +432,7 @@ fn recover_action() -> Result<Action, Stop> {
 /// itself. A record file names its own mode, and recover-date asks for the wallet after reading it
 /// only when that mode needs one.
 fn date_recovery_action() -> Result<Action, Stop> {
-    let Some(source) = ask_source()? else {
+    let Some(source) = ask_source()?.map(without_find) else {
         return Ok(Action::Back);
     };
     let mode = if names_its_mode(&source) {

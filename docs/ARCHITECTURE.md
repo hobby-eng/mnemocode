@@ -19,20 +19,20 @@ The cards crate depends on the library, and the embroidery crate on both; the li
 
 Paths below are relative to `crates/mnemocode/src/`, except where another crate is named. Each module documents its public types and refusals in rustdoc.
 
-| Module                                                          | What it owns                                                                             |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `bip39`                                                         | Checked phrases, entropy, seeds, word lookup and numbered dictionaries                   |
-| `dates`, `modes`                                                | Dates, date patterns, shifts and transformation rules                                    |
-| `forms`, `backup`                                               | Representations, encoded backups and MNC1 records                                        |
-| `wallet`, `bip32`                                               | Coin rules, wallet evidence, derivation and fingerprints                                 |
-| `sskr`                                                          | Share formats, splitting, strict restoration, repair and joint solving                   |
-| `recovery`                                                      | Reading a backup, word/code/date searches, backup checks and share restoration workflows |
-| `candidates`                                                    | MNCL records, bounded file admission, age encryption and candidate writers               |
-| `qr`                                                            | PNG admission, QR creation, decoding and content verification                            |
-| `pack`                                                          | The dictionaries and standalone manual-recovery guide                                    |
-| `secret`, `refusal`, `random`, `search`, `self_check`, `checks` | Secret owners, refusal contracts, randomness, stepped searches and known-answer checks   |
-| `mnemocode-cards`                                               | Drawing plans and output writers, shared by native and browser hosts                     |
-| `mnemocode-embroidery`                                          | Pictures, DMC threads, patterns, SeedStitch legends and charts ([format](SEEDSTITCH.md)) |
+| Module                                                          | What it owns                                                                                                                                                  |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bip39`                                                         | Checked phrases, entropy, seeds, word lookup and numbered dictionaries                                                                                        |
+| `dates`, `modes`                                                | Dates, date patterns, shifts and transformation rules                                                                                                         |
+| `forms`, `backup`                                               | Representations, encoded backups and MNC1 records                                                                                                             |
+| `wallet`, `bip32`                                               | Coin rules, wallet evidence, derivation and fingerprints                                                                                                      |
+| `sskr`                                                          | Share formats, splitting, strict restoration, repair and joint solving                                                                                        |
+| `recovery`                                                      | Reading a backup, word/code/date searches, backup checks and share restoration workflows                                                                      |
+| `candidates`                                                    | MNCL records, bounded file admission, age encryption and candidate writers                                                                                    |
+| `qr`                                                            | PNG admission, QR creation, decoding and content verification                                                                                                 |
+| `pack`                                                          | The dictionaries and standalone manual-recovery guide                                                                                                         |
+| `secret`, `refusal`, `random`, `search`, `self_check`, `checks` | Secret owners, refusal contracts, randomness, stepped searches and known-answer checks                                                                        |
+| `mnemocode-cards`                                               | Drawing plans and output writers, shared by native and browser hosts; `printed`, the codes card files keep                                                    |
+| `mnemocode-embroidery`                                          | Pictures, DMC threads, patterns, SeedStitch legends and charts ([format](SEEDSTITCH.md)); `found`, the backups found in files of cards, QR codes and patterns |
 
 `Cargo.toml` features select coins, searches, SSKR and card templates. `wasm-profiles.json` selects the parts and units included for each browser page. There is no Node.js runtime or TypeScript source import in these artifacts. [Feature and binding contracts](LIBRARY.md#browser-modules-and-features) explain what a host must select.
 

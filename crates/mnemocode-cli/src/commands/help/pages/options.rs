@@ -60,8 +60,8 @@ pub(super) const DATES_FILE: HelpOption = HelpOption {
     details: &[
         "The file may be up to 128 bytes.",
         "Dates are separated by whitespace. recover-date also accepts date patterns in this file. Do not combine it with --ask-secrets, which asks for the dates itself.",
-        "YYYY-MM-DD is also accepted. The order does not matter: the dates are sorted, oldest first. A year always has four digits, 0001 to 9999, so the year 26 is written 0026.",
         "DD-MM-YYYY, up to one date for every three words: 4, 5, 6, 7 or 8 dates for 12, 15, 18, 21 or 24 words. Dates are not written into the encoded record; protect and keep the date file yourself.",
+        "YYYY-MM-DD is also accepted. The order does not matter: the dates are sorted, oldest first. A year always has four digits, 0001 to 9999, so the year 26 is written 0026.",
         "Only one material file option may read standard input in one command; use local files for the other sources.",
     ],
 };
@@ -71,7 +71,7 @@ pub(super) const FORMAT: HelpOption = HelpOption {
     value: Some("FORMAT"),
     summary: "The form of the result, 1 to 5 or its name; default 1 (english)",
     details: &[
-        "1 english words, 2 indexes, 3 unicode codes, 4 colors-unicode, 5 colors. Formats 1 and 2 need a Seedshift (--mode seedshift with its dates): unmasked, they are the seed phrase itself. Cards need 3, 4 or 5. See mnemocode help formats. With --sskr and Seedshift, --format alone shows the complete masked backup beside the shares. The original phrase is shown only as English words, with --show-original words.",
+        "1 english words, 2 indexes, 3 unicode codes, 4 colors-unicode, 5 colors. Formats 1 and 2 need a Seedshift (--mode seedshift or seedshift-legacy, with their dates): unmasked, they are the seed phrase itself. Cards need 3, 4 or 5. See mnemocode help formats. With --sskr and Seedshift, --format alone shows the complete masked backup beside the shares. The original phrase is shown only as English words, with --show-original words.",
     ],
 };
 
@@ -397,7 +397,7 @@ pub(super) const INPUT_FILE: HelpOption = HelpOption {
     summary: "Read the encoded backup from a file or a folder; - reads standard input",
     details: &[
         "A text file of codes up to 64 KiB; a QR code image in PNG; a cross-stitch pattern's PDF, which keeps its legend; or the cards' PDF, PNG or JPEG, which keep a copy of the codes: up to 64 MiB.",
-        "A folder is read with the folders inside it, and every backup and set of shares found is listed: with --ask-secrets you choose one, and one alone is taken at once. Cards of one backup in several files, and shares of one set, are read together.",
+        "A folder is read with the folders inside it, up to 6 levels down, its files ending in .pdf, .png, .jpg or .jpeg, at most 1,024; links are not followed. Every backup and set of shares found is listed: with --ask-secrets you choose one; without it, a folder of several is refused with that list; one alone is taken at once. Cards of one backup in several files, and shares of one set, are read together; a single file of a share finds the rest of its set in its folder.",
         "The codes may be in any of the five forms. Only a record saved by an earlier version, which starts with MNC1, names its mode and form.",
     ],
 };
@@ -609,7 +609,7 @@ pub(super) const SHARE_FILE: HelpOption = HelpOption {
     value: Some("PATH"),
     summary: "A file of shares, one per line or with ; between them; may be repeated",
     details: &[
-        "Each file may be up to 64 KiB; the PDF of a cross-stitch pattern of a share, up to 64 MiB, gives the share that its legend holds.",
+        "Each text file may be up to 64 KiB. The PDF, PNG or JPEG files of share cards, a QR image, or the PDF of a cross-stitch pattern of a share, up to 64 MiB, give the shares they keep; a folder is read with the folders inside it, the shares of one set together, and a single file of a share finds the rest of its set in its folder.",
         "Use - to read standard input once. ur:sskr/..., Bytewords, word numbers, Unicode codes, colors, colors as Unicode codes and the legend lines of patterns of shares are detected automatically; ? marks an unreadable element.",
     ],
 };
@@ -619,7 +619,7 @@ pub(super) const SHARE_QR: HelpOption = HelpOption {
     value: Some("PNG"),
     summary: "A QR code of one share in a PNG image; may be repeated",
     details: &[
-        "A PDF cannot be read; save the QR code as a PNG image first.",
+        "A PDF cannot be read here: give the PDF of share cards or of a pattern with --share-file.",
         "A QR code of the legend line of a cross-stitch pattern of a share is read too.",
     ],
 };

@@ -27,8 +27,8 @@ const OWN_0_5: HelpOption = HelpOption {
     details: &[
         "The file may be up to 128 bytes.",
         "Dates are separated by whitespace. recover-date also accepts date patterns in this file. Do not combine it with --ask-secrets, which asks for the dates itself.",
-        "YYYY-MM-DD is also accepted. The order does not matter: the dates are sorted, oldest first. A year always has four digits, 0001 to 9999, so the year 26 is written 0026.",
         "DD-MM-YYYY, up to one date for every three words: 4, 5, 6, 7 or 8 dates for 12, 15, 18, 21 or 24 words. Dates are not written into the encoded record; protect and keep the date file yourself.",
+        "YYYY-MM-DD is also accepted. The order does not matter: the dates are sorted, oldest first. A year always has four digits, 0001 to 9999, so the year 26 is written 0026.",
         "Only one material file option may read standard input in one command; use local files for the other sources.",
     ],
 };

@@ -34,6 +34,7 @@ Start with the [README](../README.md) to choose a task. Its sections follow the 
 | [Design and decisions](design/README.md)         | Architecture, platform protections, crate choices and decisions |
 | [Audit index](audits/README.md)                  | Reports and their original scope, source identities and limits  |
 | [Test coverage](COVERAGE.md)                     | Line coverage on Linux by crate, the command and its limits     |
+| [What MnemoCode is for](PRODUCT.md)              | Who it is for, what it does and does not do, and its principles |
 | [Changelog](../CHANGELOG.md)                     | Version-by-version changes                                      |
 | [0.2.0 release notes](releases/v0.2.0.md)        | What 0.2.0 changes, in short                                    |
 | [Third-party notices](../THIRD_PARTY_NOTICES.md) | Dependencies, artwork and attribution                           |

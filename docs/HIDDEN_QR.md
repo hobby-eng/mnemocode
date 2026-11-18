@@ -149,6 +149,8 @@ all 40 QR versions with qrcodegen's encoder, including the exact per-block corre
 Rust: `mnemocode::qr::hidden::{matrix, png, read_png}`. Matrix and image exports verify both layers
 before returning them. `qr::read_png` deliberately keeps its ordinary-scanner behavior.
 
-Browser bindings: `hiddenQrPng(visible, record)`, `readHiddenQrPng(bytes)` and
-`CardExport.setHiddenQr(enabled)`. With hidden mode selected, call `readHiddenQrPng` to obtain the
+Browser bindings: `hiddenQrPng(visible, record)`, `readHiddenQrPng(bytes)`,
+`CardExport.setHiddenQr(enabled)` and `CardExport.hiddenQrPng(record)`, a PNG of a record behind
+the contact the export's cards print; `CardPlan.qrPng()` and `ShareCards.qrPng(at)` give a sheet's
+QR code as printed, hidden or ordinary. With hidden mode selected, call `readHiddenQrPng` to obtain the
 record; do not reconstruct the image from `readQrPng`, which returns only its public text.

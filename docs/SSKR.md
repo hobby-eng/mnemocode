@@ -71,7 +71,7 @@ Share cards print a share in colors as its colors, and a share in Unicode codes 
 
 ## Share QR images
 
-`--qr-dir NEW_FOLDER` saves one complete share per PNG in every share format, without a card design or PDF. Encode with `--sskr`, Re-encode with shares, `sskr-split` and `sskr-export` accept it. Files are named `share-1-qr.png`, `share-2-qr.png` and so on. Each PNG is read back and compared with that share before publication; a failed check offers another try on the private screen. All shares are in one folder: separate them for storage. Restore reads each image with `--share-qr PATH`.
+`--qr-dir NEW_FOLDER` saves one complete share per PNG in every share format, without a card design or PDF. Encode with `--sskr`, Re-encode with shares, `sskr-split` and `sskr-export` accept it; `stitch` with `--shares` saves the QR images of the patterns' legend lines the same way. Files are named `share-1-qr.png`, `share-2-qr.png` and so on. Each PNG is read back and compared with that share before publication; a failed check offers another try on the private screen. All shares are in one folder: separate them for storage. Restore reads each image with `--share-qr PATH`.
 
 ## Share cards
 
@@ -106,7 +106,7 @@ The reference printed on a share sheet shows the numbers of the set, the group a
 
 ## Recovery
 
-`sskr-combine` needs complete shares, not single cards of a share:
+`sskr-combine` needs complete shares: the text of a share, its QR image, or the files of its cards or its pattern, which keep it; the codes typed from a single card of a share are not enough:
 
 ```bash
 mnemocode sskr-combine --ask-secrets
@@ -120,7 +120,7 @@ mnemocode sskr-combine --share-file ./selected-shares.txt
 mnemocode sskr-combine --share-qr ./first.png --share-qr ./second.png
 ```
 
-`--share-file` and `--share-qr` may be repeated and used together. A text file holds shares one per line or separated by `;`; one `--share-file -` can read standard input. Raw `--share` values are refused: type shares on the private screen or read them from files/QR images. `--share-qr` reads a PNG image; it cannot read a PDF. The format of each share is found automatically, so formats can be mixed. Shares that another program made in several groups are accepted.
+`--share-file` and `--share-qr` may be repeated and used together. A text file holds shares one per line or separated by `;`; one `--share-file -` can read standard input. Raw `--share` values are refused: type shares on the private screen or read them from files/QR images. `--share-file` also takes the PDF, PNG or JPEG files of share cards, a pattern's PDF, a QR image or a folder, read with the folders inside it; the shares of one set found there are read together, and a single file of a share finds the rest of its set in its folder. `--share-qr` reads a PNG image only; give a PDF of share cards or of a pattern with `--share-file`. The format of each share is found automatically, so formats can be mixed. Shares that another program made in several groups are accepted.
 
 On the private screen, enter the path to a saved text file in the share field, or paste the shares themselves. The file may hold any sufficient subset, such as shares 1 and 3 of a 2-of-3 set. When replacing just one unreadable share, give that share or a file containing only that share.
 

@@ -178,19 +178,13 @@ pub(crate) const WEAK: &str = "weak: only disguised, anyone with MnemoCode reads
 pub(crate) enum Takes {
     /// Either transformation.
     Either,
-    /// Only MnemoCode Seedshift, whose result is a valid phrase again, as standard shares and the
-    /// legend of a pattern need: the original stays in its place, greyed, with `why`. `unmasked`
-    /// says what no Seedshift leaves.
-    MnemoCodeOnly {
-        unmasked: &'static str,
-        why: &'static str,
-    },
+    /// Either transformation, `unmasked` saying what no Seedshift leaves, as for standard shares.
+    EitherNoting { unmasked: &'static str },
 }
 
 /// Whether Seedshift is used and which, on one screen for every new backup: MnemoCode Seedshift,
 /// the original and none, always in this order. An answer the backup cannot take stays greyed with
-/// its reason: the original where it `takes` only MnemoCode's, none where the form is always
-/// masked (`required`). None means back.
+/// its reason: none where the form is always masked (`required`). None means back.
 pub(crate) fn ask_seedshift(
     question: &str,
     required: bool,
@@ -201,16 +195,7 @@ pub(crate) fn ask_seedshift(
     let lines = vec![MASKS.to_owned()];
     let unmasked = match takes {
         Takes::Either => WEAK,
-        Takes::MnemoCodeOnly { unmasked, why } => {
-            for choice in choices
-                .iter_mut()
-                .filter(|choice| choice.value != Mode::Seedshift)
-            {
-                choice.enabled = false;
-                choice.note = Some(why.to_owned());
-            }
-            unmasked
-        }
+        Takes::EitherNoting { unmasked } => unmasked,
     };
     let mut none = Choice::noted("No Seedshift", unmasked, Mode::Direct);
     if required {
@@ -827,9 +812,9 @@ pub(crate) fn ask_encoding_in(
 /// backup; Shift+Tab goes back a step.
 pub(crate) fn ask_splitting(finish: &mut super::new_backup::Finish<'_>) -> Result<bool, Stop> {
     use super::new_backup::{Answered, answered, named_file, run_steps};
-    let shares = Takes::MnemoCodeOnly {
+    // Either Seedshift writes a valid phrase, which standard shares split.
+    let shares = Takes::EitherNoting {
         unmasked: "the shares alone restore it",
-        why: "not for standard shares, which split a valid seed phrase",
     };
     let formats = [
         Choice::noted(
