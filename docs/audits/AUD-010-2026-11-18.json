@@ -1,0 +1,951 @@
+{
+  "schemaVersion": 1,
+  "auditId": "AUD-010",
+  "auditNumber": 10,
+  "date": "2026-11-18",
+  "title": "MnemoCode AUD-009 remediation verification",
+  "reviewer": {
+    "name": "Codex coordinator with three scoped independent reviewers",
+    "model": null,
+    "reasoningEffort": null
+  },
+  "snapshot": {
+    "commit": "19addd5583bb011dd34be53a7ce9b5253c346b04",
+    "commitComplete": false,
+    "workingTree": "Uncommitted remediation. This review added audit-only harnesses, evidence and reports; no production edits, commit or publication.",
+    "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+    "fingerprintDefinition": "SHA-256 of sorted tracked/nonignored-untracked source manifest excluding docs/audits; removed paths are represented by the production diff.",
+    "productionDiffSHA256": "b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+    "newFiles": {
+      "crates/mnemocode-cards/src/printed.rs": "bf4a3cbeae777e7c30192d7c5bd83470b2749d83593de82c1f5b30ed879cac17",
+      "crates/mnemocode-cli/src/commands/card_files.rs": "7c1036025e7034e56949a76885541357e84844285364b3d8fbfe13d376529fe4",
+      "crates/mnemocode-embroidery/src/found.rs": "07b1b65d586d55854ea546b9d692dc137b5ed0805cb90af9a7a0c0df0a2daf2d",
+      "crates/mnemocode-wasm/src/files.rs": "8b5b73e9041d4ced036c8a9d646569dc265b8d5f02e0cc61f925afc733db602b",
+      "docs/PRODUCT.md": "d0a80030c73175bf5b43c018610f616ba573c40934cc5c08a0be65b0efd56f6a"
+    },
+    "nativeCLI": "5a3273557087cfdb350265215fdc81aa45f6f644ae75931ffd67426c0eb7605b",
+    "finalSourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb"
+  },
+  "scope": {
+    "included": [
+      "Eight fixes claimed after AUD-009, Original Seedshift no-wallet refusal, and five previously incomplete acceptance checks",
+      "Changed native/core, discovery, documentation, CLI navigation and retained WASM evidence"
+    ],
+    "excluded": [
+      "Production remediation, commit, publication, cloud resources",
+      "Mass PDF/image templates, full self-test, full gate replay",
+      "Fresh browser host, Windows/macOS runtime, canonical release build"
+    ]
+  },
+  "checks": [
+    {
+      "checkId": "CHECK-SEC-001",
+      "category": "SEC",
+      "logicalGroup": "Threat model and secret ownership",
+      "owner": "core / CLI",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "passed",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Former Debug disclosures no longer reproduce in the original tests; new owners reviewed."
+    },
+    {
+      "checkId": "CHECK-SEC-002",
+      "category": "SEC",
+      "logicalGroup": "Secret Vault, CSP, sandbox, and transport",
+      "owner": "CLI / render-WASM",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "not-run",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Outside this follow-up's fresh execution scope. See AUD-008/AUD-009 and their limitations."
+    },
+    {
+      "checkId": "CHECK-SEC-003",
+      "category": "SEC",
+      "logicalGroup": "Network egress and secret guards",
+      "owner": "CLI",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "not-run",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Outside this follow-up's fresh execution scope. See AUD-008/AUD-009 and their limitations."
+    },
+    {
+      "checkId": "CHECK-SEC-004",
+      "category": "SEC",
+      "logicalGroup": "Randomness, encryption, and authentication",
+      "owner": "core",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "not-run",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Outside this follow-up's fresh execution scope. See AUD-008/AUD-009 and their limitations."
+    },
+    {
+      "checkId": "CHECK-SEC-005",
+      "category": "SEC",
+      "logicalGroup": "Secret lifecycle and exceptional paths",
+      "owner": "core / CLI",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "passed",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Scoped Debug-redaction checks pass; no general guarantee of stack/host erasure is inferred."
+    },
+    {
+      "checkId": "CHECK-SEC-006",
+      "category": "SEC",
+      "logicalGroup": "Browser injection, persistence, and sensitive APIs",
+      "owner": "render-WASM",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "not-run",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Outside this follow-up's fresh execution scope. See AUD-008/AUD-009 and their limitations."
+    },
+    {
+      "checkId": "CHECK-SEC-007",
+      "category": "SEC",
+      "logicalGroup": "Read-only guarantees and availability bounds",
+      "owner": "CLI / core",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "passed",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Changed discovery remains read-only; residual Unicode issue refuses collection rather than substituting a phrase."
+    },
+    {
+      "checkId": "CHECK-FUN-001",
+      "category": "FUN",
+      "logicalGroup": "BIP39, entropy, and seed interpretation",
+      "owner": "core",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "passed",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Current recovery integration 7/7 and old hint/candidate probes pass; exact public phrase asserted in positive control."
+    },
+    {
+      "checkId": "CHECK-FUN-002",
+      "category": "FUN",
+      "logicalGroup": "HD derivation and every coin/profile",
+      "owner": "core",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "not-run",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Outside this follow-up's fresh execution scope. See AUD-008/AUD-009 and their limitations."
+    },
+    {
+      "checkId": "CHECK-FUN-003",
+      "category": "FUN",
+      "logicalGroup": "BIP85, BIP38, messages, and Silent Payments",
+      "owner": "core",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "not-applicable",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "No BIP85, BIP38, message signing or Silent Payments producer in this utility."
+    },
+    {
+      "checkId": "CHECK-FUN-004",
+      "category": "FUN",
+      "logicalGroup": "Scripts, descriptors, Miniscript, and multisig",
+      "owner": "core",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "not-applicable",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "No transaction script, descriptor/miniscript or multisignature coordinator."
+    },
+    {
+      "checkId": "CHECK-FUN-005",
+      "category": "FUN",
+      "logicalGroup": "Transactions, PSBT version context, and commitments",
+      "owner": "core",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "not-applicable",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "No transaction or PSBT parsing/signing."
+    },
+    {
+      "checkId": "CHECK-FUN-006",
+      "category": "FUN",
+      "logicalGroup": "Recovery and backup formats",
+      "owner": "core / render-WASM",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "failed",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "AUD-009-FUN003 remains for Unicode. Wrong-set and malformed-surplus regressions pass."
+    },
+    {
+      "checkId": "CHECK-FUN-007",
+      "category": "FUN",
+      "logicalGroup": "Discovery, providers, proofs, and accounting",
+      "owner": "core",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "not-applicable",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "No connected chain provider, accounting or online discovery operation."
+    },
+    {
+      "checkId": "CHECK-API-001",
+      "category": "API",
+      "logicalGroup": "Actual dependency call contracts",
+      "owner": "release / render-WASM",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "passed",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Current native tests compile/run; actual WASM smoke retained for matching outputs, not claimed as native-to-browser acceptance."
+    },
+    {
+      "checkId": "CHECK-API-002",
+      "category": "API",
+      "logicalGroup": "Async state, cancellation, and revisions",
+      "owner": "CLI",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "passed",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Fresh completed-Saving checkbox and child-choice PTYs pass. Different-length replacement remains a stated gap."
+    },
+    {
+      "checkId": "CHECK-API-003",
+      "category": "API",
+      "logicalGroup": "Public export schema and monetary fidelity",
+      "owner": "render-WASM",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "blocked",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "New exports have retained actual-WASM smoke, but exact round-trip, correction metadata and real JS host acceptance remain incomplete."
+    },
+    {
+      "checkId": "CHECK-API-004",
+      "category": "API",
+      "logicalGroup": "Encoding and import/export interoperability",
+      "owner": "core / render-WASM",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "failed",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Fresh collector and consent controls pass, but the Unicode import/collection residual is reproducible."
+    },
+    {
+      "checkId": "CHECK-BLD-001",
+      "category": "BLD",
+      "logicalGroup": "Manifest, flags, and feature composition",
+      "owner": "release",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "not-run",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "No fresh feature-matrix rebuild. Retained xtask log completed native checks before an old probe failure."
+    },
+    {
+      "checkId": "CHECK-BLD-002",
+      "category": "BLD",
+      "logicalGroup": "Matrix depth and runtime sampling",
+      "owner": "release / coordinator",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "passed",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Bounded native regressions and PTYs executed; no full PDF/template matrix or exhaustive native/WASM platform replay."
+    },
+    {
+      "checkId": "CHECK-BLD-003",
+      "category": "BLD",
+      "logicalGroup": "Lockfiles, source provenance, and licenses",
+      "owner": "release",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "blocked",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Unchanged Cargo.lock recorded; existing license companion remains old. No new RustSec audit or signed package verification."
+    },
+    {
+      "checkId": "CHECK-BLD-004",
+      "category": "BLD",
+      "logicalGroup": "Canonical WASM and Docker bytes",
+      "owner": "release",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "blocked",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Retained 4-profile wasmi success matches current output hashes. No immutable source-input provenance or clean canonical rebuild."
+    },
+    {
+      "checkId": "CHECK-BLD-005",
+      "category": "BLD",
+      "logicalGroup": "Artifacts, CI, and release workflows",
+      "owner": "release",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "blocked",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "No final release package/signature/attestation was produced or accepted."
+    },
+    {
+      "checkId": "CHECK-UI-001",
+      "category": "UI",
+      "logicalGroup": "Real files and representative viewports",
+      "owner": "render-WASM / CLI",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "not-run",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "No fresh visual/file-layout/viewport acceptance. Tiny scene/XMP checks support the import/collection finding; one QR input supports navigation only."
+    },
+    {
+      "checkId": "CHECK-UI-002",
+      "category": "UI",
+      "logicalGroup": "Navigation, inputs, and state preservation",
+      "owner": "CLI",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "passed",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Fresh checkbox, child default preservation, and wrong-kind folder consent checks pass."
+    },
+    {
+      "checkId": "CHECK-UI-003",
+      "category": "UI",
+      "logicalGroup": "Secret visibility, help, QR, and accessibility",
+      "owner": "CLI / docs",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "passed",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Active checksum/output help now agrees with implementation; refused QR fallback exposes no phrase in the PTY."
+    },
+    {
+      "checkId": "CHECK-ARC-001",
+      "category": "ARC",
+      "logicalGroup": "Ownership, imports, and composition seams",
+      "owner": "release",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "not-run",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "No fresh complete architecture-gate run; changed source traces and existing module-map entries reviewed."
+    },
+    {
+      "checkId": "CHECK-ARC-002",
+      "category": "ARC",
+      "logicalGroup": "Dead code, duplication, and false positives",
+      "owner": "release",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "not-run",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "No fresh global duplicate/dead-code scan; prior baseline remains applicable with its recorded limits."
+    },
+    {
+      "checkId": "CHECK-ARC-003",
+      "category": "ARC",
+      "logicalGroup": "Comments, tests, and production-path fidelity",
+      "owner": "coordinator / all reviewers",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "blocked",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "The Unicode variant is now tested and fails. Precise retry and WASM acceptance gaps remain; audit-only harness mistakes are retained."
+    },
+    {
+      "checkId": "CHECK-DOC-001",
+      "category": "DOC",
+      "logicalGroup": "User-facing capability and safety descriptions",
+      "owner": "docs",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "passed",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Both remaining audited help/manual contradictions are corrected."
+    },
+    {
+      "checkId": "CHECK-DOC-002",
+      "category": "DOC",
+      "logicalGroup": "Commands, metadata, links, and legal materials",
+      "owner": "docs / release",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "blocked",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Relevant docs agree with code, but the existing packaged license text must be replaced on release."
+    },
+    {
+      "checkId": "CHECK-DOC-003",
+      "category": "DOC",
+      "logicalGroup": "Audit records and evidence consistency",
+      "owner": "coordinator / docs",
+      "scope": "MnemoCode native, bindings, tooling and documentation as applicable",
+      "method": "Targeted remediation follow-up; only executions listed in this report are fresh.",
+      "outcome": "passed",
+      "snapshot": "Working tree on 19addd5; production diff b181b946e6619de5cb819b5febed8b501b4fc8d64ae6e212a36317af0d2809b9",
+      "evidence": "Report pair, source identity, catalogue and retained/fresh distinctions validated before handoff."
+    }
+  ],
+  "findings": [],
+  "observations": [],
+  "residualFindings": [
+    {
+      "id": "AUD-009-FUN003",
+      "category": "FUN",
+      "kind": "finding",
+      "title": "Repeated card exports with different decoys collide in discovery",
+      "severity": "low",
+      "status": "open",
+      "releaseBlocking": false,
+      "evidence": [
+        "crates/mnemocode-cards/src/content.rs:539",
+        "crates/mnemocode-cards/src/palette.rs:358",
+        "crates/mnemocode-cards/src/templates.rs:466",
+        "crates/mnemocode-cards/src/printed.rs:315",
+        "docs/audits/AUD-010-harnesses/src/repeated.rs:94",
+        "Local evidence: AUD-010-evidence/unicode-regression.log"
+      ],
+      "reproduction": "Encode the public all-zero 128-bit phrase as Unicode. Create two business-it exports with deterministic bytes 0x11 and 0x42 and retain one decoy. Parse each scene's XMP and verify exact individual text; then collect both.",
+      "expected": "Individually readable exports remain separately discoverable together.",
+      "observed": "Different Unicode decoys receive the same palette colors, export mark and document ID. The collector returns Different(13). Colors control has different IDs and passes.",
+      "impact": "Discovery availability: two valid exports of one backup become unreadable together. Individual files remain usable; no incorrect recovered phrase is demonstrated.",
+      "recommendedFix": "Bind export identity to the actual ordered decoy labels where labels exist, and to encoded colors otherwise, while retaining a shared identity across layouts of the same export. Do not ignore genuine conflicts.",
+      "requiredVerification": "Keep original Colors and new Unicode positive controls; test independently randomized decoys, sheet/separate layout identity, and analogous SSKR card collection.",
+      "relatedFindings": [
+        "AUD-008-FUN007"
+      ]
+    }
+  ],
+  "remediation": [
+    {
+      "id": "AUD-008-SEC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "The legacy recovery hint now uses secret_channel. Fresh public PTY reproduction routes addict only to the redirected result; concurrent privacy suites also pass."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-SEC002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Fresh original malicious-filename regression passes; safe_display covers file and nested-folder labels in the reviewed callers."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-SEC003",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+      "evidence": [
+        "Both exposed owners now redact normal/pretty Debug. Fresh original AUD-009 probes and current recovery tests pass."
+      ],
+      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+    },
+    {
+      "id": "AUD-008-FUN001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Fresh hints.rs passes 15 exact native reconstructions: five phrase lengths through direct share splitting, embroidery entropy and embroidery share payloads. Producer-returned hints survive all paths. This does not execute every CLI/WASM producer."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-FUN002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Fresh original multi-group same-member regression passes. Group+member identity and per-group quorum are repaired; the distinct misleading external set label is AUD-009-FUN001."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-FUN003",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Fresh original incomplete-surplus regression passes and the quorum stays available. A contiguous malformed payload can still lose its warning: AUD-009-FUN002."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-FUN004",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+      "evidence": [
+        "Source still clears CHOSEN_WORDS before a replacement source; the exact different-length retry regression remains unexecuted."
+      ],
+      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+    },
+    {
+      "id": "AUD-008-FUN006",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Fresh corrected candidate probe passes both input orders and exact target phrase equality, allowing bounded Running-to-Done stepping. The original one-call completion assertion was an audit-harness error, not the repaired implementation's failure."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-API001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Fresh original re-encoding regression passes: both legacy variants return the same recovery hint and indexes."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-API002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Fresh original serialized-mode regression passes; stable mode IDs agree and real conflicts remain refused by the reviewed check."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-BLD001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "The current concurrent cargo xtask check reached and completed workspace test binaries and doctests; the former compilation failures are absent. Captured before the enclosing command finished."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-BLD002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Current retained CLI results: pty 34/34, stitch_terminal 11/11, stitch 7/7, and the previously failing cards/hidden-QR/privacy cases all pass. No full template matrix was run by this audit."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-BLD003",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "The verifier calls the actual five-i32 backup ABI. The retained completed wasmi verification reports four profiles checked with empty live-owner/after-free residue offsets. This is not execution of JS glue in a browser."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-ARC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Fresh code-rules self-test passes 45 cases and source check passes 622 files. Module/refusal registry changes are covered by the current checker."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-ARC002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Fresh copies self-test and scan pass across 336 Rust files."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-UI001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+      "evidence": [
+        "Fresh configured child PTY selects Original Seedshift, goes back from Dates with Shift+Tab, and accepts with Enter only. Original remains selected."
+      ],
+      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+    },
+    {
+      "id": "AUD-008-API003",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+      "evidence": [
+        "Fresh PTY with exactly one QR file in a folder and --find cards waits for consent: Escape reveals no phrase; selecting it restores the exact public phrase."
+      ],
+      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+    },
+    {
+      "id": "AUD-008-DOC001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+      "evidence": [
+        "Active Seedshift explanation now says both encoders write valid phrases and Original supplies a word to remember; related fingerprint explanation corrected. Static conformance check."
+      ],
+      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+    },
+    {
+      "id": "AUD-008-DOC002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Both manual copies are identical and no longer infer a masking mode from a legend; ADR marks the earlier design superseded. Documentation/source verification only; the embedded Python helper was not executed."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-DOC003",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "PRODUCT now qualifies platform isolation and surviving staging copies; checked against both file-publication error branches and Windows policy. No complete-erasure proof is claimed."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-DOC004",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+      "evidence": [
+        "CLI manual now describes automatic masked words, and built-in help describes usual output names in one selected folder. Static conformance check."
+      ],
+      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+    },
+    {
+      "id": "AUD-008-DOC005",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "The documented piped-input example redirects stdout and the built-in example uses a local input file, matching gate.rs. Fresh public legacy PTY routing verifies the underlying redirected-output boundary; not every prose example was executed."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-DOC006",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Release notes distinguish current headerless output, removed flags and old read compatibility. The remaining 'decode exactly' wording is a clarity recommendation, not proof of lost recoverability: the correct old phrase remains a candidate and the known old last word selects it."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-DOC007",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "COVERAGE now distinguishes wasmi/glue inspection from execution in an actual browser and preserves the old coverage revision."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-DOC008",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Architecture names three selectable modes and one internal legacy variant, matching Mode::ALL and both parsers."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-DOC009",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "The constructor list includes legend_entropy and no longer claims the incomplete list is exhaustive. Static API/name verification; no new documentation-example compilation."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-DOC010",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "SSKR documentation distinguishes the file suffix _1 from the folder suffix -1, matching numbered_name."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-DOC011",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Map notice identifies the historical generator and present world-land.txt asset. Its stored SHA-256 matches the resource actually included by the renderer."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-BLD004",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+      "evidence": [
+        "Generator includes all four notices. Existing dist/release license companion is still identical to THIRD_PARTY_NOTICES.md alone; package must be rebuilt and inspected before release."
+      ],
+      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+    },
+    {
+      "id": "AUD-008-FUN007",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+      "evidence": [
+        "Fresh production test verifies sheet and separate card of one export merge while another export remains separate; Colors scene/XMP coverage, no PDF matrix."
+      ],
+      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+    },
+    {
+      "id": "AUD-008-API004",
+      "status": "fixed",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+      "evidence": [
+        "New reader and both heir APIs are invoked in the retained successful wasmi probe of current artifact bytes. It permits Ok(None) for the reader and does not assert exact share restoration/correction metadata or real browser host behavior."
+      ],
+      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+    },
+    {
+      "id": "AUD-008-API005",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Fresh original MNC1 metadata regression passes, using the payload's actual form/count."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-BLD005",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "browser-files directly includes dep:mnemocode-cards and required SSKR features. The retained xtask check completed the per-module wasm32 clippy loop before reaching tests; native isolated-feature replay remains optional additional evidence."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-008-DOC012",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "LIBRARY now describes file collection, share legend reading, StitchShares and pattern heir sheets using names present in the implementation and generated declarations. This verifies the documentation match, not browser host behavior."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-007-DOC004",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "evidence": [
+        "Residual documentation mismatch fixed: protections.md/protections.json explicitly say LocalDumps is named but not read, matching windows.rs. Static documentation verification only, not new Windows runtime verification."
+      ],
+      "sourceFingerprint": "89b75c357410f75d67b489946b70ccdc12a9d7dd44355753390adb9d12e5804c",
+      "verificationBasis": "Retained AUD-009 disposition and its original evidence, not a new replay of every acceptance case in AUD-010."
+    },
+    {
+      "id": "AUD-009-FUN001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+      "evidence": [
+        "Original mismatched-internal-set regression passes, with positive core controls; collector checks internal identifiers against each other and the external reference."
+      ],
+      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+    },
+    {
+      "id": "AUD-009-FUN002",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+      "evidence": [
+        "Original malformed-surplus regression passes: warning present, quorum usable and core restoration succeeds."
+      ],
+      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+    },
+    {
+      "id": "AUD-009-FUN003",
+      "status": "open",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+      "evidence": [
+        "Partial correction: original Colors regression passes, but fresh Unicode probe gives identical document IDs and Different(13). Each export reads correctly alone; the combined discovery fails. Retain the original Low finding ID."
+      ],
+      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+    },
+    {
+      "id": "AUD-009-UI001",
+      "status": "verified",
+      "fixCommit": null,
+      "verificationCommit": null,
+      "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
+      "evidence": [
+        "Fresh production PTY returns from the seed-phrase prompt to the completed Saving step and verifies that custom output checkboxes remain selected."
+      ],
+      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+    }
+  ],
+  "procedureHashes": {
+    "multi-chain-wallet-tools/docs/FULL_AUDIT_GUIDE.md": "572cef6f58c34d00f7f60928e72afe4b5fed8a85c8380035bf251ab2211879b8",
+    "multi-chain-wallet-tools/docs/audits/AUDIT_STANDARD.md": "c43e25bbcbdd6d22d52a38f571a759f5b688af062b980c3adecd5326efc082ec",
+    "multi-chain-wallet-tools/docs/audits/AUDIT_TEMPLATE.md": "8122777f8093b04119633459b9b2cc50bc6ca9258bfc6184b52136d3b8172210",
+    "multi-chain-wallet-tools/docs/audit-report.schema.json": "989bf3de974d581579c1d1c1e143d5ab9fa232dc70cc8c6f84ad00531ae698fb",
+    ".github/instructions/audits.instructions.md": "5cd764d6de14535d7718df9b4d950ed4b263cc45ccca950cf43269700ecc2c96"
+  },
+  "limitations": [
+    "AUD-008-FUN004 lacks the exact different-length replacement regression.",
+    "AUD-008-API004 has matching-artifact WASM smoke, not full round-trip/metadata/browser acceptance.",
+    "AUD-008-BLD004 is fixed in the generator, but the present native companion is stale.",
+    "The retained xtask check failed at the former WASM probe; a subsequent standalone verification passed on different, current probe bytes. They are not a single fresh complete check.",
+    "No line-coverage campaign, exhaustive crypto vectors, platform matrix, mass rendering, or signed release verification was repeated.",
+    "Thermal sampling is reactive: jobs paused at configured 90/85 C thresholds, but recorded brief peaks reached 100 C. A 4 GiB job ceiling and memory-pressure guard limited own processes; observed available memory stayed above 4 GiB. No claim of a hard temperature ceiling."
+  ],
+  "assessment": {
+    "releaseAccepted": false,
+    "newFindings": 0,
+    "eightClaimedFixes": {
+      "verified": 7,
+      "partiallyFixed": 1
+    },
+    "AUD008Dispositions": {
+      "verified": 31,
+      "fixed": 3,
+      "open": 0
+    },
+    "AUD009Dispositions": {
+      "verified": 3,
+      "fixed": 0,
+      "open": 1
+    },
+    "newReleaseBlockers": 0,
+    "reason": "The Low Unicode residual and outstanding release/acceptance evidence prevent declaring all work complete. No severity inflation: the residual remains Low and is not independently release-blocking."
+  },
+  "additionalFix": {
+    "name": "Original Seedshift no-wallet refusal",
+    "result": "Native negative test returns core.share-restore.last-word-fits-no-phrase; positive control restores exact public phrase. New no-valid-phrase branch and real WASM response code were source-reviewed but not separately executed."
+  },
+  "executions": [
+    {
+      "name": "Original AUD-009 regressions",
+      "result": "7 passed",
+      "command": "cargo test --locked --offline --manifest-path docs/audits/AUD-009-harnesses/Cargo.toml --lib -- --nocapture"
+    },
+    {
+      "name": "Current recovery",
+      "result": "7 passed",
+      "command": "cargo test --locked --offline -p mnemocode --test ts_recovery_shares -- --nocapture"
+    },
+    {
+      "name": "Cross-layout identity",
+      "result": "1 passed, 29 filtered",
+      "command": "cargo test --locked --offline -p mnemocode-cards --test sets one_export_shares_its_document_id_and_another_has_its_own -- --exact --nocapture"
+    },
+    {
+      "name": "Completed Saving checkboxes",
+      "result": "1 passed, 2 filtered",
+      "command": "cargo test --locked --offline -p mnemocode-cli --test menu_guides the_places_ticked_for_saving_stay_ticked_when_coming_back -- --exact --nocapture"
+    },
+    {
+      "name": "Unicode variant and Colors control",
+      "result": "1 passed, 1 failed; exit 101",
+      "command": "cargo test --offline --manifest-path docs/audits/AUD-010-harnesses/Cargo.toml --lib -- --nocapture"
+    },
+    {
+      "name": "Child-choice and folder consent PTYs",
+      "result": "2 passed, three child sessions; exit 0",
+      "command": "AUD010_CLI=\"$PWD/target/debug/mnemocode\" timeout --signal=TERM --kill-after=5s 90s cargo test --locked --offline --manifest-path docs/audits/AUD-010-harnesses/Cargo.toml --test navigation -- --nocapture --test-threads=1"
+    },
+    {
+      "name": "Audit harness clippy",
+      "result": "Corrected all-targets lint passed; initial harness-only errors retained",
+      "command": "cargo clippy --locked --offline --manifest-path docs/audits/AUD-010-harnesses/Cargo.toml --all-targets -- -D warnings"
+    }
+  ],
+  "retainedSuites": [
+    {
+      "name": "Standalone wasmi verification",
+      "sha256": "b6a6af70f751623fd40c27033e633783e1fd50f29aa3b3b4791a8db632a6b9a5",
+      "result": "4 files, 784 entry returns, 171 secrets; 28 stack rows. Output manifests match current 12 WASM/glue/declaration files. No source-input manifest or retained exit metadata."
+    },
+    {
+      "name": "Earlier current xtask check",
+      "sha256": "3d4ac7cedbc65a1368aa647bf956550b2fe8d419a1427ca7a4bee1aa7f004c7d",
+      "result": "Native steps completed, then former probe failed. Followed by separate corrected WASM verification; not a full current gate pass."
+    }
+  ],
+  "notes": [
+    "No new finding identifier is assigned to the residual of AUD-009-FUN003.",
+    "Verified refers to recorded test scope and exact working-tree bytes, with null commit fields. It does not authorize or imply a commit.",
+    "Two audit-only navigation compilation attempts used an incorrect SecretBytes accessor; corrected before execution. Failed logs retained, not counted as product failures.",
+    "An automatic safety review rejected one hot test launch. Following cooldown and guard inspection, the bounded tests were permitted and completed. No approval bypass was used.",
+    "Initial audit harness lint failed on test module classification and inherited stderr expectation; corrected audit-only configuration passed clippy. No product source changed.",
+    "The initial new harness test generated its lockfile offline without --locked; subsequent rerun instructions use the retained lockfile. Final completeness review corrected the import/collection and visual-acceptance ledger classifications."
+  ]
+}

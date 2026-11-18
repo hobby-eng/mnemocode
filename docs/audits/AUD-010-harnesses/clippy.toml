@@ -1,0 +1,8 @@
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+too-many-lines-threshold = 150
+# Preserve the expectation in the shared PTY cleanup helper.
+disallowed-methods = [
+  { path = "std::io::stderr", reason = "the shared helper explicitly scopes its public cleanup diagnostic" },
+]
