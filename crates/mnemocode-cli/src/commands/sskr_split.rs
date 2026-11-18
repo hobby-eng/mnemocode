@@ -34,14 +34,13 @@ use crate::gate::Stop;
 use crate::os::SystemRandom;
 use crate::output::report_renamed;
 use crate::terminal::result::result_header;
-use crate::terminal::{Channel, NoticeKind, clear_private_screen, notice};
+use crate::terminal::{Channel, NoticeKind, can_redraw, clear_private_screen, notice};
 
 /// The numbers that a share count or a threshold may be, each on its own.
 pub(crate) const SHARE_RANGE: WholeRange = WholeRange::new(MIN_THRESHOLD as u64, MAX_SHARES as u64);
 
 /// What only a plain backup takes, refused with --sskr.
-pub(crate) const ENCODE_PLAIN_ONLY_OPTIONS: [&str; 4] =
-    ["cards", "qr", "legacy-valid-last-word", "title"];
+pub(crate) const ENCODE_PLAIN_ONLY_OPTIONS: [&str; 3] = ["cards", "qr", "title"];
 
 /// The options `sskr-split` takes, its card options apart.
 pub(crate) const OPTIONS: [&str; 15] = [
@@ -151,7 +150,6 @@ pub(crate) fn prepare_split(parsed: &Parsed, integrated: bool) -> Result<Checked
     validate_heir_sheet_options(parsed)?;
     check_share_cards_printable(cards.as_ref())?;
     let masked_words = masked_words_requested(parsed, mode)?;
-    mode.check_split()?;
     check_date_input(parsed, mode, DateWords::Split)?;
     Ok(CheckedSplit {
         mode,
@@ -182,6 +180,8 @@ struct SplitResult<'a> {
     dates: &'a [Date],
     shares: &'a [mnemocode::sskr::share::Share],
     held: &'a Phrase,
+    /// With the Original Seedshift, the last word its shift gave, which the restore asks for.
+    original_last_word: Option<u16>,
 }
 
 /// Puts the result on the screen; a repeated result restores every displayed part.
@@ -190,10 +190,13 @@ fn show(result: &SplitResult<'_>) -> Result<(), Stop> {
     let (mode, threshold, count) = (checked.mode, checked.threshold, checked.count);
     let facts = [
         ("Threshold", format!("{threshold} of {count}")),
-        ("Mode", mode.id().to_owned()),
+        super::backup_questions::seedshift_fact(mode),
+        ("Format", checked.format.label()),
+        ("Shares hold", mode.holds().to_owned()),
         ("Layout", layout_name(checked).to_owned()),
     ];
-    if !result_header("SSKR export", &facts, Channel::Output) {
+    let header = result_header("Split into shares", &facts, Channel::Output);
+    if !header {
         notice(
             &format!(
                 "SSKR: {threshold} of {count} shares required. Mode: {}.",
@@ -202,19 +205,20 @@ fn show(result: &SplitResult<'_>) -> Result<(), Stop> {
             NoticeKind::Info,
         );
     }
-    notice(
-        &format!("The shares hold {}.", mode.holds()),
-        NoticeKind::Info,
-    );
-    if mode.masked() {
+    if !header {
         notice(
-            "The shares do not store the dates or the mode; keep them yourself.",
+            &format!("The shares hold {}.", mode.holds()),
             NoticeKind::Info,
+        );
+    }
+    if mode.masked() {
+        crate::terminal::result_hint(
+            "The shares do not store the dates or the mode; keep them yourself.",
         );
     }
     if let Some(form) = checked.representation.filter(|_| !checked.original_copy) {
         if mode.masked() {
-            let backup = Backup::encode(result.phrase, result.dates, form, mode, false)?.backup;
+            let backup = Backup::encode(result.phrase, result.dates, form, mode)?.backup;
             print_encoded_backup(&backup, "Encoded result")?;
             notice(
                 "This is the complete backup: no share is needed, but the original dates are still required.",
@@ -237,10 +241,17 @@ fn show(result: &SplitResult<'_>) -> Result<(), Stop> {
         Presentation::Backup,
     );
     if checked.masked_words && !words_shown {
-        print_masked_words(result.held.text().as_str(), mode);
+        print_masked_words(result.held.text().as_str());
     }
     if checked.original_copy {
         print_original_copy(result.phrase.text().as_str());
+    }
+    let written = result
+        .held
+        .index(result.held.len() - 1)
+        .and_then(|index| u16::try_from(index).ok());
+    if let (Some(original), Some(written)) = (result.original_last_word, written) {
+        super::encode::print_last_word(original, written);
     }
     let encoded = fingerprint_of(result.held)?;
     print_fingerprints(mode, &fingerprint_of(result.phrase)?, Some(&encoded));
@@ -267,14 +278,25 @@ pub(crate) fn split_checked(
         checked.count,
         &mut SystemRandom,
     )?;
-    // The result is a step of its own: the questions are cleared away (CORE-39), before the saves,
-    // whose notices belong to it.
+    // The result is a step of its own: the questions are cleared away (CORE-39). The shares come
+    // first, then the files saved under their heading, as every result shows them; a save that
+    // fails is offered again or skipped, the shares on the screen either way.
     clear_private_screen();
-    // A save that fails is offered again or skipped: the shares are shown below either way, and only
-    // once every save is settled, so that none is lost to a failure.
+    let result = SplitResult {
+        checked,
+        phrase: &phrase,
+        dates: &dates,
+        shares: &split.shares,
+        held: &split.held,
+        original_last_word: split.original_last_word,
+    };
+    show(&result)?;
     let written = in_form(&split.shares, checked.format);
     let shown: Vec<_> = written.iter().collect();
     let mut outputs = parsed.clone();
+    if can_redraw(Channel::Error) && crate::output::saves_anything(parsed) {
+        crate::terminal::result::print_part("Saved files", true, Channel::Error);
+    }
     save_shares(
         &shown,
         &mut outputs,
@@ -299,14 +321,6 @@ pub(crate) fn split_checked(
     };
     save_heir_sheet(&mut outputs, &facts)?;
     report_renamed();
-    let result = SplitResult {
-        checked,
-        phrase: &phrase,
-        dates: &dates,
-        shares: &split.shares,
-        held: &split.held,
-    };
-    show(&result)?;
     offer_share_check(
         &phrase,
         (checked.mode, checked.threshold),

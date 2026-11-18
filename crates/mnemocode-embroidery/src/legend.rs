@@ -23,45 +23,29 @@ pub use symbols::{Glyph, SYMBOLS, Shape, Symbol};
 
 /// The entropy lengths of phrases of 12, 15, 18, 21 and 24 words, in bytes.
 pub const ENTROPY_LENGTHS: [usize; 5] = [16, 20, 24, 28, 32];
-/// The bytes of 12 to 24 word numbers of 11 bits each, packed: the original Seedshift's result,
-/// whose last word is usually no phrase's checksum, kept whole.
-pub const WORD_LENGTHS: [usize; 5] = [17, 21, 25, 29, 33];
 /// The bytes of an SSKR share of a phrase of 12 to 24 words: 5 bytes of the set, then a value as
 /// long as the phrase's entropy.
 pub const SHARE_LENGTHS: [usize; 5] = [21, 25, 29, 33, 37];
 /// The bytes of the check.
 const CHECK_BYTES: usize = 4;
-/// What a legend's phrase is, which the domain its check's hash starts with says, so that a reader
-/// learns from the check alone whether to ask for dates.
+/// What a legend holds: a phrase's entropy, or a share. The check's domain tells them apart.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Masking {
-    /// Masked with MnemoCode Seedshift dates: Decode asks for them.
-    Seedshift,
-    /// The phrase itself, for one protected some other way: anyone who knows the format reads it.
-    Unmasked,
-    /// Masked with the original Seedshift's dates, every word number kept: Decode asks for them.
-    SeedshiftLegacy,
-    /// One SSKR share of a phrase masked with MnemoCode Seedshift: restored from shares, with the
-    /// dates.
+pub enum Holds {
+    /// A phrase's entropy.
+    Entropy,
+    /// One SSKR share.
     Share,
-    /// One SSKR share of the phrase itself.
-    ShareUnmasked,
 }
 
-impl Masking {
+impl Holds {
     /// What the check's hash starts with, in format 2 where the rows' order counts (`ordered`).
+    /// One domain for every whole backup and one for every share.
     const fn domain(self, ordered: bool) -> &'static [u8] {
-        match (self, ordered) {
-            (Self::Seedshift, false) => b"MnemoCode embroidery 1",
-            (Self::Unmasked, false) => b"MnemoCode embroidery 1 unmasked",
-            (Self::Seedshift, true) => b"MnemoCode embroidery 2",
-            (Self::Unmasked, true) => b"MnemoCode embroidery 2 unmasked",
-            (Self::SeedshiftLegacy, false) => b"MnemoCode embroidery 1 original",
-            (Self::SeedshiftLegacy, true) => b"MnemoCode embroidery 2 original",
-            (Self::Share, false) => b"MnemoCode embroidery 1 share",
-            (Self::Share, true) => b"MnemoCode embroidery 2 share",
-            (Self::ShareUnmasked, false) => b"MnemoCode embroidery 1 share unmasked",
-            (Self::ShareUnmasked, true) => b"MnemoCode embroidery 2 share unmasked",
+        match (self.is_share(), ordered) {
+            (false, false) => b"MnemoCode embroidery 1",
+            (false, true) => b"MnemoCode embroidery 2",
+            (true, false) => b"MnemoCode embroidery 1 share",
+            (true, true) => b"MnemoCode embroidery 2 share",
         }
     }
 
@@ -69,27 +53,20 @@ impl Masking {
     #[must_use]
     pub const fn lengths(self) -> &'static [usize] {
         match self {
-            Self::Seedshift | Self::Unmasked => &ENTROPY_LENGTHS,
-            Self::SeedshiftLegacy => &WORD_LENGTHS,
-            Self::Share | Self::ShareUnmasked => &SHARE_LENGTHS,
+            Self::Entropy => &ENTROPY_LENGTHS,
+            Self::Share => &SHARE_LENGTHS,
         }
     }
 
     /// Whether it is one share of a set, which restores the phrase only with others.
     #[must_use]
     pub const fn is_share(self) -> bool {
-        matches!(self, Self::Share | Self::ShareUnmasked)
+        matches!(self, Self::Share)
     }
 }
 
-/// Every masking a reader tries.
-const MASKINGS: [Masking; 5] = [
-    Masking::Seedshift,
-    Masking::Unmasked,
-    Masking::SeedshiftLegacy,
-    Masking::Share,
-    Masking::ShareUnmasked,
-];
+/// Every kind a reader tries.
+const KINDS: [Holds; 2] = [Holds::Entropy, Holds::Share];
 /// The most rows a legend has: one for each symbol.
 pub const MAX_ROWS: usize = SYMBOLS.len();
 /// The most stitches a row may count.
@@ -394,10 +371,10 @@ fn moduli_with_biggest(counts: &[u32], biggest: usize) -> Vec<u32> {
         .collect()
 }
 
-/// The four bytes of the check of `entropy` with `masking`, in format 2 where `ordered`.
-pub(crate) fn check(entropy: &[u8], masking: Masking, ordered: bool) -> [u8; CHECK_BYTES] {
+/// The four bytes of the check of `entropy` with `holds`, in format 2 where `ordered`.
+pub(crate) fn check(entropy: &[u8], holds: Holds, ordered: bool) -> [u8; CHECK_BYTES] {
     let mut hash = Sha256::new();
-    hash.update(masking.domain(ordered));
+    hash.update(holds.domain(ordered));
     hash.update([entropy.len() as u8]);
     hash.update(entropy);
     let digest = hash.finalize();
@@ -484,17 +461,17 @@ impl Drop for Assignment {
 }
 
 /// The symbols and digits of the threads with `moduli`, in their own order, that hold `entropy`
-/// with `masking` and `free` above it, and in format 2 (`ordered`) the legend's order of them.
+/// with `holds` and `free` above it, and in format 2 (`ordered`) the legend's order of them.
 pub(crate) fn assign(
     entropy: &[u8],
-    masking: Masking,
+    holds: Holds,
     moduli: &[u32],
     free: &Number,
     ordered: bool,
 ) -> Assignment {
     let mut payload = SecretBytes::zeroed("an embroidery's payload", entropy.len() + CHECK_BYTES);
     payload[..entropy.len()].copy_from_slice(entropy);
-    payload[entropy.len()..].copy_from_slice(&check(entropy, masking, ordered));
+    payload[entropy.len()..].copy_from_slice(&check(entropy, holds, ordered));
     let mut n = Number::of_be_bytes(&payload);
     n.add_shifted(free, payload_bits(entropy.len()));
     let rows = moduli.len();
@@ -531,15 +508,15 @@ pub enum Reading {
     Read {
         /// The entropy.
         entropy: SecretBytes,
-        /// Whether the phrase is masked.
-        masking: Masking,
+        /// What the legend holds.
+        holds: Holds,
     },
     /// The entropy of the phrase, found by taking one row as misread.
     Corrected {
         /// The entropy.
         entropy: SecretBytes,
-        /// Whether the phrase is masked.
-        masking: Masking,
+        /// What the legend holds.
+        holds: Holds,
         /// The row taken as misread, from 1; none where changes of different rows give this same
         /// phrase, so that the phrase is sure but the row is not (AUD-007-FUN004).
         row: Option<usize>,
@@ -556,16 +533,16 @@ impl fmt::Debug for Reading {
     }
 }
 
-/// The phrase's entropy that `rows` hold and how it is masked, as a legend of format 1 lists them
+/// The phrase's entropy that `rows` hold and what kind it is, as a legend of format 1 lists them
 /// or, where every row names its thread, of format 2.
 #[must_use]
 pub fn read(rows: &[Row]) -> Reading {
-    if let Some((entropy, masking)) = entropy_by_counts(rows) {
-        return Reading::Read { entropy, masking };
+    if let Some((entropy, holds)) = entropy_by_counts(rows) {
+        return Reading::Read { entropy, holds };
     }
-    let mut found: Vec<(SecretBytes, Masking, Option<usize>)> = Vec::new();
-    let mut note = |(entropy, masking): (SecretBytes, Masking), row: usize| {
-        note_explanation(&mut found, entropy, masking, row);
+    let mut found: Vec<(SecretBytes, Holds, Option<usize>)> = Vec::new();
+    let mut note = |(entropy, holds): (SecretBytes, Holds), row: usize| {
+        note_explanation(&mut found, entropy, holds, row);
     };
     let mut changed = rows.to_vec();
     for i in 0..rows.len() {
@@ -611,10 +588,10 @@ pub fn read(rows: &[Row]) -> Reading {
     match found.len() {
         0 => Reading::NotRead,
         1 => {
-            let (entropy, masking, row) = found.remove(0);
+            let (entropy, holds, row) = found.remove(0);
             Reading::Corrected {
                 entropy,
-                masking,
+                holds,
                 row,
             }
         }
@@ -622,21 +599,21 @@ pub fn read(rows: &[Row]) -> Reading {
     }
 }
 
-/// Notes that changing `row` gives `entropy` with `masking`: a phrase found once more from another row
+/// Notes that changing `row` gives `entropy` with `holds`: a phrase found once more from another row
 /// keeps the phrase and loses its row, which is then no longer told for sure.
 fn note_explanation(
-    found: &mut Vec<(SecretBytes, Masking, Option<usize>)>,
+    found: &mut Vec<(SecretBytes, Holds, Option<usize>)>,
     entropy: SecretBytes,
-    masking: Masking,
+    holds: Holds,
     row: usize,
 ) {
     match found
         .iter_mut()
-        .find(|(e, m, _)| *m == masking && equal_bytes(e, &entropy))
+        .find(|(e, m, _)| *m == holds && equal_bytes(e, &entropy))
     {
         Some((_, _, known)) if *known != Some(row) => *known = None,
         Some(_) => {}
-        None => found.push((entropy, masking, Some(row))),
+        None => found.push((entropy, holds, Some(row))),
     }
 }
 
@@ -645,16 +622,16 @@ fn counts(rows: &[Row]) -> Vec<u32> {
     rows.iter().map(|r| r.stitches).collect()
 }
 
-/// What `rows` hold read exactly as they are, and its masking, no row taken as misread: the first
+/// What `rows` hold read exactly as they are, and its holds, no row taken as misread: the first
 /// step of [`read`], without its search.
 #[must_use]
-pub fn read_exactly(rows: &[Row]) -> Option<(SecretBytes, Masking)> {
+pub fn read_exactly(rows: &[Row]) -> Option<(SecretBytes, Holds)> {
     entropy_by_counts(rows)
 }
 
-/// The entropy `rows` hold read by the digit rule of their own counts, and its masking, the working
+/// The entropy `rows` hold read by the digit rule of their own counts, and its holds, the working
 /// copy wiped.
-fn entropy_by_counts(rows: &[Row]) -> Option<(SecretBytes, Masking)> {
+fn entropy_by_counts(rows: &[Row]) -> Option<(SecretBytes, Holds)> {
     let mut counted = counts(rows);
     let entropy = moduli(&counted).and_then(|m| entropy_of(rows, &m));
     counted.zeroize();
@@ -697,9 +674,9 @@ fn misread_counts(stitches: u32) -> Vec<u32> {
     out
 }
 
-/// The entropy that `rows` read with `moduli` hold, and its masking; none where no length's check
-/// passes with any masking, or where two do.
-fn entropy_of(rows: &[Row], moduli: &[u32]) -> Option<(SecretBytes, Masking)> {
+/// The entropy that `rows` read with `moduli` hold, and its holds; none where no length's check
+/// passes with any holds, or where two do.
+fn entropy_of(rows: &[Row], moduli: &[u32]) -> Option<(SecretBytes, Holds)> {
     // Each working copy is wiped however the reading ends: a correction's search tries many
     // changed rows that stop early, such as at a symbol named twice.
     let mut left: Zeroizing<Vec<usize>> = Zeroizing::new((1..=SYMBOLS.len()).collect());
@@ -733,15 +710,15 @@ fn entropy_of(rows: &[Row], moduli: &[u32]) -> Option<(SecretBytes, Masking)> {
     }
     drop((ranks, places, left));
     let mut passing = None;
-    for masking in MASKINGS {
-        for &length in masking.lengths() {
+    for holds in KINDS {
+        for &length in holds.lengths() {
             let payload = n.low_be_bytes("an embroidery's payload", payload_bits(length));
             let (held, sum) = payload.split_at(length);
-            if equal_bytes(sum, &check(held, masking, ordered)) {
+            if equal_bytes(sum, &check(held, holds, ordered)) {
                 if passing.is_some() {
                     return None;
                 }
-                passing = Some((SecretBytes::copy_of("what a legend holds", held), masking));
+                passing = Some((SecretBytes::copy_of("what a legend holds", held), holds));
             }
         }
     }
@@ -790,20 +767,20 @@ mod tests {
     /// Rows of the given counts written with `entropy` and `free`, masked with Seedshift, in
     /// format 1.
     fn written(entropy: &[u8], counts: &[u32], free: u64) -> Vec<Row> {
-        written_as(entropy, Masking::Seedshift, counts, (free, false))
+        written_as(entropy, Holds::Entropy, counts, (free, false))
     }
 
     /// Rows of threads with the given counts, the first threads in their own order, written with
-    /// `entropy`, `masking` and `free`, in format 2 where `ordered`, in the legend's order.
+    /// `entropy`, `holds` and `free`, in format 2 where `ordered`, in the legend's order.
     fn written_as(
         entropy: &[u8],
-        masking: Masking,
+        holds: Holds,
         counts: &[u32],
         (free, ordered): (u64, bool),
     ) -> Vec<Row> {
         let moduli = moduli(counts).unwrap();
         let free = Number::of_be_bytes(&free.to_be_bytes());
-        let assignment = assign(entropy, masking, &moduli, &free, ordered);
+        let assignment = assign(entropy, holds, &moduli, &free, ordered);
         let mut threads: Vec<usize> = (0..THREADS.len()).collect();
         threads.sort_by_key(|&t| THREADS[t].order());
         assignment
@@ -844,13 +821,13 @@ mod tests {
     fn a_phrase_explained_by_two_rows_names_no_row() {
         let bytes = |b: u8| SecretBytes::copy_of("a test entropy", &[b; 16]);
         let mut found = Vec::new();
-        note_explanation(&mut found, bytes(7), Masking::Unmasked, 2);
-        note_explanation(&mut found, bytes(7), Masking::Unmasked, 2);
+        note_explanation(&mut found, bytes(7), Holds::Entropy, 2);
+        note_explanation(&mut found, bytes(7), Holds::Entropy, 2);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].2, Some(2));
-        note_explanation(&mut found, bytes(7), Masking::Unmasked, 5);
+        note_explanation(&mut found, bytes(7), Holds::Entropy, 5);
         assert_eq!((found.len(), found[0].2), (1, None));
-        note_explanation(&mut found, bytes(8), Masking::Unmasked, 5);
+        note_explanation(&mut found, bytes(8), Holds::Entropy, 5);
         assert_eq!(found.len(), 2, "another phrase is another explanation");
     }
 
@@ -868,7 +845,7 @@ mod tests {
         for _ in 0..20 {
             let drawn = draw_free(&mut random, &free, 0).unwrap();
             assert!(drawn.is_below(&free));
-            let assignment = assign(&[7; 16], Masking::Seedshift, &moduli, &drawn, false);
+            let assignment = assign(&[7; 16], Holds::Entropy, &moduli, &drawn, false);
             last_rows.insert((assignment.symbols[38], assignment.digits[38]));
         }
         // Cut to 64 bits, the free part left this row the first free symbol and the digit 0 in
@@ -876,18 +853,18 @@ mod tests {
         assert!(last_rows.len() > 10, "{last_rows:?}");
     }
 
-    /// Asserts that `rows` read as `entropy` with `masking`, unchanged.
+    /// Asserts that `rows` read as `entropy` with `holds`, unchanged.
     #[track_caller]
-    fn assert_reads(rows: &[Row], entropy: &[u8], masking: Masking) {
+    fn assert_reads(rows: &[Row], entropy: &[u8], holds: Holds) {
         match read(rows) {
             Reading::Read {
                 entropy: read,
-                masking: as_read,
+                holds: as_read,
             } => {
                 assert_eq!(&*read, entropy);
-                assert_eq!(as_read, masking);
+                assert_eq!(as_read, holds);
             }
-            other => panic!("{masking:?} of {} bytes not read: {other:?}", entropy.len()),
+            other => panic!("{holds:?} of {} bytes not read: {other:?}", entropy.len()),
         }
     }
 
@@ -903,9 +880,9 @@ mod tests {
         // docs/SEEDSTITCH.md, "Example": the entropy is Trezor's published 24-word test vector.
         let line = EXAMPLE;
         match read(&parse(line).unwrap()) {
-            Reading::Read { entropy, masking } => {
+            Reading::Read { entropy, holds } => {
                 assert_eq!(&*entropy, &hex(VOID_COME)[..]);
-                assert_eq!(masking, Masking::Seedshift);
+                assert_eq!(holds, Holds::Entropy);
             }
             _ => panic!("not read"),
         }
@@ -922,9 +899,9 @@ mod tests {
     #[test]
     fn no_domain_and_length_read_as_another_one() {
         for ordered in [false, true] {
-            for short in MASKINGS {
+            for short in KINDS {
                 for &length in short.lengths() {
-                    for long in MASKINGS {
+                    for long in KINDS {
                         let (short_domain, long_domain) =
                             (short.domain(ordered), long.domain(ordered));
                         let Some(rest) = long_domain.strip_prefix(short_domain) else {
@@ -945,9 +922,9 @@ mod tests {
         }
     }
 
-    /// Entropies of the shortest and the longest length that `masking` takes.
-    fn entropies_of(masking: Masking) -> [Vec<u8>; 2] {
-        let lengths = masking.lengths();
+    /// Entropies of the shortest and the longest length that `holds` takes.
+    fn entropies_of(holds: Holds) -> [Vec<u8>; 2] {
+        let lengths = holds.lengths();
         let longest = lengths[lengths.len() - 1];
         let published = hex(VOID_COME).into_iter().cycle().take(longest).collect();
         [published, vec![0x7f; lengths[0]]]
@@ -955,21 +932,21 @@ mod tests {
 
     #[test]
     fn a_written_legend_reads_back_as_its_entropy() {
-        for masking in MASKINGS {
-            for entropy in entropies_of(masking) {
+        for holds in KINDS {
+            for entropy in entropies_of(holds) {
                 // Rows enough for the longest share, of 24 words.
-                let rows = written_as(&entropy, masking, &counts_for(32), (12_345, false));
-                assert_reads(&rows, &entropy, masking);
+                let rows = written_as(&entropy, holds, &counts_for(32), (12_345, false));
+                assert_reads(&rows, &entropy, holds);
             }
         }
     }
 
     #[test]
     fn a_legend_in_its_rows_order_reads_back_and_never_as_format_1() {
-        for masking in MASKINGS {
-            for entropy in entropies_of(masking) {
-                let rows = written_as(&entropy, masking, &counts_for(26), (54_321, true));
-                assert_reads(&rows, &entropy, masking);
+        for holds in KINDS {
+            for entropy in entropies_of(holds) {
+                let rows = written_as(&entropy, holds, &counts_for(26), (54_321, true));
+                assert_reads(&rows, &entropy, holds);
                 // Without its threads the order is lost, and format 1 does not read the rows.
                 let plain: Vec<Row> = rows.iter().map(|r| Row { thread: None, ..*r }).collect();
                 assert!(!matches!(read(&plain), Reading::Read { .. }));
@@ -977,7 +954,7 @@ mod tests {
         }
         // One row read wrong is found in format 2 too.
         let entropy = hex(VOID_COME);
-        let mut rows = written_as(&entropy, Masking::Seedshift, &counts_for(20), (3, true));
+        let mut rows = written_as(&entropy, Holds::Entropy, &counts_for(20), (3, true));
         // A row other than the biggest, whose digits carry part of the number.
         let most = rows.iter().map(|r| r.stitches).max().unwrap();
         let wrong = rows.iter().position(|r| r.stitches != most).unwrap();
@@ -1006,11 +983,7 @@ mod tests {
                     .fold(0, |value, &bit| value << 1 | u8::from(bit))
             })
             .collect();
-        assert_reads(
-            &parse(EXAMPLE_ORDERED).unwrap(),
-            &expected,
-            Masking::Seedshift,
-        );
+        assert_reads(&parse(EXAMPLE_ORDERED).unwrap(), &expected, Holds::Entropy);
     }
 
     // AUD-007-DOC001: format 2 sees only a thread's place in DMC's order, so a misread number that
@@ -1047,7 +1020,7 @@ mod tests {
     #[test]
     fn one_misread_row_is_corrected_and_named() {
         let entropy = hex(VOID_COME);
-        let rows = written_as(&entropy, Masking::Unmasked, &counts_for(25), (7, false));
+        let rows = written_as(&entropy, Holds::Entropy, &counts_for(25), (7, false));
         let mut wrong = rows.clone();
         wrong[3].symbol = if wrong[3].symbol == 1 { 2 } else { 1 };
         let mut digit = rows.clone();
@@ -1056,11 +1029,11 @@ mod tests {
             match read(&misread) {
                 Reading::Corrected {
                     entropy: e,
-                    masking,
+                    holds,
                     row,
                 } => {
                     assert_eq!(&*e, &entropy[..]);
-                    assert_eq!(masking, Masking::Unmasked);
+                    assert_eq!(holds, Holds::Entropy);
                     assert_eq!(row, Some(expected_row));
                 }
                 _ => panic!("not corrected"),
@@ -1117,19 +1090,13 @@ mod tests {
 
     #[test]
     fn the_check_is_sha256_of_the_domain_the_length_and_the_entropy() {
-        // SHA-256("MnemoCode embroidery 1" || 0x10 || 0x00 * 16), and of the domain
-        // "MnemoCode embroidery 1 unmasked", computed with Python's hashlib.
-        assert_eq!(check(&[0; 16], Masking::Seedshift, false), CHECK_OF_ZERO_16);
-        assert_eq!(
-            check(&[0; 16], Masking::Unmasked, false),
-            UNMASKED_CHECK_OF_ZERO_16
-        );
+        // SHA-256("MnemoCode embroidery 1" || 0x10 || 0x00 * 16), computed with Python's hashlib.
+        assert_eq!(check(&[0; 16], Holds::Entropy, false), CHECK_OF_ZERO_16);
     }
 
-    /// The first four bytes of those hashes, 22bec22d and 4b0a75ea, written down when the format
+    /// The first four bytes of that hash, 22bec22d, written down when the format
     /// was fixed.
     const CHECK_OF_ZERO_16: [u8; 4] = [0x22, 0xbe, 0xc2, 0x2d];
-    const UNMASKED_CHECK_OF_ZERO_16: [u8; 4] = [0x4b, 0x0a, 0x75, 0xea];
     #[test]
     #[ignore = "Twelve public legend/contact QR capacity cases; run for hidden-QR acceptance."]
     #[expect(
@@ -1172,12 +1139,12 @@ mod tests {
             for ordered in [false, true] {
                 let rows = written_as(
                     &entropy,
-                    Masking::Seedshift,
+                    Holds::Entropy,
                     &counts_for(count - 1),
                     (42, ordered),
                 );
                 assert_eq!(rows.len(), count);
-                assert_reads(&rows, &entropy, Masking::Seedshift);
+                assert_reads(&rows, &entropy, Holds::Entropy);
                 let text = line(&rows).unwrap();
                 for visible in &contacts {
                     let code = qr::hidden::matrix(visible, text.as_str()).unwrap();
@@ -1187,7 +1154,7 @@ mod tests {
                     assert_eq!(recovered.as_str(), text.as_str());
                     let parsed = parse(recovered.as_str()).unwrap();
                     assert_eq!(parsed, rows);
-                    assert_reads(&parsed, &entropy, Masking::Seedshift);
+                    assert_reads(&parsed, &entropy, Holds::Entropy);
                     eprintln!(
                         "public_legend rows={count} ordered={ordered} contact_bytes={} legend_bytes={} qr_modules={}",
                         visible.len(),

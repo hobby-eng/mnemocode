@@ -581,8 +581,8 @@ pub(crate) fn print_usage() {
             "Write a real phrase as colors; dates asked for",
         ),
         (
-            "mnemocode decode --input-file shifted.txt --dates-file dates.txt",
-            "Turn a record back into the phrase",
+            "mnemocode decode --mode seedshift --input-file notes.txt --dates-file dates.txt",
+            "Turn saved codes back into the phrase",
         ),
         (
             "mnemocode recover-word --ask-secrets",

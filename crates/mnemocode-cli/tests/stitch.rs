@@ -59,7 +59,15 @@ fn stitch<'a>(more: &[&'a str]) -> Vec<&'a str> {
 fn the_options_and_the_picture_are_refused_before_the_phrase_is_read() {
     let folder = with_picture("stitch-refusals");
     assert_refused(&folder, &stitch(&["--pdf", "p.pdf"]), "--picture PATH");
-    assert_refused(&folder, &stitch(&["--picture", PICTURE]), "--pdf PATH");
+    // Without --pdf the legend alone is shown.
+    let shown = run(&folder, &stitch(&["--picture", PICTURE]));
+    let said = format!(
+        "{}{}",
+        String::from_utf8_lossy(&shown.stdout),
+        String::from_utf8_lossy(&shown.stderr)
+    );
+    assert_eq!(shown.status.code(), Some(0), "{said}");
+    assert!(said.contains("Legend line"), "{said}");
     let narrow = ["--picture", PICTURE, "--pdf", "p.pdf", "--stitches-across"];
     assert_refused(
         &folder,
@@ -256,8 +264,9 @@ fn a_pattern_saves_and_shows_what_every_new_backup_does() {
     );
 }
 
-// The original Seedshift in a pattern keeps every word, the last one too: no warning, Decode gives
-// the phrase itself, and the sheet for heirs is made as for any pattern.
+// The Original Seedshift in a pattern: the legend holds the phrase with a matching last word, the
+// word the shift gave is named to remember, Decode given it gives the phrase itself, and the sheet
+// for heirs is made as for any pattern.
 #[test]
 fn a_pattern_of_the_original_seedshift_keeps_every_word() {
     let folder = with_picture("stitch-original");
@@ -280,7 +289,13 @@ fn a_pattern_of_the_original_seedshift_keeps_every_word() {
     );
     let errors = String::from_utf8_lossy(&made.stderr);
     assert_eq!(made.status.code(), Some(0), "{errors}");
-    assert!(!errors.contains("last word"), "{errors}");
+    let said = format!("{}{errors}", String::from_utf8_lossy(&made.stdout));
+    let word = said
+        .split("Remember the word ")
+        .nth(1)
+        .and_then(|rest| rest.split(':').next())
+        .expect("the word to remember");
+    fs::write(folder.join("word.txt"), format!("{word}\n")).expect("written");
     assert!(read(&folder, "heirs.pdf").starts_with(PDF_START));
     let decoded = run(
         &folder,
@@ -288,8 +303,12 @@ fn a_pattern_of_the_original_seedshift_keeps_every_word() {
             "decode",
             "--input-file",
             "legend.txt",
+            "--mode",
+            "seedshift-legacy",
             "--dates-file",
             DATES,
+            "--last-word-file",
+            "word.txt",
         ],
     );
     let output = String::from_utf8_lossy(&decoded.stdout);
@@ -393,7 +412,8 @@ fn any_two_of_three_patterns_of_shares_restore_the_phrase() {
     let (code, written) = restored(&folder, &["wrapped.txt"]);
     assert_eq!(code, Some(0), "{written}");
     assert!(written.contains(PUBLIC_MNEMONIC), "{written}");
-    // The legends say that Seedshift masked the phrase: a restore without it is refused.
+    // The legends do not say whether Seedshift masked the phrase: without it the shares give the
+    // masked phrase, not the seed phrase.
     let output = run(
         &folder,
         &[
@@ -404,13 +424,14 @@ fn any_two_of_three_patterns_of_shares_restore_the_phrase() {
             "two.txt",
         ],
     );
-    let written = String::from_utf8_lossy(&output.stderr);
-    assert_ne!(output.status.code(), Some(0), "{written}");
-    assert!(written.contains("masked with Seedshift"), "{written}");
+    let written = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(output.status.code(), Some(0), "{written}");
+    assert!(!written.contains(PUBLIC_MNEMONIC), "{written}");
 }
 
 // With shares every pattern has its own files: the options of one pattern are refused, and so are
-// those of shares without a set, all before the phrase is read.
+// those of shares without a set, all before the phrase is read. Without --pdf-dir the legends alone
+// are shown.
 #[test]
 fn the_options_of_one_pattern_and_of_shares_do_not_mix() {
     let folder = with_picture("stitch-share-options");
@@ -420,15 +441,9 @@ fn the_options_of_one_pattern_and_of_shares_do_not_mix() {
         &stitch(&[&set[..], &["--pdf", "p.pdf"]].concat()),
         "not --pdf",
     );
-    assert_refused(&folder, &stitch(&set), "--pdf-dir PATH");
     assert_refused(
         &folder,
         &stitch(&["--picture", PICTURE, "--pdf-dir", "patterns"]),
         "add --threshold and --shares",
-    );
-    assert_refused(
-        &folder,
-        &stitch(&[&set[..], &["--pdf-dir", "p", "--mode", "seedshift-legacy"]].concat()),
-        "",
     );
 }

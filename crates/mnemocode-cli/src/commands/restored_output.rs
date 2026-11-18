@@ -15,9 +15,7 @@ use super::found::{report_original_fingerprint, show_original_phrase};
 use super::share_repair::report_repairs;
 use super::sskr_combine::{PhrasesAt, Recovery};
 use crate::gate::Stop;
-use crate::terminal::result::{
-    FINGERPRINT_NOTE, code_lines, print, print_fingerprint, print_part, result_header,
-};
+use crate::terminal::result::{code_lines, print, print_part, result_header};
 use crate::terminal::{
     Channel, Chosen, NoticeKind, can_redraw, clear_private_screen, error_line, lasting_warning,
     notice, wait_for_enter,
@@ -179,7 +177,7 @@ fn show_restored_parts(
     mode: Mode,
     place: &RestoredPlace<'_>,
 ) -> Result<(), Stop> {
-    let mut facts = vec![("Mode", mode.id().to_owned())];
+    let mut facts = vec![super::backup_questions::seedshift_fact(mode)];
     if let Some(dates) = &phrase.unmasked.dates {
         facts.push(("Dates", dates.as_str().to_owned()));
     }
@@ -190,28 +188,44 @@ fn show_restored_parts(
     result_header(&title, &facts, Channel::Output);
     report_set(phrase, place, true);
     if let Some((label, backup)) = restored_backup(phrase, mode) {
-        print_part(&label, false, Channel::Output);
-        // Codes written joined apart, beside the joined text; other forms wrapped at their spaces.
-        print(
-            Channel::Output,
-            &code_lines(backup.text.as_str(), backup.form),
-        );
-        // Only a masked phrase has a fingerprint of its own; another form is the phrase below.
-        if mode.masked()
-            && let Some(bytes) = phrase.unmasked.set.fingerprint()
-        {
-            print_fingerprint(
-                mode.encoded_fingerprint_label(),
-                &mnemocode::bip32::fingerprint_hex(bytes),
-                FINGERPRINT_NOTE,
+        if mode.masked() && backup.form.written_in_words() {
+            // The masked words as a phrase is written down, as the original below.
+            print_part("Seed phrase after Seedshift", true, Channel::Output);
+            print(
                 Channel::Output,
+                &crate::terminal::result::phrase_grid(
+                    backup.text.as_str(),
+                    Channel::Output,
+                    crate::terminal::result::words_per_row(crate::terminal::columns()),
+                ),
+            );
+        } else {
+            print_part(&label, false, Channel::Output);
+            // Codes written joined apart, beside the joined text; other forms wrapped at their
+            // spaces.
+            print(
+                Channel::Output,
+                &code_lines(backup.text.as_str(), backup.form),
             );
         }
     }
+    // Only a masked phrase has a fingerprint of its own; another form is the phrase itself.
+    let encoded = phrase
+        .unmasked
+        .set
+        .fingerprint()
+        .filter(|_| mode.masked())
+        .map(|bytes| {
+            (
+                mode.encoded_fingerprint_label(),
+                mnemocode::bip32::fingerprint_hex(bytes),
+            )
+        });
     let text = phrase.unmasked.phrase.text();
     show_original_phrase(
         text.as_str(),
         Some(&phrase.unmasked.phrase),
+        encoded,
         Channel::Output,
     )
 }

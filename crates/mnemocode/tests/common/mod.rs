@@ -105,8 +105,21 @@ pub(crate) fn form_named(name: &str) -> Form {
 }
 
 /// The mode of a recorded name.
+/// The mode a recorded name gives; TS 0.1.0's "seedshift-legacy-valid" is the Original Seedshift,
+/// as 0.2.0 reads it in a record.
 pub(crate) fn mode_named(name: &str) -> Mode {
+    if name == "seedshift-legacy-valid" {
+        return Mode::SeedshiftLegacy;
+    }
     Mode::named(name).expect("a mode")
+}
+
+/// Whether `entry` is of the Original Seedshift, which 0.2.0 writes with a matching last word,
+/// splits into shares and reads by its codes: TS 0.1.0's record of it no longer applies.
+pub(crate) fn original_seedshift(entry: &Value) -> bool {
+    entry["mode"]
+        .as_str()
+        .is_some_and(|mode| mode.starts_with("seedshift-legacy"))
 }
 
 /// The refusal of `error` as the recorder writes it, without its kind where it leaves it out.

@@ -73,7 +73,6 @@ fn qr_adapter(tier: Tier) -> Result<(), CheckFailure> {
         &[date],
         Form::Unicode,
         Mode::Seedshift,
-        false,
     ))?;
     let payload = ok(encoding.backup.text())?;
     let written = ok(png(&payload))?;

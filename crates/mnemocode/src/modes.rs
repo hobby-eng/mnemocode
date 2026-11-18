@@ -1,6 +1,6 @@
-//! The transformation modes: no Seedshift, MnemoCode Seedshift, the Original Seedshift and the
-//! Original Seedshift with a valid last word. Every rule that tells them apart is a method of
-//! [`Mode`], so no caller switches over their names.
+//! The transformation modes: no Seedshift, MnemoCode Seedshift and the Original Seedshift, whose
+//! codes are read in one of two ways by their last word. Every rule that tells them apart is a
+//! method of [`Mode`], so no caller switches over their names.
 
 pub mod seedshift;
 
@@ -21,21 +21,13 @@ pub enum Mode {
     Direct,
     /// MnemoCode Seedshift, which keeps the checksum.
     Seedshift,
-    /// The Original Seedshift, kept for existing records.
+    /// The Original Seedshift, codes whose last word fails the checksum, as the original program
+    /// writes them: undone exactly.
     SeedshiftLegacy,
-    /// The Original Seedshift whose last word was replaced by one with a valid checksum.
+    /// The Original Seedshift whose last word keeps the checksum, as MnemoCode writes it: the
+    /// last word's checksum bits are lost, so a decoding gives one or two phrases, unless the
+    /// person gives the last word Encode named.
     SeedshiftLegacyValid,
-}
-
-/// What a backup made with a mode allows besides the backup itself.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Capabilities {
-    /// Whether the phrase can be split into Shamir shares.
-    pub split: bool,
-    /// Whether what was written down can be checked against the result.
-    pub backup_check: bool,
-    /// Whether a sheet for heirs can be made.
-    pub heir_sheet: bool,
 }
 
 /// How a refusal of a wrong number of dates is worded, by the command.
@@ -58,10 +50,6 @@ pub enum ModeError {
     DateCount(String),
     /// Dates where the mode takes none.
     TakesDates(String),
-    /// A mode in which no shares are made.
-    SplitModesOnly,
-    /// A mode for which no sheet for heirs can be made; the mode's name.
-    HeirSheet(&'static str),
     /// Codes without the checksum their mode gives them; the mode's name.
     MissingChecksum(&'static str),
     /// The phrase, its sizes or its dates.
@@ -73,13 +61,6 @@ impl fmt::Display for ModeError {
         match self {
             Self::Unsupported => f.write_str("Unsupported Seedshift mode."),
             Self::DateCount(message) | Self::TakesDates(message) => f.write_str(message),
-            Self::SplitModesOnly => {
-                f.write_str("Shares are made without Seedshift or with MnemoCode Seedshift.")
-            }
-            Self::HeirSheet(name) => write!(
-                f,
-                "A sheet for heirs cannot be made for {name}: only a search finds its seed phrase."
-            ),
             Self::MissingChecksum(name) => write!(
                 f,
                 "These codes lack the BIP39 checksum that {name} gives them."
@@ -99,8 +80,6 @@ impl Refusal for ModeError {
             Self::Unsupported => "core.masking.unsupported-mode",
             Self::DateCount(_) => "core.masking.assert-date-count-refused",
             Self::TakesDates(_) => "core.masking.assert-takes-dates-refused",
-            Self::SplitModesOnly => "core.masking.split-modes-only",
-            Self::HeirSheet(_) => "core.masking.sheet-heirs-cannot-made-only-search-finds-seed",
             Self::MissingChecksum(_) => "core.masking.missing-checksum",
             Self::Shift(ShiftError::Sizes(error)) => error.code(),
             Self::Shift(ShiftError::Dates(error)) => error.code(),
@@ -162,21 +141,37 @@ pub mod phrase_words {
 }
 
 impl Mode {
-    /// Every mode, in the order the menu and the help name them.
-    pub const ALL: [Self; 4] = [
-        Self::Direct,
-        Self::Seedshift,
-        Self::SeedshiftLegacy,
-        Self::SeedshiftLegacyValid,
-    ];
+    /// Every mode a person names, in the order the menu and the help name them.
+    pub const ALL: [Self; 3] = [Self::Direct, Self::Seedshift, Self::SeedshiftLegacy];
 
-    /// The stable record and command-line identifier.
+    /// The stable record and command-line identifier: one for both ways of the Original Seedshift,
+    /// which the codes tell apart.
     pub const fn id(self) -> &'static str {
         match self {
             Self::Direct => "direct",
             Self::Seedshift => "seedshift",
-            Self::SeedshiftLegacy => "seedshift-legacy",
-            Self::SeedshiftLegacyValid => "seedshift-legacy-valid",
+            Self::SeedshiftLegacy | Self::SeedshiftLegacyValid => "seedshift-legacy",
+        }
+    }
+
+    /// The way `indexes` are read in this mode: the Original Seedshift's by whether their last
+    /// word keeps the checksum, every other mode as it is.
+    pub fn for_codes(self, indexes: &[u16]) -> Self {
+        if seedshift::keeps_checksum(indexes) {
+            self.for_valid_codes()
+        } else if self == Self::SeedshiftLegacyValid {
+            Self::SeedshiftLegacy
+        } else {
+            self
+        }
+    }
+
+    /// The way codes that keep the checksum are read in this mode, such as the phrase shares
+    /// restore.
+    pub const fn for_valid_codes(self) -> Self {
+        match self {
+            Self::SeedshiftLegacy => Self::SeedshiftLegacyValid,
+            mode => mode,
         }
     }
 
@@ -193,8 +188,7 @@ impl Mode {
         match self {
             Self::Direct => "no Seedshift",
             Self::Seedshift => "MnemoCode Seedshift",
-            Self::SeedshiftLegacy => "the Original Seedshift",
-            Self::SeedshiftLegacyValid => "the Original Seedshift with a valid last word",
+            Self::SeedshiftLegacy | Self::SeedshiftLegacyValid => "the Original Seedshift",
         }
     }
 
@@ -208,46 +202,9 @@ impl Mode {
         matches!(self, Self::Seedshift | Self::SeedshiftLegacyValid)
     }
 
-    /// Whether complete dates still leave several phrases.
+    /// Whether complete dates still leave several phrases: one or two.
     pub const fn gives_several(self) -> bool {
         matches!(self, Self::SeedshiftLegacyValid)
-    }
-
-    /// What a backup of it allows.
-    pub const fn capabilities(self) -> Capabilities {
-        match self {
-            Self::Direct | Self::Seedshift => Capabilities {
-                split: true,
-                backup_check: true,
-                heir_sheet: true,
-            },
-            Self::SeedshiftLegacy => Capabilities {
-                split: false,
-                backup_check: true,
-                heir_sheet: true,
-            },
-            Self::SeedshiftLegacyValid => Capabilities {
-                split: false,
-                backup_check: false,
-                heir_sheet: false,
-            },
-        }
-    }
-
-    /// The mode a backup names once its last word is replaced by a valid one, where it offers that.
-    pub const fn with_valid_last_word(self) -> Option<Self> {
-        match self {
-            Self::SeedshiftLegacy => Some(Self::SeedshiftLegacyValid),
-            _ => None,
-        }
-    }
-
-    /// Whether a phrase can be encoded in it directly: a mode that only a replaced last word gives
-    /// cannot.
-    pub fn encodable(self) -> bool {
-        !Self::ALL
-            .into_iter()
-            .any(|mode| mode.with_valid_last_word() == Some(self))
     }
 
     /// What its codes hold, as a result says it.
@@ -314,25 +271,8 @@ impl Mode {
         Ok(())
     }
 
-    /// Refuses a mode in which no shares are made.
-    pub fn check_split(self) -> Result<(), ModeError> {
-        if self.capabilities().split {
-            Ok(())
-        } else {
-            Err(ModeError::SplitModesOnly)
-        }
-    }
-
-    /// Refuses a mode for which no sheet for heirs can be made.
-    pub fn check_heir_sheet(self) -> Result<(), ModeError> {
-        if self.capabilities().heir_sheet {
-            Ok(())
-        } else {
-            Err(ModeError::HeirSheet(self.name()))
-        }
-    }
-
-    /// The codes of `phrase` masked with `dates` in this mode.
+    /// The codes of `phrase` masked with `dates` in this mode; the Original Seedshift's with a last
+    /// word that keeps the checksum, so that they are a valid phrase like every other mode's.
     pub fn encode(self, phrase: &Phrase, dates: &[Date]) -> Result<Masked, ModeError> {
         self.check_takes_dates(dates.len(), DateWords::Codes)?;
         Ok(match self {
@@ -347,8 +287,7 @@ impl Mode {
                 }
             }
             Self::Seedshift => seedshift::mask(phrase, dates)?,
-            Self::SeedshiftLegacy => seedshift::mask_legacy(phrase, dates)?,
-            Self::SeedshiftLegacyValid => {
+            Self::SeedshiftLegacy | Self::SeedshiftLegacyValid => {
                 let masked = seedshift::mask_legacy(phrase, dates)?;
                 Masked {
                     shifted: seedshift::legacy_checksum_valid(&masked.shifted)?,
@@ -376,15 +315,17 @@ impl Mode {
         Ok(())
     }
 
-    /// Every phrase `indexes` and the complete `dates` give: one, unless it gives several.
+    /// Every phrase `indexes` and the complete `dates` give: one, unless it gives several. The
+    /// Original Seedshift's codes are read the way their last word tells.
     pub fn undo(self, indexes: &Indexes, dates: &[Date]) -> Result<Vec<Unmasked>, ModeError> {
-        self.check_takes_dates(dates.len(), DateWords::Codes)?;
-        self.check_codes(indexes)?;
-        Ok(match self {
+        let mode = self.for_codes(indexes.as_slice());
+        mode.check_takes_dates(dates.len(), DateWords::Codes)?;
+        mode.check_codes(indexes)?;
+        Ok(match mode {
             Self::Direct => vec![seedshift::direct(indexes)?],
             Self::Seedshift => vec![seedshift::unmask(indexes, dates)?],
             Self::SeedshiftLegacy => vec![seedshift::unmask_legacy(indexes, dates)?],
-            Self::SeedshiftLegacyValid => seedshift::unmask_legacy_valid(indexes, dates)?,
+            Self::SeedshiftLegacyValid => seedshift::unmask_legacy_matching(indexes, dates)?,
         })
     }
 
@@ -397,7 +338,8 @@ impl Mode {
             Self::SeedshiftLegacy => {
                 2_f64.powi(-i32::try_from(checksum_bits(word_count)).unwrap_or(0))
             }
-            Self::SeedshiftLegacyValid => f64::from(1_u32 << last_word_entropy_bits(word_count)),
+            // Each of the 2^checksum-bits last words passes once in as many tries.
+            Self::SeedshiftLegacyValid => 1.0,
         })
     }
 
@@ -414,9 +356,10 @@ impl Mode {
     pub fn last_shift_modulus(self, word_count: usize) -> Result<u32, ModeError> {
         check_word_count(word_count)?;
         Ok(match self {
-            Self::Direct | Self::SeedshiftLegacy => DICTIONARY_SIZE as u32,
+            Self::Direct | Self::SeedshiftLegacy | Self::SeedshiftLegacyValid => {
+                DICTIONARY_SIZE as u32
+            }
             Self::Seedshift => 1 << last_word_entropy_bits(word_count),
-            Self::SeedshiftLegacyValid => 1,
         })
     }
 
@@ -453,8 +396,10 @@ mod tests {
     fn the_modes_keep_their_rules() {
         assert_eq!(Mode::named("seedshift-legacy"), Ok(Mode::SeedshiftLegacy));
         assert_eq!(Mode::named("x"), Err(ModeError::Unsupported));
-        assert!(!Mode::SeedshiftLegacyValid.encodable());
-        assert!(Mode::Seedshift.encodable());
+        assert_eq!(
+            Mode::SeedshiftLegacy.for_codes(&[0; 12]),
+            Mode::SeedshiftLegacy
+        );
         assert_eq!(
             Mode::Direct
                 .check_date_count(1, false, DateWords::Codes)
@@ -470,7 +415,7 @@ mod tests {
         assert_eq!(Mode::Seedshift.last_shift_modulus(12), Ok(128));
         assert_eq!(
             Mode::SeedshiftLegacyValid.checks_per_combination(12),
-            Ok(128.0)
+            Ok(1.0)
         );
         assert_eq!(
             ModeError::MissingChecksum(Mode::Seedshift.name()).code(),

@@ -120,7 +120,7 @@ impl std::fmt::Display for OutputError {
             ),
             Self::OutsideRuled(folders) => write!(
                 f,
-                "MnemoCode may save only in the folders ruled before the seed phrase was asked: {folders}."
+                "Files can be saved only in {folders} now: MnemoCode closed every other folder to writing before it asked for the seed phrase."
             ),
             Self::NotResolved => f.write_str("The output path could not be resolved safely."),
             Self::UnreadableInput(label) => write!(
@@ -387,6 +387,11 @@ pub(crate) fn validate_output_paths(parsed: &Parsed) -> Result<(), OutputError> 
 /// Whether `left` and `right` are one place, or one lies in the other.
 fn overlap(left: &Path, right: &Path) -> bool {
     within(left, right) || within(right, left)
+}
+
+/// Whether `parsed` names a file or a folder to save to.
+pub(crate) fn saves_anything(parsed: &Parsed) -> bool {
+    !outputs_of(parsed).is_empty()
 }
 
 /// The outputs that `parsed` names, each with its option.

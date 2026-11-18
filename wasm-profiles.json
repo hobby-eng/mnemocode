@@ -10,7 +10,8 @@
         "sskr",
         "recovery",
         "cards",
-        "embroidery"
+        "embroidery",
+        "files"
       ],
       "units": [
         "template-business-architect",
@@ -55,7 +56,8 @@
         "sskr",
         "recovery",
         "cards",
-        "embroidery"
+        "embroidery",
+        "files"
       ],
       "units": [
         "template-business-architect",
@@ -84,7 +86,8 @@
         "sskr",
         "recovery",
         "cards",
-        "embroidery"
+        "embroidery",
+        "files"
       ],
       "units": [
         "template-business-it",
@@ -126,11 +129,9 @@
       "WordRow",
       "RecoverySet",
       "TypedHint",
-      "LegacyLastWords",
       "wordLookup",
       "wordTable",
-      "wordHint",
-      "legacyLastWords"
+      "wordHint"
     ],
     "wallet": [
       "WalletEvidence",
@@ -201,10 +202,22 @@
       "StitchPattern",
       "StitchLegend",
       "StitchSizes",
+      "StitchShares",
+      "StitchShareLegend",
       "readStitchLegend",
+      "readStitchShareLegend",
       "readStitchPdf",
       "stitchPdfMaxBytes",
       "selfCheckEmbroidery"
+    ],
+    "files": [
+      "BackupFile",
+      "BackupFiles",
+      "FoundBackups",
+      "readBackupFile",
+      "backupFileMaxBytes",
+      "backupFolderMaxFiles",
+      "backupFolderMaxDepth"
     ]
   }
 }

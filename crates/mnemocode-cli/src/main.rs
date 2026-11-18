@@ -213,6 +213,8 @@ fn main() -> ExitCode {
             terminal::failure(&refusal.to_string());
             1
         }
+        // Shift+Tab at the first question of a command of the menu: its question comes again.
+        Err(Stop::Cancelled) if terminal::take_step_back() => terminal::BACK_STATUS,
         Err(Stop::Cancelled) => {
             terminal::cancelled();
             130

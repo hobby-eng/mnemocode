@@ -13,8 +13,8 @@ mod common;
 use std::collections::HashSet;
 
 use common::{
-    LONG_PHRASE, NoChoices, PHRASE, SET_SHARES, colors_of, direct_backup, first_choices,
-    last_choices, phrase_cards, refused, template,
+    Choices, LONG_PHRASE, NoChoices, PHRASE, SET_SHARES, colors_of, direct_backup, first_choices,
+    last_choices, phrase_cards, refused, template, unicode_cards,
 };
 use mnemocode::backup::Backup;
 use mnemocode::bip39::phrase::Phrase;
@@ -392,12 +392,14 @@ fn a_shorter_start_passes_on_a_refusal_of_the_dates_and_leaves_out_what_cannot_h
     // Four dates, the most 12 words take: the 12-word start is kept, decoys after its codes.
     let four = in_month(3, 1..=4);
     let phrase = Phrase::parse(PHRASE).expect("a public phrase");
-    let written = Backup::encode(&phrase, &four, Form::Unicode, Mode::SeedshiftLegacy, false);
+    let written = Backup::encode(&phrase, &four, Form::Unicode, Mode::SeedshiftLegacy);
     let written = written.expect("a backup").backup;
     let codes = with_three_decoys(written.indexes());
     let typed = Backup::of(&codes, Form::Unicode, Mode::SeedshiftLegacy).expect("the codes");
-    let found = typed.shorter_phrases(&four).expect("the starts");
-    assert_eq!(phrases_of(&found), [(12, PHRASE.to_owned())]);
+    // Its start keeps the checksum, as Encode writes it: one or two phrases, the one written among them.
+    let found = phrases_of(&typed.shorter_phrases(&four).expect("the starts"));
+    assert!(found.len() <= 2 && found.iter().all(|(words, _)| *words == 12));
+    assert!(found.contains(&(12, PHRASE.to_owned())));
 }
 
 #[test]
@@ -558,7 +560,7 @@ fn separate_cards_keep_one_decoy_for_every_printable_form_of_every_length() {
     for words in WORD_COUNTS {
         let phrase = Phrase::of_entropy(&vec![0; words * 4 / 3]).expect("a public phrase");
         for form in CARD_FORMS {
-            let backup = Backup::encode(&phrase, &[], form, Mode::Direct, false);
+            let backup = Backup::encode(&phrase, &[], form, Mode::Direct);
             let backup = backup.expect("a backup").backup;
             let original = backup_card_content(&backup, CardSettings::default(), None);
             let original = original.expect("the cards");
@@ -659,7 +661,7 @@ fn unicode_codes_print_in_colors_that_decorate_them_and_a_form_without_cards_is_
     let phrase = Phrase::parse(PHRASE).expect("a public phrase");
     let dates = [parse_date(MASKED_DATE).expect("a public date")];
     let backup = |form| {
-        Backup::encode(&phrase, &dates, form, Mode::Seedshift, false)
+        Backup::encode(&phrase, &dates, form, Mode::Seedshift)
             .expect("a backup")
             .backup
     };
@@ -791,4 +793,39 @@ fn retained_card_codes_protect_text_and_owner_arrays_without_changing_the_backup
     }
     assert_ne!(codes.payload.as_ptr(), cloned.payload.as_ptr());
     assert_ne!(codes.colors[0].as_ptr(), cloned.colors[0].as_ptr());
+}
+
+// AUD-008-FUN007 and AUD-009-FUN003: the sheet and the separate cards of one export share their
+// document ID whatever decoys each keeps; another export of the same backup, whose decoys differ,
+// has its own, so that a folder holding both reads each of them: cards of colors, and Unicode
+// cards, whose colors only decorate their codes.
+#[test]
+fn one_export_shares_its_document_id_and_another_has_its_own() {
+    let drawing = CardDrawing::new();
+    let it = template("business-it");
+    for cards in [
+        phrase_cards(&colors_of([0; 12])),
+        unicode_cards(CardSettings::default()),
+    ] {
+        // Two pools of decoys new to the cards, whose Unicode codes get the same colors in turn.
+        let first = cards.with_decoy_pool(&mut Choices::new(|upper| upper / 2));
+        let last = cards.with_decoy_pool(&mut Choices::new(|upper| upper / 3));
+        let (first, last) = (first.expect("a pool"), last.expect("a pool"));
+        let own = first.own().expect("the real codes");
+        let pages = |cards: &mnemocode_cards::content::ColorCards, fragment: Option<usize>| {
+            let page = it.draw(&drawing, &mut first_choices(), cards, fragment, 0);
+            let kept = page.expect("a page").kept.expect("the codes kept");
+            mnemocode_cards::printed::pages_in(mnemocode_cards::printed::xmp(&kept).as_bytes())
+        };
+        let sheet = pages(&first.kept(own + 2).expect("a sheet's cards"), None);
+        let separate = pages(&first.kept_individual().expect("separate cards"), Some(0));
+        let again = pages(&last.kept(own + 2).expect("a sheet's cards"), None);
+        assert_eq!(sheet[0].document, separate[0].document);
+        assert_ne!(sheet[0].document, again[0].document);
+        let found = mnemocode_cards::printed::found_in(&[sheet, separate, again]);
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].files, [0, 1]);
+        assert_eq!(found[1].files, [2]);
+        assert!(found.iter().all(|one| one.parts.iter().all(Result::is_ok)));
+    }
 }

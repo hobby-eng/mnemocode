@@ -10,6 +10,8 @@ pub mod checks;
 pub mod color;
 pub mod dmc;
 pub mod fabric;
+#[cfg(feature = "sskr")]
+pub mod found;
 pub mod hide;
 pub mod legend;
 pub mod pattern;

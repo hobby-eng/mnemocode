@@ -100,7 +100,7 @@ pub(crate) fn template(id: &str) -> &'static CardTemplate {
 /// The backup of the public phrase `phrase` in `form`, not masked.
 pub(crate) fn direct_backup(phrase: &str, form: Form) -> Backup {
     let phrase = Phrase::parse(phrase).expect("a public phrase");
-    Backup::encode(&phrase, &[], form, Mode::Direct, false)
+    Backup::encode(&phrase, &[], form, Mode::Direct)
         .expect("a backup")
         .backup
 }
@@ -117,6 +117,7 @@ pub(crate) fn phrase_cards(colors: &[String]) -> ColorCards {
         kind: ContentKind::Colors,
         codes: CardCodes::new(colors.to_vec(), None, colors.join(" ")),
         decoys: None,
+        export: None,
         title: None,
         reference: None,
         qr_card: false,

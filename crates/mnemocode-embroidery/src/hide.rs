@@ -13,7 +13,7 @@ use zeroize::Zeroizing;
 
 use crate::color::Lab;
 use crate::dmc::{THREADS, Thread};
-use crate::legend::{self, Masking, ONE_DIGIT_FROM, Row, TWO_DIGITS_FROM};
+use crate::legend::{self, Holds, ONE_DIGIT_FROM, Row, TWO_DIGITS_FROM};
 use crate::pattern::Pattern;
 use crate::phrase::LegendEntropy;
 use crate::picture::Grid;
@@ -169,9 +169,9 @@ pub fn hide(
     entropy: &LegendEntropy,
     random: &mut dyn Random,
 ) -> Result<Hidden, HideError> {
-    let masking = entropy.masking();
+    let holds = entropy.holds();
     let entropy = entropy.bytes();
-    if !masking.lengths().contains(&entropy.len()) {
+    if !holds.lengths().contains(&entropy.len()) {
         return Err(HideError::NotAnEntropy);
     }
     let needed = legend::payload_bits(entropy.len()) as f64;
@@ -182,7 +182,7 @@ pub fn hide(
     // phrase; else format 2, whose order of rows holds more.
     for ordered in [false, true] {
         for (pattern, plan, moduli) in candidates(grid, (fewest, needed), ordered) {
-            match place(pattern, &plan, &moduli, (entropy, masking), ordered, random) {
+            match place(pattern, &plan, &moduli, (entropy, holds), ordered, random) {
                 Err(HideError::NoLegend) => tried_one = true,
                 done => return done,
             }
@@ -268,7 +268,7 @@ fn place(
     pattern: Pattern,
     plan: &Plan,
     moduli: &[u32],
-    (entropy, masking): (&SecretBytes, Masking),
+    (entropy, holds): (&SecretBytes, Holds),
     ordered: bool,
     random: &mut dyn Random,
 ) -> Result<Hidden, HideError> {
@@ -282,7 +282,7 @@ fn place(
         }
         let attempt = u32::try_from(attempt).unwrap_or(u32::MAX);
         let choice = legend::draw_free(random, &free, attempt).map_err(HideError::Random)?;
-        let assignment = legend::assign(entropy, masking, moduli, &choice, ordered);
+        let assignment = legend::assign(entropy, holds, moduli, &choice, ordered);
         if plan
             .fixed
             .iter()
@@ -343,8 +343,8 @@ fn place(
     match legend::read(&hidden.rows) {
         legend::Reading::Read {
             entropy: read,
-            masking: as_read,
-        } if as_read == masking && mnemocode::secret::equal_bytes(&read, entropy) => Ok(hidden),
+            holds: as_read,
+        } if as_read == holds && mnemocode::secret::equal_bytes(&read, entropy) => Ok(hidden),
         _ => Err(HideError::NoLegend),
     }
 }
@@ -696,10 +696,7 @@ mod tests {
             .unwrap()
             .unwrap();
         // Word numbers from 1: abandon is 1, about 4.
-        assert_eq!(
-            read.record().as_str(),
-            format!("MNC1:direct:indexes:{} 4", ["1"; 11].join(" "))
-        );
+        assert_eq!(read.record().as_str(), format!("{} 4", ["1"; 11].join(" ")));
     }
 
     #[test]

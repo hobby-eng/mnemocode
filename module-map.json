@@ -144,6 +144,7 @@
           "jpeg-encoder",
           "zune-jpeg",
           "libm",
+          "sha2",
           "unicode-normalization",
           "unicode-properties",
           "unicode-script"
@@ -168,6 +169,7 @@
         "text_rules",
         "settings",
         "palette",
+        "printed",
         "scene",
         "pdf",
         "raster",
@@ -213,6 +215,7 @@
         "phrase",
         "hide",
         "chart",
+        "found",
         "checks"
       ]
     },
@@ -315,6 +318,9 @@
         "embroidery": [
           "host"
         ],
+        "files": [
+          "host"
+        ],
         "probe": [
           "host",
           "phrase",
@@ -325,6 +331,7 @@
           "recovery",
           "cards",
           "embroidery",
+          "files",
           "words"
         ]
       }
@@ -419,6 +426,11 @@
     "core.bip32.depth-exceeded": "BIP32 public library admission: a child beyond the one-byte depth cannot be serialized truthfully.",
     "export.qr-image.capacity": "Hidden QR records (ADR 0012): the visible and hidden UTF-8 texts exceed level-M version-40 capacity.",
     "export.qr-image.no-hidden-record": "Hidden QR records (ADR 0012): no valid checked hidden envelope was found.",
+    "cli.card-files.incomplete": "Decode or Restore from card files: the one backup or set they hold lacks a card or a share; TS read no card files",
+    "cli.card-files.several": "Decode or Restore from card files without a terminal to choose on: they hold several complete backups; TS read no card files",
+    "export.printed-codes.missing-card": "Decode from card files: a card of the backup is missing among the files given; TS read no card files",
+    "export.printed-codes.different-codes": "Decode from card files: two files print different codes under one number; TS read no card files",
+    "export.printed-codes.unreadable": "Decode from card files: the codes a file keeps are not numbered codes; TS read no card files",
     "export.pdf-documents.font-not-embedded": "the writer of a PDF: TS's pdf-lib has no such refusal",
     "export.pdf-documents.not-written": "a sink of a PDF that refuses a write: TS keeps a PDF in memory",
     "export.image-export.page-not-drawn": "the drawing of a page image: TS's Poppler has its own failures",
@@ -438,6 +450,15 @@
     "cli.output-questions.no-such-folder": "the one folder that a task saves in, which TS did not ask: it asked each file's name",
     "cli.output-questions.not-a-folder": "the one folder that a task saves in, which TS did not ask: it asked each file's name",
     "cli.output-questions.folder-unwritable": "the one folder that a task saves in, which TS did not ask: it asked each file's name",
+    "cli.output-questions.folder-locked": "another folder after going back from the seed phrase, when writes are closed already; TS had no step back",
+    "cli.arguments.removed-option": "an option of 0.1.0 that 0.2.0 dropped, named with what takes its place, where TS had the option itself",
+    "core.share-restore.last-word-fits-no-phrase": "Original Seedshift shares whose last word, given, fits none of their phrases, without a wallet; TS split no Original Seedshift",
+    "core.share-restore.no-valid-phrase": "shares and dates that give no phrase with a valid checksum, without a wallet, where TS said that the wallet given did not match",
+    "cli.card-files.none-of-kind": "Decode or Restore from card files without a terminal: nothing of the kind --find names is there; TS read no card files",
+    "wasm.files.too-large": "a file a page gives above the limit Decode keeps for a file of a backup, refused before it is read; TS read no files",
+    "wasm.files.nothing": "a file a page gives that holds nothing MnemoCode reads, which a page may pass over; TS read no files",
+    "core.encoded-backup.codes-give-several-phrases": "Original Seedshift codes that keep the checksum give one or two phrases without the last word Encode named; TS wrote no such codes",
+    "core.encoded-backup.last-word-does-not-fit": "a last word given for Original Seedshift codes that differs from theirs in more than the checksum bits; TS asked for no word",
     "wasm.embroidery.pdf-too-large": "a pattern PDF above the limit the command line keeps too, refused before it is read (AUD-007-API002)",
     "wasm.recovery.no-wallet": "a search by the wallet without one, which TS's types refuse",
     "cli.output-paths.result-not-written": "a result that standard output did not take, which TS dropped (CORE-22; owner, 2026-11-02)",
@@ -475,14 +496,8 @@
     "embroidery.hide.too-few-colours": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
     "embroidery.hide.no-legend": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
     "cli.stitch.no-picture": "the port's own SeedStitch command (crates/mnemocode-cli/src/commands/stitch.rs): TS has no such command",
-    "cli.stitch.no-pdf": "the port's own SeedStitch command (crates/mnemocode-cli/src/commands/stitch.rs): TS has no such command",
-    "cli.stitch.no-pdf-dir": "the port's own SeedStitch command (crates/mnemocode-cli/src/commands/stitch.rs): TS has no such command",
     "cli.stitch.not-with-shares": "the port's own SeedStitch command (crates/mnemocode-cli/src/commands/stitch.rs): TS has no such command",
     "cli.stitch.only-with-shares": "the port's own SeedStitch command (crates/mnemocode-cli/src/commands/stitch.rs): TS has no such command",
-    "cli.stitch.share-mode": "the port's own SeedStitch command (crates/mnemocode-cli/src/commands/stitch.rs): TS has no such command",
-    "cli.pattern-folder.nothing": "the port's own reading of a folder of shares and patterns (crates/mnemocode-cli/src/commands/pattern_folder.rs): TS has no such input",
-    "cli.pattern-folder.several": "the port's own reading of a folder of shares and patterns (crates/mnemocode-cli/src/commands/pattern_folder.rs): TS has no such input",
-    "cli.pattern-folder.sets": "the port's own reading of a folder of shares and patterns (crates/mnemocode-cli/src/commands/pattern_folder.rs): TS has no such input",
     "embroidery.phrase.share": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",
     "cli.input.pdf-without-legend": "the port's own SeedStitch command (crates/mnemocode-cli/src/input.rs): Decode reads a pattern's PDF, which TS does not have",
     "embroidery.phrase.legend-not-read": "the port's own SeedStitch embroidery (crates/mnemocode-embroidery): TS has no such feature",

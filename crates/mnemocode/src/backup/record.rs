@@ -113,7 +113,11 @@ pub fn parse_record(value: &str) -> Result<Option<Record<'_>>, RecordError> {
     if !number || !name(mode) || !name(form) || payload.is_empty() {
         return Err(RecordError::MalformedHeader);
     }
-    let mode = Mode::named(mode).map_err(|_| RecordError::MalformedHeader)?;
+    // 0.1.0 named the Original Seedshift with a valid last word apart; its codes tell it now.
+    let mode = match mode {
+        "seedshift-legacy-valid" => Mode::SeedshiftLegacy,
+        named => Mode::named(named).map_err(|_| RecordError::MalformedHeader)?,
+    };
     if version.parse::<u32>().ok() != Some(RECORD_VERSION) {
         return Err(RecordError::Version);
     }

@@ -552,7 +552,7 @@ impl CardPreview {
             .iter()
             .map(|date| parse_date(date))
             .collect::<Result<Vec<Date>, _>>()?;
-        let encoding = Backup::encode(&phrase, &dates, form, Mode::Seedshift, false)?;
+        let encoding = Backup::encode(&phrase, &dates, form, Mode::Seedshift)?;
         let cards =
             backup_card_content(&encoding.backup, options.settings, options.title.as_deref())?;
         Ok(Self { cards })
@@ -758,6 +758,7 @@ impl ShareCardSet {
                 kind: ContentKind::Sskr,
                 codes: share_card_codes(&read.share, format)?,
                 decoys: None,
+                export: None,
                 title: title.clone(),
                 reference: Some(reference.clone()),
                 qr_card: layout.whole_share_qr(),

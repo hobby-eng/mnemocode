@@ -20,8 +20,7 @@ use mnemocode_embroidery::{chart, legend, phrase};
 use zeroize::Zeroizing;
 
 use super::asking::{AfterFailure, after_failure, value_until};
-use super::backup_questions::SHARE_SEEDSHIFT_QUESTION;
-use super::configure::asked_options;
+use super::configure::run_configured;
 use super::encode::{masked_words_requested, original_copy_requested, write_qr};
 use super::encode_questions::file_questions;
 use super::given::{PATH_LIMIT, check_date_input, given_mode, phrase_and_dates};
@@ -37,10 +36,10 @@ use crate::gate::Stop;
 use crate::input::read_picture;
 use crate::os::{self, Folder, SystemRandom};
 use crate::output::{report_renamed, shown_path};
-use crate::terminal::result::{phrase_grid, print, result_header};
+use crate::terminal::result::{phrase_grid, print, result_header, words_per_row};
 use crate::terminal::{
-    self, Channel, Choice, NoticeKind, TEXT_WIDTH, clear_private_screen, hint, lasting_warning,
-    notice, saved, wrap_text,
+    self, Channel, Choice, NoticeKind, clear_private_screen, lasting_warning, notice, saved,
+    wrap_text,
 };
 use mnemocode_cards::heir::{HeirBackup, HeirSheetFacts};
 
@@ -75,27 +74,16 @@ pub(crate) const OPTIONS: [&str; 22] = [
 enum StitchError {
     /// --picture is missing.
     NoPicture,
-    /// --pdf is missing.
-    NoPdf,
-    /// --pdf-dir is missing where --shares asks for patterns of shares.
-    NoPdfFolder,
     /// An option that names one pattern's file, given with --shares.
     NotWithShares(&'static str),
     /// An option for the patterns of shares, given without --shares.
     OnlyWithShares(&'static str),
-    /// A share's legend that says its phrase was masked, or was not, where the restore was told
-    /// otherwise.
-    ShareMode(bool),
 }
 
 impl fmt::Display for StitchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NoPicture => f.write_str("Name the picture of the pattern with --picture PATH."),
-            Self::NoPdf => f.write_str("Name the PDF of the pattern with --pdf PATH."),
-            Self::NoPdfFolder => {
-                f.write_str("Name a new folder for the patterns of the shares with --pdf-dir PATH.")
-            }
             Self::NotWithShares(option) => write!(
                 f,
                 "With --shares each share has its own pattern: name new folders with --pdf-dir and --qr-dir, not {option}."
@@ -103,14 +91,6 @@ impl fmt::Display for StitchError {
             Self::OnlyWithShares(option) => write!(
                 f,
                 "{option} is for the patterns of Shamir shares: add --threshold and --shares."
-            ),
-            Self::ShareMode(true) => write!(
-                f,
-                "This pattern's legend holds a share of a phrase masked with Seedshift: restore it with Seedshift, answering Yes to \"{SHARE_SEEDSHIFT_QUESTION}\" (--mode seedshift)."
-            ),
-            Self::ShareMode(false) => write!(
-                f,
-                "This pattern's legend holds a share of the phrase itself, not masked: restore it without Seedshift, answering No to \"{SHARE_SEEDSHIFT_QUESTION}\" (--mode direct)."
             ),
         }
     }
@@ -122,11 +102,8 @@ impl Refusal for StitchError {
     fn code(&self) -> &'static str {
         match self {
             Self::NoPicture => "cli.stitch.no-picture",
-            Self::NoPdf => "cli.stitch.no-pdf",
-            Self::NoPdfFolder => "cli.stitch.no-pdf-dir",
             Self::NotWithShares(_) => "cli.stitch.not-with-shares",
             Self::OnlyWithShares(_) => "cli.stitch.only-with-shares",
-            Self::ShareMode(_) => "cli.stitch.share-mode",
         }
     }
 }
@@ -225,8 +202,12 @@ impl Source {
 /// Runs the command: every option checked and the picture read before the phrase is asked or read,
 /// `cli.stitch.no-picture` and `cli.stitch.no-pdf` among them.
 pub(crate) fn run(parsed: &Parsed, protection: &mut crate::os::Protection) -> Result<(), Stop> {
-    let (fresh, dates) = asked_options(parsed, protection, super::pattern_questions::ask_pattern)?;
-    run_with_dates(&fresh, dates.as_deref())
+    run_configured(
+        parsed,
+        protection,
+        super::pattern_questions::ask_pattern,
+        |fresh, dates| run_with_dates(fresh, dates.as_deref()),
+    )
 }
 
 /// The set that --threshold and --shares ask for, none for one pattern of the whole backup, its
@@ -248,18 +229,12 @@ fn share_set(parsed: &Parsed) -> Result<Option<(usize, usize)>, Stop> {
             return Err(StitchError::NotWithShares(option).into());
         }
     }
-    if value(parsed, "pdf-dir").is_none() {
-        return Err(StitchError::NoPdfFolder.into());
-    }
     Ok(Some((threshold, count)))
 }
 
 fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> Result<(), Stop> {
     let path = value(parsed, "picture").ok_or(StitchError::NoPicture)?;
     let set = share_set(parsed)?;
-    if set.is_none() && value(parsed, "pdf").is_none() {
-        return Err(StitchError::NoPdf.into());
-    }
     let width = integer_option(
         parsed,
         "stitches-across",
@@ -272,19 +247,13 @@ fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> 
         Some(text) => Fabric::named(text)?,
     };
     // Masked unless the person says otherwise, as before --mode was there.
-    let mode = phrase::legend_mode(given_mode(parsed)?.unwrap_or(Mode::Seedshift))?;
-    if set.is_some() {
-        mode.check_split()?;
-    }
+    let mode = given_mode(parsed)?.unwrap_or(Mode::Seedshift);
     check_date_input(parsed, mode, DateWords::Codes)?;
     // What every new backup may ask for, checked before a secret is read, as Encode checks it.
     super::hidden_qr::validate(parsed)?;
     let original_copy = original_copy_requested(parsed)?;
     let masked_words = masked_words_requested(parsed, mode)?;
     validate_heir_sheet_options(parsed)?;
-    if parsed.contains_key("heir-sheet") {
-        mode.check_heir_sheet()?;
-    }
     let mut source = Source {
         path: path.to_owned(),
         width,
@@ -318,10 +287,15 @@ fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> 
             Err(error) => return Err(error.into()),
         }
     };
-    let pdfs = hidden
-        .iter()
-        .map(|one| chart::chart(one, fabric))
-        .collect::<Result<Vec<_>, _>>()?;
+    // The charts are drawn only where a PDF is saved; the legend alone is shown otherwise.
+    let pdfs = if parsed.contains_key("pdf") || parsed.contains_key("pdf-dir") {
+        hidden
+            .iter()
+            .map(|one| chart::chart(one, fabric))
+            .collect::<Result<Vec<_>, _>>()?
+    } else {
+        Vec::new()
+    };
     let lines = hidden
         .iter()
         .map(|one| legend::line(one.rows()))
@@ -330,7 +304,7 @@ fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> 
     clear_private_screen();
     let masked = if masked_words {
         Some(
-            Backup::encode(&phrase, &dates, Form::English, mode, false)?
+            Backup::encode(&phrase, &dates, Form::English, mode)?
                 .backup
                 .text()?,
         )
@@ -346,6 +320,9 @@ fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> 
             original.as_ref().map(SecretText::as_str),
         ),
     );
+    if let Some((original, written)) = entropies.first().and_then(|entropy| entropy.last_words()) {
+        super::encode::print_last_word(original, written);
+    }
     let backup = match set {
         None => HeirBackup::Pattern {
             words: phrase.len(),
@@ -357,8 +334,8 @@ fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> 
         mode,
         dates: dates.len(),
     };
-    match (set, pdfs.first(), lines.first()) {
-        (None, Some(pdf), Some(line)) => save_pattern(parsed, (pdf, line.as_str()), &facts),
+    match (set, lines.first()) {
+        (None, Some(line)) => save_pattern(parsed, (pdfs.first(), line.as_str()), &facts),
         _ => save_share_patterns(parsed, (&pdfs, &lines), &facts),
     }
 }
@@ -367,7 +344,7 @@ fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> 
 fn heading(channel: Channel, text: &str) -> [String; 2] {
     [
         String::new(),
-        terminal::paint(channel, terminal::style::STRONG, text),
+        terminal::paint(channel, terminal::style::HEADING, text),
     ]
 }
 
@@ -402,20 +379,31 @@ fn show_result(
     result_header("Embroidery", &facts, channel);
     // The phrases go where a phrase always goes, the codes where the codes do; on a terminal both
     // are the private screen.
+    // As much on one screen as its width allows: the private screen keeps no scrollback.
+    let width = terminal::columns().clamp(40, 160);
+    let per_row = words_per_row(width);
     if let Some(words) = masked {
         print(
             Channel::Output,
             &heading(Channel::Output, "Seed phrase after Seedshift"),
         );
-        print(Channel::Output, &phrase_grid(words, Channel::Output));
-        hint("Only your dates turn these words back into the wallet's seed phrase.");
+        print(
+            Channel::Output,
+            &phrase_grid(words, Channel::Output, per_row),
+        );
+        terminal::result_hint(
+            "Only your dates turn these words back into the wallet's seed phrase.",
+        );
     }
     if let Some(phrase) = original {
         print(
             Channel::Output,
             &heading(Channel::Output, "Original seed phrase"),
         );
-        print(Channel::Output, &phrase_grid(phrase, Channel::Output));
+        print(
+            Channel::Output,
+            &phrase_grid(phrase, Channel::Output, per_row),
+        );
         notice(
             "Keep the original phrase apart from the patterns.",
             NoticeKind::Warning,
@@ -427,16 +415,30 @@ fn show_result(
         Some(_) => "The seed phrase split into Shamir shares",
     };
     print(channel, &heading(channel, title));
+    // Each share's name beside its legend, the legend wrapped under it.
+    let label_width = set.map_or(2, |(_, count)| format!("Share {count} of {count}  ").len());
     for (place, line) in lines.iter().enumerate() {
-        if let Some((_, count)) = set {
-            print(
-                channel,
-                &heading(channel, &format!("Share {} of {count}", place + 1)),
-            );
+        if place > 0 {
+            print(channel, &[String::new()]);
         }
-        let rows: Vec<String> = wrap_text(line.as_str(), TEXT_WIDTH - 2)
+        let label = set.map_or_else(String::new, |(_, count)| {
+            format!("Share {} of {count}", place + 1)
+        });
+        let rows: Vec<String> = wrap_text(line.as_str(), width.saturating_sub(label_width))
             .iter()
-            .map(|row| format!("  {row}"))
+            .enumerate()
+            .map(|(row, text)| {
+                let lead = if row == 0 {
+                    terminal::paint(
+                        channel,
+                        terminal::style::STRONG,
+                        &format!("{label:<label_width$}"),
+                    )
+                } else {
+                    " ".repeat(label_width)
+                };
+                format!("{lead}{text}")
+            })
             .collect();
         print(channel, &rows);
     }
@@ -475,18 +477,20 @@ fn line_text(lines: &[SecretText]) -> Result<SecretText, Stop> {
 /// QR code, and the sheet for heirs of `facts`, as every new backup saves them.
 fn save_pattern(
     parsed: &Parsed,
-    (pdf, line): (&[u8], &str),
+    (pdf, line): (Option<&SecretBytes>, &str),
     facts: &HeirSheetFacts,
 ) -> Result<(), Stop> {
     let mut outputs = parsed.clone();
-    let saved_pdf = save_output(
-        &mut outputs,
-        "pdf",
-        ResultName::one("The pattern"),
-        |path| os::publish_new_file(&resolved(path), pdf),
-    )?;
-    if let Some(path) = saved_pdf {
-        saved(&format!("Saved pattern: {}", shown_path(&path)));
+    if let Some(pdf) = pdf {
+        let saved_pdf = save_output(
+            &mut outputs,
+            "pdf",
+            ResultName::one("The pattern"),
+            |path| os::publish_new_file(&resolved(path), pdf),
+        )?;
+        if let Some(path) = saved_pdf {
+            saved(&format!("Saved pattern: {}", shown_path(&path)));
+        }
     }
     let text = line_text(&[SecretText::copy_of("a SeedStitch legend", line)])?;
     let saved_line = save_output(
@@ -620,22 +624,21 @@ fn warn_misread(row: Option<usize>, corrected: bool) {
     }
 }
 
-/// What the SeedStitch legend line `text` holds: the record of the masked phrase, or the share as a
-/// share's code (ur:sskr/…) with whether its set's phrase is masked; none for another text. A
-/// misread row is warned of.
-fn read_legend(text: &str) -> Result<Option<(SecretText, Option<bool>)>, Stop> {
+/// What the SeedStitch legend line `text` holds: its phrase's word numbers, or the share as a
+/// share's code (ur:sskr/…); none for another text. A misread row is warned of.
+fn read_legend(text: &str) -> Result<Option<SecretText>, Stop> {
     match phrase::record_of_legend(text) {
         Ok(None) => Ok(None),
         Ok(Some(read)) => {
             warn_misread(read.corrected_row(), read.corrected());
-            Ok(Some((read.into_record(), None)))
+            Ok(Some(read.into_record()))
         }
         Err(SeedStitchError::Share) => {
             let Some(line) = phrase::share_of_legend(text)? else {
                 return Ok(None);
             };
             warn_misread(line.corrected_row, line.corrected);
-            Ok(Some((line.share.ur(), Some(line.masked))))
+            Ok(Some(line.share.ur()))
         }
         Err(error) => Err(error.into()),
     }
@@ -650,9 +653,9 @@ fn read_legend(text: &str) -> Result<Option<(SecretText, Option<bool>)>, Stop> {
 /// The legend's refusals: `embroidery.legend.*` and `embroidery.phrase.legend-*`.
 pub(crate) fn text_of_legend(text: &str) -> Result<Option<SecretText>, Stop> {
     match read_legend(text) {
-        Ok(read) => Ok(read.map(|(text, _)| text)),
+        Ok(read) => Ok(read),
         // Legends of several shares, one after another.
-        Err(refused) if text.contains([';', '\n']) => match shares_of_legends(text, None) {
+        Err(refused) if text.contains([';', '\n']) => match shares_of_legends(text) {
             Ok(Some(shares)) => Ok(Some(shares)),
             _ => Err(refused),
         },
@@ -715,10 +718,7 @@ fn legend_end(pieces: &[&str], at: usize) -> usize {
 /// # Errors
 ///
 /// The legend's refusals for a legend line that does not read, and `cli.stitch.share-mode`.
-pub(crate) fn shares_of_legends(
-    text: &str,
-    masked: Option<bool>,
-) -> Result<Option<SecretText>, Stop> {
+pub(crate) fn shares_of_legends(text: &str) -> Result<Option<SecretText>, Stop> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let pieces: Vec<&str> = text
         .split([';', '\n'])
@@ -743,10 +743,7 @@ pub(crate) fn shares_of_legends(
     for (at, end) in parts {
         let joined = Zeroizing::new(pieces[at..end].join(" "));
         read.push(match read_legend(&joined)? {
-            Some((_, Some(share_masked))) if masked.is_some_and(|told| told != share_masked) => {
-                return Err(StitchError::ShareMode(share_masked).into());
-            }
-            Some((share, _)) => share,
+            Some(share) => share,
             None => SecretText::copy_of("a typed share", &joined),
         });
     }
@@ -768,8 +765,15 @@ mod tests {
                 .is_none()
         );
         assert!(text_of_legend("28:1725 #ff0000").unwrap().is_none());
+        // A legend gives the word numbers of its phrase alone, as a record file holds them.
         let record = text_of_legend(EXAMPLE).unwrap().unwrap();
-        assert!(record.as_str().starts_with("MNC1:seedshift:indexes:"));
+        assert_eq!(record.as_str().split(' ').count(), 24);
+        assert!(
+            record
+                .as_str()
+                .split(' ')
+                .all(|number| number.parse::<u16>().is_ok())
+        );
         assert!(text_of_legend("28:1725 25:2163").is_err());
     }
 }

@@ -24,11 +24,15 @@ const RECORDED: &str = include_str!("../../../vectors/ts-0.1.0/transcripts-v1.js
 /// What TS's help says that differs here, each by a decision of PLAN.md's "Parity with TS 0.1.0":
 /// images need no other program, a missing folder is made, each text input has its own limit, and
 /// re-encode asks the new backup first; the stitch command is new, and Decode reads the stitch PDF.
-const WRITTEN_IN: [(&str, &str); 41] = [
-    // The guide's section 6 names who replaces a last word now: Encode's option.
+const WRITTEN_IN: [(&str, &str); 42] = [
+    // Decode names the form it read in the words of the menu.
     (
-        "This historical mode replaced the last word of a legacy result to make its\nchecksum valid. Information was lost. Subtract shifts modulo 2048 from the\nfirst n-1 words; the stored last word cannot uniquely recover the original.",
-        "This mode replaces the last word of a legacy result to make its checksum valid,\nas `encode --legacy-valid-last-word` does. Information was lost. Subtract shifts\nmodulo 2048 from the first n-1 words; the stored last word cannot uniquely\nrecover the original.",
+        "Detected input format: english.\n",
+        "Read as English words.\n",
+    ),
+    (
+        "Detected input format: indexes.\n",
+        "Read as Word numbers.\n",
     ),
     // The consolidated recovery menu names its current entry in validation errors too.
     (
@@ -199,17 +203,16 @@ const WRITTEN_IN: [(&str, &str); 41] = [
     ),
 ];
 
+/// Whether `args` ask for help: none at all, `help`, `--help` or `-h`.
+fn is_help(args: &[&str]) -> bool {
+    args.is_empty()
+        || args.first() == Some(&"help")
+        || args.contains(&"--help")
+        || args.contains(&"-h")
+}
+
 /// The manual recovery guide as this program bundles it.
 const GUIDE: &str = include_str!("../../mnemocode/assets/MANUAL_RECOVERY.md");
-/// What this program's guide adds that TS's does not have, each from its first heading to the
-/// heading it stands before: the cross-stitch legend in section 1, and its helper in section 7.
-const GUIDE_ADDED: [(&str, &str); 2] = [
-    (
-        "### Cross-stitch pattern (SeedStitch)",
-        "## 2. Build the date-shift sequence",
-    ),
-    ("### Cross-stitch legend helper", "## 8. Confirm the wallet"),
-];
 
 /// The anchors of the warnings about the machine itself, which the one that recorded TS did not
 /// give: swap that is not encrypted, and memory that the system did not lock.
@@ -272,13 +275,51 @@ fn expected(args: &[&str], text: &str) -> String {
     for (recorded, written) in WRITTEN_IN {
         text = text.replace(recorded, written);
     }
-    for (first, before) in GUIDE_ADDED {
-        let start = GUIDE.find(first).expect("the added part");
-        let end = GUIDE.find(before).expect("the heading after it") + before.len();
-        text = text.replace(before, &GUIDE[start..end]);
-    }
     text
 }
+
+/// The commands of the Original Seedshift that 0.2.0 changed on purpose, each with its standard
+/// output, standard error and exit status now: a 0.1.0 record named seedshift-legacy-valid reads as
+/// the Original Seedshift, --legacy-valid-last-word is gone, and a date search of codes that pass
+/// the checksum needs the wallet, as MnemoCode Seedshift's does.
+const CHANGED: [(&str, &str, &str, i64); 5] = [
+    (
+        "recover-date --input-file masked.txt --mode seedshift-legacy --dates-file pattern.txt --progress-every 2",
+        "",
+        WALLET_NEEDED,
+        1,
+    ),
+    (
+        "decode --input-file legacy-valid.txt --dates-file date.txt",
+        "name drip hero method return journey help monitor room earn flavor zoo\n",
+        "BIP39 checksum: invalid — dates or input may be wrong.\n",
+        0,
+    ),
+    (
+        "recover-date --input-file masked.txt --mode seedshift-legacy --dates-file pattern.txt --max-results 1",
+        "",
+        WALLET_NEEDED,
+        1,
+    ),
+    (
+        "recover-word --mnemonic-file masked.txt --legacy-valid-last-word",
+        "",
+        LAST_WORD_GONE,
+        1,
+    ),
+    (
+        "recover-word --mnemonic-file masked.txt --legacy-valid-last-word --missing-word",
+        "",
+        LAST_WORD_GONE,
+        1,
+    ),
+];
+
+/// The refusal of a date search without the wallet where every date gives a valid phrase.
+const WALLET_NEEDED: &str = "mnemocode: This recovery mode can produce checksum-valid candidates for every date. Provide a master fingerprint, address, public key, extended public key, or WIF to identify the intended wallet.\n";
+
+/// The refusal of the option that is gone.
+const LAST_WORD_GONE: &str = "mnemocode: --legacy-valid-last-word is gone: Encode writes the Original Seedshift with a last word that passes the checksum and names the word to remember; Decode takes it with --last-word-file.\n";
 
 // The guide a reader finds in docs/ is the one the program hands out.
 #[test]
@@ -300,6 +341,7 @@ fn every_command_writes_what_ts_writes() {
         let text = text.as_str().expect("a text");
         fs::write(folder.join(name), text).expect("a file");
     }
+    let mut differences = Vec::new();
     for entry in recorded["commands"].as_array().expect("the commands") {
         let args: Vec<&str> = entry["args"]
             .as_array()
@@ -314,28 +356,55 @@ fn every_command_writes_what_ts_writes() {
             .output()
             .expect("the program runs");
         let name = args.join(" ");
-        assert_eq!(
-            String::from_utf8_lossy(&output.stdout),
-            expected(&args, entry["stdout"].as_str().expect("standard output")),
-            "{name}"
-        );
+        let written_out = String::from_utf8_lossy(&output.stdout).into_owned();
+        // The help of every command was written anew for this version: it keeps TS's first line,
+        // the command's summary, and its exit status.
+        if is_help(&args) {
+            let recorded = expected(&args, entry["stdout"].as_str().expect("standard output"));
+            if written_out.lines().next() != recorded.lines().next()
+                || !output.stderr.is_empty()
+                || output.status.code().map(i64::from) != entry["status"].as_i64()
+            {
+                differences.push(format!(
+                    "{name}: another summary, an error or another status"
+                ));
+            }
+            continue;
+        }
+        // The recovery guide is the bundled one, which the test above holds to the documentation.
+        if name == "table --recovery-guide" {
+            if written_out != GUIDE || !output.status.success() {
+                differences.push(format!("{name}: not the bundled guide"));
+            }
+            continue;
+        }
+        let (out, err, status) = match CHANGED.iter().find(|(changed, ..)| *changed == name) {
+            Some(&(_, out, err, status)) => (out.to_owned(), err.to_owned(), Some(status)),
+            None => (
+                expected(&args, entry["stdout"].as_str().expect("standard output")),
+                expected(&args, entry["stderr"].as_str().expect("standard error")),
+                entry["status"].as_i64(),
+            ),
+        };
         // A saved folder is named in full; TS named it as given.
-        let errors = expected(&args, entry["stderr"].as_str().expect("standard error")).replace(
+        let err = err.replace(
             "Saved 9 individual card files to: out\n",
             &format!(
                 "Saved 9 individual card files to: {}\n",
                 folder.join("out").display()
             ),
         );
-        assert_eq!(
+        let written = (
+            written_out,
             without_machine_warnings(&String::from_utf8_lossy(&output.stderr)),
-            errors,
-            "{name}"
-        );
-        assert_eq!(
             output.status.code().map(i64::from),
-            entry["status"].as_i64(),
-            "{name}"
         );
+        if written != (out.clone(), err.clone(), status) {
+            differences.push(format!(
+                "{name}\nwritten: {written:?}\nexpected: {:?}",
+                (out, err, status)
+            ));
+        }
     }
+    assert!(differences.is_empty(), "{}", differences.join("\n\n"));
 }

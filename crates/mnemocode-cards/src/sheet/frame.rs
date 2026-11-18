@@ -489,6 +489,20 @@ pub fn collection_payload(cards: &ColorCards) -> Option<&str> {
     (cards.settings.card_qr || whole_share_qr(cards)).then_some(cards.codes.payload.as_str())
 }
 
+/// The PNG of the sheet's QR code exactly as printed: a contact over the hidden backup, or the
+/// backup's text; none where the sheet prints no QR code.
+pub fn collection_png(
+    cards: &ColorCards,
+) -> Result<Option<mnemocode::secret::SecretBytes>, mnemocode::qr::QrError> {
+    let contact = cards
+        .settings
+        .hidden_qr
+        .then(|| cards.settings.profile.qr_contact());
+    collection_payload(cards)
+        .map(|payload| mnemocode::qr::hidden::png_behind(contact.as_deref(), payload))
+        .transpose()
+}
+
 /// The verified QR matrix for a sheet, with a contact or the ordinary backup text.
 pub fn collection_matrix(cards: &ColorCards) -> Result<Option<Matrix>, mnemocode::qr::QrError> {
     collection_payload(cards)

@@ -32,10 +32,11 @@ const PROBE_COMBINATIONS: u64 = 256;
 /// The words of the public phrase that a wallet check is timed with.
 const PROBE_WORDS: usize = 12;
 
-/// Whether a mode gives a checksum-valid phrase for every date, so that only the wallet tells the
-/// right dates.
+/// Whether only the wallet tells the right dates: in every mode that masks, whose wrong dates give
+/// a checksum-valid phrase for every date, one or two for most dates with Original Seedshift codes
+/// that keep the checksum, or for one in 16 to 256 dates with those that do not.
 pub const fn wallet_needed(mode: Mode) -> bool {
-    mode.keeps_checksum()
+    mode.masked()
 }
 
 /// Why the wallet is asked for before a date search in `mode`, or in a mode not known yet.
@@ -266,6 +267,7 @@ impl DateSearch {
         if !mode.masked() {
             return Err(ModeError::Unsupported.into());
         }
+        let mode = mode.for_codes(indexes.as_slice());
         let word_count = indexes.as_slice().len();
         if !dates.fits_phrase(word_count) {
             return Err(DateSearchError::Answer(AnswerError::TooManyDates(
@@ -480,6 +482,27 @@ mod tests {
         assert_eq!(outcome.shown[0].phrase.text().as_str(), TWELVE);
         assert_eq!(outcome.shown[0].evidence.as_deref(), Some("m"));
         assert!(outcome.warning.is_some());
+    }
+
+    #[test]
+    fn an_original_seedshift_search_finds_the_phrase_among_at_most_two_a_date() {
+        // Encode writes the Original Seedshift with a matching last word: each date guessed gives
+        // at most two valid phrases, the right one among those of the right date.
+        let codes = masked(Mode::SeedshiftLegacy, &["23-09-2026"]);
+        let search = DateSearch::new(
+            codes,
+            answer("2?-09-2026"),
+            Mode::SeedshiftLegacy,
+            None,
+            MatchLimits::default(),
+        )
+        .unwrap();
+        let outcome = run(search);
+        assert_eq!(outcome.checked, 10);
+        assert!(outcome.match_count <= 20);
+        assert!(outcome.shown.iter().any(|found| {
+            found.dates.as_str() == "23-09-2026" && found.phrase.text().as_str() == TWELVE
+        }));
     }
 
     #[test]

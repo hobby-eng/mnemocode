@@ -2,8 +2,9 @@
 
 use super::super::{CommandHelp, HelpGroup, HelpOption};
 use super::options::{
-    CARD_LAYOUT, CARD_QR_2, CARDS_DIR_2, DATES, DATES_FILE, IMAGE_FORMAT_2, MAX_CANDIDATES,
-    MAX_TRIES, ORIENTATION, PAGE_SIZE, QR_DIR, QR_HIDDEN, QR_TEXT, RUN_1, RUN_2, RUN_9,
+    CARD_LAYOUT, CARD_QR_2, CARD_QR_PNG, CARDS_DIR_2, DATES, DATES_FILE, IMAGE_FORMAT_2,
+    LAST_WORD_FILE, MAX_CANDIDATES, MAX_TRIES, ORIENTATION, PAGE_SIZE, QR_DIR, QR_HIDDEN, QR_TEXT,
+    RUN_1, RUN_2, RUN_9,
 };
 
 const OWN_1_0: HelpOption = HelpOption {
@@ -40,8 +41,8 @@ const OWN_1_8: HelpOption = HelpOption {
 };
 const OWN_3_15: HelpOption = HelpOption {
     flag: "--mode",
-    value: Some("seedshift"),
-    summary: "The phrase was masked before splitting: check the wallet after the dates",
+    value: Some("MODE"),
+    summary: "seedshift or seedshift-legacy, when the phrase was masked before splitting: check the wallet after the dates",
     details: &[
         "Without it the wallet check compares the phrase that the shares hold, which is the wallet of a standard split.",
     ],
@@ -74,6 +75,7 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
                 &PAGE_SIZE,
                 &ORIENTATION,
                 &CARD_QR_2,
+                &CARD_QR_PNG,
                 &QR_HIDDEN,
                 &QR_TEXT,
             ]],
@@ -84,7 +86,7 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
         },
         HelpGroup {
             heading: "Wallet check (one of them keeps only the matching phrases):",
-            options: &[RUN_1, &[&OWN_3_15, &DATES, &DATES_FILE]],
+            options: &[RUN_1, &[&OWN_3_15, &DATES, &DATES_FILE, &LAST_WORD_FILE]],
         },
     ],
     asks: Some(&[
@@ -94,7 +96,11 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
         ),
         (
             "Dates",
-            "only with --mode seedshift; ? for each forgotten digit",
+            "only with a Seedshift mode; ? for each forgotten digit",
+        ),
+        (
+            "Last word",
+            "with seedshift-legacy, the word Encode named; Enter goes on without it",
         ),
         (
             "Wallet",

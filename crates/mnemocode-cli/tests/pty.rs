@@ -31,10 +31,17 @@ fn file(name: &str) -> PathBuf {
     Path::new(env!("CARGO_TARGET_TMPDIR")).join(name)
 }
 
+/// The menu at its first question.
+fn at_the_menu() -> Session {
+    let mut session = Session::start(PROGRAM, &[]);
+    session.wait_for("Choose an action");
+    session
+}
+
 /// `decode --ask-secrets` at its first question.
 fn at_the_first_question() -> Session {
     let mut session = Session::start(PROGRAM, &["decode", "--ask-secrets"]);
-    session.wait_for(" to cancel");
+    session.wait_for_answer_keys();
     session
 }
 
@@ -52,8 +59,11 @@ fn a_secret_command_runs_on_the_private_screen_and_clears_it() {
         ],
     );
     session.wait_for(ENTER_PRIVATE_SCREEN);
-    session.wait_for(" to cancel");
+    session.wait_for_answer_keys();
     session.press(&format!("{PHRASE}\r"));
+    // The result and the question under it are more than 24 rows: the result is shown first.
+    session.wait_for("Enter done");
+    session.press("\r");
     session.wait_for("Check the backup now?");
     session.press("2");
     session.wait_for("Press Enter to clear this screen.");
@@ -76,7 +86,7 @@ fn a_result_sent_to_a_file_stays_off_the_screen() {
         out.display()
     );
     let mut session = Session::start("/bin/sh", &["-c", &line]);
-    session.wait_for(" to cancel");
+    session.wait_for_answer_keys();
     session.press(&format!("{PHRASE}\r"));
     session.wait_for("Press Enter to clear this screen.");
     session.press("\r");
@@ -96,8 +106,8 @@ fn a_pipe_typed_as_a_file_name_is_refused_at_once() {
     let made = std::process::Command::new("mkfifo").arg(&pipe).status();
     assert!(made.is_ok_and(|status| status.success()), "mkfifo");
     for (option, missing, prompt) in [
-        ("--input-file", "missing.txt", "Record file name:"),
-        ("--qr-file", "missing.png", "QR code file name:"),
+        ("--input-file", "missing.txt", "Enter the record file name:"),
+        ("--qr-file", "missing.png", "Enter the QR code file name:"),
     ] {
         let missing = file(missing);
         let mut session = Session::start(
@@ -163,7 +173,7 @@ fn a_stopped_command_goes_on_where_it_was() {
 fn keys_typed_ahead_answer_nothing() {
     let mut session = Session::start(PROGRAM, &["decode", "--ask-secrets"]);
     session.press("typed ahead\r");
-    session.wait_for(" to cancel");
+    session.wait_for_answer_keys();
     let screen = session.from;
     session.press("\x03");
     let (status, written) = session.end();
@@ -178,7 +188,9 @@ fn what_does_not_fit_is_shown_by_pages() {
     let second = "1867 166 26 1886 920 572 1724 100 1966 612 795 29 1422 661 1840 1553 1660 1876 1908 1623 1409";
     fs::write(&shares, format!("{first};{second}")).expect("the shares");
     let mut session = Session::start(PROGRAM, &["sskr-export", "--ask-secrets"]);
-    session.wait_for(" to cancel");
+    // A window lower than the repaired shares with their notes.
+    session.resize(18, 80);
+    session.wait_for_answer_keys();
     session.press(&format!("{}\r", shares.display()));
     session.wait_for("Page 1/2");
     session.press("\x1b[B");
@@ -195,7 +207,7 @@ fn a_wrong_answer_in_any_script_is_asked_again() {
     for wrong in ["файл", "файл.txt", "的的的 的", "file:файл"] {
         let mut session = at_the_first_question();
         session.press(&format!("{wrong}\r"));
-        session.wait_for(" to cancel");
+        session.wait_for_answer_keys();
         session.press("\x03");
         let (status, written) = session.end();
         assert_eq!(status, 130, "{wrong}: {written}");
@@ -248,12 +260,11 @@ fn sigterm_during_a_save_leaves_no_staging_folder() {
 
 #[test]
 fn the_menu_runs_a_lookup_and_offers_another() {
-    let mut session = Session::start(PROGRAM, &[]);
-    session.wait_for("What do you want to do?");
+    let mut session = at_the_menu();
     session.press("8");
     session.wait_for("What do you want to look up?");
     session.press("1");
-    session.wait_for("Word: ");
+    session.wait_for("Enter a word: ");
     session.press("abandon\r");
     session.wait_for("mnemocode table --word abandon");
     session.wait_for("Press Enter for another lookup");
@@ -263,25 +274,24 @@ fn the_menu_runs_a_lookup_and_offers_another() {
 
 #[test]
 fn the_menu_leaves_a_secret_to_the_private_screen_of_its_command() {
-    let mut session = Session::start(PROGRAM, &[]);
-    session.wait_for("What do you want to do?");
+    let mut session = at_the_menu();
     session.press("3");
     session.wait_for("Where is the encoded seed phrase?");
-    session.press("1");
+    session.press("2");
     session.wait_for("How many words");
     session.press("1");
     session.wait_for("Was Seedshift used");
     session.press("1");
     session.wait_for("mnemocode decode --ask-secrets --mode direct");
-    session.wait_for(" to cancel");
+    session.wait_for_answer_keys();
     session.press(&format!("{PHRASE}\r"));
     session.wait_for("Press Enter to clear this screen.");
     session.press("\r");
-    session.wait_for("What do you want to do?");
+    session.wait_for("Choose an action");
     session.press("7");
     session.wait_for("Which card design?");
     session.press("\x1b");
-    session.wait_for("What do you want to do?");
+    session.wait_for("Choose an action");
     // From Preview: Word lookup, Self-test, Help, Quit, then select Quit with Enter.
     session.press("\x1b[B\x1b[B\x1b[B\x1b[B\r");
     let (status, written) = session.end();
@@ -296,13 +306,12 @@ fn the_menu_leaves_a_secret_to_the_private_screen_of_its_command() {
 
 #[test]
 fn the_menu_reads_an_address_as_every_coin_of_its_form_with_no_coin_asked() {
-    let mut session = Session::start(PROGRAM, &[]);
-    session.wait_for("What do you want to do?");
+    let mut session = at_the_menu();
     session.press("6");
     session.wait_for("What is forgotten?");
     session.press("3");
     session.wait_for("Where is the encoded seed phrase?");
-    session.press("1");
+    session.press("2");
     session.wait_for("How many words");
     session.press("1");
     session.wait_for("Which Seedshift was used?");
@@ -324,9 +333,11 @@ fn the_menu_reads_an_address_as_every_coin_of_its_form_with_no_coin_asked() {
 /// What the program wrote, once the command that the menu started is cancelled at its first secret
 /// question and the menu, back again, is left with q.
 fn cancelled_back_to_the_menu(mut session: Session) -> String {
-    session.wait_for(" to cancel");
+    // The command's own question, on its private screen.
+    session.wait_for(ENTER_PRIVATE_SCREEN);
+    session.wait_for_answer_keys();
     session.press("\x03");
-    session.wait_for("What do you want to do?");
+    session.wait_for("Choose an action");
     session.press("q");
     let (status, written) = session.end();
     assert_eq!(status, 0, "{written}");
@@ -335,8 +346,7 @@ fn cancelled_back_to_the_menu(mut session: Session) -> String {
 
 #[test]
 fn a_cancelled_command_comes_back_to_the_menu() {
-    let mut session = Session::start(PROGRAM, &[]);
-    session.wait_for("What do you want to do?");
+    let mut session = at_the_menu();
     session.press("5");
     session.wait_for("Was Seedshift used");
     session.press("1");
@@ -475,15 +485,14 @@ fn re_encode_checks_what_is_given_before_its_first_question() {
 #[test]
 fn menu_seedshift_dates_are_asked_before_other_settings_and_cancel_privately() {
     for version in ["1", "2"] {
-        let mut session = Session::start(PROGRAM, &[]);
-        session.wait_for("What do you want to do?");
+        let mut session = at_the_menu();
         session.press("1");
         session.wait_for("Which form should the seed phrase take?");
         session.press("3");
         session.wait_for("Use Seedshift?");
         session.press(version);
         session.wait_for("DD-MM-YYYY, separated by spaces):");
-        session.wait_for("Shift+Tab back · Esc menu");
+        session.wait_for(" back · ");
         let before_dates = session.written().to_owned();
         assert!(
             !before_dates.contains("Split it into Shamir shares?"),
@@ -495,16 +504,12 @@ fn menu_seedshift_dates_are_asked_before_other_settings_and_cancel_privately() {
         );
         session.press("not-a-date\r");
         session.wait_for("DD-MM-YYYY, separated by spaces):");
-        session.wait_for("Shift+Tab back · Esc menu");
+        session.wait_for(" back · ");
         session.press("23-09-2026\r");
-        // The original Seedshift is never split: its next question is the sheet for heirs.
-        session.wait_for(if version == "1" {
-            "Split it into Shamir shares?"
-        } else {
-            "Instructions for your heirs?"
-        });
+        // Either Seedshift can be split: shares come next.
+        session.wait_for("Split it into Shamir shares?");
         session.press("\x03");
-        session.wait_for("What do you want to do?");
+        session.wait_for("Choose an action");
         session.press("q");
         let (status, written) = session.end();
         assert_eq!(status, 0, "{written}");
@@ -515,13 +520,12 @@ fn menu_seedshift_dates_are_asked_before_other_settings_and_cancel_privately() {
 
 #[test]
 fn share_creation_asks_its_dates_immediately_after_seedshift() {
-    let mut session = Session::start(PROGRAM, &[]);
-    session.wait_for("What do you want to do?");
+    let mut session = at_the_menu();
     session.press("4");
     session.wait_for("Use Seedshift before splitting?");
     session.press("1");
     session.wait_for("DD-MM-YYYY, separated by spaces):");
-    session.wait_for("Shift+Tab back · Esc menu");
+    session.wait_for(" back · ");
     assert!(!session.written().contains("How many shares, and how many"));
     session.press("\x1b");
     exit_menu(session);
@@ -546,7 +550,7 @@ fn configure_rejects_conflicting_options_and_requires_private_input() {
             written.contains("Use --configure with --ask-secrets"),
             "{written}"
         );
-        assert!(!written.contains("Dates that mask"), "{written}");
+        assert!(!written.contains("dates that mask"), "{written}");
     }
 }
 
@@ -577,10 +581,14 @@ fn the_old_backup_is_not_asked_under_the_heading_of_the_new_one() {
     session.press("1");
     session.wait_for("Instructions for your heirs?");
     session.press("1");
-    // Where it is saved comes last; nothing ticked: the screen only.
+    // Where it is saved comes last: printable cards, ticked by default, untouched; the screen
+    // only, and no QR code.
     session.wait_for("Where should the result be saved?");
+    session.press("2");
     session.press("\r");
-    session.wait_for("Encoded seed phrase, record or text file path:");
+    session.wait_for("Add a QR code?");
+    session.press("1");
+    session.wait_for("Enter the encoded seed phrase, a record or the path of a text file:");
     let written = session.written();
     let last_page = written.rsplit("\x1b[2J").next().expect("a page");
     assert!(!last_page.contains("New backup"), "{last_page}");
@@ -588,30 +596,15 @@ fn the_old_backup_is_not_asked_under_the_heading_of_the_new_one() {
     session.end();
 }
 
-/// The menu at the last question of a new color backup without Seedshift, shares or a sheet for
-/// heirs: where it is saved.
+/// The menu at the last question of a new color backup: where it is saved.
 fn at_where_a_color_backup_is_saved() -> Session {
-    let mut session = Session::start(PROGRAM, &[]);
-    session.wait_for("What do you want to do?");
-    session.press("1");
-    session.wait_for("Which form should the seed phrase take?");
-    session.press("5");
-    session.wait_for("Use Seedshift?");
-    session.press("3");
-    session.wait_for("Split it into Shamir shares?");
-    session.press("1");
-    session.wait_for("Instructions for your heirs?");
-    session.press("1");
-    session.wait_for("Where should the result be saved?");
-    session
+    terminal::at_where_a_color_backup_is_saved(PROGRAM)
 }
 
 #[test]
 fn a_detail_of_a_card_is_taken_as_it_is_typed() {
     let mut session = at_where_a_color_backup_is_saved();
-    // Printable cards, ticked alone: third, after the record file and the QR code image, which
-    // every new backup offers.
-    session.press("3");
+    // Printable cards, ticked by default after the record file.
     session.press("\r");
     session.wait_for("Which kind of file?");
     session.press("1");
@@ -619,18 +612,20 @@ fn a_detail_of_a_card_is_taken_as_it_is_typed() {
     session.press("4");
     // The one folder of the task's files, asked the first time one is saved: Enter keeps the
     // folder the program started in.
-    session.wait_for("Folder for the files");
+    session.wait_for("Enter the folder for the files");
     session.press("\r");
     session.wait_for("Which card design?");
     session.press("5");
+    session.wait_for("Add a QR code?");
+    session.press("1");
     session.wait_for("Type your own details for the cards?");
     session.press("2");
-    session.wait_for("Name, in Latin letters");
+    session.wait_for("Enter the name, in Latin letters");
     session.press("Alice Example\r");
     session.wait_for("Alice Example");
-    session.wait_for("Role");
+    session.wait_for("Enter the role");
     session.press("\x03");
-    session.wait_for("What do you want to do?");
+    session.wait_for("Choose an action");
     session.press("q");
     let (status, written) = session.end();
     assert_eq!(status, 0, "{written}");
@@ -669,7 +664,7 @@ fn a_question_refuses_one_byte_past_its_limit_and_takes_an_answer_at_it() {
     for (args, question, limit) in [
         (
             vec!["decode", "--ask-secrets", "--mode", "direct"],
-            "Encoded seed phrase, record or text file path:",
+            "Enter the encoded seed phrase, a record or the path of a text file:",
             64 * 1024,
         ),
         (
@@ -714,6 +709,8 @@ fn the_rest_of_a_paste_reaches_no_shell_when_a_prompt_ends_the_program() {
     );
     let line = line.replace(&format!("--mnemonic-file {} ", phrase.display()), "");
     let mut session = Session::start("/bin/sh", &["-c", &line]);
+    // A window of today's usual size, where a result shows at once, not by pages.
+    session.resize(60, 100);
     session.wait_for("Press Enter to clear this screen.");
     session.press(&format!("\r{}", "abandon ".repeat(60)));
     session.wait_for("finished");
@@ -725,8 +722,7 @@ fn the_rest_of_a_paste_reaches_no_shell_when_a_prompt_ends_the_program() {
 
 #[test]
 fn ctrl_c_typed_with_an_answer_still_cancels() {
-    let mut session = Session::start(PROGRAM, &[]);
-    session.wait_for("What do you want to do?");
+    let mut session = at_the_menu();
     session.press("8\x03");
     let (status, written) = session.end();
     assert_eq!(status, 130, "{written}");
@@ -781,7 +777,7 @@ fn at_the_pages_of_shares(rows: u16) -> Session {
         "5",
     ];
     let mut session = Session::start_with(&setting, PROGRAM, &args);
-    session.wait_for(" to cancel");
+    session.wait_for_answer_keys();
     session.press(&format!("{PHRASE}\r"));
     session
 }
@@ -791,7 +787,7 @@ fn the_pages_of_a_result_are_drawn_again_at_a_new_size_without_a_key() {
     let mut session = at_the_pages_of_shares(12);
     session.wait_for("Page 1/");
     session.resize(9, 40);
-    session.wait_for("Page 1/13");
+    session.wait_for("Page 1/9");
     session.press("\x03");
     session.end();
 }
@@ -813,7 +809,7 @@ fn the_questions_under_an_encoded_result_keep_its_beginning() {
         "unicode",
     ];
     let mut session = Session::start_with(&setting, PROGRAM, &args);
-    session.wait_for(" to cancel");
+    session.wait_for_answer_keys();
     let phrase = format!("{}art", "abandon ".repeat(23));
     session.press(&format!("{phrase}\r"));
     session.wait_for("Page 1/");
@@ -830,7 +826,7 @@ fn the_questions_under_an_encoded_result_keep_its_beginning() {
 }
 
 fn exit_menu(mut session: Session) {
-    session.wait_for("What do you want to do?");
+    session.wait_for("Choose an action");
     session.press("q");
     let (status, written) = session.end();
     assert_eq!(status, 0, "{written}");
@@ -841,17 +837,8 @@ fn exit_menu(mut session: Session) {
 #[test]
 fn cards_beside_a_qr_code_image_follow_its_hidden_choice() {
     let mut session = at_where_a_color_backup_is_saved();
-    // The QR code image and the cards, ticked together: how the QR code shows its data comes
-    // right after them, before the folder.
-    session.press("2");
-    session.press("3");
-    session.press("\r");
-    session.wait_for("What should a QR scanner show?");
-    session.wait_for("Never put your dates or anything private here.");
-    session.press("4");
-    session.wait_for("A QR scanner shows these words as they are.");
-    session.press("Design studio\r");
-    session.wait_for("Folder for the files");
+    // Printable cards, ticked by default; the QR code is one question after the design: hidden
+    // data on the sheets and as a PNG file, then the details whose contact a scanner shows.
     session.press("\r");
     session.wait_for("Which kind of file?");
     session.press("1");
@@ -859,12 +846,17 @@ fn cards_beside_a_qr_code_image_follow_its_hidden_choice() {
     session.press("1");
     session.wait_for("How should the sheets be turned?");
     session.press("1");
+    session.wait_for("Enter the folder for the files");
+    session.press("\r");
     session.wait_for("Which card design?");
     session.press("1");
-    session.wait_for("Add the QR code to the sheets too?");
-    session.wait_for("the same as the image: your contact");
+    session.wait_for("Add a QR code?");
+    session.wait_for("7  With hidden data, PNG file only");
+    session.press("6");
+    session.wait_for("QR code     With hidden data, PDF + PNG file");
+    session.wait_for("Type your own details for the cards?");
     session.press("\x03");
-    session.wait_for("What do you want to do?");
+    session.wait_for("Choose an action");
     session.press("q");
     let (status, written) = session.end();
     assert_eq!(status, 0, "{written}");

@@ -54,6 +54,8 @@ pub(crate) enum ArgsError {
     PrivateMaterial(String, String),
     /// Standard input named by two options.
     MultipleStandardInputs,
+    /// An option of 0.1.0 that is gone, with what takes its place.
+    Removed(&'static str, &'static str),
 }
 
 impl fmt::Display for ArgsError {
@@ -84,6 +86,7 @@ impl fmt::Display for ArgsError {
             Self::MultipleStandardInputs => f.write_str(
                 "Standard input can supply only one material source per command; use local files for the other sources.",
             ),
+            Self::Removed(key, instead) => write!(f, "--{key} is gone: {instead}"),
         }
     }
 }
@@ -108,9 +111,20 @@ impl Refusal for ArgsError {
             Self::FlagWithValue(_) => "cli.arguments.on-off-choice-does-not-accept-separate-value",
             Self::PrivateMaterial(..) => "cli.arguments.private-material-argv",
             Self::MultipleStandardInputs => "cli.arguments.multiple-standard-input-sources",
+            Self::Removed(..) => "cli.arguments.removed-option",
         }
     }
 }
+
+/// The options of 0.1.0 that are gone, each with what takes its place, so that a script that gives
+/// one learns what to change.
+const REMOVED_OPTIONS: [(&str, &str); 2] = [
+    (
+        "legacy-valid-last-word",
+        "Encode writes the Original Seedshift with a last word that passes the checksum and names the word to remember; Decode takes it with --last-word-file.",
+    ),
+    ("bitcoin-profile", "an address or a key names its own path."),
+];
 
 /// Where a date goes instead of the command line.
 const DATE_SOURCE_ADVICE: &str = "--dates-file PATH or --ask-secrets";
@@ -150,6 +164,7 @@ pub(crate) fn assert_safe_material_argv(argv: &[String]) -> Result<(), ArgsError
 /// The on-or-off options, for every command.
 const BOOLEAN_OPTIONS: [&str; 15] = [
     "card-qr",
+    "card-qr-png",
     "qr-hidden",
     "sskr",
     "show-masked-words",
@@ -158,7 +173,6 @@ const BOOLEAN_OPTIONS: [&str; 15] = [
     "ask-secrets",
     "configure",
     "cards",
-    "legacy-valid-last-word",
     "list",
     "missing-word",
     "list-candidates",
@@ -181,6 +195,9 @@ pub(crate) fn parse_arguments(items: &[String]) -> Result<Parsed, ArgsError> {
         let Some(key) = item.strip_prefix("--") else {
             return Err(ArgsError::UnnamedValue);
         };
+        if let Some(&(removed, instead)) = REMOVED_OPTIONS.iter().find(|(flag, _)| *flag == key) {
+            return Err(ArgsError::Removed(removed, instead));
+        }
         if let Some((_, list_key)) = LIST_OPTIONS.iter().find(|(flag, _)| *flag == key) {
             let mut values = Vec::new();
             while let Some(next) = items.get(index + 1).filter(|next| !next.starts_with("--")) {
@@ -424,7 +441,7 @@ pub(crate) fn option_value(key: &str) -> String {
 }
 
 /// How each option is named in a sentence (TS 0.1.0's OPTION_LABELS).
-const OPTION_LABELS: [(&str, &str); 101] = [
+const OPTION_LABELS: [(&str, &str); 102] = [
     ("card-name", "card name"),
     ("card-role", "card role"),
     ("card-company", "card company"),
@@ -451,6 +468,7 @@ const OPTION_LABELS: [(&str, &str); 101] = [
     ("coin-address", "coin address"),
     ("card-layout", "card layout"),
     ("card-qr", "card QR code"),
+    ("card-qr-png", "card QR code also as a PNG file"),
     ("qr-hidden", "hidden QR record"),
     ("qr-text", "visible QR text"),
     ("candidates-file", "candidates file"),
@@ -477,10 +495,10 @@ const OPTION_LABELS: [(&str, &str); 101] = [
     ("word-lists-dir", "word list export folder"),
     ("input", "encoded text"),
     ("input-kind", "kind of the typed text"),
+    ("find", "kind of backup looked for"),
     ("input-file", "encoded input file"),
     ("last-word", "last word of the original seed phrase"),
     ("last-word-file", "original final-word file"),
-    ("legacy-valid-last-word", "legacy checksum word replacement"),
     ("list", "template listing"),
     ("list-candidates", "listing of every candidate"),
     ("master-fingerprint", "master fingerprint"),

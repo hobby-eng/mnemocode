@@ -5,7 +5,7 @@
 use std::rc::Rc;
 
 use super::ShareFlowError;
-use crate::backup::Backup;
+use crate::backup::{Backup, BackupError};
 use crate::bip39::phrase::Phrase;
 use crate::bip39::sizes::WORD_COUNTS;
 use crate::dates::Date;
@@ -64,26 +64,36 @@ pub enum Unmasked {
 
 /// How the sets of one restore are turned into seed phrases: built once with the mode, the dates
 /// and the wallet check, so that the time it announces and the search it runs follow from the same.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ShareUnmasking {
     mode: Mode,
     dates: Option<Rc<DatesAnswer>>,
     wallet: Option<Rc<WalletCheck>>,
     limits: MatchLimits,
     keep: u64,
+    /// The last word Encode named, for Original Seedshift shares.
+    last_word: Option<u16>,
+}
+
+/// Redacted: it holds the dates and the last word Encode named.
+impl std::fmt::Debug for ShareUnmasking {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        crate::secret::redacted(f, "a share unmasking")
+    }
 }
 
 impl ShareUnmasking {
-    /// The unmasking in `mode`; refused for a mode in which no shares are made, Seedshift without
-    /// dates, dates for a mode that takes none, and a count that is no whole number of 0 or more:
-    /// in every mode, before any work, rather than at a search after the shares are restored.
+    /// The unmasking in `mode` of the phrase shares restore, which keeps the checksum; refused for
+    /// Seedshift without dates, dates for a mode that takes none, and a count that is no whole
+    /// number of 0 or more: in every mode, before any work, rather than at a search after the
+    /// shares are restored.
     pub fn new(
         mode: Mode,
         dates: Option<Rc<DatesAnswer>>,
         wallet: Option<Rc<WalletCheck>>,
         limits: MatchLimits,
     ) -> Result<Self, ShareFlowError> {
-        mode.check_split()?;
+        let mode = mode.for_valid_codes();
         if mode.masked() && dates.is_none() {
             return Err(ShareFlowError::NoDates);
         }
@@ -99,7 +109,22 @@ impl ShareUnmasking {
             wallet,
             limits,
             keep,
+            last_word: None,
         })
+    }
+
+    /// The unmasking with `word`, the last word Encode named, which picks the one phrase of
+    /// Original Seedshift shares with complete dates.
+    #[must_use]
+    pub const fn with_last_word(mut self, word: Option<u16>) -> Self {
+        self.last_word = word;
+        self
+    }
+
+    /// Whether the last word Encode named was given.
+    #[must_use]
+    pub const fn last_word_given(&self) -> bool {
+        self.last_word.is_some()
     }
 
     /// Whether a date holds ?, so that each phrase of the shares is searched.
@@ -244,16 +269,34 @@ impl UnmaskSearch {
             return Ok(());
         }
         let known: Vec<Date> = dates.known().iter().collect();
-        let recovered = backup.decode(&known)?.recovered;
-        let indexes: Vec<usize> = recovered
-            .as_slice()
-            .iter()
-            .map(|&index| usize::from(index))
-            .collect();
-        let phrase = Phrase::of_indexes(&indexes)?;
-        let (matched, warning) = self.unmasking.check(&phrase)?;
-        if matched {
-            self.keep(set, phrase, warning);
+        // The Original Seedshift's phrase may give two: the last word Encode named picks one,
+        // otherwise each is checked.
+        // A word that does not fit this set's last word rules out this set, not the others.
+        let candidates = match self.unmasking.last_word {
+            Some(word) if backup.gives_several() => {
+                match backup.decode_with_last_word(&known, word) {
+                    Ok(found) => vec![found],
+                    Err(BackupError::LastWord) => Vec::new(),
+                    Err(error) => return Err(error.into()),
+                }
+            }
+            _ => backup.candidates(&known)?,
+        };
+        for found in candidates {
+            let indexes: Vec<usize> = found
+                .recovered
+                .as_slice()
+                .iter()
+                .map(|&index| usize::from(index))
+                .collect();
+            // A word that fits but gives no valid phrase under these dates rules out this one too.
+            let Ok(phrase) = Phrase::of_indexes(&indexes) else {
+                continue;
+            };
+            let (matched, warning) = self.unmasking.check(&phrase)?;
+            if matched {
+                self.keep(Rc::clone(&set), phrase, warning);
+            }
         }
         self.place += 1;
         Ok(())

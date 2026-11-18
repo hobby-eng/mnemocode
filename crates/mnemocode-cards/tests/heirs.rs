@@ -347,27 +347,29 @@ fn facts_that_would_print_a_wrong_sheet_are_refused() {
         dates: 1,
     });
     assert_eq!(refused(dated).1, "Dates cannot be used in direct mode.");
+    // Original Seedshift shares have a sheet that asks for the last word to remember.
     let legacy = sheet(HeirSheetFacts {
         mode: Mode::SeedshiftLegacy,
         ..MASKED_SHARES
-    });
-    assert_eq!(
-        refused(legacy).1,
-        "Shares are made without Seedshift or with MnemoCode Seedshift."
+    })
+    .expect("a sheet");
+    assert!(
+        legacy
+            .needs
+            .join(" ")
+            .contains("The last word the owner was asked to remember")
     );
-    let replaced = sheet(HeirSheetFacts {
+    // Its codes that keep the checksum, the way Encode writes it, get the same line.
+    let written = sheet(HeirSheetFacts {
         backup: HeirBackup::Encoded {
             form: Form::English,
             words: 12,
         },
         mode: Mode::SeedshiftLegacyValid,
         dates: 1,
-    });
-    assert!(
-        refused(replaced)
-            .1
-            .contains("A sheet for heirs cannot be made")
-    );
+    })
+    .expect("a sheet");
+    assert_eq!(written.needs.last(), legacy.needs.last());
 }
 
 /// Every kind of backup the sheet describes, with the longest wording of each: the most shares and

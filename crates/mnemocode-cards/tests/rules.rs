@@ -226,7 +226,7 @@ fn a_text_that_the_rule_settled_passes_again_as_it_is() {
 fn cards_titled(title: &str) -> Result<ColorCards, ContentError> {
     let phrase = Phrase::parse(PHRASE).expect("a public phrase");
     let dates = [parse_date(MASKED_DATE).expect("a public date")];
-    let encoding = Backup::encode(&phrase, &dates, Form::Colors, Mode::Seedshift, false);
+    let encoding = Backup::encode(&phrase, &dates, Form::Colors, Mode::Seedshift);
     let backup = encoding.expect("a backup").backup;
     backup_card_content(&backup, CardSettings::default(), Some(title))
 }

@@ -36,7 +36,7 @@ fn piped(args: &[&str], environment: &[(&str, &str)]) -> String {
 fn the_system_sees_a_command_at_its_first_question_protected() {
     use std::fs;
     let mut session = Session::start(PROGRAM, &["decode", "--ask-secrets"]);
-    session.wait_for(" to cancel");
+    session.wait_for_answer_keys();
     let process = session.process();
     let limits = fs::read_to_string(format!("/proc/{process}/limits")).expect("its limits");
     let core = limits

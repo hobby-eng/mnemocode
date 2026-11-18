@@ -249,6 +249,9 @@ pub struct Page {
     pub height: f64,
     /// What it draws, in order.
     pub steps: Vec<Step>,
+    /// The codes its cards print, as its file keeps them for reading back (see
+    /// [`crate::printed`]); none on a page of no cards.
+    pub kept: Option<crate::printed::Kept>,
 }
 
 impl fmt::Debug for Page {
@@ -503,6 +506,7 @@ impl Page {
             width: width * MM,
             height: height * MM,
             steps: Vec::new(),
+            kept: None,
         }
     }
 

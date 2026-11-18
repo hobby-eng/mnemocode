@@ -166,7 +166,7 @@ fn profile_of(recorded: &Value) -> CardProfile {
 fn planned(drawing: &CardDrawing, random: &mut dyn Random, given: &Value) -> CardJob {
     let phrase = phrase_of(given["words"].as_u64().expect("words"));
     let form = Form::named(given["format"].as_str().expect("a form")).expect("a form");
-    let encoding = Backup::encode(&phrase, &[], form, Mode::Direct, false).expect("a backup");
+    let encoding = Backup::encode(&phrase, &[], form, Mode::Direct).expect("a backup");
     let settings = CardSettings {
         page_size: given["pageSize"]
             .as_str()

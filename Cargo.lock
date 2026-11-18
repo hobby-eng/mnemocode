@@ -737,6 +737,7 @@ dependencies = [
  "pdf-writer",
  "png",
  "serde_json",
+ "sha2",
  "skrifa",
  "subsetter",
  "tiny-skia",

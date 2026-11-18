@@ -27,7 +27,7 @@ const LEAVE_PRIVATE_SCREEN: &str = "\x1b[?1049l";
 fn cleared_and_quit(mut session: Session) -> String {
     session.wait_for("Press Enter to clear this screen.");
     session.press("\r");
-    session.wait_for("What do you want to do?");
+    session.wait_for("Choose an action");
     session.press("q");
     let (status, written) = session.end();
     assert_eq!(status, 0, "{written}");
@@ -52,7 +52,9 @@ fn folder_with_picture(name: &str) -> (PathBuf, PathBuf) {
 /// The menu at its first question of Embroidery, whether Seedshift is used.
 fn at_embroidery() -> Session {
     let mut session = Session::start(PROGRAM, &[]);
-    session.wait_for("What do you want to do?");
+    // A window of today's usual size, where a result shows at once, not by pages.
+    session.resize(60, 100);
+    session.wait_for("Choose an action");
     session.press("1");
     session.wait_for("Which form should the seed phrase take?");
     session.press("6");
@@ -63,18 +65,24 @@ fn at_embroidery() -> Session {
 /// The menu's Decode at the question for a cross-stitch pattern's PDF or folder.
 fn at_decode_of_patterns() -> Session {
     let mut session = Session::start(PROGRAM, &[]);
-    session.wait_for("What do you want to do?");
+    // A window of today's usual size, where a result shows at once, not by pages.
+    session.resize(60, 100);
+    session.wait_for("Choose an action");
     session.press("3");
     session.wait_for("In a cross-stitch pattern");
-    session.press("4");
+    session.press("5");
     session
 }
 
-/// The files of the task saved in `folder`, the public phrase then typed.
-fn saved_in(session: &mut Session, folder: &Path) {
-    session.wait_for("Folder for the files");
+/// The files of the task saved in `folder`, the QR code answered `qr`, the public phrase then
+/// typed.
+fn saved_in(session: &mut Session, folder: &Path, qr: &str) {
+    session.wait_for("Enter the folder for the files");
     session.press(&format!("{}\r", folder.display()));
-    session.wait_for(" to cancel");
+    session.wait_for("Add a QR code?");
+    session.press(qr);
+    session.wait_for("Enter the seed phrase");
+    session.wait_for_answer_keys();
     session.press(&format!("{PHRASE}\r"));
 }
 
@@ -85,9 +93,9 @@ fn at_the_pattern_size(picture: &Path, dates: &str) -> Session {
     session.wait_for("only they turn it back");
     session.press("1");
     session.wait_for("DD-MM-YYYY, separated by spaces):");
-    session.wait_for("Shift+Tab back · Esc menu");
+    session.wait_for(" back · ");
     session.press(&format!("{dates}\r"));
-    session.wait_for("Picture file name");
+    session.wait_for("Enter the picture's file name");
     session.press(&format!("{}\r", picture.display()));
     session.wait_for("Which fabric?");
     session.press("\r");
@@ -115,7 +123,7 @@ fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen(
     session.wait_for("A4, 21 x 29.7 cm");
     session.wait_for("152 x 101 stitches, 27.6 x 18.3 cm");
     session.press("6");
-    session.wait_for("Width in centimetres");
+    session.wait_for("Enter the width in centimetres");
     session.wait_for(" (7.3 to 43.7): ");
     session.press("5\r");
     session.wait_for("Type a number of centimetres from 7.3 to 43.7.");
@@ -130,18 +138,21 @@ fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen(
     session.wait_for("Where should the result be saved?");
     session.wait_for("the legend line, which Decode reads back");
     session.press("\r");
-    session.wait_for("Folder for the files");
+    session.wait_for("Enter the folder for the files");
     session.press(&format!("{}\r", folder.display()));
+    session.wait_for("Add a QR code?");
+    session.press("1");
 
     // Dates were already entered; only the phrase remains, with checksum retry.
-    session.wait_for(" to cancel");
+    session.wait_for("Enter the seed phrase");
+    session.wait_for_answer_keys();
     session.press(&format!("{}\r", PHRASE.replace("about", "abandon")));
     session.wait_for("These words fail the BIP39 checksum");
     session.press(&format!("{PHRASE}\r"));
     // The phrase length is now known: five dates cannot mask twelve words.
     session.wait_for("Too many dates for this seed phrase");
     session.wait_for("up to 4, DD-MM-YYYY");
-    session.wait_for(" to cancel");
+    session.wait_for_answer_keys();
     session.press("23-09-2026\r");
     // The phrase after Seedshift, then the legend and the files saved, on one screen.
     session.wait_for("Seed phrase after Seedshift");
@@ -167,20 +178,15 @@ fn the_menu_makes_a_pattern_a_share() {
     session.press("1");
     session.wait_for("Where should the shares be saved?");
     session.wait_for("every share's legend line, one to a line");
-    session.press("1");
+    // The PDF patterns are ticked already; the text file of the legends too.
     session.press("2");
     session.press("\r");
-    // A business card that MnemoCode invents is what a QR scanner shows of each QR code.
-    session.wait_for("What should a QR scanner show?");
-    session.press("1");
-    saved_in(&mut session, &folder);
-    // The phrase after Seedshift first, then its shares; they take more than a screen, turned
-    // page by page.
+    // A QR code of each legend with hidden data: a scanner sees a contact card MnemoCode invents.
+    saved_in(&mut session, &folder, "3");
+    // The phrase after Seedshift first, then its shares, all on one screen of a usual window.
     session.wait_for("Seed phrase after Seedshift");
     session.wait_for("That phrase split into Shamir shares");
     session.wait_for("Share 1 of 3");
-    session.wait_for("Enter done");
-    session.press("\r");
     let written = cleared_and_quit(session);
     for place in 1..=3 {
         let pattern = folder.join(format!("cross-stitch-patterns/share-{place}-pattern.pdf"));
@@ -220,7 +226,7 @@ fn a_picture_that_cannot_be_used_is_asked_again_before_the_phrase() {
     );
     session.wait_for("no PNG, JPEG or WebP");
     session.press("1");
-    session.wait_for("Picture file name");
+    session.wait_for("Enter the picture's file name");
     session.press(&format!("{}\r", picture.display()));
     // The gradient is 240 pixels across, fewer than 300 stitches.
     session.wait_for("narrower than the pattern");
@@ -229,7 +235,7 @@ fn a_picture_that_cannot_be_used_is_asked_again_before_the_phrase() {
     session.wait_for("How large, on Aida 14?");
     session.wait_for("A6, 10.5 x 14.8 cm");
     session.press("1");
-    session.wait_for(" to cancel");
+    session.wait_for_answer_keys();
     session.press("\x03");
     let (status, written) = session.end();
     assert_eq!(status, 130, "{written}");
@@ -256,13 +262,13 @@ fn a_picture_too_flat_for_the_phrase_is_changed_and_the_phrase_kept() {
             &pdf_path,
         ],
     );
-    session.wait_for(" to cancel");
+    session.wait_for_answer_keys();
     session.press(&format!("{PHRASE}\r"));
-    session.wait_for(" to cancel");
+    session.wait_for_answer_keys();
     session.press("23-09-2026\r");
     session.wait_for("too few colours");
     session.press("1");
-    session.wait_for("Picture file name");
+    session.wait_for("Enter the picture's file name");
     session.press(&format!("{}\r", picture.display()));
     session.wait_for("Press Enter to clear this screen.");
     session.press("\r");
@@ -276,9 +282,13 @@ fn a_typed_legend_is_decoded_and_its_corrected_row_stays_in_the_summary() {
     // docs/SEEDSTITCH.md's example with two digits of its first row swapped.
     let mistyped = mnemocode_embroidery::legend::EXAMPLE.replacen("28:1725", "28:1752", 1);
     let mut session = Session::start(PROGRAM, &["decode", "--ask-secrets"]);
-    session.wait_for(" to cancel");
+    // A window of today's usual size, where a result shows at once, not by pages.
+    session.resize(60, 100);
+    session.wait_for_answer_keys();
     session.press(&format!("{mistyped}\r"));
-    session.wait_for(" to cancel");
+    session.wait_for("Was Seedshift used when it was encoded?");
+    session.press("2");
+    session.wait_for_answer_keys();
     session.press("23-09-2026\r");
     session.wait_for("Press Enter to clear this screen.");
     session.press("\r");
@@ -317,17 +327,20 @@ fn the_menu_s_decode_reads_the_phrase_from_a_pattern_s_pdf() {
         .expect("the program runs");
     assert!(made.status.success(), "{made:?}");
     let mut session = at_decode_of_patterns();
-    session.wait_for("Folder of the patterns, or one pattern's PDF");
+    session.wait_for("Enter the folder of the patterns, or one pattern's PDF");
     session.press(&format!("{}\r", pdf.display()));
-    // The legend says the phrase is masked: the dates are asked, and the words come back.
+    // The legend does not say whether Seedshift was used: it is asked, then the dates.
+    session.wait_for("Found cross-stitch backup");
+    session.wait_for("Was Seedshift used when it was encoded?");
+    session.press("2");
     session.wait_for("up to 4, DD-MM-YYYY");
     session.press("23-09-2026\r");
     session.wait_for("abandon");
     cleared_and_quit(session);
 }
 
-// Restore from shares takes the folder of the patterns: what it holds is listed, the shares of its
-// one set are chosen at once, and with the dates they give the phrase back.
+// Restore from shares takes the folder of the patterns: the one set it holds is taken and named,
+// the other file counted, and with the dates the shares give the phrase back.
 #[test]
 fn a_folder_of_share_patterns_restores_the_phrase() {
     let folder = file("restore-from-folder");
@@ -339,20 +352,15 @@ fn a_folder_of_share_patterns_restores_the_phrase() {
     )
     .expect("a copy");
     fs::write(folder.join("patterns/notes.pdf"), "%PDF-1.4 nothing").expect("a file");
-    let mut session = Session::start(PROGRAM, &[]);
-    session.wait_for("What do you want to do?");
-    session.press("5");
-    session.wait_for("Was Seedshift used before it was split?");
-    session.press("2");
-    session.wait_for("If they are in different places");
-    session.wait_for(" to cancel");
-    session.press(&format!("{}\r", folder.join("patterns").display()));
-    session.wait_for("Restore from these shares?");
-    session.wait_for("share-3-pattern.pdf: share 3");
-    session.wait_for("1 other file holds no share.");
-    session.wait_for("Use shares 1, 2, 3");
-    session.press("\r");
-    session.wait_for(" to cancel");
+    let mut session = restore_from_folder(
+        "2",
+        "Enter the Shamir shares, or the path of a file or folder",
+        &folder.join("patterns"),
+    );
+    session.wait_for("Found cross-stitch shares: 3 shares, 2 needed");
+    session.wait_for("1 other file holds");
+    session.wait_for("Enter the dates that mask the seed phrase");
+    session.wait_for_answer_keys();
     session.press("23-09-2026\r");
     session.wait_for(PHRASE);
     let written = cleared_and_quit(session);
@@ -367,27 +375,27 @@ fn shift_tab_goes_back_a_step_and_escape_to_the_menu() {
     const SHIFT_TAB: &str = "\x1b[Z";
     let (_, picture) = folder_with_picture("menu-steps");
     let mut session = at_embroidery();
-    session.wait_for("Shift+Tab back · Esc menu");
+    session.wait_for(" back · ");
     session.press("1");
     session.wait_for("DD-MM-YYYY, separated by spaces):");
-    session.wait_for("Shift+Tab back · Esc menu");
+    session.wait_for(" back · ");
     session.press(SHIFT_TAB);
     // Without Seedshift no dates are asked, and going back passes them.
     session.wait_for("Use Seedshift?");
     session.press("3");
-    session.wait_for("Picture file name");
+    session.wait_for("Enter the picture's file name");
     session.press(SHIFT_TAB);
     session.wait_for("Use Seedshift?");
     session.press("1");
     session.wait_for("DD-MM-YYYY, separated by spaces):");
     session.press("23-09-2026\r");
-    session.wait_for("Picture file name");
+    session.wait_for("Enter the picture's file name");
     session.press(&format!("{}\r", picture.display()));
     session.wait_for("Which fabric?");
     session.press(SHIFT_TAB);
-    session.wait_for("Picture file name");
+    session.wait_for("Enter the picture's file name");
     session.press("\x1b");
-    session.wait_for("What do you want to do?");
+    session.wait_for("Choose an action");
     session.press("q");
     let (status, written) = session.end();
     assert_eq!(status, 0, "{written}");
@@ -427,22 +435,20 @@ fn share_patterns(folder: &Path) {
     assert!(made.status.success(), "{made:?}");
 }
 
-// Decode takes the folder of the patterns too: it lists the shares in it and sends them to the
-// restore, which asks for the dates and gives the phrase back.
+// Decode takes the folder of the patterns too: it names the set of shares in it and sends them to
+// the restore, which asks about Seedshift and the dates and gives the phrase back.
 #[test]
 fn decode_reads_a_folder_of_share_patterns() {
     let folder = file("decode-folder");
     share_patterns(&folder);
     let mut session = at_decode_of_patterns();
-    session.wait_for("copy them into one folder first");
-    session.wait_for("Folder of the patterns, or one pattern's PDF");
+    session.wait_for("Enter the folder of the patterns, or one pattern's PDF");
     session.press(&format!("{}\r", folder.join("patterns").display()));
-    session.wait_for("Restore from these shares?");
-    session.wait_for("Use shares 1, 2, 3");
-    session.press("\r");
+    session.wait_for("Found cross-stitch shares: 3 shares, 2 needed");
     session.wait_for("Was Seedshift used before it was split?");
     session.press("2");
-    session.wait_for(" to cancel");
+    session.wait_for("Enter the dates that mask the seed phrase");
+    session.wait_for_answer_keys();
     session.press("23-09-2026\r");
     session.wait_for(PHRASE);
     cleared_and_quit(session);
@@ -471,16 +477,12 @@ fn a_folder_of_share_qr_codes_restores_the_phrase() {
         .output()
         .expect("the shares");
     assert!(made.status.success(), "{made:?}");
-    let mut session = Session::start(PROGRAM, &[]);
-    session.wait_for("What do you want to do?");
-    session.press("5");
-    session.wait_for("Was Seedshift used before it was split?");
-    session.press("1");
-    session.wait_for(" to cancel");
-    session.press(&format!("{}\r", folder.join("qr").display()));
-    session.wait_for("Restore from these shares?");
-    session.wait_for("share-2-qr.png: share 2");
-    session.press("\r");
+    let mut session = restore_from_folder(
+        "1",
+        "Enter the Shamir shares, or the path of a file or folder",
+        &folder.join("qr"),
+    );
+    session.wait_for("Found QR codes of Shamir shares: 3 shares, 2 needed");
     session.wait_for(PHRASE);
     cleared_and_quit(session);
 }
@@ -495,7 +497,7 @@ fn an_answer_changed_after_shift_tab_replaces_the_old_one() {
     // Back from the size to the fabric, the picture, the dates and Seedshift.
     for asked in [
         "Which fabric?",
-        "Picture file name",
+        "Enter the picture's file name",
         "DD-MM-YYYY",
         "Use Seedshift?",
     ] {
@@ -503,7 +505,7 @@ fn an_answer_changed_after_shift_tab_replaces_the_old_one() {
         session.wait_for(asked);
     }
     session.press("3");
-    session.wait_for("Picture file name");
+    session.wait_for("Enter the picture's file name");
     session.press(&format!("{}\r", picture.display()));
     session.wait_for("Which fabric?");
     session.press("\r");
@@ -515,7 +517,7 @@ fn an_answer_changed_after_shift_tab_replaces_the_old_one() {
     session.press("1");
     session.wait_for("Where should the result be saved?");
     session.press("\r");
-    saved_in(&mut session, &folder);
+    saved_in(&mut session, &folder, "1");
     session.wait_for("Saved files");
     let written = cleared_and_quit(session);
     let result = written
@@ -525,4 +527,20 @@ fn an_answer_changed_after_shift_tab_replaces_the_old_one() {
     assert!(!result.contains("Seed phrase after Seedshift"), "{result}");
     assert!(!result.contains("with your dates"), "{result}");
     assert!(folder.join("cross-stitch-pattern.pdf").is_file());
+}
+
+/// The menu's Restore from shares, answered `seedshift` about Seedshift, and given `folder` once
+/// `asked` shows.
+fn restore_from_folder(seedshift: &str, asked: &str, folder: &Path) -> Session {
+    let mut session = Session::start(PROGRAM, &[]);
+    // A window of today's usual size, where a result shows at once, not by pages.
+    session.resize(60, 100);
+    session.wait_for("Choose an action");
+    session.press("5");
+    session.wait_for("Was Seedshift used before it was split?");
+    session.press(seedshift);
+    session.wait_for(asked);
+    session.wait_for_answer_keys();
+    session.press(&format!("{}\r", folder.display()));
+    session
 }

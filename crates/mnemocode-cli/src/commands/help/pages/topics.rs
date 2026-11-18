@@ -3,7 +3,7 @@
 use super::super::{TopicHelp, TopicSection};
 
 pub(in super::super) const MODES: TopicHelp = TopicHelp {
-    summary: "Transformation modes: direct, seedshift and the legacy modes",
+    summary: "Transformation modes: direct, seedshift and seedshift-legacy",
     sections: &[
         TopicSection {
             heading: "Modes:",
@@ -19,11 +19,7 @@ pub(in super::super) const MODES: TopicHelp = TopicHelp {
                 ),
                 (
                     "seedshift-legacy",
-                    "Works exactly like the original Seedshift program, for records made with it. The result usually fails the BIP39 checksum; MnemoCode shows a valid last word too.",
-                ),
-                (
-                    "seedshift-legacy-valid",
-                    "A legacy record whose last word was replaced by a valid one (--legacy-valid-last-word). Decoding lists every possible last word with its fingerprint.",
+                    "Masks the words as the original Seedshift program does. MnemoCode then writes a last word that passes the BIP39 checksum and names the original one to remember: Decode asks for it, and without it the codes give one or two phrases. Codes of the original program, whose last word fails the checksum, decode exactly.",
                 ),
             ]),
         },
@@ -34,14 +30,6 @@ pub(in super::super) const MODES: TopicHelp = TopicHelp {
                 "Every set of dates gives a valid phrase, so wrong dates give a wrong but valid phrase. To check a recovery, keep the fingerprint of the original phrase, or an address or a public key of the wallet.",
             ]),
             rows: None,
-        },
-        TopicSection {
-            heading: "Candidates of a legacy-valid record:",
-            paragraphs: None,
-            rows: Some(&[
-                ("Words", "12   15   18   21   24"),
-                ("Candidates", "128  64   32   16   8"),
-            ]),
         },
     ],
     examples: Some(&[(
@@ -78,8 +66,12 @@ pub(in super::super) const FORMATS: TopicHelp = TopicHelp {
     }],
     examples: Some(&[
         (
-            "printf '%s\\n' \"$TEST_PHRASE\" | mnemocode encode --mode direct --mnemonic-file - --format 3",
-            "The test phrase as Unicode codes",
+            "printf '%s\\n' \"$TEST_PHRASE\" > test-phrase.txt",
+            "Save the test phrase in a file",
+        ),
+        (
+            "mnemocode encode --mode direct --mnemonic-file test-phrase.txt --format 3",
+            "The test phrase as Unicode codes, on the private screen",
         ),
         (
             "mnemocode table --word abandon",
@@ -87,7 +79,7 @@ pub(in super::super) const FORMATS: TopicHelp = TopicHelp {
         ),
     ]),
     notes: Some(&[
-        "Every format is a representation, not encryption. For decode and recover-date the format is found automatically when exactly one fits; otherwise the terminal asks, and a script must pass --format. A record file names its format.",
+        "Every format is a representation, not encryption. For decode and recover-date the format is found automatically when exactly one fits; otherwise the terminal asks, and a script must pass --format. Only a record saved by an earlier version, which starts with MNC1, names its format.",
     ]),
 };
 
@@ -100,13 +92,14 @@ pub(in super::super) const CARDS: TopicHelp = TopicHelp {
                 "In formats 4 and 5 the phrase is a short list of color codes, in format 3 one Unicode code a word. A template places them into a familiar document, such as a print studio proposal with sample business cards. Each card shows one code: a color and its code, such as Ref. 01AB63, or a Unicode code in a color that only decorates it, the same color for the same code. The printed codes are the whole value: decode turns them back into the phrase.",
                 "A set ends with a few random codes that belong to nothing: on a sheet at least one, so that every row is full and the cards are as large as the page allows; separate cards end with exactly one, after all real codes. No card says how many cards there are. The QR code holds only the real codes, and the sheet for heirs says how many words the phrase has: decode --words reads only the codes of so many words.",
                 "The names, companies and contact details are a decoy that makes the cards look ordinary, invented at random unless given with --card-name and the other details. Like the images, they are not needed for recovery.",
+                "Each file of the cards, a PDF, PNG or JPEG, also keeps the codes as named colour swatches in its design metadata (XMP), as files from design programs do. decode --input-file reads them from the file, or from a folder of such files, without typing.",
             ]),
             rows: None,
         },
         TopicSection {
             heading: "In the menu:",
             paragraphs: Some(&[
-                "When printable cards are among the chosen outputs, the menu asks about the files: which kind of file, PDF, PNG or JPEG; how the cards are laid out, on A6, A5 or A4 sheets in one PDF or as images of the sheets, or as separate business cards of 90 x 50 mm, one file each in a new folder; for sheets, how they are turned, landscape, portrait or whichever fills the sheet best (at least three rows, the largest cards); and the name of the PDF or of the folder. Then it asks for the design, for sheets whether to add a QR code with the codes of the backup, without the extra cards, and last, for every way of saving, whether to type your own details; Enter on a detail keeps it random. Typed details that do not fit on the cards are refused at once, and the details are asked again with every other answer kept.",
+                "When printable cards are among the chosen outputs, the menu asks about the files: which kind of file, PDF, PNG or JPEG; how the cards are laid out, on A6, A5 or A4 sheets in one PDF or as images of the sheets, or as separate business cards of 90 x 50 mm, one file each in a new folder; for sheets, how they are turned, landscape, portrait or whichever fills the sheet best (at least three rows, the largest cards). The files go to the one folder of the task, under their usual names, numbered where a name is taken. Then it asks for the design; for sheets, the QR code: none, an ordinary one or one with hidden data, printed on the sheets alone, on them and saved as a PNG file too, or only in a PNG file; it holds the codes of the backup without the extra cards. Last, for every way of saving, whether to type your own details; Enter on a detail keeps it random. Typed details that do not fit on the cards are refused at once, and the details are asked again with every other answer kept.",
             ]),
             rows: None,
         },

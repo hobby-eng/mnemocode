@@ -7,6 +7,7 @@
 use mnemocode::backup::{Backup, Encoding};
 use mnemocode::bip32::{ExtendedKey, fingerprint_hex};
 use mnemocode::bip39::phrase::Phrase;
+use mnemocode::bip39::table::english;
 use mnemocode::checks::Part;
 use mnemocode::forms::Form;
 use mnemocode::modes::Mode;
@@ -26,21 +27,13 @@ pub struct EncodedBackup {
 
 impl EncodedBackup {
     /// [`EncodedBackup::encode`] of the text read: the form and the mode refused first.
-    fn encode_text(
-        form: &str,
-        mode: &str,
-        valid_last_word: bool,
-        phrase: &str,
-        dates: &str,
-    ) -> Result<Self, JsValue> {
+    fn encode_text(form: &str, mode: &str, phrase: &str, dates: &str) -> Result<Self, JsValue> {
         let form = Form::named(form).map_err(|refusal| refused(&refusal))?;
         let mode = Mode::named(mode).map_err(|refusal| refused(&refusal))?;
-        Backup::check_encodable(mode, valid_last_word, Some(form))
-            .map_err(|refusal| refused(&refusal))?;
+        Backup::check_encodable(mode, Some(form)).map_err(|refusal| refused(&refusal))?;
         let (phrase, dates) = phrase_and_dates(phrase, dates)?;
         let encoding = Box::new(
-            Backup::encode(&phrase, &dates, form, mode, valid_last_word)
-                .map_err(|refusal| refused(&refusal))?,
+            Backup::encode(&phrase, &dates, form, mode).map_err(|refusal| refused(&refusal))?,
         );
         let original = ExtendedKey::of_phrase(&phrase, "")
             .and_then(|key| key.fingerprint())
@@ -55,21 +48,19 @@ impl EncodedBackup {
 #[wasm_bindgen]
 impl EncodedBackup {
     /// `phrase` encoded in `form` (its name, as `--format` takes it) with `mode` and `dates`, the
-    /// dates typed as a line of them (undefined: none); with `validLastWord`, the Original
-    /// Seedshift's checksum-valid last word. Refused as the library refuses the phrase, the dates,
-    /// the form and the mode, and for a phrase or dates that are not text.
+    /// dates typed as a line of them (undefined: none); the Original Seedshift's codes end with a
+    /// last word that keeps the checksum. Refused as the library refuses the phrase, the dates, the
+    /// form and the mode, and for a phrase or dates that are not text.
     pub fn encode(
         phrase: JsValue,
         dates: JsValue,
         form: JsValue,
         mode: JsValue,
-        valid_last_word: bool,
     ) -> Result<EncodedBackup, JsValue> {
         after_secret(|| {
             Self::encode_text(
                 &name(&form),
                 &name(&mode),
-                valid_last_word,
                 &text(&phrase)?,
                 &optional_text(&dates)?,
             )
@@ -104,8 +95,7 @@ impl EncodedBackup {
         self.original.clone()
     }
 
-    /// The master fingerprint of the codes read as a phrase, where they are a valid BIP39 phrase;
-    /// undefined for the Original Seedshift's, which are one only by chance.
+    /// The master fingerprint of the codes read as a phrase.
     #[wasm_bindgen(js_name = encodedFingerprint)]
     pub fn encoded_fingerprint(&self) -> Result<Option<String>, JsValue> {
         after_secret(|| {
@@ -118,10 +108,13 @@ impl EncodedBackup {
         })
     }
 
-    /// Whether the Original Seedshift's valid last word differs from the mode's own.
-    #[wasm_bindgen(getter, js_name = lastWordChanged)]
-    pub fn last_word_changed(&self) -> bool {
-        self.encoding.last_word_changed
+    /// The Original Seedshift's own last word, which Decode asks for to give the phrase back
+    /// exactly; undefined in any other mode.
+    #[wasm_bindgen(js_name = originalLastWord)]
+    pub fn original_last_word(&self) -> Option<String> {
+        self.encoding
+            .original_last_word
+            .map(|index| english()[usize::from(index)].to_owned())
     }
 }
 
@@ -160,8 +153,7 @@ mod tests {
 
     #[test]
     fn a_phrase_is_encoded_and_fingerprinted_as_the_library_does() {
-        let backup =
-            EncodedBackup::encode_text("unicode", "direct", false, PUBLIC_MNEMONIC, "").unwrap();
+        let backup = EncodedBackup::encode_text("unicode", "direct", PUBLIC_MNEMONIC, "").unwrap();
         assert_eq!(backup.codes().unwrap(), PUBLIC_UNICODE);
         assert_eq!(backup.original_fingerprint(), PUBLIC_FINGERPRINT);
         assert_eq!(
@@ -177,7 +169,6 @@ mod tests {
         let masked = EncodedBackup::encode_text(
             "unicode",
             "seedshift",
-            false,
             PUBLIC_MNEMONIC,
             "01-02-2020, 03-04-2021",
         )

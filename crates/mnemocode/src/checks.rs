@@ -26,7 +26,7 @@ use bip39::{Language, Mnemonic};
 use sha2::{Digest, Sha256};
 
 use crate::bip32::{ExtendedKey, fingerprint_hex};
-use crate::bip39::phrase::{Phrase, legacy_valid_last_words};
+use crate::bip39::phrase::Phrase;
 use crate::bip39::seed::seed;
 use crate::bip39::sizes::{WORD_COUNTS, entropy_bytes};
 use crate::bip39::table::{self, Format, chinese, english};
@@ -34,7 +34,7 @@ use crate::dates::{Date, parse_date};
 use crate::forms::Form;
 use crate::forms::hints::{BIP39, LineWordHints, WordHint, WordHints, codes_list};
 use crate::modes::Mode;
-use crate::modes::seedshift::Indexes;
+use crate::modes::seedshift::{self, Indexes};
 pub(crate) use crate::self_check::ok;
 use crate::self_check::vectors::{
     MASKED_DATE, MASKED_ENGLISH, PUBLIC_MNEMONIC, PUBLIC_MNEMONIC_24, SEEDSHIFT_DATES,
@@ -46,21 +46,22 @@ use public_vectors::{PUBLIC_VECTORS, PublicVector};
 /// SHA-256 of each BIP39 word list joined by line feeds, as TS's lists give it.
 const ENGLISH_SHA256: &str = "187db04a869dd9bc7be80d21a86497d692c0db6abd3aa8cb6be5d618ff757fae";
 const CHINESE_SHA256: &str = "407312f9014543242bd157c255125a753ac60128fc15883a33b8685a9328b0cc";
-/// A phrase of the Original Seedshift's vector, its dates and its codes.
+/// A phrase of the Original Seedshift's vector, its dates and its codes as the original program
+/// writes them, whose last word fails the checksum.
 const LEGACY_SOURCE: &str =
     "oppose duck hello neglect reveal key humor mosquito road evoke flock hedgehog";
 const LEGACY_DATES: [&str; 3] = ["10-07-1963", "27-04-1956", "31-01-1994"];
 const LEGACY_ENGLISH: &str =
     "mosquito dust hotel maximum rich kitten hair mother salute dream flush hospital";
-/// The public phrase's last words and the Original Seedshift's with a valid last word, under
-/// [`MASKED_DATE`], for each length: the phrase's last word, the codes' and how many phrases they
-/// give.
-const LEGACY_VALID_ANSWERS: [(usize, &str, &str, usize); 5] = [
-    (12, "about", "actress", 128),
-    (15, "address", "alert", 64),
-    (18, "agent", "afford", 32),
-    (21, "admit", "arrest", 16),
-    (24, "art", "bridge", 8),
+/// The public phrase's last words and the Original Seedshift's codes MnemoCode writes, with a last
+/// word keeping the checksum, under [`MASKED_DATE`], for each length: the phrase's last word and
+/// the codes'.
+const LEGACY_VALID_ANSWERS: [(usize, &str, &str); 5] = [
+    (12, "about", "actress"),
+    (15, "address", "alert"),
+    (18, "agent", "afford"),
+    (21, "admit", "arrest"),
+    (24, "art", "bridge"),
 ];
 /// The BIP39 passphrase of the published vectors.
 const VECTOR_PASSPHRASE: &str = "TREZOR";
@@ -406,17 +407,21 @@ fn digest(words: &[&str]) -> String {
     hex_of_bytes(&Sha256::digest(words.join("\n").as_bytes()))
 }
 
-/// The codes `text` in `form`, read back with `dates` in `mode`: the first phrase they give, in
-/// English words.
-fn decoded(mode: Mode, form: Form, text: &str, dates: &[Date]) -> Result<String, CheckFailure> {
+/// Whether the codes `text` in `form`, read back with `dates` in `mode`, give `expected`.
+fn decodes_to(
+    mode: Mode,
+    form: Form,
+    (text, dates): (&str, &[Date]),
+    expected: &str,
+) -> Result<bool, CheckFailure> {
     let indexes = Indexes::new(ok(form.read(text))?);
-    let phrases = ok(mode.undo(&indexes, dates))?;
-    let first = phrases
-        .first()
-        .ok_or(CheckFailure::Mismatch("Decoded phrase"))?;
-    Ok(ok(Form::English.codes(first.recovered.as_slice()))?
-        .as_str()
-        .to_owned())
+    // Original Seedshift codes that keep the checksum may give two phrases: the one is among them.
+    for phrase in ok(mode.undo(&indexes, dates))? {
+        if ok(Form::English.codes(phrase.recovered.as_slice()))?.as_str() == expected {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Every form of `vector`, forward and back.
@@ -438,8 +443,8 @@ fn check_vector(vector: &PublicVector) -> Result<(), CheckFailure> {
             vector.name,
         )?;
         expect_same(
-            decoded(vector.mode, form, codes, &dates)?.as_str(),
-            vector.source,
+            &decodes_to(vector.mode, form, (codes, &dates), vector.source)?,
+            &true,
             vector.name,
         )?;
     }
@@ -471,24 +476,10 @@ fn core_integrity(_: Tier) -> Result<(), CheckFailure> {
     for vector in &PUBLIC_VECTORS[..2] {
         check_vector(vector)?;
     }
-    let about = ok(legacy_valid_last_words(PUBLIC_MNEMONIC))?
-        .into_iter()
-        .find(|candidate| english()[candidate.index] == "about")
-        .map(|candidate| candidate.index);
-    expect_same(&about, &Some(3), "Final-word BIP39 index")?;
-    let legacy_last_words = ok(legacy_valid_last_words(LEGACY_ENGLISH))?;
     expect_same(
-        &legacy_last_words.len(),
-        &128,
-        "Legacy final-word candidate count",
-    )?;
-    expect_same(
-        &legacy_last_words
-            .iter()
-            .filter(|candidate| candidate.preserves_entropy)
-            .count(),
-        &1,
-        "Legacy entropy-preserving final-word count",
+        &table::index_of_english("about"),
+        &Some(3),
+        "Final-word BIP39 index",
     )?;
     let masked_date = dates_of(&[MASKED_DATE])?;
     expect_same(
@@ -497,22 +488,23 @@ fn core_integrity(_: Tier) -> Result<(), CheckFailure> {
         "Checksum-valid Seedshift checksum",
     )?;
     let legacy_dates = dates_of(&LEGACY_DATES)?;
-    let legacy =
-        ok(Mode::SeedshiftLegacy.encode(&ok(Phrase::parse(LEGACY_SOURCE))?, &legacy_dates))?;
+    let legacy = ok(
+        seedshift::mask_legacy(&ok(Phrase::parse(LEGACY_SOURCE))?, &legacy_dates)
+            .map_err(crate::modes::ModeError::from),
+    )?;
     expect_same(
         ok(Form::English.codes(legacy.shifted.as_slice()))?.as_str(),
         LEGACY_ENGLISH,
         "Legacy Seedshift vector",
     )?;
     expect_same(
-        decoded(
+        &decodes_to(
             Mode::SeedshiftLegacy,
             Form::English,
-            LEGACY_ENGLISH,
-            &legacy_dates,
-        )?
-        .as_str(),
-        LEGACY_SOURCE,
+            (LEGACY_ENGLISH, &legacy_dates),
+            LEGACY_SOURCE,
+        )?,
+        &true,
         "Legacy Seedshift reverse vector",
     )?;
     let ones = "1 ".repeat(11);
@@ -549,22 +541,25 @@ fn core_integrity(_: Tier) -> Result<(), CheckFailure> {
         "core.encoded-form.unsupported-encoded-format",
         "Unknown representation",
     )?;
-    for (words, source_last, stored_last, candidates) in LEGACY_VALID_ANSWERS {
+    for (words, source_last, stored_last) in LEGACY_VALID_ANSWERS {
         let source = format!("{}{source_last}", "abandon ".repeat(words - 1));
         let stored = format!(
             "{}wool abuse {stored_last}",
             "wool abuse actual ".repeat(words / 3 - 1)
         );
-        let masked =
-            ok(Mode::SeedshiftLegacyValid.encode(&ok(Phrase::parse(&source))?, &masked_date))?;
+        let masked = ok(Mode::SeedshiftLegacy.encode(&ok(Phrase::parse(&source))?, &masked_date))?;
         expect_same(
             ok(Form::English.codes(masked.shifted.as_slice()))?.as_str(),
             stored.as_str(),
             "Legacy-valid encoding",
         )?;
         let indexes = Indexes::new(ok(Form::English.read(&stored))?);
-        let recovered = ok(Mode::SeedshiftLegacyValid.undo(&indexes, &masked_date))?;
-        expect_same(&recovered.len(), &candidates, "Legacy-valid candidates")?;
+        let recovered = ok(Mode::SeedshiftLegacy.undo(&indexes, &masked_date))?;
+        expect_same(
+            &(1..=2).contains(&recovered.len()),
+            &true,
+            "Legacy-valid candidates",
+        )?;
         let source_indexes = ok(Form::English.read(&source))?;
         expect_same(
             &recovered
@@ -604,7 +599,8 @@ fn representation_matrix(tier: Tier) -> Result<(), CheckFailure> {
                 let text = ok(form.codes(masked.shifted.as_slice()))?;
                 let read = Indexes::new(ok(form.read(&text))?);
                 let back = ok(mode.undo(&read, dates))?;
-                let same = back.first().is_some_and(|phrase| {
+                // The Original Seedshift's codes may give two phrases: the phrase is one.
+                let same = back.iter().any(|phrase| {
                     phrase
                         .recovered
                         .as_slice()

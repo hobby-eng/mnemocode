@@ -24,6 +24,7 @@ pub struct SplitShares {
     shares: Vec<Share>,
     format: ShareFormat,
     masked: bool,
+    original_last_word: Option<u16>,
 }
 
 impl SplitShares {
@@ -52,6 +53,7 @@ impl SplitShares {
             shares: split.shares,
             format,
             masked: mode.masked(),
+            original_last_word: split.original_last_word,
         })
     }
 
@@ -95,6 +97,14 @@ impl SplitShares {
                 .map(|share| self.format.write(share).as_str().to_owned())
                 .collect()
         })
+    }
+
+    /// With the Original Seedshift, the English word the page shows the person to remember: the
+    /// restore asks for it to give the phrase back exactly. Undefined in any other mode.
+    #[wasm_bindgen(js_name = originalLastWord)]
+    pub fn original_last_word(&self) -> Option<String> {
+        self.original_last_word
+            .map(|index| mnemocode::bip39::table::english()[usize::from(index)].to_owned())
     }
 
     /// The note the shares are kept with, saved as `packaging` ("file", "folder", "files",

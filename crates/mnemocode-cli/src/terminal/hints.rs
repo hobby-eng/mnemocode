@@ -26,11 +26,21 @@ impl Hints for InputHints<'_> {
             .filter(|hint| length > 0 || hint.shown_at_once())
             .map_or_else(Vec::new, |hint| hint.rows(typed, length, columns));
         let action = if self.secret { "cancel" } else { "go back" };
-        if super::steps_back() {
-            if columns > super::STEP_KEYS.len() {
-                rows.push(paint(Channel::Error, style::MUTED, super::STEP_KEYS));
+        // The keys stand apart, a blank row above them.
+        let keys = if super::steps_back() || super::back_to_menu_question() {
+            Some(super::STEP_KEYS)
+        } else if super::for_menu() && self.secret {
+            Some(super::MENU_KEY)
+        } else {
+            None
+        };
+        if let Some(keys) = keys {
+            if columns > keys.len() {
+                rows.push(String::new());
+                rows.push(super::key_line(keys));
             }
         } else if columns > "Press Esc to ".len() + action.len() {
+            rows.push(String::new());
             rows.push(escape_hint(action));
         }
         rows

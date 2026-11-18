@@ -27,6 +27,7 @@ use mnemocode_cards::heir::{
 use mnemocode_cards::pdf::document;
 use mnemocode_cards::raster::{ImageFormat, page_image};
 use mnemocode_cards::settings::{CardProfile, CardSettings, Orientation, PageSize, ProfileField};
+use mnemocode_cards::sheet::frame::collection_png;
 use mnemocode_cards::templates::{CARD_TEMPLATES, CardDrawing, CardTemplate, select_template};
 use wasm_bindgen::prelude::*;
 
@@ -253,6 +254,20 @@ impl CardExport {
         })
     }
 
+    /// A QR code image of `record` with hidden data alone, without cards: behind the contact this
+    /// export's cards print, the one its session keeps, or one invented where none is kept yet.
+    #[wasm_bindgen(js_name = hiddenQrPng)]
+    pub fn hidden_qr_png(&self, record: JsValue) -> Result<Vec<u8>, JsValue> {
+        after_secret(|| {
+            let settings = self.settings(Some(self.design()?))?;
+            let image = thrown(mnemocode::qr::hidden::png(
+                &settings.profile.qr_contact(),
+                &text(&record)?,
+            ))?;
+            Ok(image.to_vec())
+        })
+    }
+
     /// Sample cards of a random phrase of `words` words (0: the default), of this design or of
     /// `every` design.
     pub fn preview(&self, words: f64, every: bool) -> Result<CardDocuments, JsValue> {
@@ -329,6 +344,13 @@ impl CardPlan {
                 }],
             })
         })
+    }
+
+    /// The QR code that the sheets print, as a PNG exactly as printed: a contact over the hidden
+    /// backup, or the backup's codes; undefined where the sheets print none.
+    #[wasm_bindgen(js_name = qrPng)]
+    pub fn qr_png(&self) -> Result<Option<Vec<u8>>, JsValue> {
+        after_secret(|| Ok(thrown(collection_png(&self.job.cards))?.map(|image| image.to_vec())))
     }
 
     /// The separate cards: a document for each.
@@ -490,6 +512,25 @@ pub mod shares {
             })
         }
 
+        /// The QR code that the sheets of the share at `at` print, as a PNG exactly as printed: a
+        /// contact over the hidden share, or the share itself; undefined on separate cards.
+        #[wasm_bindgen(js_name = qrPng)]
+        pub fn qr_png(&self, at: f64) -> Result<Option<Vec<u8>>, JsValue> {
+            after_secret(|| {
+                self.set
+                    .qr_codes()
+                    .get(place(at))
+                    .map(|code| {
+                        thrown(mnemocode::qr::hidden::png_behind(
+                            code.contact.as_deref(),
+                            &code.payload,
+                        ))
+                        .map(|image| image.to_vec())
+                    })
+                    .transpose()
+            })
+        }
+
         /// The QR code that the sheets of the share at `at` print, as its text; none on separate
         /// cards.
         #[wasm_bindgen(js_name = qrPayload)]
@@ -612,6 +653,34 @@ impl HeirPage {
         self.sheet(backup, mode, dates)
     }
 
+    /// The sheet for a cross-stitch pattern whose legend holds a phrase of `words` words, masked in
+    /// `mode` with `dates` dates.
+    #[wasm_bindgen(js_name = patternSheet)]
+    pub fn pattern_sheet(&self, words: f64, mode: &str, dates: f64) -> Result<Vec<u8>, JsValue> {
+        let backup = HeirBackup::Pattern {
+            words: place(words),
+        };
+        self.sheet(backup, mode, dates)
+    }
+
+    /// The sheet for `count` cross-stitch patterns, a Shamir share in the legend of each, of which
+    /// `threshold` restore the phrase, masked in `mode` with `dates` dates.
+    #[cfg(feature = "browser-sskr")]
+    #[wasm_bindgen(js_name = patternSharesSheet)]
+    pub fn pattern_shares_sheet(
+        &self,
+        threshold: f64,
+        count: f64,
+        mode: &str,
+        dates: f64,
+    ) -> Result<Vec<u8>, JsValue> {
+        let backup = HeirBackup::PatternShares {
+            threshold: place(threshold),
+            count: place(count),
+        };
+        self.sheet(backup, mode, dates)
+    }
+
     /// The sheet of `backup`.
     fn sheet(&self, backup: HeirBackup, mode: &str, dates: f64) -> Result<Vec<u8>, JsValue> {
         let facts = HeirSheetFacts {
@@ -656,6 +725,10 @@ impl HeirRoute for HeirPage {
         self.steps_with(dates)
     }
 
+    fn read_pattern(&self, dates: Option<&str>) -> Vec<String> {
+        self.steps_with(dates)
+    }
+
     fn date_digit_help(&self) -> Option<String> {
         self.date_digit_help.clone()
     }
@@ -683,7 +756,7 @@ mod tests {
     #[test]
     fn separate_cards_keep_the_turn_of_their_export() {
         let phrase = mnemocode::bip39::phrase::Phrase::parse(PUBLIC_MNEMONIC).unwrap();
-        let encoding = Backup::encode(&phrase, &[], Form::Colors, Mode::Direct, false).unwrap();
+        let encoding = Backup::encode(&phrase, &[], Form::Colors, Mode::Direct).unwrap();
         let drawing = Rc::new(CardDrawing::new());
         let template = select_template(Some("business-it")).unwrap();
         let cards = backup_card_content(&encoding.backup, CardSettings::default(), None).unwrap();

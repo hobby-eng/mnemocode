@@ -230,7 +230,7 @@ fn by_encoded_fingerprint(
     let fingerprint = match given {
         Some(fingerprint) => Some(fingerprint.to_owned()),
         None => value_until(
-            "Encoded fingerprint of these codes, such as 1a2b3c4d:",
+            "Enter the encoded fingerprint of these codes, such as 1a2b3c4d:",
             "the eight characters of the fingerprint",
             PATH_LIMIT,
             None,

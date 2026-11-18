@@ -21,9 +21,9 @@ const OWN_0_5: HelpOption = HelpOption {
 const OWN_0_6: HelpOption = HelpOption {
     flag: "--mode",
     value: Some("MODE"),
-    summary: "seedshift, seedshift-legacy or seedshift-legacy-valid",
+    summary: "seedshift or seedshift-legacy",
     details: &[
-        "Needed for typed text, terminal output and QR codes, which carry no header; without it, --ask-secrets asks how they were masked. A file saved with --output names its mode; a --mode that contradicts it stops the command, and with --ask-secrets MnemoCode offers to read the record as it says or to give it again. See mnemocode help modes.",
+        "Needed for codes, which say nothing of how they were masked: without it, --ask-secrets asks. Only a record saved by an earlier version, which starts with MNC1, names its mode; a --mode that contradicts it stops the command, and with --ask-secrets MnemoCode offers to read the record as it says or to give it again. See mnemocode help modes.",
     ],
 };
 const OWN_2_1: HelpOption = HelpOption {
@@ -43,7 +43,7 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
     summary: "Find a forgotten digit of a date",
     about: &[
         "Tries every date that fits one to three incomplete dates, where each forgotten digit is written as ?, and lists the candidates that pass a recovery check. Every check is local and offline.",
-        "In the seedshift and seedshift-legacy-valid modes every date gives a valid phrase, so a recovery check is required; with --ask-secrets it is asked for after the dates when no option gives it. In seedshift-legacy mode the BIP39 checksum can be used instead, a weak filter of 4 to 8 bits.",
+        "Wrong dates give valid phrases: every wrong date with seedshift; with seedshift-legacy one or two for most wrong dates, or one in 16 to 256 for codes of the original program. So a recovery check is required; with --ask-secrets it is asked for after the dates when no option gives it.",
         "With --ask-secrets the encoded fingerprint of the codes is shown once they are read, before the dates, as decode shows it, so that a code typed wrongly shows before a long search.",
     ],
     usage: "[OPTIONS] (--ask-secrets | --dates-file <PATH>) [<RECOVERY CHECK>]",
@@ -70,10 +70,7 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
             "Encoded record",
             "unless --input-file or --qr-file gives it",
         ),
-        (
-            "Seedshift",
-            "which, for codes without a header, unless --mode",
-        ),
+        ("Seedshift", "which, unless --mode"),
         ("Dates", "one line, with ? in place of each forgotten digit"),
         (
             "Wallet",

@@ -260,7 +260,7 @@ pub(crate) fn save_output(
             AfterFailedSave::Other => {
                 let checked = &*parsed;
                 let other = value_until(
-                    &format!("New name for {}:", lower_first(name.what)),
+                    &format!("Enter a new name for {}:", lower_first(name.what)),
                     if folder {
                         "the name of a new folder"
                     } else {

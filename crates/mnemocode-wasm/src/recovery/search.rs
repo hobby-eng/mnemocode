@@ -90,7 +90,7 @@ impl Recovery {
         input: ShareInput,
         mode: Mode,
         dates: &JsValue,
-        keep: Option<u64>,
+        (keep, last_word): (Option<u64>, Option<u16>),
     ) -> Result<RestoreFlow, JsValue> {
         RestoreFlow::new(ShareRestoreRequest {
             input,
@@ -100,6 +100,7 @@ impl Recovery {
             keep,
             limits: self.limits,
             confirmed: self.confirmed,
+            last_word,
         })
         .map_err(fail)
     }
@@ -256,8 +257,9 @@ impl Recovery {
     }
 
     /// The restore of `shares` as typed, each in any form, in `mode` with `dates`, which may hold
-    /// ?, by the limits set. `decode_entry` names where the page reads an encoded phrase. The page
-    /// calls `begin`, then steps it.
+    /// ?, by the limits set. `decode_entry` names where the page reads an encoded phrase. With
+    /// Original Seedshift shares, `last_word`, the English word Encode named, picks the one phrase
+    /// of complete dates; undefined gives both. The page calls `begin`, then steps it.
     #[wasm_bindgen(js_name = restoreShares)]
     pub fn restore_shares(
         &self,
@@ -265,10 +267,17 @@ impl Recovery {
         mode: JsValue,
         dates: JsValue,
         decode_entry: JsValue,
+        last_word: JsValue,
     ) -> Result<RecoverySearch, JsValue> {
         after_secret(|| {
             let input = input_of(&texts_of(&shares)?, &name(&decode_entry))?;
-            let flow = self.restore(input, needed_mode(&mode)?, &dates, self.keep)?;
+            let word = if last_word.is_undefined() {
+                None
+            } else {
+                let typed = crate::host::text(&last_word)?;
+                Some(mnemocode::backup::re_encoding::last_word_index(&typed).map_err(fail)?)
+            };
+            let flow = self.restore(input, needed_mode(&mode)?, &dates, (self.keep, word))?;
             Ok(RecoverySearch(Running::Restore(Box::new(flow), None)))
         })
     }
@@ -301,7 +310,7 @@ impl Recovery {
             {
                 return Ok(RecoverySearch(Running::Ready(Box::new(Ready(outcome)))));
             }
-            let flow = self.restore(input, mode, &dates, None)?;
+            let flow = self.restore(input, mode, &dates, (None, None))?;
             let rewrite = Rewrite {
                 input: input_of(&texts, &entry)?,
                 form,

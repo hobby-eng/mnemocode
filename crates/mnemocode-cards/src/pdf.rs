@@ -460,7 +460,8 @@ impl<W: Write> PdfPages<W> {
         })
     }
 
-    /// Writes `page` after those so far.
+    /// Writes `page` after those so far; a page of cards keeps the codes it prints as its XMP
+    /// metadata (see [`crate::printed`]).
     pub fn add(&mut self, page: &Page) -> Result<(), PdfError> {
         self.add_with_piece(page, None)
     }
@@ -481,6 +482,18 @@ impl<W: Write> PdfPages<W> {
                     chunk.stream(id, &compressed).filter(Filter::FlateDecode);
                 })?;
                 Some((application, id))
+            }
+            None => None,
+        };
+        // The codes of a page of cards, in its metadata as a design program keeps its swatches.
+        let metadata = match &page.kept {
+            Some(kept) => {
+                let id = self.ids.next();
+                let packet = crate::printed::xmp(kept);
+                self.output.object(id, |chunk| {
+                    chunk.metadata(id, packet.as_bytes());
+                })?;
+                Some(id)
             }
             None => None,
         };
@@ -505,6 +518,9 @@ impl<W: Write> PdfPages<W> {
             written.parent(tree);
             written.media_box(Rect::new(0.0, 0.0, page.width as f32, page.height as f32));
             written.contents(content_id);
+            if let Some(id) = metadata {
+                written.pair(Name(b"Metadata"), id);
+            }
             if let Some((application, id)) = private {
                 written.pair(Name(b"LastModified"), Str(PIECE_DATE));
                 let mut pieces = written.insert(Name(b"PieceInfo")).dict();

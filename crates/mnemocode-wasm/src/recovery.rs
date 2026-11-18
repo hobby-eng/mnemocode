@@ -161,12 +161,14 @@ impl ReadBackup {
     }
 
     /// The codes in `form`, read as `mode` holds them, with their master fingerprint where they
-    /// are a valid phrase, and decoded under `dates`.
+    /// are a valid phrase, and decoded under `dates`. With Original Seedshift codes that give two
+    /// phrases, `last_word`, the English word Encode named, picks the one; undefined lists both.
     pub fn decode(
         &self,
         form: JsValue,
         mode: JsValue,
         dates: JsValue,
+        last_word: JsValue,
     ) -> Result<DecodedBackup, JsValue> {
         after_secret(|| {
             let (form, mode) = (needed_form(&form)?, needed_mode(&mode)?);
@@ -175,7 +177,10 @@ impl ReadBackup {
                 .codes(form)
                 .and_then(|codes| codes.with_mode(mode))
                 .map_err(fail)?;
-            DecodedBackup::of(&backup, &optional_text(&dates)?)
+            let word = (!last_word.is_undefined())
+                .then(|| text(&last_word))
+                .transpose()?;
+            DecodedBackup::of(&backup, &optional_text(&dates)?, word.as_deref())
         })
     }
 
@@ -223,10 +228,20 @@ pub struct DecodedBackup {
 }
 
 impl DecodedBackup {
-    /// What `backup` gives under the dates typed in `typed`.
-    fn of(backup: &Backup, typed: &str) -> Result<DecodedBackup, JsValue> {
+    /// What `backup` gives under the dates typed in `typed`, with `last_word` where it is given.
+    fn of(backup: &Backup, typed: &str, last_word: Option<&str>) -> Result<DecodedBackup, JsValue> {
         let dates = crate::host::dates_of(typed, backup.words())?;
-        let phrases = decoded_phrases(backup, &dates)?;
+        let phrases = match last_word {
+            Some(word) => {
+                let result = mnemocode::backup::re_encoding::with_last_word(backup, &dates, word)
+                    .map_err(fail)?;
+                let words = Form::English
+                    .codes(result.recovered.as_slice())
+                    .map_err(fail)?;
+                vec![(words.as_str().to_owned(), result.checksum_valid)]
+            }
+            None => decoded_phrases(backup, &dates)?,
+        };
         let encoded = backup.fingerprint().map_err(fail)?.map(fingerprint_hex);
         Ok(DecodedBackup { phrases, encoded })
     }
@@ -249,7 +264,7 @@ pub(crate) fn decoded_phrases(
 
 #[wasm_bindgen]
 impl DecodedBackup {
-    /// How many phrases: more than one only for a record with a replaced last word.
+    /// How many phrases: two at most, only for Original Seedshift codes without the last word.
     #[wasm_bindgen(getter)]
     pub fn count(&self) -> usize {
         self.phrases.len()
@@ -362,8 +377,7 @@ pub fn check_backup(
             mode,
             codes,
             dates,
-        })
-        .map_err(fail)?;
+        });
         written_finding(&backup, &written_dates, |written| check.check(written))
     })
 }

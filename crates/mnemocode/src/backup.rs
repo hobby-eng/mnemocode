@@ -12,10 +12,10 @@ use std::fmt;
 
 use crate::bip32::{Bip32Error, ExtendedKey};
 use crate::bip39::phrase::Phrase;
-use crate::bip39::sizes::{WORD_COUNTS, is_word_count, word_counts_text};
+use crate::bip39::sizes::{WORD_COUNTS, checksum_bits, is_word_count, word_counts_text};
 use crate::dates::{Date, maximum_dates};
 use crate::forms::{Form, FormError};
-use crate::modes::seedshift::{Indexes, Masked, Unmasked};
+use crate::modes::seedshift::{self, Indexes, Masked, Unmasked};
 use crate::modes::{DateWords, Mode, ModeError};
 use crate::refusal::Refusal;
 use crate::secret::SecretText;
@@ -28,12 +28,10 @@ pub enum BackupError {
     CodeCount(usize, &'static str),
     /// A form always masked, given without a mask.
     FormAlwaysMasked,
-    /// A mode only a replaced last word gives.
-    NotEncodable,
-    /// The replacement asked for outside the legacy mode.
-    ReplacementLegacyOnly,
-    /// A mode that gives several phrases, decoded as one.
+    /// Codes that give several phrases, decoded as one.
     GivesSeveral,
+    /// A last word that does not fit the codes' own, given for codes that do not take one.
+    LastWord,
     /// The form's refusal.
     Form(FormError),
     /// The mode's refusal.
@@ -47,9 +45,8 @@ impl fmt::Display for BackupError {
         match self {
             Self::CodeCount(count, unit) => write!(f, "These are {count} {unit}; an encoded seed phrase has {}.", word_counts_text()),
             Self::FormAlwaysMasked => f.write_str("English words and word numbers are always masked: unmasked, they are the seed phrase itself. Choose a Seedshift, or Unicode codes or colors."),
-            Self::NotEncodable => f.write_str("To create a legacy checksum-valid record, select legacy Seedshift and enable the checksum-word replacement."),
-            Self::ReplacementLegacyOnly => f.write_str("The legacy checksum-word replacement is available only in legacy Seedshift mode."),
-            Self::GivesSeveral => f.write_str("The Original Seedshift with a valid last word gives several phrases: take its candidates."),
+            Self::GivesSeveral => f.write_str("These Original Seedshift codes can give two phrases: take their candidates."),
+            Self::LastWord => f.write_str("This is not the last word that Encode named: it does not fit the last word of the backup."),
             Self::Form(error) => error.fmt(f),
             Self::Mode(error) => error.fmt(f),
             Self::Record(error) => error.fmt(f),
@@ -64,15 +61,8 @@ impl Refusal for BackupError {
         match self {
             Self::CodeCount(..) => "core.encoded-backup.encoded-seed-phrase",
             Self::FormAlwaysMasked => "core.encoded-backup.form-always-masked",
-            Self::NotEncodable => {
-                "core.encoded-backup.create-legacy-checksum-valid-record-select-legacy-seedshift"
-            }
-            Self::ReplacementLegacyOnly => {
-                "core.encoded-backup.legacy-checksum-word-replacement-available-only-legacy-seedshift"
-            }
-            Self::GivesSeveral => {
-                "core.encoded-backup.original-seedshift-valid-last-word-gives-several-phrases"
-            }
+            Self::GivesSeveral => "core.encoded-backup.codes-give-several-phrases",
+            Self::LastWord => "core.encoded-backup.last-word-does-not-fit",
             Self::Form(error) => error.code(),
             Self::Mode(error) => error.code(),
             Self::Record(error) => error.code(),
@@ -100,29 +90,29 @@ impl From<ModeError> for BackupError {
     }
 }
 
-/// What encoding gave: the backup, the result of the mode itself, and the result with a valid last
-/// word where the mode offers it, whether that changed the last word and whether it was taken.
-#[derive(Debug)]
+/// What encoding gave: the backup, the masked result, and with the Original Seedshift the last word
+/// its shift gave, which a last word keeping the checksum replaced in the backup and which Decode
+/// asks for to give back the phrase exactly.
 pub struct Encoding {
     /// The backup.
     pub backup: Backup,
-    /// The result of the mode itself.
-    pub base: Masked,
-    /// The result with a valid last word, where the mode offers one.
-    pub valid_last_word: Option<Masked>,
-    /// Whether the valid last word differs from the mode's.
-    pub last_word_changed: bool,
-    /// Whether the valid last word was written.
-    pub replaced: bool,
+    /// The masked result written.
+    pub masked: Masked,
+    /// The Original Seedshift's own last word, an index.
+    pub original_last_word: Option<u16>,
+}
+
+/// Redacted: it holds the codes and the word to remember.
+impl fmt::Debug for Encoding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        crate::secret::redacted(f, "an encoding")
+    }
 }
 
 impl Encoding {
-    /// The result written: the valid last word's where it was taken.
-    pub fn result(&self) -> &Masked {
-        match &self.valid_last_word {
-            Some(valid) if self.replaced => valid,
-            _ => &self.base,
-        }
+    /// The result written.
+    pub const fn result(&self) -> &Masked {
+        &self.masked
     }
 }
 
@@ -141,6 +131,7 @@ impl Backup {
         if !is_word_count(indexes.len()) {
             return Err(BackupError::CodeCount(indexes.len(), form.unit()));
         }
+        let mode = mode.for_codes(indexes);
         let held = Indexes::new(indexes.to_vec());
         mode.check_codes(&held)?;
         Ok(Self {
@@ -156,56 +147,40 @@ impl Backup {
         Self::of(indexes.as_slice(), form, mode)
     }
 
-    /// Refuses what no encoding allows: a form always masked without a mask, a mode only a replaced
-    /// last word gives, and the replacement outside the legacy mode.
-    pub fn check_encodable(
-        mode: Mode,
-        valid_last_word: bool,
-        form: Option<Form>,
-    ) -> Result<(), BackupError> {
+    /// Refuses what no encoding allows: a form always masked without a mask.
+    pub fn check_encodable(mode: Mode, form: Option<Form>) -> Result<(), BackupError> {
         if form.is_some_and(Form::always_masked) && !mode.masked() {
             return Err(BackupError::FormAlwaysMasked);
-        }
-        if !mode.encodable() {
-            return Err(BackupError::NotEncodable);
-        }
-        if valid_last_word && mode.with_valid_last_word().is_none() {
-            return Err(BackupError::ReplacementLegacyOnly);
         }
         Ok(())
     }
 
-    /// Encodes `phrase` with `dates` in `form` and `mode`, the last word replaced by a valid one
-    /// where `valid_last_word` asks it and the mode offers it.
+    /// Encodes `phrase` with `dates` in `form` and `mode`.
     pub fn encode(
         phrase: &Phrase,
         dates: &[Date],
         form: Form,
         mode: Mode,
-        valid_last_word: bool,
     ) -> Result<Encoding, BackupError> {
-        Self::check_encodable(mode, valid_last_word, Some(form))?;
+        Self::check_encodable(mode, Some(form))?;
         mode.check_date_count(dates.len(), false, DateWords::Codes)?;
-        let base = mode.encode(phrase, dates)?;
-        let replacement = mode.with_valid_last_word();
-        let valid = replacement
-            .map(|replacement| replacement.encode(phrase, dates))
-            .transpose()?;
-        let last_word_changed = valid
-            .as_ref()
-            .is_some_and(|valid| valid.shifted.as_slice().last() != base.shifted.as_slice().last());
-        let replaced = valid_last_word && last_word_changed;
-        let (written, record_mode) = match (&valid, replacement) {
-            (Some(valid), Some(replacement)) if replaced => (valid, replacement),
-            _ => (&base, mode),
-        };
-        let backup = Self::of(written.shifted.as_slice(), form, record_mode)?;
+        let masked = mode.encode(phrase, dates)?;
+        let original_last_word =
+            if matches!(mode, Mode::SeedshiftLegacy | Mode::SeedshiftLegacyValid) {
+                seedshift::mask_legacy(phrase, dates)
+                    .map_err(ModeError::from)?
+                    .shifted
+                    .as_slice()
+                    .last()
+                    .copied()
+            } else {
+                None
+            };
+        let backup = Self::of(masked.shifted.as_slice(), form, mode)?;
         Ok(Encoding {
             backup,
-            base,
-            valid_last_word: valid,
-            last_word_changed,
-            replaced,
+            masked,
+            original_last_word,
         })
     }
 
@@ -280,17 +255,26 @@ impl Backup {
             .ok_or(BackupError::GivesSeveral)
     }
 
-    /// The backup with its last word taken as a replacement, where the mode offers one and the codes
-    /// keep the checksum it needs.
-    pub fn last_word_replacement(&self) -> Result<Option<Self>, BackupError> {
-        let Some(mode) = self.mode.with_valid_last_word() else {
-            return Ok(None);
-        };
-        match self.with_mode(mode) {
-            Ok(backup) => Ok(Some(backup)),
-            Err(BackupError::Mode(ModeError::MissingChecksum(_))) => Ok(None),
-            Err(error) => Err(error),
+    /// The phrase it holds under `dates` with `word` as the last word the Original Seedshift gave,
+    /// which Encode named: refused unless the codes are the Original Seedshift's with a last word
+    /// keeping the checksum, and the word differs from theirs only in the checksum bits.
+    pub fn decode_with_last_word(
+        &self,
+        dates: &[Date],
+        word: u16,
+    ) -> Result<Unmasked, BackupError> {
+        let codes = self.indexes();
+        let free = checksum_bits(codes.len());
+        let last = codes.last().copied().unwrap_or(0);
+        if self.mode != Mode::SeedshiftLegacyValid || word >> free != last >> free {
+            return Err(BackupError::LastWord);
         }
+        let mut given = codes.to_vec();
+        if let Some(place) = given.last_mut() {
+            *place = word;
+        }
+        let given = Indexes::new(given);
+        Ok(seedshift::unmask_legacy(&given, dates).map_err(ModeError::from)?)
     }
 
     /// Every phrase its codes and complete `dates` give.
@@ -316,10 +300,18 @@ impl Backup {
                 Err(BackupError::Mode(ModeError::MissingChecksum(_))) => continue,
                 Err(error) => return Err(error),
             };
-            let result = start.decode(dates)?;
-            if result.checksum_valid {
-                found.push((words, result));
-            }
+            // An Original Seedshift start written by Encode gives one or two phrases.
+            let results = if start.gives_several() {
+                start.candidates(dates)?
+            } else {
+                vec![start.decode(dates)?]
+            };
+            found.extend(
+                results
+                    .into_iter()
+                    .filter(|result| result.checksum_valid)
+                    .map(|result| (words, result)),
+            );
         }
         Ok(found)
     }
@@ -331,10 +323,22 @@ mod tests {
 
     const ABANDON: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
+    // AUD-008-SEC003: an encoding prints neither its codes nor the last word to remember.
+    #[test]
+    fn an_encoding_of_the_original_seedshift_prints_as_redacted() {
+        let phrase = Phrase::parse(ABANDON).unwrap();
+        let date = crate::dates::parse_date("23-09-2026").unwrap();
+        let encoding =
+            Backup::encode(&phrase, &[date], Form::Indexes, Mode::SeedshiftLegacy).unwrap();
+        assert!(encoding.original_last_word.is_some());
+        assert_eq!(format!("{encoding:?}"), "[an encoding: redacted]");
+        assert_eq!(format!("{encoding:#?}"), "[an encoding: redacted]");
+    }
+
     #[test]
     fn its_codes_and_its_record_stay_in_owners_that_print_as_redacted() {
         let phrase = Phrase::parse(ABANDON).unwrap();
-        let encoding = Backup::encode(&phrase, &[], Form::Unicode, Mode::Direct, false).unwrap();
+        let encoding = Backup::encode(&phrase, &[], Form::Unicode, Mode::Direct).unwrap();
         let text = encoding.backup.text().unwrap();
         let record = encoding.backup.record().unwrap();
         assert!(text.as_str().starts_with("76847684"));
@@ -347,8 +351,7 @@ mod tests {
     fn a_backup_encodes_and_decodes_its_phrase() {
         let phrase = Phrase::parse(ABANDON).unwrap();
         let dates = [Date::new(2020, 5, 17).unwrap()];
-        let encoding =
-            Backup::encode(&phrase, &dates, Form::Unicode, Mode::Seedshift, false).unwrap();
+        let encoding = Backup::encode(&phrase, &dates, Form::Unicode, Mode::Seedshift).unwrap();
         let read = Backup::read(
             encoding.backup.text().unwrap().as_str(),
             Form::Unicode,
@@ -365,7 +368,7 @@ mod tests {
         );
         assert!(read.fingerprint().unwrap().is_some());
         assert_eq!(
-            Backup::encode(&phrase, &[], Form::English, Mode::Direct, false).err(),
+            Backup::encode(&phrase, &[], Form::English, Mode::Direct).err(),
             Some(BackupError::FormAlwaysMasked)
         );
     }
@@ -377,7 +380,7 @@ mod tests {
         let dates: Vec<Date> = (1..=6)
             .map(|day| Date::new(2000, 1, day).unwrap())
             .collect();
-        let backup = Backup::encode(&phrase, &dates, Form::Indexes, Mode::SeedshiftLegacy, false)
+        let backup = Backup::encode(&phrase, &dates, Form::Indexes, Mode::SeedshiftLegacy)
             .unwrap()
             .backup;
         assert!(backup.shorter_phrases(&dates).is_ok());
@@ -386,7 +389,7 @@ mod tests {
     #[test]
     fn the_direct_fingerprint_is_the_wallet_s() {
         let phrase = Phrase::parse(ABANDON).unwrap();
-        let backup = Backup::encode(&phrase, &[], Form::Unicode, Mode::Direct, false)
+        let backup = Backup::encode(&phrase, &[], Form::Unicode, Mode::Direct)
             .unwrap()
             .backup;
         assert_eq!(

@@ -177,11 +177,17 @@ fn scanline_bytes(width: u64, height: u64, bits: u64, interlaced: bool) -> u64 {
 }
 
 /// A PNG file let in: where its image data lies, and the exact bytes its scanlines inflate to.
-#[derive(Debug)]
 pub struct Admitted<'a> {
     bytes: &'a [u8],
     data: Vec<(usize, usize)>,
     filtered_bytes: usize,
+}
+
+/// Redacted: it borrows the whole image, whose code may be a backup.
+impl std::fmt::Debug for Admitted<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Admitted(..)")
+    }
 }
 
 /// Whether `bytes` start as a PNG file, whatever its name says.

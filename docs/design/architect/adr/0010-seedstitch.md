@@ -25,6 +25,11 @@ decimal digits stay.
   way; the check's domain says which, so Decode asks for dates only where they were used (owner,
   2026-11-04). The original Seedshift is not offered: its result usually fails the checksum, and a
   legend holds only a valid phrase.
+  - Superseded on 2026-11-17: a domain that told masked from unmasked phrases told a reader of the
+    public format that dates protect the phrase. The check now has two domains, a whole phrase and
+    a share, and Decode asks whether Seedshift was used and which. The Original Seedshift is
+    offered too: Encode writes it with a last word that passes the checksum, so its legend holds
+    entropy as long as every other mode's and does not show the mode.
 - The DMC colours come from craft-color-codes by MakeBead under CC BY 4.0, converted unchanged
   into a table (THIRD_PARTY_NOTICES.md).
 

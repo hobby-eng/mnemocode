@@ -106,13 +106,22 @@ pub fn split(
     Ok(shares)
 }
 
-/// A backup split into shares: the shares, and the phrase they hold.
-#[derive(Debug)]
+/// A backup split into shares: the shares, the phrase they hold, and with the Original Seedshift
+/// the last word its shift gave, which the person keeps to restore the phrase exactly.
 pub struct BackupSplit {
     /// The shares, in member order.
     pub shares: Vec<Share>,
     /// The phrase the shares hold: the seed phrase itself, or its Seedshift mask.
     pub held: Phrase,
+    /// The Original Seedshift's own last word, an index; none in any other mode.
+    pub original_last_word: Option<u16>,
+}
+
+/// Redacted: the shares, the phrase and the last word are secret.
+impl std::fmt::Debug for BackupSplit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        crate::secret::redacted(f, "a backup split")
+    }
 }
 
 /// How many Shamir shares to make, and how many of them restore the seed phrase: a set that SSKR
@@ -210,7 +219,6 @@ pub fn split_backup(
     count: usize,
     random: &mut dyn Random,
 ) -> Result<BackupSplit, SplitError> {
-    mode.check_split().map_err(SplitError::Mode)?;
     let masked = mode.encode(phrase, dates).map_err(SplitError::Mode)?;
     let indexes: Vec<usize> = masked
         .shifted
@@ -220,7 +228,21 @@ pub fn split_backup(
         .collect();
     let held = Phrase::of_indexes(&indexes).map_err(SplitError::Phrase)?;
     let shares = split(&held, threshold, count, random)?;
-    Ok(BackupSplit { shares, held })
+    let original_last_word = if matches!(mode, Mode::SeedshiftLegacy | Mode::SeedshiftLegacyValid) {
+        crate::modes::seedshift::mask_legacy(phrase, dates)
+            .map_err(|error| SplitError::Mode(error.into()))?
+            .shifted
+            .as_slice()
+            .last()
+            .copied()
+    } else {
+        None
+    };
+    Ok(BackupSplit {
+        shares,
+        held,
+        original_last_word,
+    })
 }
 
 #[cfg(test)]
@@ -264,19 +286,22 @@ mod tests {
         let backup =
             split_backup(&phrase, Mode::Seedshift, &[date], 2, 2, &mut Counting(9)).unwrap();
         assert_ne!(backup.held.text().as_str(), phrase.text().as_str());
-        assert_eq!(
-            split_backup(
-                &phrase,
-                Mode::SeedshiftLegacy,
-                &[date],
-                2,
-                2,
-                &mut Counting(9)
-            )
-            .unwrap_err()
-            .code(),
-            "core.masking.split-modes-only"
-        );
+        assert_eq!(backup.original_last_word, None);
+        // Original Seedshift splits the phrase with a matching last word and names the original.
+        let legacy = split_backup(
+            &phrase,
+            Mode::SeedshiftLegacy,
+            &[date],
+            2,
+            2,
+            &mut Counting(9),
+        )
+        .unwrap();
+        assert!(Phrase::parse(legacy.held.text().as_str()).is_ok());
+        assert!(legacy.original_last_word.is_some());
+        // AUD-008-SEC003: neither the shares nor the word reach a Debug print.
+        assert_eq!(format!("{legacy:?}"), "[a backup split: redacted]");
+        assert_eq!(format!("{legacy:#?}"), "[a backup split: redacted]");
         let direct = split_backup(&phrase, Mode::Direct, &[], 2, 2, &mut Counting(9)).unwrap();
         assert_eq!(direct.held.text().as_str(), PUBLIC_MNEMONIC);
     }

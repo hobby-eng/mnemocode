@@ -68,9 +68,9 @@ pub(in crate::wasm) fn backup_abi_problems(
         let form = store.data_mut().add(Object::Text("english".to_owned()));
         let mode = store.data_mut().add(Object::Text("seedshift".to_owned()));
         instance
-            .get_typed_func::<(i32, i32, i32, i32, i32, i32), ()>(&store, "encodedbackup_encode")
+            .get_typed_func::<(i32, i32, i32, i32, i32), ()>(&store, "encodedbackup_encode")
             .map_err(wasm_error)?
-            .call(&mut store, (ret, phrase, dates, form, mode, 0))
+            .call(&mut store, (ret, phrase, dates, form, mode))
             .map_err(wasm_error)?;
         let at =
             usize::try_from(ret).map_err(|_| Failure("negative ABI return pointer".to_owned()))?;

@@ -7,6 +7,8 @@
 use miniz_oxide::inflate::decompress_slice_iter_to_slice;
 use mnemocode::secret::SecretBytes;
 
+use crate::printed::find;
+
 /// The most bytes a page's private data inflates to.
 const MOST_PRIVATE: usize = 1 << 20;
 
@@ -14,7 +16,11 @@ const MOST_PRIVATE: usize = 1 << 20;
 /// not as this writer writes it.
 #[must_use]
 pub fn private_data(pdf: &[u8], application: &str) -> Option<SecretBytes> {
-    let id = private_reference(pdf, application)?;
+    object_data(pdf, private_references(pdf, application).next()?)
+}
+
+/// The stream of the object `id` of `pdf`, inflated.
+fn object_data(pdf: &[u8], id: usize) -> Option<SecretBytes> {
     let object = find(pdf, format!("\n{id} 0 obj").as_bytes(), 0)?;
     let length_at = find(pdf, b"/Length", object)? + b"/Length".len();
     let length = leading_number(&pdf[length_at..])?;
@@ -39,8 +45,8 @@ pub fn private_data(pdf: &[u8], application: &str) -> Option<SecretBytes> {
 
 /// This writer emits one application dictionary inside each page's PieceInfo.
 /// A matching PDF structural name elsewhere is not an application key.
-fn private_reference(pdf: &[u8], application: &str) -> Option<usize> {
-    pdf.iter().enumerate().find_map(|(at, byte)| {
+fn private_references<'a>(pdf: &'a [u8], application: &'a str) -> impl Iterator<Item = usize> + 'a {
+    pdf.iter().enumerate().filter_map(move |(at, byte)| {
         if *byte != b'/' {
             return None;
         }
@@ -109,15 +115,6 @@ fn name_delimiter(byte: u8) -> bool {
             | b'/'
             | b'%'
     )
-}
-
-/// Where `needle` first stands in `haystack` from `from`.
-fn find(haystack: &[u8], needle: &[u8], from: usize) -> Option<usize> {
-    haystack
-        .get(from..)?
-        .windows(needle.len())
-        .position(|window| window == needle)
-        .map(|at| from + at)
 }
 
 /// The whole number that `bytes` start with, after white space.

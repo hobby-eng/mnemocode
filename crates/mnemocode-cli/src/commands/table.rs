@@ -63,12 +63,12 @@ impl Refusal for TableCommandError {
 /// One row: grey labels under the result's heading on a terminal, plain lines for a script.
 fn print_row(row: &Row) {
     let facts = [
-        ("Index", row.index.to_string()),
-        ("English", row.english.to_owned()),
-        ("Unicode hex", row.unicode_hex.clone()),
+        ("Word", row.english.to_owned()),
+        ("Number", row.index.to_string()),
+        ("Unicode code", row.unicode_hex.clone()),
     ];
     if terminal::can_redraw(Channel::Output) {
-        for line in terminal::result_lines(Channel::Output, "Word mapping", &facts) {
+        for line in terminal::result_lines(Channel::Output, "Word lookup", &facts) {
             result_line(&line);
         }
         return;

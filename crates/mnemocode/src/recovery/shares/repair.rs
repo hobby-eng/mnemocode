@@ -316,6 +316,12 @@ pub fn repaired(
         ShareRestoreOutcome::Trouble { message, lines } => {
             return Ok(ShareRepairOutcome::Trouble { message, lines });
         }
+        ShareRestoreOutcome::NoPhrase { refusal, lines } => {
+            return Ok(ShareRepairOutcome::Trouble {
+                message: refusal.to_string(),
+                lines,
+            });
+        }
         ShareRestoreOutcome::Question { question, lines } => {
             return Ok(ShareRepairOutcome::Question { question, lines });
         }

@@ -24,6 +24,7 @@ use mnemocode::recovery::shares::repair::{ShareRepairOutcome, repair_before_rest
 use mnemocode::recovery::shares::{
     SearchLimits, WALLET_CHECK_NEEDS_THRESHOLD, several_sets_note, variants_message,
 };
+use mnemocode::refusal::Refusal as _;
 use mnemocode::search::{Search, Step};
 use mnemocode::sskr::forms::ShareFormat;
 use mnemocode::sskr::joint::tries_per_second;
@@ -34,8 +35,8 @@ mod common;
 
 use common::{
     DECODE, SHARE_READER, TWELVE, code_and_message, date_list, fixed_seconds, form_named, items,
-    line_value, mode_named, number, optional, recorded_recovery as recorded, refused, repairs_list,
-    text, texts, wallet,
+    line_value, mode_named, number, optional, original_seedshift, recorded_recovery as recorded,
+    refused, repairs_list, text, texts, wallet,
 };
 
 /// The dates of the encoded backup that is checked again.
@@ -146,8 +147,7 @@ fn a_written_backup_is_checked_as_ts_checks_it() {
         mode: Mode::Seedshift,
         codes: masked.shifted.clone(),
         dates,
-    })
-    .expect("a check");
+    });
     assert_eq!(
         Form::English
             .codes(masked.shifted.as_slice())
@@ -221,6 +221,7 @@ fn request_of(entry: &Value) -> Result<ShareRestoreRequest, Value> {
             dates: entry["limits"]["dates"].as_u64(),
         },
         confirmed: entry["confirmed"].as_bool().unwrap_or(false),
+        last_word: None,
     })
 }
 
@@ -244,6 +245,9 @@ fn restored_value(outcome: &ShareRestoreOutcome) -> Value {
     match outcome {
         ShareRestoreOutcome::Trouble { message, lines } => json!({
             "kind": "trouble", "lines": lines_value(lines), "message": message, "question": null,
+        }),
+        ShareRestoreOutcome::NoPhrase { refusal, lines } => json!({
+            "kind": "trouble", "lines": lines_value(lines), "message": refusal.to_string(), "question": null,
         }),
         ShareRestoreOutcome::Few { message, lines } => json!({
             "kind": "few", "lines": lines_value(lines), "message": message, "question": null,
@@ -308,6 +312,10 @@ fn check_restored(found: &Value, entry: &Value) {
 fn shares_are_restored_in_the_steps_ts_takes() {
     let recorded = recorded();
     for entry in items(&recorded["restores"]) {
+        // TS made no Original Seedshift shares; 0.2.0's are checked where they are split.
+        if original_seedshift(entry) {
+            continue;
+        }
         let outcome = request_of(entry).and_then(restore_of);
         match outcome {
             Ok(outcome) => check_restored(&restored_value(&outcome), entry),
@@ -433,5 +441,99 @@ fn the_words_of_several_sets_are_as_ts_writes_them() {
         assert_eq!(several_sets_note(sets), text(&entry["note"]));
         assert_eq!(variants_message(sets, false), text(&entry["withoutWallet"]));
         assert_eq!(variants_message(sets, true), text(&entry["withWallet"]));
+    }
+}
+
+// AUD-008-SEC003: a restore request prints neither its shares, its dates nor its last word.
+#[test]
+fn a_restore_request_prints_as_redacted() {
+    let recorded = recorded();
+    let entry = items(&recorded["restores"])
+        .iter()
+        .find(|entry| entry.get("dates").is_some() && !original_seedshift(entry))
+        .expect("a restore with dates");
+    let mut request = request_of(entry).expect("a request");
+    request.last_word = Some(5);
+    assert_eq!(
+        format!("{request:?}"),
+        "[a share restore request: redacted]"
+    );
+    assert_eq!(
+        format!("{request:#?}"),
+        "[a share restore request: redacted]"
+    );
+}
+
+/// Randomness of one public byte, for shares of the public phrase.
+struct Filled;
+
+impl mnemocode::random::Random for Filled {
+    fn fill(&mut self, bytes: &mut [u8]) -> Result<(), mnemocode::random::RandomError> {
+        bytes.fill(7);
+        Ok(())
+    }
+}
+
+/// The restore of Original Seedshift shares of the public phrase, masked with 23-09-2026, given
+/// `last_word` and no wallet; and the word that the split named.
+fn original_seedshift_restore(last_word: impl Fn(u16) -> u16) -> (ShareRestoreOutcome, u16) {
+    let phrase = Phrase::parse(TWELVE).unwrap();
+    let date = mnemocode::dates::parse_date("23-09-2026").unwrap();
+    let split = mnemocode::sskr::split::split_backup(
+        &phrase,
+        Mode::SeedshiftLegacy,
+        &[date],
+        2,
+        3,
+        &mut Filled,
+    )
+    .unwrap();
+    let word = split.original_last_word.expect("the word to remember");
+    let texts: Vec<String> = split.shares[..2]
+        .iter()
+        .map(|share| share.ur().as_str().to_owned())
+        .collect();
+    let mut input = ShareInput::new(DECODE);
+    input.add(&texts).expect("shares");
+    let request = ShareRestoreRequest {
+        input,
+        mode: Mode::SeedshiftLegacy,
+        dates: Some(Rc::new(
+            DatesAnswer::parse("23-09-2026", None, true).unwrap(),
+        )),
+        wallet: None,
+        keep: None,
+        limits: SearchLimits {
+            shares: None,
+            dates: None,
+        },
+        confirmed: false,
+        last_word: Some(last_word(word)),
+    };
+    (restore_of(request).expect("a restore"), word)
+}
+
+// A last word that fits no phrase of Original Seedshift shares, without a wallet, says so with its
+// own code; the word the split named gives the phrase.
+#[test]
+fn original_seedshift_shares_tell_a_last_word_that_fits_no_phrase() {
+    // The other half of the word list: its high bits are not the shares' last word's.
+    let (outcome, _) = original_seedshift_restore(|word| word ^ 0x400);
+    match outcome {
+        ShareRestoreOutcome::NoPhrase { refusal, .. } => {
+            assert_eq!(
+                refusal.code(),
+                "core.share-restore.last-word-fits-no-phrase"
+            );
+        }
+        other => panic!("{other:?}"),
+    }
+    let (outcome, _) = original_seedshift_restore(|word| word);
+    match outcome {
+        ShareRestoreOutcome::Phrases { found, .. } => {
+            assert_eq!(found.phrases.len(), 1);
+            assert_eq!(found.phrases[0].unmasked.phrase.text().as_str(), TWELVE);
+        }
+        other => panic!("{other:?}"),
     }
 }

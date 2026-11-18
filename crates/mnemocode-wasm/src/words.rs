@@ -2,7 +2,6 @@
 //! set, and the words hinted below a phrase being typed. A word typed may be a word of a phrase, so
 //! it crosses as a `JsValue` that Rust reads (ARCHITECTURE.md §6). Nothing else here is secret.
 
-use mnemocode::bip39::phrase::{LastWordCandidate, legacy_valid_last_words};
 use mnemocode::bip39::table::{self, Format, Lookup, Row};
 use mnemocode::forms::hints::{BIP39, LineWordHints, WordHint, WordHints, codes_list};
 use mnemocode::pack;
@@ -86,48 +85,6 @@ impl Default for RecoverySet {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// The checksum-valid phrases that an exact legacy Seedshift phrase gives, one for each last word.
-#[wasm_bindgen]
-pub struct LegacyLastWords(Vec<LastWordCandidate>);
-
-#[wasm_bindgen]
-impl LegacyLastWords {
-    /// How many there are.
-    #[wasm_bindgen(getter)]
-    pub fn count(&self) -> usize {
-        self.0.len()
-    }
-
-    /// The phrase at `at`; none past the last.
-    pub fn phrase(&self, at: f64) -> Result<Option<String>, JsValue> {
-        after_secret(|| {
-            Ok(self
-                .0
-                .get(place(at))
-                .map(|candidate| candidate.phrase.text().as_str().to_owned()))
-        })
-    }
-
-    /// Whether the phrase at `at` keeps the entropy of the old last word.
-    #[wasm_bindgen(js_name = keepsEntropy)]
-    pub fn keeps_entropy(&self, at: f64) -> bool {
-        self.0
-            .get(place(at))
-            .is_some_and(|candidate| candidate.preserves_entropy)
-    }
-}
-
-/// The replacements of the last word of `phrase`, an exact legacy Seedshift phrase: the phrases, not
-/// wallets, as `recover-word --legacy-valid-last-word` lists them.
-#[wasm_bindgen(js_name = legacyLastWords)]
-pub fn legacy_last_words(phrase: JsValue) -> Result<LegacyLastWords, JsValue> {
-    after_secret(|| {
-        legacy_valid_last_words(&text(&phrase)?)
-            .map(LegacyLastWords)
-            .map_err(|refusal| refused(&refusal))
-    })
 }
 
 /// What shows below a line being typed, and what Tab adds to it.

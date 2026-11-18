@@ -14,6 +14,7 @@ pub mod palette;
 pub mod pdf;
 pub mod plan;
 pub mod preflight;
+pub mod printed;
 pub mod raster;
 pub mod scene;
 pub mod settings;

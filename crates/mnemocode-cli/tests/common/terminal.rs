@@ -102,16 +102,39 @@ impl Session {
         String::from_utf8_lossy(&seen).into_owned()
     }
 
-    /// Waits until the program writes `text`.
+    /// Waits until the program writes `text`, as a person sees it: its colours left out, unless
+    /// `text` names terminal sequences itself.
     pub(crate) fn wait_for(&mut self, text: &str) {
         let deadline = Instant::now() + PATIENCE;
         loop {
             let written = self.written();
-            if let Some(at) = written[self.from..].find(text) {
-                self.from += at + text.len();
+            if let Some(end) = shown_end(&written[self.from..], text) {
+                self.from += end;
                 return;
             }
             assert!(Instant::now() < deadline, "no {text:?} in {written:?}");
+            thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    /// Waits for the keys under a typed answer: "Press Esc to cancel", or "Esc menu" in a command
+    /// that the menu started.
+    pub(crate) fn wait_for_answer_keys(&mut self) {
+        let deadline = Instant::now() + PATIENCE;
+        loop {
+            let written = self.written();
+            let found = [" to cancel", " menu"]
+                .iter()
+                .filter_map(|text| written[self.from..].find(text).map(|at| at + text.len()))
+                .min();
+            if let Some(end) = found {
+                self.from += end;
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "no keys under an answer in {written:?}"
+            );
             thread::sleep(Duration::from_millis(10));
         }
     }
@@ -203,4 +226,55 @@ pub(crate) fn cleanup_failure(error: &std::io::Error) {
         std::io::stderr().lock(),
         "PTY test child cleanup failed: {error}"
     );
+}
+
+/// Where in `written` the first `text` ends, read without the colour sequences between its letters;
+/// a `text` with sequences of its own is looked for as written.
+fn shown_end(written: &str, text: &str) -> Option<usize> {
+    if text.is_empty() || text.contains('\x1b') {
+        return written.find(text).map(|at| at + text.len());
+    }
+    let bytes = written.as_bytes();
+    let mut shown = String::with_capacity(written.len());
+    // For each byte shown, where it ends in what was written.
+    let mut ends = Vec::with_capacity(written.len());
+    let mut chars = written.char_indices().peekable();
+    while let Some((at, character)) = chars.next() {
+        if character == '\x1b' && bytes.get(at + 1) == Some(&b'[') {
+            let colour = bytes[at + 2..]
+                .iter()
+                .position(|byte| !(byte.is_ascii_digit() || *byte == b';'))
+                .filter(|&length| bytes.get(at + 2 + length) == Some(&b'm'));
+            if let Some(length) = colour {
+                let after = at + 2 + length + 1;
+                while chars.next_if(|&(next, _)| next < after).is_some() {}
+                continue;
+            }
+        }
+        shown.push(character);
+        ends.extend(std::iter::repeat_n(
+            at + character.len_utf8(),
+            character.len_utf8(),
+        ));
+    }
+    let start = shown.find(text)?;
+    Some(ends[start + text.len() - 1])
+}
+
+/// The menu of `program` at the last question of a new color backup without Seedshift, shares or a
+/// sheet for heirs: where it is saved.
+pub(crate) fn at_where_a_color_backup_is_saved(program: &str) -> Session {
+    let mut session = Session::start(program, &[]);
+    session.wait_for("Choose an action");
+    for (key, next) in [
+        ("1", "Which form should the seed phrase take?"),
+        ("5", "Use Seedshift?"),
+        ("3", "Split it into Shamir shares?"),
+        ("1", "Instructions for your heirs?"),
+        ("1", "Where should the result be saved?"),
+    ] {
+        session.press(key);
+        session.wait_for(next);
+    }
+    session
 }

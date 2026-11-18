@@ -2,15 +2,15 @@
 
 use super::super::{CommandHelp, HelpGroup, HelpOption};
 use super::options::{
-    ASK_SECRETS, BACKUP_CHECK, CARD_LAYOUT, CARD_QR_2, CARDS_DIR_2, DATES, DATES_FILE, HEIR_SHEET,
-    HEIR_SHEET_SIZE, IMAGE_FORMAT_2, IMAGES_DIR, MNEMONIC, MNEMONIC_FILE, ORIENTATION, PAGE_SIZE,
-    QR_DIR, QR_HIDDEN, QR_TEXT, RUN_2, SHARES, TEMPLATE, THRESHOLD,
+    ASK_SECRETS, BACKUP_CHECK, CARD_LAYOUT, CARD_QR_2, CARD_QR_PNG, CARDS_DIR_2, DATES, DATES_FILE,
+    HEIR_SHEET, HEIR_SHEET_SIZE, IMAGE_FORMAT_2, IMAGES_DIR, MNEMONIC, MNEMONIC_FILE, ORIENTATION,
+    PAGE_SIZE, QR_DIR, QR_HIDDEN, QR_TEXT, RUN_2, SHARES, TEMPLATE, THRESHOLD,
 };
 
 const OWN_0_3: HelpOption = HelpOption {
     flag: "--mode",
     value: Some("MODE"),
-    summary: "direct or seedshift; see mnemocode help modes",
+    summary: "direct, seedshift or seedshift-legacy; see mnemocode help modes",
     details: &[
         "Without --mode, MnemoCode uses seedshift when --dates-file is given and direct otherwise.",
     ],
@@ -64,6 +64,7 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
                 &PAGE_SIZE,
                 &ORIENTATION,
                 &CARD_QR_2,
+                &CARD_QR_PNG,
                 &QR_HIDDEN,
                 &QR_TEXT,
                 &HEIR_SHEET,
@@ -78,7 +79,7 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
     ],
     asks: Some(&[
         ("Phrase", "English BIP39 words"),
-        ("Dates", "only with --mode seedshift"),
+        ("Dates", "only with a Seedshift mode"),
         (
             "Backup check",
             "whether to type the shares again from paper, unless --backup-check",

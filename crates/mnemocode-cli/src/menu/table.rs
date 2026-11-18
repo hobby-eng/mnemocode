@@ -17,9 +17,19 @@ const LOOKUP_LIMIT: usize = 64;
 pub(super) fn lookup_action(lookup: Lookup) -> Result<Action, Stop> {
     let numbers = format!("a number from {}", WORD_NUMBER_RANGE.to());
     let (question, label, what, option) = match lookup {
-        Lookup::Word => ("Word", "Word", "a word of the English BIP39 list", "--word"),
-        Lookup::Index => ("Word number", "Number", numbers.as_str(), "--index"),
-        Lookup::Unicode => ("Unicode code", "Code", UNICODE_CODE_HINT, "--unicode"),
+        Lookup::Word => (
+            "Enter a word",
+            "Word",
+            "a word of the English BIP39 list",
+            "--word",
+        ),
+        Lookup::Index => ("Enter a word number", "Number", numbers.as_str(), "--index"),
+        Lookup::Unicode => (
+            "Enter a Unicode code",
+            "Code",
+            UNICODE_CODE_HINT,
+            "--unicode",
+        ),
     };
     let how = LineQuestion {
         what: Some(what),

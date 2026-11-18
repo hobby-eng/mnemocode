@@ -115,7 +115,7 @@ fn share_ask<'h>(prompt: &str, what: &str, hints: &'h dyn crate::terminal::Hints
     Ask {
         text_file: Some(SHARE_FILE),
         // A pattern of a share gives its legend line, which holds the share.
-        pattern_pdf: true,
+        files: Some(super::card_files::answered_files),
         hints: Some(hints),
         pasted_line_break: Some(SHARE_SEPARATOR_BYTE),
         ..secret_ask(prompt, what, SHARE_SET_LIMIT)
@@ -143,15 +143,13 @@ fn shares_or_folder(
 }
 
 /// The shares of `answer`, each legend line of a pattern taken for the share it holds, checked as
-/// [`ShareInput::shares_of_answer`] checks them: alone, or `adding` them to those typed. A legend
-/// whose phrase is masked, or not, where `masked` says otherwise is refused.
+/// [`ShareInput::shares_of_answer`] checks them: alone, or `adding` them to those typed.
 fn shares_in(
     input: &ShareInput,
     answer: &str,
-    (adding, masked): (bool, Option<bool>),
+    (adding, _): (bool, Option<bool>),
 ) -> Result<Vec<String>, String> {
-    let legends =
-        super::stitch::shares_of_legends(answer, masked).map_err(|stop| stop.message())?;
+    let legends = super::stitch::shares_of_legends(answer).map_err(|stop| stop.message())?;
     let answer = legends.as_ref().map_or(answer, SecretText::as_str);
     input
         .shares_of_answer(answer, adding)
@@ -188,7 +186,7 @@ impl TypedShares {
     /// the restore finds it too few.
     pub(crate) fn starting_with(first: &FirstShare, masked: Option<bool>) -> Result<Self, Stop> {
         let mut shares = Self::new(masked);
-        let legends = super::stitch::shares_of_legends(first.text.as_str(), masked)?;
+        let legends = super::stitch::shares_of_legends(first.text.as_str())?;
         let first_text = legends.as_ref().unwrap_or(&first.text);
         let parts = shares.input.shares_of_answer(first_text.as_str(), false)?;
         shares.input.add(&parts)?;
@@ -209,24 +207,34 @@ impl TypedShares {
         let mut shares = Self::new(masked);
         shares.input.add(&values(parsed, "share"))?;
         for path in files {
-            // A pattern's PDF gives the legend line it keeps.
+            // Cards give the shares their files keep; a pattern's PDF the legend line it keeps.
             let pattern = match path {
                 "-" => None,
-                path => crate::input::pattern_legend(Path::new(path))?,
+                path => match super::card_files::card_codes(
+                    Path::new(path),
+                    super::card_files::Wanted::Shares,
+                    (
+                        crate::terminal::can_redraw(crate::terminal::Channel::Error),
+                        true,
+                    ),
+                )? {
+                    Some(codes) => Some(codes),
+                    None => crate::input::pattern_legend(Path::new(path))?,
+                },
             };
             let text = match pattern {
                 Some(line) => line,
                 None if path == "-" => read_input_text(path, "The text input", SHARE_SET_LIMIT)?,
                 None => read_input_path(Path::new(path), SHARE_FILE, SHARE_SET_LIMIT, false)?,
             };
-            let legends = super::stitch::shares_of_legends(text.as_str(), masked)?;
+            let legends = super::stitch::shares_of_legends(text.as_str())?;
             let text = legends.unwrap_or(text);
             let parts = shares.input.shares_of_text(&text, "The file holds")?;
             shares.input.add(&parts)?;
         }
         for path in values(parsed, "share-qr") {
             let text = read_qr_path(Path::new(path), false)?;
-            let legend = super::stitch::shares_of_legends(text.as_str(), masked)?;
+            let legend = super::stitch::shares_of_legends(text.as_str())?;
             shares
                 .input
                 .add(&[legend.as_ref().unwrap_or(&text).as_str()])?;
@@ -258,7 +266,7 @@ impl TypedShares {
     fn ask_all(&mut self) -> Result<(), Stop> {
         let hints = share_word_hints();
         let prompt = format!(
-            "Shamir shares, or the path of a file or folder ({}):",
+            "Enter the Shamir shares, or the path of a file or folder ({}):",
             share_answer_hint()
         );
         let ask = Ask {
@@ -294,7 +302,7 @@ impl TypedShares {
         self.from_qr = false;
         let hints = share_word_hints();
         let prompt = format!(
-            "More shares, or the path of a file or folder ({}):",
+            "Enter more shares, or the path of a file or folder ({}):",
             separator_hint()
         );
         let ask = Ask {
@@ -317,8 +325,37 @@ impl TypedShares {
             match answer {
                 SharesAnswer::Texts(texts) => return Ok(texts),
                 SharesAnswer::Folder(folder) => {
-                    if let Some(texts) = super::pattern_folder::folder_shares(&folder, masked)? {
-                        return Ok(texts);
+                    // Cards give the shares of the set the person chooses, read as typed ones are.
+                    let cards = super::card_files::card_codes(
+                        &folder,
+                        super::card_files::Wanted::Shares,
+                        (true, true),
+                    );
+                    match cards {
+                        Ok(Some(codes)) => match shares_in(input, codes.as_str(), (adding, masked))
+                        {
+                            Ok(texts) => return Ok(texts),
+                            Err(problem) => {
+                                crate::terminal::notice(
+                                    &problem,
+                                    crate::terminal::NoticeKind::Warning,
+                                );
+                            }
+                        },
+                        Ok(None) => crate::terminal::notice(
+                            &format!(
+                                "No share was found in {} or the folders inside it.",
+                                crate::output::shown_path(&folder.to_string_lossy())
+                            ),
+                            crate::terminal::NoticeKind::Warning,
+                        ),
+                        Err(Stop::Refused(refusal)) => {
+                            crate::terminal::notice(
+                                &refusal.to_string(),
+                                crate::terminal::NoticeKind::Warning,
+                            );
+                        }
+                        Err(stop) => return Err(stop),
                     }
                 }
             }
@@ -334,7 +371,7 @@ impl TypedShares {
             }
             let input = &self.input;
             let texts = value_until(
-                "QR code file name:",
+                "Enter the QR code file name:",
                 "the name of the QR code image of a share",
                 PATH_LIMIT,
                 None,
@@ -379,7 +416,7 @@ impl TypedShares {
         if let Some(share) = self.input.list().last() {
             // An image may hold any text: it is shown without its control characters.
             status(
-                &format!("Share {}, from its QR code:", share.place),
+                &format!("Enter share {} from its QR code:", share.place),
                 &printable(share.text.as_str()),
                 true,
             );
@@ -400,7 +437,7 @@ impl TypedShares {
                 }
             }
             let hints = share_word_hints();
-            let prompt = format!("Share {place} again, or its text file path:");
+            let prompt = format!("Enter share {place} again, or the path of its text file:");
             let what = format!("share {place} or its text file path");
             let ask = Ask {
                 pasted_line_break: None,

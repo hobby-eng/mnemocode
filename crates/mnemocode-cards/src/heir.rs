@@ -680,7 +680,6 @@ fn backup_words(backup: HeirBackup, mode: Mode) -> Result<BackupWords, HeirError
             if !is_recorded_quorum(threshold, count) {
                 return Err(HeirError::Quorum);
             }
-            mode.check_split()?;
             Ok(BackupWords {
                 needs: vec![format!(
                     "Any {threshold} of the {count} cross-stitch patterns in DMC threads; the table of each one's threads, the floss key, holds a Shamir share in its rows' symbols and stitch counts."
@@ -702,7 +701,6 @@ fn backup_words(backup: HeirBackup, mode: Mode) -> Result<BackupWords, HeirError
             if codes == Some(0) {
                 return Err(HeirError::Codes);
             }
-            mode.check_split()?;
             let mut needs = vec![format!(
                 "Any {threshold} of the {count} Shamir shares, written as {}.",
                 share_look(format)
@@ -881,6 +879,10 @@ fn hint_note(facts: &HeirSheetFacts) -> String {
     )
 }
 
+/// What an heir of an Original Seedshift backup needs besides the dates: its codes leave the last
+/// word open, and two seed phrases may come out without it.
+const LAST_WORD_NEED: &str = "The last word the owner was asked to remember when the backup was made. Without it, two seed phrases may come out; the wallet shows which one is the owner's.";
+
 /// The words of the sheet for `facts` through `route`. Refuses facts that would print a wrong
 /// sheet, and words of the route that would print its address twice, or another address.
 pub fn heir_sheet_text(
@@ -892,7 +894,6 @@ pub fn heir_sheet_text(
         mode,
         dates,
     } = facts;
-    mode.check_heir_sheet()?;
     let words = backup_words(backup, mode)?;
     mode.check_date_count(dates, false, DateWords::Codes)?;
     let masked = mode.masked();
@@ -929,6 +930,9 @@ pub fn heir_sheet_text(
             "The owner's {count} secret dates (see the back). They are written nowhere; the hint may lead to them."
         ),
     });
+    if mode.gives_several() || mode == Mode::SeedshiftLegacy {
+        needs.push(LAST_WORD_NEED.to_owned());
+    }
     let mut trouble = vec![
         "An error usually means a mistyped code or word: check each one against the paper."
             .to_owned(),

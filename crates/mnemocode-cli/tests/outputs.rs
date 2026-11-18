@@ -183,7 +183,10 @@ fn a_file_option_reads_the_file_it_names() {
 #[test]
 fn the_image_beside_a_sheet_is_named_as_a_path_is_written() {
     let folder = folder("qr-name");
-    let said = saved(&folder, &encode(&["--pdf", "./c.pdf", "--card-qr"]));
+    let said = saved(
+        &folder,
+        &encode(&["--pdf", "./c.pdf", "--card-qr", "--card-qr-png"]),
+    );
     assert!(
         said.contains(&format!(
             "Saved the QR code of the sheet as an image: {}",

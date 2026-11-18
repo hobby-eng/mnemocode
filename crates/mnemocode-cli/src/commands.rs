@@ -6,6 +6,7 @@ pub(crate) mod asking;
 mod backup_check;
 pub(crate) mod backup_questions;
 pub(crate) mod candidates_file;
+pub(crate) mod card_files;
 pub(crate) mod card_questions;
 mod cards;
 mod configure;
@@ -22,7 +23,7 @@ mod marked_search;
 pub(crate) mod menu_entries;
 mod new_backup;
 pub(crate) mod output_questions;
-mod pattern_folder;
+pub(crate) mod pattern_folder;
 pub(crate) mod pattern_questions;
 pub(crate) mod preview;
 pub(crate) mod re_encode;
@@ -235,6 +236,10 @@ pub(crate) fn check_options(command: &Command, parsed: &Parsed) -> Result<(), St
     let mut options: Vec<&str> = command.options.iter().copied().flatten().copied().collect();
     if matches!(command.name, "encode" | "re-encode") {
         options.extend(BACKUP_OPTIONS.iter().copied().flatten().copied());
+    }
+    // Re-encode takes its phrase from the old backup, never typed or read from a file.
+    if command.name == "re-encode" {
+        options.retain(|&option| !matches!(option, "mnemonic" | "mnemonic-file"));
     }
     args::assert_allowed(parsed, command.name, &options)?;
     if matches!(command.name, "encode" | "stitch") {

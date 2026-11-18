@@ -51,7 +51,7 @@ pub(crate) const COPY_OPTIONS: [&str; 5] = [
     "card-reference-label",
 ];
 /// What a command that saves cards takes beside its own.
-pub(crate) const CARD_OPTIONS: [&str; 21] = [
+pub(crate) const CARD_OPTIONS: [&str; 22] = [
     "qr-hidden",
     "qr-text",
     "cards-dir",
@@ -73,6 +73,7 @@ pub(crate) const CARD_OPTIONS: [&str; 21] = [
     "card-footer",
     "card-reference-label",
     "card-qr",
+    "card-qr-png",
 ];
 /// The options that say how cards are printed.
 pub(crate) const BUSINESS_OPTIONS: [&str; 15] = [
@@ -203,7 +204,12 @@ pub(crate) fn card_settings(
         orientation: Orientation::parse(value(parsed, "orientation"))?,
         profile: details.profile,
         presentation: Some(details.presentation),
-        card_qr: is_on(parsed, "card-qr") || is_on(parsed, "qr-hidden"),
+        // --qr-hidden alone puts the hidden code on the sheets; beside an image of its own, the
+        // sheets print one only with --card-qr.
+        card_qr: is_on(parsed, "card-qr")
+            || (is_on(parsed, "qr-hidden")
+                && value(parsed, "qr").is_none()
+                && value(parsed, "qr-dir").is_none()),
         hidden_qr: is_on(parsed, "qr-hidden"),
     })
 }
@@ -214,7 +220,7 @@ pub(crate) fn card_template(parsed: &Parsed) -> Result<&'static CardTemplate, St
 }
 
 /// The settings of a card output, which it must use.
-pub(crate) const ENCODE_CARD_SETTINGS: [&str; 17] = [
+pub(crate) const ENCODE_CARD_SETTINGS: [&str; 18] = [
     "template",
     "title",
     "page-size",
@@ -232,6 +238,7 @@ pub(crate) const ENCODE_CARD_SETTINGS: [&str; 17] = [
     "card-footer",
     "card-reference-label",
     "card-qr",
+    "card-qr-png",
 ];
 
 /// Refuses card options that cannot draw cards of codes in `form`, before a secret is asked.
@@ -624,10 +631,7 @@ fn normalised(path: &Path) -> PathBuf {
 /// Saves the QR image of `payload` at the first free name from `path`, as every result is saved.
 fn save_qr_at(payload: &str, path: &Path, contact: Option<&str>) -> Result<Option<String>, Stop> {
     let free = first_free_name(&normalised(path).to_string_lossy())?;
-    let image = match contact {
-        Some(text) => mnemocode::qr::hidden::png(text, payload)?,
-        None => mnemocode::qr::png(payload)?,
-    };
+    let image = mnemocode::qr::hidden::png_behind(contact, payload)?;
     let mut output = Parsed::new();
     output.insert("qr".to_owned(), Given::One(free));
     let saved_at = save_output(

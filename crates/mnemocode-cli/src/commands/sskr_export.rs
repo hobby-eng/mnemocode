@@ -36,10 +36,11 @@ use crate::args::{Parsed, REPEATABLE_OPTIONS, assert_single_values, value};
 use crate::gate::Stop;
 use crate::output::report_renamed;
 use crate::terminal::result::{print, result_header};
-use crate::terminal::{Channel, Choice, NoticeKind, clear_private_screen, hint, notice};
+use crate::terminal::{Channel, Choice, NoticeKind, clear_private_screen, notice};
 
 /// The options `sskr-export` takes, its card options apart.
-pub(crate) const OPTIONS: [&str; 13] = [
+pub(crate) const OPTIONS: [&str; 14] = [
+    "last-word-file",
     "mode",
     "date",
     "dates-file",
@@ -293,7 +294,9 @@ fn show_variants(
         &variants_message(all.len(), wallet_given),
         NoticeKind::Warning,
     );
-    hint("Each fingerprint is that of the phrase the shares hold, with an empty passphrase.");
+    crate::terminal::result_hint(
+        "Each fingerprint is that of the phrase the shares hold, with an empty passphrase.",
+    );
     let total = places.iter().copied().max().unwrap_or(0);
     for (index, variant) in all.iter().enumerate() {
         let title = format!("Variant {} of {}", index + 1, all.len());

@@ -5,8 +5,9 @@
 // Test code throughout, so that clippy's allow-*-in-tests keys cover the helpers too.
 #![cfg(test)]
 
+use mnemocode::backup::Backup;
 use mnemocode::bip39::phrase::Phrase;
-use mnemocode::dates::parse_date;
+use mnemocode::dates::{Date, parse_date};
 use mnemocode::forms::Form;
 use mnemocode::forms::hints::{WordHint, WordHints};
 use mnemocode::modes::Mode;
@@ -34,7 +35,10 @@ use serde_json::{Map, Value, json};
 
 mod common;
 
-use common::{close, items, line_value, optional, refused, repairs_list, text, texts};
+use common::{
+    close, items, line_value, mode_named, optional, original_seedshift, refused, repairs_list,
+    text, texts,
+};
 
 const RECORDED: &str = include_str!("../../../vectors/ts-0.1.0/shares-v1.json");
 const RECORDED_REPAIR: &str = include_str!("../../../vectors/ts-0.1.0/share-repair-v1.json");
@@ -733,15 +737,47 @@ impl Random for Filled {
     }
 }
 
+/// TS refused to split the Original Seedshift; 0.2.0 splits its phrase with a matching last word,
+/// which the word Encode named turns back into the seed phrase.
+fn original_seedshift_split(phrase: &Phrase, dates: &[Date], threshold: usize, count: usize) {
+    let split = split_backup(
+        phrase,
+        Mode::SeedshiftLegacy,
+        dates,
+        threshold,
+        count,
+        &mut Filled,
+    )
+    .unwrap();
+    assert_eq!(split.shares.len(), count);
+    assert_ne!(split.held.text().as_str(), phrase.text().as_str());
+    let word = split.original_last_word.expect("the original last word");
+    let backup = Backup::read(
+        split.held.text().as_str(),
+        Form::English,
+        Mode::SeedshiftLegacy,
+    )
+    .unwrap();
+    let found = backup.decode_with_last_word(dates, word).unwrap();
+    let original: Vec<u16> = (0..phrase.len())
+        .map(|place| u16::try_from(phrase.index(place).unwrap()).unwrap())
+        .collect();
+    assert_eq!(found.recovered.as_slice(), original.as_slice());
+}
+
 #[test]
 fn backups_are_split_and_refused_as_ts_does() {
     let recorded = recorded();
     let phrase = Phrase::parse(mnemocode::self_check::vectors::PUBLIC_MNEMONIC).unwrap();
     for entry in items(&recorded["splits"]) {
-        let mode = Mode::named(text(&entry["mode"])).unwrap();
+        let mode = mode_named(text(&entry["mode"]));
         let date = parse_date(mnemocode::self_check::vectors::MASKED_DATE).unwrap();
         let dates = vec![date; number(&entry["dates"])];
         let (threshold, count) = (number(&entry["threshold"]), number(&entry["count"]));
+        if original_seedshift(entry) {
+            original_seedshift_split(&phrase, &dates, threshold, count);
+            continue;
+        }
         let outcome = match split_backup(&phrase, mode, &dates, threshold, count, &mut Filled) {
             Ok(split) => json!({
                 "count": split.shares.len(),

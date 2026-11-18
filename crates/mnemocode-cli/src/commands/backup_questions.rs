@@ -46,30 +46,46 @@ pub(crate) const ENCODED_SEEDSHIFT_QUESTION: &str = "Was Seedshift used when it 
 /// The question for shares, whose phrase may have been masked before it was split.
 pub(crate) const SHARE_SEEDSHIFT_QUESTION: &str = "Was Seedshift used before it was split?";
 
-/// Its answers: shares take only MnemoCode Seedshift, so there is nothing more to choose.
-pub(crate) fn share_seedshift_choices() -> [Choice<Mode>; 2] {
+/// Its answers: no Seedshift, or which one.
+pub(crate) fn share_seedshift_choices() -> [Choice<Mode>; 3] {
     [
-        Choice::new("No", Mode::Direct),
+        Choice::noted("No", "the shares hold the seed phrase itself", Mode::Direct),
         Choice::noted(
-            "Yes",
+            "MnemoCode Seedshift",
             "the dates are asked after the shares",
             Mode::Seedshift,
+        ),
+        Choice::noted(
+            "Original Seedshift",
+            "the dates and the word to remember are asked after the shares",
+            Mode::SeedshiftLegacy,
         ),
     ]
 }
 
 /// The answer of a share's question for `mode`, as the sheet for heirs names it.
 pub(crate) fn share_seedshift_label(mode: Mode) -> &'static str {
-    if mode.masked() { "Yes" } else { "No" }
+    encoded_seedshift_label(mode)
 }
 
 /// The answer of the question of codes that name no mode for `mode`, as the sheet names it.
 pub(crate) fn encoded_seedshift_label(mode: Mode) -> &'static str {
     match mode {
         Mode::Seedshift => "MnemoCode Seedshift",
-        Mode::SeedshiftLegacy => "Original Seedshift",
-        _ => "No",
+        Mode::SeedshiftLegacy | Mode::SeedshiftLegacyValid => "Original Seedshift",
+        Mode::Direct => "No",
     }
+}
+
+/// The Seedshift fact of a result, in the words of the questions: which Seedshift masks the phrase,
+/// or none.
+pub(crate) fn seedshift_fact(mode: Mode) -> (&'static str, String) {
+    let used = match mode {
+        Mode::Direct => "not used",
+        Mode::Seedshift => "MnemoCode Seedshift",
+        Mode::SeedshiftLegacy | Mode::SeedshiftLegacyValid => "Original Seedshift",
+    };
+    ("Seedshift", used.to_owned())
 }
 
 /// Which Seedshift masked them: both as a question offers them.
@@ -82,7 +98,7 @@ pub(crate) fn seedshift_choices() -> Vec<Choice<Mode>> {
         ),
         Choice::noted(
             "Original Seedshift",
-            "as the original program; checksum usually fails",
+            "as the original program; one more word to remember",
             Mode::SeedshiftLegacy,
         ),
     ]
@@ -165,8 +181,8 @@ impl SourceKind {
     }
     const fn question(self) -> &'static str {
         match self {
-            Self::Qr => "QR code file name:",
-            Self::Record | Self::Typed => "Record file name:",
+            Self::Qr => "Enter the QR code file name:",
+            Self::Record | Self::Typed => "Enter the record file name:",
         }
     }
     fn file_option(self) -> Option<&'static str> {
@@ -176,12 +192,16 @@ impl SourceKind {
     }
 }
 
-/// The options for typing after a file: remove every file-source selector.
+/// The options for typing after a file: every file-source selector removed, and with them the
+/// word count and the kind of file, which told how many of the cards' codes are the phrase's and
+/// what a folder was searched for: codes typed are read whole (AUD-008-FUN004).
 pub(crate) fn typed_after_file(parsed: &Parsed) -> Parsed {
     let mut typed = parsed.clone();
     for (key, _) in FILE_SOURCES {
         typed.remove(key);
     }
+    typed.remove("words");
+    typed.remove("find");
     typed
 }
 
@@ -229,6 +249,8 @@ impl BackupSource<'_> {
 
     /// The text of the next attempt; `problem`, shown first, is why the last could not be used.
     fn next(&mut self, problem: Option<String>) -> Result<SecretText, Stop> {
+        // The words said for cards read before belong to them, not to this attempt.
+        super::card_files::forget_chosen_words();
         if self.kind == SourceKind::Typed {
             return self.ask_typed(problem);
         }
@@ -270,14 +292,14 @@ impl BackupSource<'_> {
         let ask = Ask {
             hints: Some(&hints),
             text_file: Some(ENCODED_INPUT_FILE),
-            pattern_pdf: true,
+            files: Some(super::card_files::answered_files),
             pasted_line_break: Some(if self.shares {
                 SHARE_SEPARATOR_BYTE
             } else {
                 b' '
             }),
             ..secret_ask(
-                "Encoded seed phrase, record or text file path:",
+                "Enter the encoded seed phrase, a record or the path of a text file:",
                 "the encoded seed phrase or its record",
                 self.limit(),
             )
@@ -467,6 +489,33 @@ fn again_of<T>(result: Result<T, Stop>) -> Result<Result<T, Again>, Stop> {
     }
 }
 
+/// What follows codes that lack the checksum of their mode.
+#[derive(Clone, Copy)]
+enum AfterChecksum {
+    /// They were masked with the Original Seedshift.
+    Legacy,
+    /// The phrase has another length: fewer or more of the codes are its own.
+    Length,
+    /// Another file, or the codes typed again.
+    Again,
+}
+
+/// How many words the phrase has, asked after codes of `words` words lacked their checksum; none
+/// for back.
+fn ask_other_length(words: usize) -> Result<Option<usize>, Stop> {
+    let choices: Vec<Choice<usize>> = mnemocode::bip39::sizes::WORD_COUNTS
+        .into_iter()
+        .filter(|&count| count != words)
+        .map(|count| Choice::new(&super::menu_entries::phrase_words_answer(count), count))
+        .collect();
+    super::asking::ask_list(
+        super::menu_entries::PHRASE_WORDS_QUESTION,
+        "Words",
+        &choices,
+        None,
+    )
+}
+
 fn checked_backup(
     text: &str,
     question: BackupQuestion<'_>,
@@ -483,53 +532,75 @@ fn checked_backup(
             Ok(Some(Offered::Codes) | None) => {}
         }
     }
-    let read = phrase_words(question.parsed).and_then(|words| {
-        let rules = ReadingRules {
-            seedshift_only: question.seedshift_only,
-            share_reader: SHARE_READER,
-            words,
+    // A length chosen after codes of cards lacked their checksum, in place of --words.
+    let mut length = None;
+    loop {
+        let read = phrase_words(question.parsed).and_then(|given| {
+            let rules = ReadingRules {
+                seedshift_only: question.seedshift_only,
+                share_reader: SHARE_READER,
+                words: length.or(given),
+            };
+            Ok(BackupReading::of(text, rules)?)
+        });
+        let reading = match again_of(read)? {
+            Ok(reading) => reading,
+            Err(again) => return Ok(Err(again)),
         };
-        Ok(BackupReading::of(text, rules)?)
-    });
-    let reading = match again_of(read)? {
-        Ok(reading) => reading,
-        Err(again) => return Ok(Err(again)),
-    };
-    let Some(settled) = settled_mode(&reading, question, source)? else {
-        return Ok(Err(Again(None)));
-    };
-    if reading.marked() {
-        return marked_backup(&reading, settled, question, source);
-    }
-    let read = codes_and_mode(&reading, settled, question, source, false, |form| {
-        Ok(reading.codes(form)?)
-    })?;
-    let (codes, mode) = match read {
-        Ok(read) => read,
-        Err(again) => return Ok(Err(again)),
-    };
-    let recorded = reading.mode(None);
-    match codes.with_mode(mode) {
-        Ok(backup) => Ok(Ok(ReadBackup::Codes(backup, recorded))),
-        Err(error @ BackupError::Mode(ModeError::MissingChecksum(_))) => {
-            let legacy = after_failure(
-                &error.to_string(),
-                &[
-                    Choice::new("It was the Original Seedshift", true),
-                    source.again_choice(false),
-                ],
-                AfterFailure {
-                    escape: "asks again",
-                    ..AfterFailure::default()
-                },
-            )?;
-            if !legacy {
-                return Ok(Err(Again(None)));
-            }
-            let backup = codes.with_mode(Mode::SeedshiftLegacy)?;
-            Ok(Ok(ReadBackup::Codes(backup, recorded)))
+        let Some(settled) = settled_mode(&reading, question, source)? else {
+            return Ok(Err(Again(None)));
+        };
+        if reading.marked() {
+            return marked_backup(&reading, settled, question, source);
         }
-        Err(error) => Err(error.into()),
+        let read = codes_and_mode(&reading, settled, question, source, false, |form| {
+            Ok(reading.codes(form)?)
+        })?;
+        let (codes, mode) = match read {
+            Ok(read) => read,
+            Err(again) => return Ok(Err(again)),
+        };
+        let recorded = reading.mode(None);
+        match codes.with_mode(mode) {
+            Ok(backup) => return Ok(Ok(ReadBackup::Codes(backup, recorded))),
+            Err(error @ BackupError::Mode(ModeError::MissingChecksum(_))) => {
+                // Codes of cards end with decoys: with another length, other codes are the phrase's,
+                // whether or not a length was given.
+                let words = length.or(phrase_words(question.parsed)?);
+                let mut choices = vec![Choice::new(
+                    "It was the Original Seedshift",
+                    AfterChecksum::Legacy,
+                )];
+                choices.push(Choice::noted(
+                    "Another seed phrase length",
+                    "12, 15, 18, 21 or 24 words",
+                    AfterChecksum::Length,
+                ));
+                choices.push(source.again_choice(AfterChecksum::Again));
+                let next = after_failure(
+                    &error.to_string(),
+                    &choices,
+                    AfterFailure {
+                        escape: "asks again",
+                        ..AfterFailure::default()
+                    },
+                )?;
+                match (next, words) {
+                    (AfterChecksum::Legacy, _) => {
+                        let backup = codes.with_mode(Mode::SeedshiftLegacy)?;
+                        return Ok(Ok(ReadBackup::Codes(backup, recorded)));
+                    }
+                    (AfterChecksum::Length, words) => {
+                        // Back from the lengths: the same choice again.
+                        if let Some(chosen) = ask_other_length(words.unwrap_or(0))? {
+                            length = Some(chosen);
+                        }
+                    }
+                    (AfterChecksum::Again, _) => return Ok(Err(Again(None))),
+                }
+            }
+            Err(error) => return Err(error.into()),
+        }
     }
 }
 
@@ -622,7 +693,7 @@ fn asked_mode(seedshift_only: bool) -> Result<Option<Mode>, Stop> {
     } else {
         keep_context(
             notice_lines(
-                "These codes have no MNC1 record header, so they do not say how they were made.",
+                "Whether Seedshift was used is not written in the backup: only you know it.",
                 NoticeKind::Info,
             ),
             Lifetime::Question,
@@ -695,11 +766,14 @@ mod source_tests {
         for (key, expected) in FILE_SOURCES {
             let mut parsed = Parsed::new();
             parsed.insert(key.to_owned(), Given::One("public-fixture".to_owned()));
+            // The word count said for the cards of the file does not cut the codes typed after it.
+            parsed.insert("words".to_owned(), Given::One("12".to_owned()));
             assert_eq!(SourceKind::of(&parsed), expected);
             assert!(from_file(&parsed));
             let typed = typed_after_file(&parsed);
             assert_eq!(SourceKind::of(&typed), SourceKind::Typed);
             assert!(!from_file(&typed));
+            assert!(!typed.contains_key("words"));
         }
     }
 }

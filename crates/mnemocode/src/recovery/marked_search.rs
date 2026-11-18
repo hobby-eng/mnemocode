@@ -112,8 +112,6 @@ pub enum MarkedSearchError {
     ListOverflow(&'static str),
     /// A list of more candidates than it holds.
     TooManyToList(String),
-    /// Codes that keep no checksum, whose encoded fingerprint tells nothing.
-    NoChecksum,
     /// What the date search refuses.
     Dates(DateSearchError),
     /// What the backup refuses.
@@ -139,9 +137,6 @@ impl fmt::Display for MarkedSearchError {
                 "More than {MAX_LISTED} {rows} fit these codes and dates. Narrow the codes or use a wallet check instead of listing them."
             ),
             Self::TooManyToList(message) => f.write_str(message),
-            Self::NoChecksum => f.write_str(
-                "These codes keep no checksum, so their encoded fingerprint cannot tell them.",
-            ),
             Self::Dates(error) => error.fmt(f),
             Self::Backup(error) => error.fmt(f),
             Self::Mode(error) => error.fmt(f),
@@ -163,7 +158,6 @@ impl Refusal for MarkedSearchError {
             Self::NotMasked => "core.missing-codes-search.codes-were-not-masked-no-dates-search",
             Self::ListOverflow(_) => LIST_OVERFLOW,
             Self::TooManyToList(_) => "core.missing-codes-search.operation-refused",
-            Self::NoChecksum => "core.missing-codes-search.codes-keep-no-checksum",
             Self::Dates(error) => error.code(),
             Self::Backup(error) => error.code(),
             Self::Mode(error) => error.code(),
@@ -250,7 +244,6 @@ fn too_many_to_list(codes: &MissingCodes) -> Result<String, ModeError> {
 /// Why `way` cannot tell `codes`; none where it can.
 fn refusal_of(way: Way, codes: &MissingCodes) -> Result<Option<MarkedSearchError>, ModeError> {
     Ok(match way {
-        Way::Encoded if !codes.checksummed() => Some(MarkedSearchError::NoChecksum),
         Way::List if !list_holds(codes)? => {
             Some(MarkedSearchError::TooManyToList(too_many_to_list(codes)?))
         }

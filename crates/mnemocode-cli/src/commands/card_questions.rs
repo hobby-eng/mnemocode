@@ -43,11 +43,7 @@ pub(crate) fn ask_design(with_every: bool, separate: bool) -> Result<Option<Stri
     }
     for template in CARD_TEMPLATES {
         if !separate || template.draws_separate_cards() {
-            designs.push(Choice::noted(
-                &template.name(),
-                template.id,
-                template.id.to_owned(),
-            ));
+            designs.push(Choice::new(&template.name(), template.id.to_owned()));
         }
     }
     ask_list("Which card design?", "Design", &designs, None)
@@ -76,6 +72,15 @@ enum FileKind {
 }
 
 impl FileKind {
+    /// Its name where a QR code goes into the cards: "PDF", "JPEG" or "PNG cards".
+    const fn cards_word(self) -> &'static str {
+        match self {
+            Self::Pdf => "PDF",
+            Self::Png => "PNG cards",
+            Self::Jpg => "JPEG",
+        }
+    }
+
     /// Its value of --image-format; none for the PDF.
     const fn image(self) -> Option<&'static str> {
         match self {
@@ -124,6 +129,7 @@ fn ask_sheet_turn() -> Result<Option<Vec<String>>, Stop> {
 struct CardFiles {
     options: Vec<String>,
     sheets: bool,
+    kind: FileKind,
 }
 
 /// How the cards are saved, in files named after `base`: first the kind of file, then the layout.
@@ -182,6 +188,7 @@ fn ask_card_files(base: &str, shares: bool) -> Result<Option<CardFiles>, Stop> {
         return Ok(Some(CardFiles {
             options,
             sheets: false,
+            kind,
         }));
     };
     // Sheets only: a separate card has the shape of a business card.
@@ -195,7 +202,15 @@ fn ask_card_files(base: &str, shares: bool) -> Result<Option<CardFiles>, Stop> {
     }
     size_options.extend(turn);
     let mut options = Vec::new();
-    if kind == FileKind::Pdf {
+    if shares {
+        // Each share in files of its own, a PDF or the images of its sheet, kept apart.
+        let Some(folder) = new_folder(base)? else {
+            return Ok(None);
+        };
+        options.extend(["--cards-dir".to_owned(), folder]);
+        options.extend(["--card-layout".to_owned(), "collection".to_owned()]);
+        options.extend(image);
+    } else if kind == FileKind::Pdf {
         let path = output_file(&format!("{base}.pdf"))?;
         let Some(path) = path else {
             return Ok(None);
@@ -212,6 +227,7 @@ fn ask_card_files(base: &str, shares: bool) -> Result<Option<CardFiles>, Stop> {
     Ok(Some(CardFiles {
         options,
         sheets: true,
+        kind,
     }))
 }
 
@@ -226,13 +242,13 @@ fn refuse_option_like(answer: &str) -> Result<(), String> {
 /// The question of each detail of the person on the cards.
 const fn person_question(field: ProfileField) -> &'static str {
     match field {
-        ProfileField::Name => "Name, in Latin letters",
-        ProfileField::Role => "Role",
-        ProfileField::Company => "Company",
-        ProfileField::Email => "Email",
-        ProfileField::Phone => "Phone",
-        ProfileField::Website => "Website",
-        ProfileField::Location => "Location",
+        ProfileField::Name => "Enter the name, in Latin letters",
+        ProfileField::Role => "Enter the role",
+        ProfileField::Company => "Enter the company",
+        ProfileField::Email => "Enter the email",
+        ProfileField::Phone => "Enter the phone",
+        ProfileField::Website => "Enter the website",
+        ProfileField::Location => "Enter the location",
     }
 }
 
@@ -331,23 +347,29 @@ fn ask_details_once(sheets: bool, warning: Option<&str>) -> Result<Option<Vec<St
                 studio_name: Some(text),
                 ..CardCopy::default()
             }),
-            ("card-slogan", "Slogan", "Slogan", |text| CardCopy {
-                slogan: Some(text),
-                ..CardCopy::default()
+            ("card-slogan", "Enter the slogan", "Slogan", |text| {
+                CardCopy {
+                    slogan: Some(text),
+                    ..CardCopy::default()
+                }
             }),
-            ("card-subtitle", "Subtitle", "Subtitle", |text| CardCopy {
-                subtitle: Some(text),
-                ..CardCopy::default()
+            ("card-subtitle", "Enter the subtitle", "Subtitle", |text| {
+                CardCopy {
+                    subtitle: Some(text),
+                    ..CardCopy::default()
+                }
             }),
-            ("card-footer", "Footer", "Footer", |text| CardCopy {
-                footer: Some(text),
-                ..CardCopy::default()
+            ("card-footer", "Enter the footer", "Footer", |text| {
+                CardCopy {
+                    footer: Some(text),
+                    ..CardCopy::default()
+                }
             }),
         ]
     } else {
         vec![(
             "card-reference-label",
-            "Label before each code",
+            "Enter the label before each code",
             "Reference",
             |text| CardCopy {
                 reference_label: Some(text),
@@ -393,14 +415,14 @@ fn ask_card_details(
     }
 }
 
-/// Printable cards: how the cards are saved in files named after `base`, the design, a QR code on
-/// each sheet, and the details on them, which `fit` checks as the command will. Separate business
-/// cards never carry a QR code. `shares`: the cards of Shamir shares, one set per share.
-/// `qr_hidden`: how a QR code image chosen already shows its data, which the sheets' follows.
+/// Printable cards: how the cards are saved in files named after `base`, the design, then `qr`, the
+/// QR code's question, told the name of the cards' files where they are sheets that can carry one,
+/// and the details on them, which `fit` checks as the command will. Separate business cards never carry a QR code.
+/// `shares`: the cards of Shamir shares, one set per share.
 pub(crate) fn ask_cards(
     base: &str,
     shares: bool,
-    qr_hidden: Option<bool>,
+    qr: &mut dyn FnMut(Option<&'static str>) -> Result<Option<Vec<String>>, Stop>,
     fit: &dyn Fn(&[String]) -> Result<(), Stop>,
 ) -> Result<Option<Vec<String>>, Stop> {
     let Some(files) = ask_card_files(base, shares)? else {
@@ -409,56 +431,12 @@ pub(crate) fn ask_cards(
     let Some(design) = ask_design(false, !files.sheets)? else {
         return Ok(None);
     };
-    let qr = if let (true, Some(hidden)) = (files.sheets, qr_hidden) {
-        // The QR code image settled how a QR code shows its data: the sheets carry the same.
-        let same = if hidden {
-            "the same as the image: your contact; MnemoCode reads the codes"
-        } else {
-            "the same as the image: the backup codes"
-        };
-        let choices = [
-            // --qr-hidden is given already, with the image.
-            Choice::noted("Yes", same, 1),
-            Choice::noted("No QR", "the cards alone", 0_u8),
-        ];
-        match ask_list(
-            "Add the QR code to the sheets too?",
-            "QR code",
-            &choices,
-            None,
-        )? {
-            Some(qr) => qr,
-            None => return Ok(None),
-        }
-    } else if files.sheets {
-        let choices = [
-            Choice::noted(
-                "Ordinary QR",
-                "shows the backup codes; also saved as PNG",
-                1_u8,
-            ),
-            Choice::noted(
-                "QR with hidden data",
-                "shows the printed contact; MnemoCode reads the codes",
-                2,
-            ),
-            Choice::noted("No QR", "the cards alone", 0),
-        ];
-        match ask_list("Add a QR code?", "QR code", &choices, None)? {
-            Some(qr) => qr,
-            None => return Ok(None),
-        }
-    } else {
-        0
+    let Some(on_cards) = qr(files.sheets.then(|| files.kind.cards_word()))? else {
+        return Ok(None);
     };
     let mut chosen = vec!["--template".to_owned(), design];
     chosen.extend(files.options);
-    if qr != 0 {
-        chosen.push("--card-qr".to_owned());
-    }
-    if qr == 2 {
-        chosen.push("--qr-hidden".to_owned());
-    }
+    chosen.extend(on_cards);
     let Some(details) = ask_card_details(files.sheets, &chosen, fit)? else {
         return Ok(None);
     };

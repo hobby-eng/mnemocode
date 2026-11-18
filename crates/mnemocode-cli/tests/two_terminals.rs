@@ -46,9 +46,31 @@ fn text(seen: &Arc<Mutex<Vec<u8>>>) -> String {
     String::from_utf8_lossy(&seen.lock().expect("what was written")).into_owned()
 }
 
+/// What was written as a person reads it: the colour sequences left out.
+fn shown(seen: &Arc<Mutex<Vec<u8>>>) -> String {
+    let written = text(seen);
+    let mut shown = String::with_capacity(written.len());
+    let mut rest = written.as_str();
+    while let Some(at) = rest.find("\x1b[") {
+        shown.push_str(&rest[..at]);
+        let after = &rest[at + 2..];
+        let length = after
+            .find(|character: char| !(character.is_ascii_digit() || character == ';'))
+            .unwrap_or(after.len());
+        rest = if after[length..].starts_with('m') {
+            &after[length + 1..]
+        } else {
+            shown.push_str("\x1b[");
+            after
+        };
+    }
+    shown.push_str(rest);
+    shown
+}
+
 fn wait_for(seen: &Arc<Mutex<Vec<u8>>>, wanted: &str) {
     let until = Instant::now() + Duration::from_secs(180);
-    while !text(seen).contains(wanted) {
+    while !shown(seen).contains(wanted) {
         assert!(Instant::now() < until, "no {wanted:?} in {}", text(seen));
         thread::sleep(Duration::from_millis(50));
     }
@@ -56,9 +78,10 @@ fn wait_for(seen: &Arc<Mutex<Vec<u8>>>, wanted: &str) {
 
 #[test]
 fn a_decoded_phrase_stays_off_a_second_terminal_on_standard_output() {
+    // A window of today's usual size, where a result shows at once, not by pages.
     let size = PtySize {
-        rows: 24,
-        cols: 80,
+        rows: 60,
+        cols: 100,
         pixel_width: 0,
         pixel_height: 0,
     };

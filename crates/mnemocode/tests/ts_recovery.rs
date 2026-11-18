@@ -38,7 +38,8 @@ mod common;
 
 use common::{
     close, code_and_message, date_list, fixed_seconds, form_named, items, mode_named, number,
-    optional, recorded_recovery as recorded, refused, text, texts, wallet, wallet_of,
+    optional, original_seedshift, recorded_recovery as recorded, refused, text, texts, wallet,
+    wallet_of,
 };
 
 /// The most candidates a recording shows.
@@ -331,6 +332,19 @@ fn searches_of_marked_codes_go_as_ts_goes() {
         let codes = MissingCodes::read(typed, form_named(form), mode_named(mode)).expect("codes");
         let word_count = codes.word_count();
         let search = MissingCodesSearch::new(codes);
+        if original_seedshift(entry) {
+            // Its codes may keep the checksum now: the encoded fingerprint is offered too.
+            let ways = search.ways().expect("ways");
+            assert!(
+                ways.iter().any(|choice| choice.way == Way::Encoded),
+                "{typed}"
+            );
+            assert!(
+                ways.iter().any(|choice| choice.way == Way::Wallet),
+                "{typed}"
+            );
+            continue;
+        }
         assert_eq!(
             MissingCodesSearch::places_text(search.codes()),
             text(&entry["places"])
@@ -420,6 +434,15 @@ fn dates_as_typed_say_what_ts_says() {
     }
     for entry in items(&recorded["wallets"]) {
         let mode = mode_named(text(&entry["mode"]));
+        if original_seedshift(entry) {
+            // Every date gives one or two valid phrases, as with MnemoCode Seedshift.
+            assert!(wallet_needed(mode));
+            assert_eq!(
+                wallet_reason(Some(mode)),
+                wallet_reason(Some(Mode::Seedshift))
+            );
+            continue;
+        }
         assert_eq!(json!(wallet_needed(mode)), entry["needed"]);
         assert_eq!(wallet_reason(Some(mode)), text(&entry["reason"]));
     }
@@ -428,7 +451,7 @@ fn dates_as_typed_say_what_ts_says() {
 
 /// What a date search of `entry` found, as the recorder writes it; its refusal otherwise.
 fn date_run(entry: &Value) -> Result<Value, Value> {
-    let mode = Mode::named(text(&entry["mode"])).expect("a mode");
+    let mode = mode_named(text(&entry["mode"]));
     let codes =
         Backup::read(text(&entry["text"]), Form::English, mode).map_err(|error| refused(&error))?;
     let answer = DatesAnswer::parse(text(&entry["dates"]), Some(codes.words()), true)
@@ -505,6 +528,11 @@ fn date_searches_find_what_ts_finds() {
     let recorded = recorded();
     for entry in items(&recorded["dateRuns"]) {
         let name = format!("{} {}", text(&entry["mode"]), text(&entry["dates"]));
+        // Codes of the original program are read as TS read them; those that keep the checksum
+        // give one or two phrases a date since 0.2.0 (the date search's own tests).
+        if text(&entry["mode"]) == "seedshift-legacy-valid" {
+            continue;
+        }
         match date_run(entry) {
             Ok(mut value) => {
                 assert!(close(

@@ -27,9 +27,9 @@ use crate::terminal::{
 const EXAMPLE_PHRASE: &str =
     "letter advice cage absurd amount doctor acoustic avoid letter advice cage above";
 /// The file that Encode saves a record in by default, and that Decode reads by default.
-pub(crate) const RECORD_FILE: &str = "mnemocode-record.txt";
+pub(crate) const RECORD_FILE: &str = "notes.txt";
 /// The QR code image that Encode saves by default, and that Decode reads by default.
-pub(crate) const QR_FILE: &str = "mnemocode-qr.png";
+pub(crate) const QR_FILE: &str = "qr-code.png";
 /// The sheet for heirs by default.
 pub(crate) const HEIR_SHEET_FILE: &str = "mnemocode-heirs.pdf";
 /// The legend line of a cross-stitch pattern by default, its name saying nothing of what it holds.
@@ -45,10 +45,12 @@ const HEIR_SHEET_SIZES: [(&str, &str, &str); 2] = [
 ];
 /// The name of a question for each kind of file.
 pub(crate) mod file_questions {
-    pub(crate) const PDF: &str = "Folder of the patterns, or one pattern's PDF";
-    pub(crate) const RECORD: &str = "Record file name";
-    pub(crate) const QR: &str = "QR code file name";
-    pub(crate) const PICTURE: &str = "Picture file name (PNG, JPEG or WebP)";
+    pub(crate) const PDF: &str = "Enter the folder of the patterns, or one pattern's PDF";
+    pub(crate) const RECORD: &str = "Enter the record file name";
+    pub(crate) const QR: &str = "Enter the QR code file name";
+    pub(crate) const PICTURE: &str = "Enter the picture's file name (PNG, JPEG or WebP)";
+    pub(crate) const FOUND: &str = "Enter the folder to look in, or the full path of a file";
+    pub(crate) const CARDS: &str = "Enter the folder of the cards, or the full path of a card file";
 }
 
 /// `form` written out for the example phrase, in groups that read well.
@@ -85,6 +87,11 @@ pub(crate) fn sample_of(text: &str, room: usize) -> String {
         sample = longer;
     }
     format!("{sample} …")
+}
+
+/// The name of `form` in the menu's list of forms.
+pub(crate) fn form_label(form: Form) -> &'static str {
+    form_texts(form).0
 }
 
 /// What the question says of each form, beside its name.
@@ -140,8 +147,7 @@ const MASKS: &str = "Masks the seed phrase with dates you remember; only they tu
 /// Why a form that would show the phrase itself is always masked.
 const ALWAYS_MASKED: &str = "Always masked: unmasked, this form shows the seed phrase itself.";
 /// How the two Seedshift transformations differ.
-const CHECKSUMS: &str =
-    "MnemoCode's result keeps a valid checksum; the original's usually fails it.";
+const CHECKSUMS: &str = "Both write a valid BIP39 phrase. The Original also shows the last word its shift gave: remember it to restore the phrase exactly.";
 
 /// What Seedshift is, shown with the first question about it; the README explains it.
 pub(crate) fn seedshift_explanation() -> Explanation {
@@ -209,7 +215,7 @@ pub(crate) fn ask_seedshift(
     let mut none = Choice::noted("No Seedshift", unmasked, Mode::Direct);
     if required {
         none.enabled = false;
-        none.note = Some("not for this form, which would show the seed phrase itself".to_owned());
+        none.note = Some("this form would show the seed phrase itself".to_owned());
     }
     choices.push(none);
     let explanation = Explanation {
@@ -223,6 +229,10 @@ pub(crate) fn ask_seedshift(
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Place {
     Record,
+    /// The PDF of a cross-stitch pattern, its legend in it.
+    Pattern,
+    /// The PDFs of the patterns of shares, one a share, in a new folder.
+    SharePatterns,
     /// The legend line of a cross-stitch pattern, as Decode reads it back.
     Legend,
     /// That line as a QR code image.
@@ -245,6 +255,8 @@ impl Place {
     const fn note(self) -> &'static str {
         match self {
             Self::Record => "text that Decode reads back",
+            Self::Pattern => "the chart and its legend, to print",
+            Self::SharePatterns => "one pattern per share, in a new folder",
             Self::Legend => "the legend line, which Decode reads back",
             Self::LegendQr => "the legend line in a PNG file that Decode reads back",
             Self::ShareLegends => "every share's legend line, one to a line",
@@ -258,6 +270,14 @@ impl Place {
         }
     }
 
+    /// Whether it is ticked when the list is first shown: the PDF to print, of cards or a pattern.
+    const fn ticked_first(self) -> bool {
+        matches!(
+            self,
+            Self::Pattern | Self::SharePatterns | Self::Cards(_) | Self::ShareCards(_)
+        )
+    }
+
     /// Whether it is a QR code image, which asks how the QR code shows its data.
     const fn is_qr(self) -> bool {
         matches!(
@@ -269,6 +289,8 @@ impl Place {
     const fn name(self) -> &'static str {
         match self {
             Self::Record => "a record file",
+            Self::Pattern => "a PDF pattern",
+            Self::SharePatterns => "PDF patterns",
             Self::Legend => "a text file",
             Self::LegendQr => "a QR code image",
             Self::ShareLegends => "a text file",
@@ -280,25 +302,40 @@ impl Place {
         }
     }
 
-    /// Asks where it goes; none when the person goes back. `qr_hidden`: how a QR code image ticked
-    /// before it shows its data, which cards then follow rather than ask again.
-    fn ask(self, qr_hidden: Option<bool>) -> Result<Option<Vec<String>>, Stop> {
+    /// What a QR code of this place holds, the files it is saved as, and their name in a list.
+    const fn qr_words(self) -> (&'static str, &'static str, &'static str) {
+        match self {
+            Self::QrFolder => ("the shares", "PNG files, one per share", "PNG files"),
+            Self::LegendQr => ("the legend", "a PNG file", "PNG file"),
+            Self::ShareLegendQr => ("the legends", "PNG files, one per share", "PNG files"),
+            _ => ("the codes", "a PNG file", "PNG file"),
+        }
+    }
+
+    /// Asks where it goes; none when the person goes back. `qr`: the QR code's question, which
+    /// cards ask after their layout, told whether they are sheets that can carry one.
+    fn ask(
+        self,
+        qr: &mut dyn FnMut(Option<&'static str>) -> Result<Option<Vec<String>>, Stop>,
+    ) -> Result<Option<Vec<String>>, Stop> {
         let (option, path) = match self {
             Self::Record => ("--output", output_file(RECORD_FILE)?),
+            Self::Pattern => return super::pattern_questions::pattern_file(),
+            Self::SharePatterns => return super::pattern_questions::pattern_folder(),
             Self::Legend => ("--output", output_file(LEGEND_FILE)?),
-            Self::ShareFile => ("--output", output_file("mnemocode-shares.txt")?),
+            Self::ShareFile => ("--output", output_file("notes.txt")?),
             Self::QrImage => ("--qr", output_file(QR_FILE)?),
             Self::LegendQr => ("--qr", output_file(LEGEND_QR_FILE)?),
             Self::ShareLegends => ("--output", output_file(LEGEND_FILE)?),
             Self::ShareLegendQr => ("--qr-dir", new_folder("cross-stitch-legend-qr")?),
-            Self::QrFolder => ("--qr-dir", new_folder("mnemocode-share-qr")?),
+            Self::QrFolder => ("--qr-dir", new_folder("qr-codes")?),
             Self::Cards(form) => {
-                return ask_cards("mnemocode-cards", false, qr_hidden, &|options| {
+                return ask_cards("card-designs", false, qr, &|options| {
                     color_cards_fit_of(options, form)
                 });
             }
             Self::ShareCards(format) => {
-                return ask_cards("mnemocode-share-cards", true, qr_hidden, &|options| {
+                return ask_cards("card-design-series", true, qr, &|options| {
                     share_cards_fit_of(options, format)
                 });
             }
@@ -310,43 +347,201 @@ impl Place {
     }
 }
 
-/// Asks where the result goes besides the screen, as a checklist: then how a QR code shows its
-/// data where one is ticked, then every ticked place's own questions, the folder among them; none
-/// ticked keeps the result on the screen only.
+/// How a QR code is made: none, an ordinary one, or one that hides what it holds; and where it
+/// goes.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum QrMade {
+    None,
+    Ordinary(QrGoes),
+    Hidden(QrGoes),
+}
+
+/// Where a QR code goes: into the cards only, into them and a PNG file apart, or that file only.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum QrGoes {
+    Cards,
+    CardsAndFile,
+    File,
+}
+
+/// The options that a QR code's answer gives: those for the cards, and those of its own file.
+type QrOptions = (Vec<String>, Vec<String>);
+
+/// The QR code of `place` on one page: none, an ordinary one, or one that hides what it holds;
+/// where the cards are sheets, named `cards` ("PDF", "JPEG" or "PNG cards"), also whether they
+/// print it, with a PNG file apart or not, or that file holds it alone. A hidden one shows ordinary
+/// scanners a business card: the one printed on the cards, or one that MnemoCode invents for a file
+/// alone. A file's name is asked in the task's folder. Every entry and its note fit one line. The
+/// options for the cards and those of the file apart; none for back.
+fn ask_qr(place: Place, cards: Option<&'static str>) -> Result<Option<QrOptions>, Stop> {
+    let (holds, files, file) = place.qr_words();
+    let ordinary = format!("any scanner shows {holds}");
+    let hidden = "scanners see only a contact card";
+    let (choices, explanation) = match cards {
+        Some(cards) => {
+            let mut all = vec![Choice::new("No QR code", QrMade::None)];
+            for (kind, note, made) in [
+                (
+                    "Ordinary",
+                    ordinary.as_str(),
+                    QrMade::Ordinary as fn(QrGoes) -> QrMade,
+                ),
+                ("With hidden data", hidden, QrMade::Hidden),
+            ] {
+                all.push(Choice::noted(
+                    &format!("{kind}, {cards} only"),
+                    note,
+                    made(QrGoes::Cards),
+                ));
+                all.push(Choice::noted(
+                    &format!("{kind}, {cards} + {file}"),
+                    note,
+                    made(QrGoes::CardsAndFile),
+                ));
+                all.push(Choice::noted(
+                    &format!("{kind}, {file} only"),
+                    note,
+                    made(QrGoes::File),
+                ));
+            }
+            (
+                all,
+                format!(
+                    "In the {cards} it is printed on every sheet; as {files} it is saved apart. Of a QR code with hidden data, regular scanners see only a contact card, the one on the cards or one MnemoCode invents; MnemoCode reads {holds} from it."
+                ),
+            )
+        }
+        None => (
+            vec![
+                Choice::new("No QR code", QrMade::None),
+                Choice::noted(
+                    "Ordinary QR code",
+                    &ordinary,
+                    QrMade::Ordinary(QrGoes::File),
+                ),
+                Choice::noted(
+                    "QR code with hidden data",
+                    hidden,
+                    QrMade::Hidden(QrGoes::File),
+                ),
+            ],
+            format!(
+                "It is saved as {files}. Of a QR code with hidden data, regular scanners see only a contact card that MnemoCode invents; MnemoCode reads {holds} from it."
+            ),
+        ),
+    };
+    let explanation = Explanation {
+        lines: vec![explanation],
+        more: vec![readme_link("qr-codes-with-hidden-records")],
+    };
+    loop {
+        let Some(made) = ask_list("Add a QR code?", "QR code", &choices, Some(&explanation))?
+        else {
+            return Ok(None);
+        };
+        let (hidden, goes) = match made {
+            QrMade::None => return Ok(Some((Vec::new(), Vec::new()))),
+            QrMade::Ordinary(goes) => (false, goes),
+            QrMade::Hidden(goes) => (true, goes),
+        };
+        let mut on_cards: Vec<String> = Vec::new();
+        if !matches!(goes, QrGoes::File) {
+            on_cards.push("--card-qr".to_owned());
+            // The business card printed on the cards is what a scanner shows of the sheets' code.
+            if hidden {
+                on_cards.push("--qr-hidden".to_owned());
+            }
+        }
+        match goes {
+            QrGoes::Cards => return Ok(Some((on_cards, Vec::new()))),
+            // The file apart is saved where the cards go, under their name.
+            QrGoes::CardsAndFile => {
+                on_cards.push("--card-qr-png".to_owned());
+                return Ok(Some((on_cards, Vec::new())));
+            }
+            QrGoes::File => {}
+        }
+        let mut apart = if hidden {
+            super::hidden_qr::invented_card_options()?
+        } else {
+            Vec::new()
+        };
+        // The file apart, named in the task's folder; back from its name, this page again.
+        let Some(named) = place.ask(&mut |_| Ok(Some(Vec::new())))? else {
+            continue;
+        };
+        apart.extend(named);
+        return Ok(Some((on_cards, apart)));
+    }
+}
+
+/// The ticks of the last list of places answered, with its places: coming back to it from a later
+/// step finds them as they were, and another list of places starts from its own defaults.
+static LAST_TICKS: std::sync::Mutex<Option<(Vec<Place>, Vec<bool>)>> = std::sync::Mutex::new(None);
+
+/// Asks where the result goes besides the screen, as a checklist, then every ticked place's own
+/// questions, the folder among them, then the QR code on a page of its own: within the cards'
+/// questions, after their layout, where cards are ticked. None ticked keeps the result on the
+/// screen only.
 fn ask_destination(question: &str, places: &[Place]) -> Result<Option<Vec<String>>, Stop> {
-    // Every place stays in the list: a QR code image too beside cards, which ask on their own
-    // whether a sheet also carries one.
-    let choices: Vec<Choice<Place>> = places
+    let qr_place = places.iter().copied().find(|place| place.is_qr());
+    let listed: Vec<Place> = places
+        .iter()
+        .copied()
+        .filter(|place| !place.is_qr())
+        .collect();
+    let choices: Vec<Choice<Place>> = listed
         .iter()
         .map(|place| Choice::noted(&upper_first(place.name()), place.note(), *place))
         .collect();
-    // Shift+Tab after the list, at the QR code or a place's own question, comes back to it with
-    // its ticks, the files those claimed given back.
-    let mut ticked = vec![false; places.len()];
+    // Shift+Tab after the list, at a place's own question or the QR code, comes back to it with
+    // its ticks, the files those claimed given back; so does a later step of the task.
+    let remembered = LAST_TICKS
+        .lock()
+        .ok()
+        .and_then(|last| last.clone())
+        .filter(|(places, _)| *places == listed)
+        .map(|(_, ticks)| ticks);
+    let mut ticked: Vec<bool> =
+        remembered.unwrap_or_else(|| listed.iter().map(|place| place.ticked_first()).collect());
     let start = super::output_questions::claims_now();
     'list: loop {
         super::output_questions::claims_back_to(start);
         let Some(asks) = ask_checks(question, "Output", &choices, &ticked)? else {
             return Ok(None);
         };
-        ticked = places.iter().map(|place| asks.contains(place)).collect();
-        let mut options = Vec::new();
-        // How a QR code shows its data comes right after the places, before the folder: one
-        // choice, which --qr-hidden makes for every QR code.
-        let mut qr_hidden = None;
-        if asks.iter().any(|place| place.is_qr()) {
-            let Some(chosen) = super::hidden_qr::ask_options()? else {
-                continue 'list;
-            };
-            qr_hidden = Some(chosen.iter().any(|option| option == "--qr-hidden"));
-            options.extend(chosen);
+        ticked = listed.iter().map(|place| asks.contains(place)).collect();
+        if let Ok(mut last) = LAST_TICKS.lock() {
+            *last = Some((listed.clone(), ticked.clone()));
         }
+        let mut options = Vec::new();
+        // The options of an image apart, once the QR code is asked.
+        let mut apart: Option<Vec<String>> = None;
         for place in asks {
-            let Some(asked) = place.ask(qr_hidden)? else {
+            let mut qr = |sheets: Option<&'static str>| -> Result<Option<Vec<String>>, Stop> {
+                let Some(qr_place) = qr_place else {
+                    return Ok(Some(Vec::new()));
+                };
+                Ok(ask_qr(qr_place, sheets)?.map(|(on_cards, image)| {
+                    apart = Some(image);
+                    on_cards
+                }))
+            };
+            let Some(asked) = place.ask(&mut qr)? else {
                 continue 'list;
             };
             options.extend(asked);
         }
+        // Without cards, the QR code comes last.
+        if apart.is_none()
+            && let Some(qr_place) = qr_place
+        {
+            let Some((_, image)) = ask_qr(qr_place, None)? else {
+                continue 'list;
+            };
+            apart = Some(image);
+        }
+        options.extend(apart.unwrap_or_default());
         return Ok(Some(options));
     }
 }
@@ -386,7 +581,14 @@ pub(crate) fn ask_shares(
 /// Where the shares of a pattern go, besides the patterns themselves: their legend lines as text
 /// and as QR code images.
 pub(crate) fn ask_pattern_shares(set: ShareSetChoice) -> Result<Option<Vec<String>>, Stop> {
-    share_places(set, &[Place::ShareLegends, Place::ShareLegendQr])
+    share_places(
+        set,
+        &[
+            Place::SharePatterns,
+            Place::ShareLegends,
+            Place::ShareLegendQr,
+        ],
+    )
 }
 
 /// The options of the share `set`, then of the `places` its shares are saved to, as asked; none for
@@ -515,22 +717,14 @@ fn ask_other_share_set() -> Result<Option<ShareSetChoice>, Stop> {
 }
 
 /// Whether a sheet that tells heirs how to restore the backup is made, and its size: asked of every
-/// backup, Yes greyed where one made in `mode` can have none. `Some(None)` for none, none for
-/// back. Its file is named with the others, last (heir_sheet_files).
-pub(crate) fn ask_heir_sheet(mode: Mode) -> Result<Option<Option<&'static str>>, Stop> {
-    let possible = mode.capabilities().heir_sheet;
+/// backup. `Some(None)` for none, none for back. Its file is named with the others, last
+/// (heir_sheet_files).
+pub(crate) fn ask_heir_sheet() -> Result<Option<Option<&'static str>>, Stop> {
     let mut choices = vec![Choice::new("No", None)];
     for (size, name, note) in HEIR_SHEET_SIZES {
-        let mut yes = Choice::noted(&format!("Yes, {name}"), note, Some(size));
-        // A replaced last word keeps the question, its answers greyed: no sheet leads through it.
-        yes.enabled = possible;
-        choices.push(yes);
+        choices.push(Choice::noted(&format!("Yes, {name}"), note, Some(size)));
     }
-    let mut lines =
-        vec!["A printed page on how to restore the backup; it holds no secret.".to_owned()];
-    if !possible {
-        lines.push("A backup whose last word was replaced has no sheet for heirs.".to_owned());
-    }
+    let lines = vec!["A printed page on how to restore the backup; it holds no secret.".to_owned()];
     let explanation = Explanation {
         lines,
         more: vec![readme_link("instructions-for-heirs")],
@@ -622,13 +816,16 @@ pub(crate) type EncodingAnswers = (Vec<String>, SecretVec<Date>);
 
 /// Asks the new backup's settings in `form`, as every new backup is asked them, and keeps its dates
 /// outside the command arguments.
-pub(crate) fn ask_encoding_in(form: Form) -> Result<Option<EncodingAnswers>, Stop> {
-    super::new_backup::ask_new_backup(super::new_backup::Way::Form(form))
+pub(crate) fn ask_encoding_in(
+    form: Form,
+    finish: &mut super::new_backup::Finish<'_>,
+) -> Result<bool, Stop> {
+    super::new_backup::ask_new_backup(super::new_backup::Way::Form(form), finish)
 }
 
 /// Protected setup for the menu entry that creates standard SSKR shares, in the steps of every new
 /// backup; Shift+Tab goes back a step.
-pub(crate) fn ask_splitting() -> Result<Option<EncodingAnswers>, Stop> {
+pub(crate) fn ask_splitting(finish: &mut super::new_backup::Finish<'_>) -> Result<bool, Stop> {
     use super::new_backup::{Answered, answered, named_file, run_steps};
     let shares = Takes::MnemoCodeOnly {
         unmasked: "the shares alone restore it",
@@ -660,7 +857,18 @@ pub(crate) fn ask_splitting() -> Result<Option<EncodingAnswers>, Stop> {
     let mut heir_size = None;
     let mut saved = Vec::new();
     let mut heirs = Vec::new();
-    let done = run_steps(7, |step| {
+    crate::terminal::set_screen_title("Split into shares");
+    let names = [
+        Some("Seedshift"),
+        Some("Dates"),
+        Some("Format"),
+        Some("Shares"),
+        Some("Heirs"),
+        Some("Saving"),
+        None,
+        Some("Phrase"),
+    ];
+    let done = run_steps(8, &names, |step| {
         Ok(match step {
             0 => answered(
                 ask_seedshift("Use Seedshift before splitting?", false, shares)?
@@ -688,29 +896,35 @@ pub(crate) fn ask_splitting() -> Result<Option<EncodingAnswers>, Stop> {
                 }
                 _ => Answered::Back,
             },
-            4 => answered(ask_heir_sheet(mode)?.map(|size| heir_size = size)),
+            4 => answered(ask_heir_sheet()?.map(|size| heir_size = size)),
             // Last, where the shares are saved.
             5 => match set {
                 Some(set) => answered(ask_shares(set, format)?.map(|chosen| saved = chosen)),
                 None => Answered::Back,
             },
-            _ => {
+            6 => {
                 let (files, step) = named_file(|| heir_sheet_files(heir_size))?;
                 if let Some(files) = files {
                     heirs = files;
                 }
                 step
             }
+            // The seed phrase, Shift+Tab there coming back to the answers.
+            _ => {
+                let mut run = ["encode", "--sskr", "--ask-secrets", "--mode", mode.id()]
+                    .map(str::to_owned)
+                    .to_vec();
+                run.extend(saved.iter().cloned());
+                run.extend(super::new_backup::shown_masked_words(mode, false));
+                run.extend(heirs.iter().cloned());
+                let dates = mnemocode::secret::SecretVec::new(dates.to_vec());
+                if finish((run, dates))? {
+                    Answered::Next
+                } else {
+                    Answered::Back
+                }
+            }
         })
     })?;
-    if !done {
-        return Ok(None);
-    }
-    let mut run = ["encode", "--sskr", "--ask-secrets", "--mode", mode.id()]
-        .map(str::to_owned)
-        .to_vec();
-    run.extend(saved);
-    run.extend(super::new_backup::shown_masked_words(mode, false));
-    run.extend(heirs);
-    Ok(Some((run, dates)))
+    Ok(done)
 }

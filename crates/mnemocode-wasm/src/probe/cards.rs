@@ -7,8 +7,8 @@ use mnemocode::forms::Form;
 use wasm_bindgen::JsValue;
 
 use super::{Met, js};
-use crate::cards::CardExport;
 use crate::cards::shares::own_cards;
+use crate::cards::{CardExport, HeirPage};
 use crate::host::after_secret;
 
 /// The designs that the probe's file holds: for sheets, and for separate cards.
@@ -52,6 +52,11 @@ pub(super) fn card_entries(phrase: &str, met: &mut Met) {
     };
     met.ok("card pdf", sheets.pdf(0.0));
     met.ok("card image", sheets.image(0.0, 0.0, "png"));
+    met.ok("card qr image", plan.qr_png());
+    met.ok(
+        "hidden qr image of a record",
+        export.hidden_qr_png(js(&codes)),
+    );
     // Separate cards are a business design's.
     let Ok(separate) = CardExport::new(Some(SEPARATE_DESIGN.to_owned()), None, None, false) else {
         met.failed("card export");
@@ -76,8 +81,35 @@ pub(super) fn share_card_entries(shares: &[String], met: &mut Met) {
         if let Some(Some(payload)) = met.ok("share qr payload", cards.qr_payload(0.0)) {
             met.text(&payload);
         }
+        met.ok("share qr image", cards.qr_png(0.0));
     }
     if let Some(share) = shares.first() {
         met.ok("own share cards", own_cards(js(share), js("colors")));
+    }
+}
+
+/// The sheets for heirs of a pattern and of the patterns of shares. They hold no secret, so the
+/// gate asks no scrub of them: drawn as a page draws them, so that their entries run in the file a
+/// page gets, and told where they fail.
+pub(super) fn heir_entries(met: &mut Met) {
+    let Ok(page) = HeirPage::new(
+        "Wallet tools".to_owned(),
+        "https://example.org".to_owned(),
+        vec!["Open the page.".to_owned()],
+        vec!["Choose Decode.".to_owned()],
+        None,
+        None,
+    ) else {
+        met.failed("heir page");
+        return;
+    };
+    if page.pattern_sheet(12.0, "seedshift", 1.0).is_err() {
+        met.failed("pattern heir sheet");
+    }
+    if page
+        .pattern_shares_sheet(2.0, 3.0, "seedshift-legacy", 1.0)
+        .is_err()
+    {
+        met.failed("pattern shares heir sheet");
     }
 }

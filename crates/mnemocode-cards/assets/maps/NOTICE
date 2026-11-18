@@ -6,4 +6,9 @@ Natural Earth map data is in the public domain. No permission is needed to use i
 Source file: geojson/ne_110m_land.geojson in the repository nvkelso/natural-earth-vector.
 SHA-256: 9e0729ee253ca7d7a5c4ae9395fb1902264c5377c52e224d13dd85010e2835d9
 
-scripts/build-world-map.mjs turns this file into src/export/world-map-data.ts.
+History: in MnemoCode TS 0.1.0, scripts/build-world-map.mjs turned this file into
+src/export/world-map-data.ts. Neither is part of this repository.
+
+world-land.txt holds the land shapes taken over from that TypeScript file, one polygon per line
+as an SVG path in map units. No program here regenerates it.
+SHA-256 of world-land.txt: 8cc939207e86d6ee8a7c868618cab8b6d202eeb927550bb92e3439905f74b5ec

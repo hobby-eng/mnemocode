@@ -75,7 +75,7 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
             "One design with your own details",
         ),
         (
-            "mnemocode preview --template business-it --words 24 --page-size business --pdf business-cards.pdf",
+            "mnemocode preview --template business-it --words 24 --page-size business --pdf card-designs.pdf",
             "Real 90 x 50 mm cards, one per page",
         ),
         (

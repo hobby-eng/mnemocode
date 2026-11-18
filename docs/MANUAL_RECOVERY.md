@@ -16,15 +16,16 @@ and word numbers. Keep this guide with it. The two lists are matched by position
 not by translation. Do not substitute the Simplified Chinese list or change the
 order of either dictionary.
 
-Keep a separate record of the mode used: `direct`, `seedshift`,
-`seedshift-legacy` or `seedshift-legacy-valid`. Record the exact dates where the
+Keep a separate record of the mode used: `direct`, `seedshift` or
+`seedshift-legacy`; with `seedshift-legacy`, also the last word that MnemoCode
+named to remember (section 6). Record the exact dates where the
 intended owner can recover them; do not put them beside a disguised backup if
 that would defeat its purpose. Keep the BIP39 passphrase too, if the wallet uses
 one: dates and the BIP39 passphrase are different things.
 
-A text record may start with `MNC1:MODE:FORMAT:`. The text after the third colon
-is its payload. A plain list of codes or a share does not necessarily record the
-mode or the dates. A valid checksum cannot tell you which dates were used.
+A record saved by an earlier version may start with `MNC1:MODE:FORMAT:`; the text
+after the third colon is its payload. A file of codes saved now, a QR code or a
+share does not record the mode or the dates. A valid checksum cannot tell you which dates were used.
 
 For a backup on printed cards, keep the sheet for heirs, or a note of how many
 words the seed phrase has, with the cards: that number tells where the backup ends
@@ -142,11 +143,10 @@ helper of section 7 reads it from the PDF.
 
 Turning the line into word numbers takes arithmetic on numbers of about 90 digits
 and SHA-256, so use the helper `manual_seedstitch.py` of section 7 on a trusted
-offline computer. It prints the word numbers and says whether the phrase is
-masked. A masked phrase is then reversed with its dates as mode `seedshift`
-(sections 2 to 4, or `manual_seedshift.py`), or, where the helper says the Original
-Seedshift masked it, as mode `seedshift-legacy` (section 5); an unmasked one
-is the phrase itself. A pattern of a Shamir share gives the share's bytes instead:
+offline computer. It prints the word numbers; the legend does not say whether or
+how the phrase was masked. Reverse a masked phrase with its dates: MnemoCode
+Seedshift as mode `seedshift` (sections 2 to 4, or `manual_seedshift.py`), the
+Original Seedshift as section 6 says; an unmasked one is the phrase itself. A pattern of a Shamir share gives the share's bytes instead:
 enough shares of the set restore the phrase with an SSKR tool, and then the dates
 undo the mask as above.
 If the line does not read, a row was misread: check each symbol and count against
@@ -163,8 +163,9 @@ Seedshift, is
 
 and reads as the word numbers `1965 369 566 1734 263 1750 1979 852 1589 1366 357
 425 1242 63 1549 1290 824 1667 1339 1784 639 1635 946 1898`, "void come effort …
-involve unfold", marked as masked with Seedshift. The example was written for the
-format, so no dates belong to it: it shows the reading only.
+involve unfold". The legend does not say whether or how the phrase was masked; the
+example was written for the format, so no dates belong to it: it shows the reading
+only.
 
 ## 2. Build the date-shift sequence
 
@@ -274,6 +275,9 @@ index modulo 2048 would instead give the wrong answer.
 
 ## 5. Original Seedshift: mode `seedshift-legacy`
 
+This is how the original Seedshift program writes and reads; MnemoCode writes the
+last word differently (section 6).
+
 Use the ordinary modulus-2048 formula on **every** word, including the last.
 Add each shift to encode; subtract it to decode. Do not recompute or replace
 the stored last word. The shifted phrase may fail the BIP39 checksum and still
@@ -282,19 +286,30 @@ be a correct legacy backup. A correctly recovered original must pass it.
 Using the same public example, the legacy result ends in printed number 27,
 because ((4 - 1 + 23) mod 2048) + 1 = 27. MnemoCode Seedshift instead ends in 377. These two modes are not interchangeable.
 
-## 6. Replaced legacy last word: mode `seedshift-legacy-valid`
+## 6. Original Seedshift as MnemoCode writes it
 
-This mode replaces the last word of a legacy result to make its checksum valid,
-as `encode --legacy-valid-last-word` does. Information was lost. Subtract shifts
-modulo 2048 from the first n-1 words; the stored last word cannot uniquely
-recover the original.
+MnemoCode writes the Original Seedshift result with its last word changed, so
+that the codes pass the BIP39 checksum like those of every other mode. It keeps
+the first 11 - c bits of the shifted last word, where c is 4, 5, 6, 7 or 8 for
+12, 15, 18, 21 or 24 words, and puts the checksum of the masked words in the last
+c bits. Encode shows the shifted last word before the change, for the owner to
+keep.
 
-List every last word that completes those recovered first words with a valid
-BIP39 checksum. There are 128, 64, 32, 16 or 8 possibilities for 12, 15, 18,
-21 or 24 words. An offline BIP39 implementation can enumerate them, or enumerate
-all possible entropy tails and calculate the checksums as in section 4.
-Do not choose one merely because its checksum is valid. Compare candidates
-against a known wallet address, public key or other independently saved evidence.
+With that word, put it in place of the stored last word and decode every word as
+section 5 says.
+
+Without it, subtract the shifts from the first n - 1 words as section 5 says. For
+the last word, take its stored index (printed number minus 1), keep its first
+11 - c bits, and try each of the 2^c values of the last c bits, 16 to 256 values:
+subtract the last shift modulo 2048 from each and keep every result whose
+recovered phrase passes the checksum. One or two remain. Compare them with a known
+wallet address, public key or other independently saved evidence; do not choose
+one merely because its checksum is valid.
+
+In the public example of section 5, the original program's result ends in printed
+number 27, `addict`. MnemoCode writes 23, `actress`, and names `addict` to
+remember. Index 22 keeps the first seven bits 0000001, so the last index was one
+of 16 to 31; with `addict` it is 26, and 26 - 23 = 3 gives `about`.
 
 ## 7. Optional standalone Python helper
 
@@ -304,9 +319,11 @@ reads or writes no files. It takes word **numbers**, and prints word numbers;
 use the printed dictionary to convert between words and numbers. Its output
 contains recovery material, so clear it when finished.
 
-The helper supports `direct`, `seedshift` and exact `seedshift-legacy`.
-It does not combine shares, read color codes, search dates or resolve the lost
-last word of `seedshift-legacy-valid`; use the preceding sections first.
+The helper supports `direct`, `seedshift` and exact `seedshift-legacy`. For codes
+that MnemoCode wrote in `seedshift-legacy`, put the last word it named to remember
+in place of the stored last word first (section 6). It does not combine shares,
+read color codes, search dates or try the last words of section 6 without that
+word; use the preceding sections first.
 
 ```python
 import datetime
@@ -327,7 +344,7 @@ operation = input("Operation (encode or decode): ").strip()
 date_text = input("Dates DD-MM-YYYY, separated by commas; blank for direct: ").strip()
 numbers = [int(part) for part in input("Word numbers 1..2048, separated by spaces: ").split()]
 if mode not in ("direct", "seedshift", "seedshift-legacy"):
-    raise ValueError("Unknown mode; legacy-valid needs candidate recovery.")
+    raise ValueError("Unknown mode.")
 if operation not in ("encode", "decode"):
     raise ValueError("Choose encode or decode.")
 n = len(numbers)
@@ -367,9 +384,9 @@ masked numbers above. The output is eleven 1s followed by 4 and `valid`.
 Save the following code as `manual_seedstitch.py` and run it the same way. It
 takes the legend line, each row as `symbol:stitches` or `symbol:DMC:stitches` from
 the top of the key down, on one line or several, ended by an empty line; or the
-path of the pattern's PDF, which keeps the line. It prints the word numbers and
-whether they are masked with Seedshift, or, for a pattern of a Shamir share, the
-share's bytes. It does not correct a misread row; check the rows instead. Its
+path of the pattern's PDF, which keeps the line. It prints the word numbers, or, for a pattern
+of a Shamir share, the share's bytes. The legend does not say whether Seedshift was
+used: the person who made the backup knows it. It does not correct a misread row; check the rows instead. Its
 output is recovery material, so clear it when finished.
 
 ```python
@@ -381,14 +398,10 @@ import zlib
 # What a legend may hold: its domain's ending, its lengths in bytes with the phrase's words, and
 # what it is.
 ENTROPY = {16: 12, 20: 15, 24: 18, 28: 21, 32: 24}
-WORDS = {17: 12, 21: 15, 25: 18, 29: 21, 33: 24}
 SHARE = {21: 12, 25: 15, 29: 18, 33: 21, 37: 24}
 DOMAINS = [
-    (b"", ENTROPY, "masked with Seedshift: undo it with the dates"),
-    (b" unmasked", ENTROPY, "not masked: these are the phrase's own words"),
-    (b" original", WORDS, "masked with the Original Seedshift: undo it as section 5 says"),
-    (b" share", SHARE, "one Shamir share of a phrase masked with Seedshift"),
-    (b" share unmasked", SHARE, "one Shamir share of the phrase itself"),
+    (b"", ENTROPY, "the phrase's words: if Seedshift was used, undo it with the dates"),
+    (b" share", SHARE, "one Shamir share: if Seedshift was used, undo it after the restore"),
 ]
 
 
@@ -491,19 +504,15 @@ if ending.startswith(b" share"):
     print("Share bytes:", held.hex())
     print("The legend holds", meaning, "of", words, "words")
 else:
-    if ending == b" original":
-        if int(bits[11 * words:] or "0", 2):
-            raise ValueError("The legend does not read: check each row's symbol, thread and stitches.")
-    else:
-        checksum_bits = words // 3
-        bits += f"{hashlib.sha256(held).digest()[0] >> (8 - checksum_bits):0{checksum_bits}b}"
+    checksum_bits = words // 3
+    bits += f"{hashlib.sha256(held).digest()[0] >> (8 - checksum_bits):0{checksum_bits}b}"
     numbers = [int(bits[k:k + 11], 2) + 1 for k in range(0, 11 * words, 11)]
     print("Word numbers:", " ".join(str(number) for number in numbers))
     print("The phrase is", meaning)
 ```
 
-For the example of section 1, it prints the numbers above and says that the phrase
-is masked with Seedshift.
+For the example of section 1, it prints the numbers above and says that the phrase's
+words must be unmasked with the dates if Seedshift was used.
 
 ## 8. Confirm the wallet
 
@@ -514,4 +523,5 @@ passphrase. A 32-bit fingerprint is only a short filter, not proof of identity.
 
 Date masking is not encryption. This guide restores the reversible date shift;
 it cannot recover missing dates, missing Shamir quorum, an unknown BIP39 passphrase
-or information discarded by a legacy last-word replacement on its own.
+or, on its own, the last word that Original Seedshift codes written by MnemoCode
+leave open, without the word the owner kept or a wallet to compare.

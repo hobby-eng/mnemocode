@@ -57,9 +57,9 @@ const LISTED: [(&str, &str, &str); 5] = [
 ];
 /// The last digit of code 3 unread, and a digit of the date forgotten.
 const ONE_MARKED: &str = "2027 10 2? 2027 10 24 2027 10 24 2027 10 377";
-/// Twelve words in the Original Seedshift with a valid last word, the last digit of code 4 unread:
-/// each set of codes gives 128 phrases, more than a list holds.
-const LEGACY_VALID_MARKED: &str = "1 1 1 1? 1 1 1 1 1 1 1 1";
+/// Twelve word numbers, code 4 unread whole: some 128 sets of codes keep the checksum, more than a
+/// list holds.
+const TOO_MANY_MARKED: &str = "1 1 1 ? 1 1 1 1 1 1 1 1";
 
 /// What `search` found, which must be one set of codes.
 fn found_by(search: WaySearch, name: &'static str) -> Result<MissingCodesFound, CheckFailure> {
@@ -125,13 +125,13 @@ fn marked_codes_search(tier: Tier) -> Result<(), CheckFailure> {
         "Date found with the marked codes",
     )?;
     let too_many = MissingCodesSearch::new(ok(MissingCodes::read(
-        LEGACY_VALID_MARKED,
+        TOO_MANY_MARKED,
         Form::Indexes,
-        Mode::SeedshiftLegacyValid,
+        Mode::Seedshift,
     ))?);
     expect_refused(
         too_many.listed(&day),
         "core.missing-codes-search.operation-refused",
-        "A list of more phrases than it holds",
+        "A list of more candidates than it holds",
     )
 }

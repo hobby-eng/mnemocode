@@ -75,21 +75,12 @@ pub(super) const FORMAT: HelpOption = HelpOption {
     ],
 };
 
-pub(super) const LEGACY_VALID_LAST_WORD: HelpOption = HelpOption {
-    flag: "--legacy-valid-last-word",
-    value: None,
-    summary: "In seedshift-legacy mode, end with a last word that passes the checksum",
-    details: &[
-        "A legacy result usually fails the BIP39 checksum. With this option only the checksum bits of the last word are calculated again, as with the same option of the original Seedshift; the record becomes seedshift-legacy-valid. Its decoding lists every possible last word.",
-    ],
-};
-
 pub(super) const OUTPUT: HelpOption = HelpOption {
     flag: "--output",
     value: Some("PATH"),
-    summary: "Also save a versioned MNC1 record file",
+    summary: "Also save the codes in a text file",
     details: &[
-        "The record starts with MNC1:<mode>:<format>:, so decode needs only the file and the dates. Dates are never stored. A taken name is numbered, as record_1.txt, never replaced.",
+        "The file holds the codes alone, as the screen shows them: not the mode, the dates or the form, so decode needs the mode and the dates with it. A taken name is numbered, as notes_1.txt, never replaced.",
     ],
 };
 
@@ -131,7 +122,7 @@ pub(super) const HEIR_SHEET: HelpOption = HelpOption {
     value: Some("PATH"),
     summary: "Also save one sheet that tells heirs how to restore the backup",
     details: &[
-        "A PDF of one sheet to print on both sides. The front says what the backup looks like, how many shares restore it and how many dates it needs, and leaves the rest of its room for a hint written by hand; the back gives the steps in the menu and the basics for someone new to wallets. It holds no secret: no codes, no dates, no fingerprint and no places. Not with --legacy-valid-last-word. See Instructions for heirs in the README.",
+        "A PDF of one sheet to print on both sides. The front says what the backup looks like, how many shares restore it and how many dates it needs, and leaves the rest of its room for a hint written by hand; the back gives the steps in the menu and the basics for someone new to wallets. It holds no secret: no codes, no dates, no fingerprint and no places. See Instructions for heirs in the README.",
     ],
 };
 
@@ -232,7 +223,16 @@ pub(super) const CARD_QR: HelpOption = HelpOption {
     summary: "Add one QR code with the whole encoded phrase to a collection sheet",
     details: &[
         "Off by default. Without --qr-hidden, the QR code holds only the encoded data in the selected format: no header, mode, dates, names or fingerprints. Separate cards never carry a QR code.",
-        "encode and the commands of shares also save the QR code as a PNG image where the sheets go: beside the PDF (cards.pdf gives cards-qr.png), or in their folder; one image per share for Shamir shares. Decode reads it back with --qr-file, Restore with --share-qr. With encode alone, --qr names the image instead. preview only draws it.",
+        "With --card-qr-png, encode and the commands of shares also save the QR code as a PNG image where the sheets go. preview only draws it.",
+    ],
+};
+
+pub(super) const CARD_QR_PNG: HelpOption = HelpOption {
+    flag: "--card-qr-png",
+    value: None,
+    summary: "Also save the QR code of the sheets as a PNG image",
+    details: &[
+        "Beside the PDF (cards.pdf gives cards-qr.png), or in the folder of the sheets; one image per share for Shamir shares. Decode reads it back with --qr-file, Restore with --share-qr. With encode, --qr names an image of its own instead.",
     ],
 };
 
@@ -334,7 +334,7 @@ pub(super) const SSKR: HelpOption = HelpOption {
     value: None,
     summary: "Split the result into Shamir shares (SSKR) as the last step",
     details: &[
-        "The shares use the Blockchain Commons SSKR format. Fewer shares than --threshold cannot restore the phrase, but each share still shows the set identifier, the thresholds and the length of the phrase; keep every share private. A BIP39 passphrase, the mode and the dates are not stored in the shares. The legacy modes cannot be used with shares.",
+        "The shares use the Blockchain Commons SSKR format. Fewer shares than --threshold cannot restore the phrase, but each share still shows the set identifier, the thresholds and the length of the phrase; keep every share private. A BIP39 passphrase, the mode and the dates are not stored in the shares.",
         "The card options then print the shares as sskr-split does: each file or folder in --cards-dir holds one share, and --card-qr gives each collection sheet a QR code of its own share.",
     ],
 };
@@ -381,13 +381,24 @@ pub(super) const CARD_LAYOUT: HelpOption = HelpOption {
     ],
 };
 
+pub(super) const LAST_WORD_FILE: HelpOption = HelpOption {
+    flag: "--last-word-file",
+    value: Some("PATH"),
+    summary: "Read the last word Encode named for seedshift-legacy codes from a file or -",
+    details: &[
+        "The file may be up to 256 bytes.",
+        "Original Seedshift codes that MnemoCode wrote may give two phrases without it; the word gives the one exactly. Not with --ask-secrets, which asks for that word privately.",
+    ],
+};
+
 pub(super) const INPUT_FILE: HelpOption = HelpOption {
     flag: "--input-file",
     value: Some("PATH"),
-    summary: "Read the encoded record from a file; - reads standard input",
+    summary: "Read the encoded backup from a file or a folder; - reads standard input",
     details: &[
-        "The file may be up to 64 KiB, or a cross-stitch pattern's PDF, which keeps its legend, up to 64 MiB.",
-        "Any of the five formats, with or without an MNC1 header. A file saved with encode --output names its mode and format, so only the dates are needed with it.",
+        "A text file of codes up to 64 KiB; a QR code image in PNG; a cross-stitch pattern's PDF, which keeps its legend; or the cards' PDF, PNG or JPEG, which keep a copy of the codes: up to 64 MiB.",
+        "A folder is read with the folders inside it, and every backup and set of shares found is listed: with --ask-secrets you choose one, and one alone is taken at once. Cards of one backup in several files, and shares of one set, are read together.",
+        "The codes may be in any of the five forms. Only a record saved by an earlier version, which starts with MNC1, names its mode and form.",
     ],
 };
 
@@ -702,6 +713,7 @@ pub(super) const RUN_3: &[&HelpOption] = &[
     &PAGE_SIZE,
     &ORIENTATION,
     &CARD_QR,
+    &CARD_QR_PNG,
     &QR_HIDDEN,
     &QR_TEXT,
     &TITLE,
@@ -727,8 +739,7 @@ pub(super) const RUN_5: &[&HelpOption] = &[
     &CARD_LAYOUT,
 ];
 
-pub(super) const RUN_6: &[&HelpOption] =
-    &[&MODE, &DATES, &DATES_FILE, &FORMAT, &LEGACY_VALID_LAST_WORD];
+pub(super) const RUN_6: &[&HelpOption] = &[&MODE, &DATES, &DATES_FILE, &FORMAT];
 
 pub(super) const RUN_7: &[&HelpOption] = &[
     &CANDIDATES_FILE,

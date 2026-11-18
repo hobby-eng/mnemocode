@@ -1,13 +1,13 @@
-//! The phrase an old backup holds, before it is encoded again: decoded with its dates, and with the
-//! original last word where the Original Seedshift with a valid last word keeps none of it; given
-//! out only once the person recognised it or the wallet matched.
+//! The phrase an old backup holds, before it is encoded again: decoded with its dates, and where
+//! Original Seedshift codes give two phrases, with the last word Encode named; given out only once
+//! the person recognised it or the wallet matched.
 
 use std::fmt;
 
 use super::{Backup, BackupError};
 use crate::bip39::phrase::{Phrase, english_tokens};
+use crate::bip39::table::index_of_english;
 use crate::dates::Date;
-use crate::forms::Form;
 use crate::modes::seedshift::Unmasked;
 use crate::refusal::Refusal;
 use crate::text::words::{capitalized, list_in_words};
@@ -47,10 +47,10 @@ pub enum ReEncodingError {
 impl fmt::Display for ReEncodingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::LastWordNotTaken => f.write_str("This backup gives one seed phrase and takes no last word: the last word is only for a backup of the Original Seedshift with a valid last word."),
+            Self::LastWordNotTaken => f.write_str("This backup gives one seed phrase and takes no last word."),
             Self::ChecksumFails => f.write_str("These codes and dates give no seed phrase with a valid checksum: a date or a code is wrong."),
-            Self::LastWordNeeded => f.write_str("This backup was made with the Original Seedshift with a valid last word, which keeps nothing of the original last word: give the last word of the original seed phrase."),
-            Self::NoSuchLastWord => f.write_str("No seed phrase of this backup ends with that word: check the last word and the dates."),
+            Self::LastWordNeeded => f.write_str("These codes and dates give two seed phrases: give the last word that Encode named to tell them apart."),
+            Self::NoSuchLastWord => f.write_str("That word does not fit this backup: check the last word that Encode named."),
             Self::NotConfirmed => f.write_str("The seed phrase of the old backup is not confirmed: it is encoded again only once the person recognised it or the wallet has the address given."),
             Self::MatchedBy => write!(
                 f,
@@ -140,27 +140,58 @@ pub struct ReEncoding {
     confirmation: Option<Confirmation>,
 }
 
+/// The index of `word`, the English last word Encode named, as typed; refused where it is no
+/// single BIP39 word.
+pub fn last_word_index(word: &str) -> Result<u16, ReEncodingError> {
+    let typed = english_tokens(word);
+    match typed.as_slice() {
+        [word] => index_of_english(word),
+        _ => None,
+    }
+    .and_then(|index| u16::try_from(index).ok())
+    .ok_or(ReEncodingError::NoSuchLastWord)
+}
+
+/// The phrase that `backup`, Original Seedshift codes that give two, gives under `dates` with
+/// `word`, the English last word Encode named. Refused: a word for codes that give one phrase, and
+/// a word that is no BIP39 word or does not fit the codes.
+pub fn with_last_word(
+    backup: &Backup,
+    dates: &[Date],
+    word: &str,
+) -> Result<Unmasked, ReEncodingError> {
+    if !backup.gives_several() {
+        return Err(ReEncodingError::LastWordNotTaken);
+    }
+    match backup.decode_with_last_word(dates, last_word_index(word)?) {
+        Err(BackupError::LastWord) => Err(ReEncodingError::NoSuchLastWord),
+        other => Ok(other?),
+    }
+}
+
 impl ReEncoding {
-    /// The phrase `backup` gives with `dates`; for the Original Seedshift with a valid last word,
-    /// the one that ends with `last_word`. Refused: a last word where none is taken, none where one
-    /// is needed, one no phrase ends with, and codes and dates of no valid phrase.
+    /// The phrase `backup` gives with `dates`; where its Original Seedshift codes give two, the one
+    /// that `last_word`, the last word Encode named, gives. Refused: a last word where none is taken,
+    /// none where two phrases need one, one that does not fit, and codes and dates of no valid
+    /// phrase.
     pub fn of(
         backup: &Backup,
         dates: &[Date],
         last_word: Option<&str>,
     ) -> Result<Self, ReEncodingError> {
         if backup.gives_several() {
-            let last_word = last_word.ok_or(ReEncodingError::LastWordNeeded)?;
-            let typed = english_tokens(last_word);
-            let found = match typed.as_slice() {
-                [word] => backup.candidates(dates)?.into_iter().find(|candidate| {
-                    Form::English
-                        .codes(candidate.recovered.as_slice())
-                        .is_ok_and(|words| english_tokens(words.as_str()).last() == Some(word))
-                }),
-                _ => None,
+            let result = match last_word {
+                Some(word) => with_last_word(backup, dates, word)?,
+                None => {
+                    let mut found = backup.candidates(dates)?;
+                    match found.len() {
+                        0 => return Err(ReEncodingError::ChecksumFails),
+                        1 => found.remove(0),
+                        _ => return Err(ReEncodingError::LastWordNeeded),
+                    }
+                }
             };
-            return Self::confirming(found.ok_or(ReEncodingError::NoSuchLastWord)?);
+            return Self::confirming(result);
         }
         if last_word.is_some() {
             return Err(ReEncodingError::LastWordNotTaken);
@@ -169,6 +200,12 @@ impl ReEncoding {
         if !result.checksum_valid {
             return Err(ReEncodingError::ChecksumFails);
         }
+        Self::confirming(result)
+    }
+
+    /// The phrase of `result`, decoded already, such as with the last word Encode named; refused
+    /// where it fails the checksum.
+    pub fn of_decoded(result: Unmasked) -> Result<Self, ReEncodingError> {
         Self::confirming(result)
     }
 
@@ -260,6 +297,7 @@ impl ReEncoding {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::forms::Form;
     use crate::modes::Mode;
     use crate::self_check::vectors::{MASKED_DATE, MASKED_ENGLISH, PUBLIC_MNEMONIC};
 

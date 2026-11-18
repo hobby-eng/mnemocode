@@ -22,6 +22,7 @@ use mnemocode::random::{Random, RandomError};
 use mnemocode::refusal::Refusal;
 use mnemocode::secret::{SecretText, SecretVec};
 use mnemocode::text::space::{tokens, trim};
+use sha2::{Digest, Sha256};
 
 use crate::palette::{TooManyColours, code_colors};
 use crate::settings::{CardSettings, PageSize, SHEET_SIZES_TEXT, SettingsError};
@@ -427,6 +428,9 @@ pub struct ColorCards {
     pub codes: CardCodes,
     /// How many of the last cards are decoys; none until a plan adds them.
     pub decoys: Option<usize>,
+    /// The mark of the export, taken from its random decoys: the files of one export share it in
+    /// their document ID, and two exports of one backup, whose decoys differ, are told apart.
+    pub export: Option<u64>,
     /// The title of the sheet in place of the studio name.
     pub title: Option<String>,
     /// The share's reference, such as 376C-1-2: the series that its sheets name.
@@ -530,6 +534,18 @@ impl ColorCards {
             }
         }
         cards.decoys = Some(MAX_DECOYS);
+        // The mark of this export, from the codes its decoys print, which are random already: no
+        // draw is taken from `random`, so that every card drawn after them stays the same. Unicode
+        // cards are told by their codes, not their colors, which only decorate them.
+        let mut hash = Sha256::new();
+        for index in own..cards.codes.colors.len() {
+            hash.update(cards.codes.printed(index).as_bytes());
+            hash.update(b"\n");
+        }
+        let digest = hash.finalize();
+        let mut mark = [0; 8];
+        mark.copy_from_slice(&digest[..8]);
+        cards.export = Some(u64::from_be_bytes(mark));
         Ok(cards)
     }
 
@@ -598,6 +614,7 @@ pub fn backup_card_content(
         kind: ContentKind::Colors,
         codes: CardCodes::new(colors, labels, payload),
         decoys: None,
+        export: None,
         title: title.map(card_title).transpose()?,
         reference: None,
         qr_card: false,

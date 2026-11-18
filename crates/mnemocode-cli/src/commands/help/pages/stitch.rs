@@ -12,7 +12,7 @@ const MODE: HelpOption = HelpOption {
     summary: "seedshift (default), seedshift-legacy or direct",
     details: &[
         "seedshift masks the phrase with the dates, as Encode does; Decode asks for them. direct hides the phrase itself, for one protected some other way: anyone who knows MnemoCode reads it from the legend.",
-        "seedshift-legacy is the original Seedshift: the pattern keeps every masked word, and Decode asks for the same dates. It cannot be split into shares.",
+        "seedshift-legacy is the Original Seedshift, with the last word Encode writes: Decode asks for the same dates and for the last word that was named to remember.",
     ],
 };
 const PICTURE: HelpOption = HelpOption {
@@ -41,7 +41,9 @@ const PDF: HelpOption = HelpOption {
     flag: "--pdf",
     value: Some("PATH"),
     summary: "Save the pattern: a cover, the floss key and the chart in colour",
-    details: &["A folder of its path that is missing is made."],
+    details: &[
+        "A folder of its path that is missing is made. Without --pdf the legend is shown, and saved where --output or --qr says.",
+    ],
 };
 const OUTPUT: HelpOption = HelpOption {
     flag: "--output",
@@ -70,10 +72,10 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
     summary: "Hide a phrase in the legend of a cross-stitch pattern",
     about: &[
         "Masks an English BIP39 phrase with dates, as seedshift mode does, unless --mode direct, and hides it in the legend of a cross-stitch pattern made from a picture: the symbol of each thread and the last digits of its count of stitches (SeedStitch). The pattern is an ordinary chart in DMC threads; nothing on it names MnemoCode.",
-        "Decode reads the legend back without the picture: type its rows as each symbol's number, a colon and the stitches, from the top, then give the dates if it asks for them. A pattern too small for the phrase otherwise uses the rows' order too, and each row names its DMC number between them, as 15:407:38. Decode also reads the pattern's PDF itself, which keeps the legend line where no viewer shows it: decode --input-file pattern.pdf.",
+        "Decode reads the legend back without the picture: type its rows as each symbol's number, a colon and the stitches, from the top, then say whether Seedshift was used, and which, and give the dates: the legend does not say. A pattern too small for the phrase otherwise uses the rows' order too, and each row names its DMC number between them, as 15:407:38. Decode also reads the pattern's PDF itself, which keeps the legend line where no viewer shows it: decode --input-file pattern.pdf.",
         "With --threshold and --shares the phrase is split into Shamir shares (SSKR), as sskr-split splits it, and each share is hidden in a pattern of its own, all made from the same picture. sskr-combine restores the phrase from any threshold of them: their PDFs, their legend lines or their QR images. A share holds 5 bytes more than the phrase, so its pattern needs a few more threads.",
     ],
-    usage: "(--configure --ask-secrets | --picture <PATH> (--pdf <PATH> | --threshold <N> --shares <M> --pdf-dir <NEW_FOLDER>) [OPTIONS] (--ask-secrets | --mnemonic-file <PATH>))",
+    usage: "(--configure --ask-secrets | --picture <PATH> [--pdf <PATH> | --threshold <N> --shares <M> [--pdf-dir <NEW_FOLDER>]] [OPTIONS] (--ask-secrets | --mnemonic-file <PATH>))",
     groups: &[
         HelpGroup {
             heading: "The phrase and the dates:",

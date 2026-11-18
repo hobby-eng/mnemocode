@@ -11,6 +11,7 @@ use mnemocode::recovery::marked_search::{
 use mnemocode::recovery::shares::flow::{ShareRestoreOutcome, match_warnings};
 use mnemocode::recovery::shares::repair::{RepairedShare, ShareRepairOutcome, ShareVariant};
 use mnemocode::recovery::word_search::WordSearchOutcome;
+use mnemocode::refusal::Refusal as _;
 use mnemocode::secret::SecretBytes;
 use mnemocode::sskr::repair::report::{ReportLine, ShareRepairs};
 use wasm_bindgen::prelude::*;
@@ -46,6 +47,7 @@ struct KeptList {
 pub struct SearchResult {
     kind: &'static str,
     message: Option<String>,
+    code: Option<&'static str>,
     lines: Vec<String>,
     notes: Vec<String>,
     warning: Option<String>,
@@ -273,6 +275,13 @@ impl SearchResult {
                 lines: line_texts(lines),
                 ..Self::default()
             },
+            ShareRestoreOutcome::NoPhrase { refusal, lines } => Self {
+                kind: "trouble",
+                message: Some(refusal.to_string()),
+                code: Some(refusal.code()),
+                lines: line_texts(lines),
+                ..Self::default()
+            },
             ShareRestoreOutcome::Question { question, lines } => Self {
                 kind: "question",
                 message: Some(question),
@@ -397,6 +406,13 @@ impl SearchResult {
     #[wasm_bindgen(getter)]
     pub fn message(&self) -> Option<String> {
         self.message.clone()
+    }
+
+    /// The stable code of a trouble that has one, such as
+    /// core.share-restore.last-word-fits-no-phrase; undefined for the rest.
+    #[wasm_bindgen(getter)]
+    pub fn code(&self) -> Option<String> {
+        self.code.map(str::to_owned)
     }
 
     /// The lines of a report, said before the phrases.

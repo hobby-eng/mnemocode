@@ -10,14 +10,13 @@ use mnemocode::backup::re_encoding::{MatchedBy, ReEncoding, ReEncodingError, wor
 use mnemocode::bip39::phrase::Phrase;
 use mnemocode::dates::Date;
 use mnemocode::forms::Form;
-use mnemocode::forms::hints::BIP39;
 use mnemocode::modes::Mode;
 use mnemocode::modes::seedshift::Unmasked;
 use mnemocode::recovery::wallet_check::WalletCheck;
 use mnemocode::refusal::Refusal;
 use mnemocode::text::space::trim;
 
-use super::asking::{AfterFailure, WHAT_NOW, after_failure, secret_until};
+use super::asking::{AfterFailure, WHAT_NOW, after_failure};
 use super::date_search::{backup_choice, dates_again_choice};
 use super::decode::{
     DecodeUse, Step, backup_and_dates_from_options, compared_passphrase, decode_with_questions,
@@ -37,7 +36,7 @@ use super::wallet_options::{
 use super::wallet_question::{WalletAnswer, ask_wallet_evidence};
 use crate::args::{self, OLD_DATES_KEY, Parsed, assert_asked_not_given, is_on, value};
 use crate::gate::Stop;
-use crate::input::{Ask, assert_terminal, secret_ask};
+use crate::input::assert_terminal;
 use crate::os::{Needs, Protection};
 use crate::output::{preflight, warn_of_cloud_copies};
 use crate::terminal::result::part_line;
@@ -447,9 +446,26 @@ impl DecodeUse for ReEncodeUse<'_> {
     }
 
     fn several(&mut self, backup: &Backup, dates: &[Date]) -> Result<Step, Stop> {
-        let re_encoding = match ask_last_word(backup, dates, self.old)? {
+        let re_encoding = match ReEncoding::of(backup, dates, None) {
             Ok(re_encoding) => re_encoding,
-            Err(step) => return Ok(step),
+            // Two phrases: the last word Encode named tells them apart, or the dates were wrong.
+            Err(ReEncodingError::LastWordNeeded) => {
+                notice(
+                    &ReEncodingError::LastWordNeeded.to_string(),
+                    NoticeKind::Warning,
+                );
+                return after_failure(
+                    WHAT_NOW,
+                    &[
+                        Choice::new("Type the last word", Step::Decode),
+                        dates_again_choice(Step::Dates),
+                        backup_choice(self.old, Step::Backup),
+                        Choice::noted("Stop", "nothing is re-encoded", Step::Done),
+                    ],
+                    AfterFailure::default(),
+                );
+            }
+            Err(error) => return Err(error.into()),
         };
         clear_private_screen();
         show_old_phrase(&OldPhrase {
@@ -461,8 +477,8 @@ impl DecodeUse for ReEncodeUse<'_> {
         self.confirm(re_encoding, backup.mode())
     }
 
-    fn decoded(&mut self, backup: &Backup, dates: &[Date]) -> Result<Step, Stop> {
-        let re_encoding = ReEncoding::of(backup, dates, None)?;
+    fn decoded(&mut self, backup: &Backup, result: Unmasked) -> Result<Step, Stop> {
+        let re_encoding = ReEncoding::of_decoded(result)?;
         self.confirm(re_encoding, backup.mode())
     }
 
@@ -479,61 +495,6 @@ impl DecodeUse for ReEncodeUse<'_> {
 /// The checksum and fingerprint of `result`, without the phrase.
 fn report_checksum_of(result: &Unmasked) -> Result<(), Stop> {
     report_checksum(words_of(result)?.1.as_ref())
-}
-
-/// What the last word gave.
-enum LastWord {
-    Word(Box<ReEncoding>),
-    NoPhrase,
-}
-
-/// The last word of the original seed phrase, for a backup of the Original Seedshift with a valid
-/// last word, which keeps nothing of it, picking the phrase of the backup that ends with it. Where
-/// none does, the word may be mistyped, or a wrong date gave other phrases: the person chooses what
-/// to type again, or stops; the dates and the codes are given back to Decode's questions.
-fn ask_last_word(
-    backup: &Backup,
-    dates: &[Date],
-    old: &Parsed,
-) -> Result<Result<ReEncoding, Step>, Stop> {
-    let ask = Ask {
-        hints: Some(&*BIP39),
-        ..secret_ask(
-            "Last word of the original seed phrase:",
-            "the last word of the original seed phrase",
-            PHRASE_LIMIT,
-        )
-    };
-    loop {
-        let read = secret_until(&ask, |answer: &str| {
-            match ReEncoding::of(backup, dates, Some(answer)) {
-                Ok(re_encoding) => Ok(LastWord::Word(Box::new(re_encoding))),
-                Err(ReEncodingError::NoSuchLastWord) => Ok(LastWord::NoPhrase),
-                Err(error) => Err(error),
-            }
-        })?;
-        if let LastWord::Word(re_encoding) = read {
-            return Ok(Ok(*re_encoding));
-        }
-        notice(
-            &ReEncodingError::NoSuchLastWord.to_string(),
-            NoticeKind::Warning,
-        );
-        // Only the Original Seedshift gives several phrases, and only with its dates.
-        let next = after_failure(
-            WHAT_NOW,
-            &[
-                Choice::new("Type the last word again", None),
-                dates_again_choice(Some(Step::Dates)),
-                backup_choice(old, Some(Step::Backup)),
-                Choice::noted("Stop", "nothing is re-encoded", Some(Step::Done)),
-            ],
-            AfterFailure::default(),
-        )?;
-        if let Some(step) = next {
-            return Ok(Err(step));
-        }
-    }
 }
 
 /// The new backup, asked until Encode takes it, with what it needs: a refusal, such as text that
@@ -553,6 +514,10 @@ fn new_backup_asked_until_taken() -> Result<(PreparedEncode, Needs), Stop> {
 /// first, and at the first it cancels. The names of the files are settled as the command line
 /// settles them, and every option checked as Encode checks it.
 fn asked_new_backup(refusal: Option<&str>) -> Result<(PreparedEncode, Needs), Stop> {
+    // Started from the menu, Shift+Tab goes back a step, from the first one to the menu's questions.
+    let in_menu = crate::terminal::for_menu();
+    crate::terminal::set_steps_back(in_menu);
+    crate::terminal::remember_choices(in_menu);
     // Encode's command line: its name, then the options.
     let encoding = loop {
         new_backup_screen(&Notices::new());
@@ -560,11 +525,20 @@ fn asked_new_backup(refusal: Option<&str>) -> Result<(PreparedEncode, Needs), St
             notice(refusal, NoticeKind::Warning);
         }
         forget_claimed();
-        let form = ask_form()?.ok_or(Stop::Cancelled)?;
-        if let Some(encoding) = ask_encoding_in(form)? {
+        let Some(form) = ask_form()? else {
+            if in_menu {
+                crate::terminal::go_back_a_step();
+            }
+            return Err(Stop::Cancelled);
+        };
+        let mut answers = None;
+        if ask_encoding_in(form, &mut super::new_backup::kept(&mut answers))?
+            && let Some(encoding) = answers
+        {
             break encoding;
         }
     };
+    crate::terminal::set_steps_back(false);
     let (encoding, dates) = encoding;
     let mut fresh = args::parse_arguments(&encoding[1..])?;
     let needs = preflight(&mut fresh)?;

@@ -341,6 +341,17 @@ fn drawn(font: &UiFont, page: &Page, white: bool) -> Result<Pixmap, RasterError>
 
 /// RGBA pixels as a PNG file.
 pub fn png_of(width: u32, height: u32, rgba: &[u8]) -> Result<Vec<u8>, RasterError> {
+    png_with(width, height, rgba, None)
+}
+
+/// RGBA pixels as a PNG file that keeps `kept`, the codes the image shows, where there are any
+/// (see [`crate::printed`]).
+fn png_with(
+    width: u32,
+    height: u32,
+    rgba: &[u8],
+    kept: Option<&crate::printed::Kept>,
+) -> Result<Vec<u8>, RasterError> {
     let mut file = Vec::new();
     let mut encoder = png::Encoder::new(&mut file, width, height);
     encoder.set_color(png::ColorType::Rgba);
@@ -354,7 +365,13 @@ pub fn png_of(width: u32, height: u32, rgba: &[u8]) -> Result<Vec<u8>, RasterErr
     encoder.set_source_srgb(png::SrgbRenderingIntent::RelativeColorimetric);
     encoder
         .write_header()
-        .and_then(|mut writer| writer.write_image_data(rgba))
+        .and_then(|mut writer| {
+            if let Some(kept) = kept {
+                let chunk = crate::printed::png_chunk(kept);
+                writer.write_chunk(png::chunk::ChunkType(*b"iTXt"), &chunk)?;
+            }
+            writer.write_image_data(rgba)
+        })
         .map_err(|error| RasterError(error.to_string()))?;
     Ok(file)
 }
@@ -370,7 +387,7 @@ pub fn page_image(
     let file = match format {
         ImageFormat::Png => {
             let rgba = pixmap.clone().take_demultiplied();
-            png_of(width, height, &rgba)?
+            png_with(width, height, &rgba, page.kept.as_ref())?
         }
         ImageFormat::Jpg => {
             let rgb: Vec<u8> = pixmap
@@ -383,6 +400,12 @@ pub fn page_image(
             let mut file = Vec::new();
             let mut encoder = Encoder::new(&mut file, JPEG_QUALITY);
             encoder.set_density(PixelDensity::dpi(IMAGE_DPI as u16));
+            if let Some(kept) = &page.kept {
+                let segment = crate::printed::jpeg_segment(kept);
+                encoder
+                    .add_app_segment(crate::printed::JPEG_SEGMENT, segment.to_vec())
+                    .map_err(|error| RasterError(error.to_string()))?;
+            }
             encoder
                 .encode(&rgb, width as u16, height as u16, ColorType::Rgb)
                 .map_err(|error| RasterError(error.to_string()))?;

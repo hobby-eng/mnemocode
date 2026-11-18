@@ -43,6 +43,8 @@ pub(crate) enum InputError {
     Terminal(String),
     /// A PDF that keeps no legend line, such as one another program rewrote.
     PdfWithoutLegend,
+    /// Files whose backup could not be read, as the reader of an answer's files refused them.
+    Files(Box<dyn Refusal>),
 }
 
 impl std::fmt::Display for InputError {
@@ -65,6 +67,7 @@ impl std::fmt::Display for InputError {
             Self::PdfWithoutLegend => f.write_str(
                 "This PDF keeps no legend that MnemoCode can read, as when another program saved it again: type the rows of its floss key instead.",
             ),
+            Self::Files(error) => error.fmt(f),
         }
     }
 }
@@ -82,6 +85,7 @@ impl Refusal for InputError {
             Self::Signal => "cli.signal",
             Self::Terminal(_) => "cli.terminal",
             Self::PdfWithoutLegend => "cli.input.pdf-without-legend",
+            Self::Files(error) => error.code(),
         }
     }
 }
@@ -299,7 +303,7 @@ fn path_of_answer(answer: &str) -> Result<Option<PathBuf>, InputError> {
 
 /// `path` made absolute against the folder the program started in; a network path refused as at
 /// a question, so that options and answers read only local files alike (AUD-007-DOC005).
-fn local_resolved(path: &Path) -> Result<PathBuf, InputError> {
+pub(crate) fn local_resolved(path: &Path) -> Result<PathBuf, InputError> {
     let local = local_path(path.to_path_buf())?;
     Ok(os::resolve(
         &local,
@@ -379,14 +383,21 @@ pub(crate) fn answered_text(
     text_of(os::read_secret_file(&resolved, limit, what, true)?, what)
 }
 
-/// The legend line of the pattern's PDF that `answer` names as a path, where `pattern_pdf` lets an
-/// answer name one; none for any other answer.
-fn pattern_answer(answer: &str, pattern_pdf: bool) -> Result<Option<SecretText>, InputError> {
-    if !pattern_pdf {
+/// Reads the backup that the files at a path hold, such as the codes of cards or a pattern's
+/// legend line; none where they hold none. The commands give it, so that input needs none of them.
+pub(crate) type FilesReader = fn(&Path) -> Result<Option<SecretText>, InputError>;
+
+/// The backup of the files that `answer` names as a path, read by `files` where a question takes
+/// them; none for any other answer.
+fn files_answer(
+    answer: &str,
+    files: Option<FilesReader>,
+) -> Result<Option<SecretText>, InputError> {
+    let Some(read) = files else {
         return Ok(None);
-    }
+    };
     match path_of_answer(answer)? {
-        Some(path) => pattern_legend(&path),
+        Some(path) => read(&path),
         None => Ok(None),
     }
 }
@@ -508,8 +519,8 @@ pub(crate) struct Ask<'h> {
     pub(crate) echo: bool,
     /// Accept a local text file path too; this name, never the path, appears in file refusals.
     pub(crate) text_file: Option<&'static str>,
-    /// Take a pattern's PDF at such a path as the legend line it keeps.
-    pub(crate) pattern_pdf: bool,
+    /// Take the backup that the files at such a path hold, read by this.
+    pub(crate) files: Option<FilesReader>,
     /// Pass the path of a local folder on as it is typed, for the caller to read.
     pub(crate) folders: bool,
     /// A line above the prompt that says what the answer may be.
@@ -530,7 +541,7 @@ fn read_answer(ask: &Ask<'_>, secret: bool) -> Result<Reading, InputError> {
             echo: ask.echo,
             limit: ask.limit,
             escape_goes_back: true,
-            previous: terminal::steps_back(),
+            previous: terminal::steps_back() || terminal::back_to_menu_question(),
             prompt_width: text_width(&shown),
             pasted_line_break: ask.pasted_line_break,
             hints: Some(&hints),
@@ -588,12 +599,17 @@ pub(crate) fn ask_until<T, E: std::fmt::Display>(
             }
         }
         if let Some(note) = &ask.note {
+            // A warning above, drawn here or on the new step screen, stands apart from the note.
+            if warning.is_some() && !redrawn {
+                terminal::error_line("");
+            }
             for line in notice_lines(note, NoticeKind::Info) {
                 terminal::error_line(&line);
             }
         }
-        // A blank line keeps what is said above apart from the line typed into.
-        if warning.is_some() || ask.note.is_some() {
+        // A blank line keeps what is said above apart from the line typed into; a new step screen
+        // has drawn the warning with one under it already.
+        if (warning.is_some() && !redrawn) || ask.note.is_some() {
             terminal::error_line("");
         }
         let reading = read_answer(ask, secret)?;
@@ -603,6 +619,11 @@ pub(crate) fn ask_until<T, E: std::fmt::Display>(
             // In a task of the menu Escape leaves for the main menu, and Shift+Tab goes back.
             Reading::Back if terminal::steps_back() => {
                 terminal::leave_to_menu();
+                return Ok(Err(Left::Cancelled));
+            }
+            // The first question of a command of the menu: back to the menu's question.
+            Reading::Previous if !terminal::steps_back() => {
+                terminal::go_back_a_step();
                 return Ok(Err(Left::Cancelled));
             }
             Reading::Previous => return Ok(Err(Left::Back)),
@@ -620,7 +641,7 @@ pub(crate) fn ask_until<T, E: std::fmt::Display>(
             Reading::Answer(text) => {
                 let read = match ask.text_file {
                     Some(_) if ask.folders && folder_answer(&text).is_some() => Ok(text),
-                    Some(name) => match pattern_answer(&text, ask.pattern_pdf) {
+                    Some(name) => match files_answer(&text, ask.files) {
                         Ok(Some(line)) => Ok(line),
                         Ok(None) => answered_text(&text, name, ask.limit),
                         Err(refused) => Err(refused),
@@ -651,7 +672,7 @@ pub(crate) fn secret_ask<'h>(prompt: &str, what: &str, limit: usize) -> Ask<'h> 
         hints: None,
         echo: on_private_screen(),
         text_file: None,
-        pattern_pdf: false,
+        files: None,
         folders: false,
         note: None,
         fallback: None,

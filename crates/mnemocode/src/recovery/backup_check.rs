@@ -23,8 +23,6 @@ pub const RESTORES_MESSAGE: &str = "The backup restores this seed phrase.";
 /// The refusals of a backup check.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CheckError {
-    /// A backup made with the Original Seedshift with a valid last word.
-    Uncheckable,
     /// What a backup refuses.
     Backup(BackupError),
     /// What a form refuses.
@@ -36,9 +34,6 @@ pub enum CheckError {
 impl fmt::Display for CheckError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Uncheckable => f.write_str(
-                "A backup made with the Original Seedshift with a valid last word cannot be checked: its last word was replaced.",
-            ),
             Self::Backup(error) => error.fmt(f),
             Self::Form(error) => error.fmt(f),
             Self::Mode(error) => error.fmt(f),
@@ -51,7 +46,6 @@ impl std::error::Error for CheckError {}
 impl Refusal for CheckError {
     fn code(&self) -> &'static str {
         match self {
-            Self::Uncheckable => "core.backup-check.uncheckable",
             Self::Backup(error) => error.code(),
             Self::Form(error) => error.code(),
             Self::Mode(error) => error.code(),
@@ -60,7 +54,6 @@ impl Refusal for CheckError {
 
     fn kind(&self) -> RefusalKind {
         match self {
-            Self::Uncheckable => RefusalKind::Error,
             Self::Backup(error) => error.kind(),
             Self::Form(error) => error.kind(),
             Self::Mode(error) => error.kind(),
@@ -386,8 +379,11 @@ impl WrittenCodes {
         // instead of being refused for its checksum.
         let backup = self.codes.with_mode(self.mode)?;
         let all: Vec<Date> = dates.iter().collect();
-        let recovered = backup.decode(&all)?.recovered;
-        Ok(holds_phrase(&recovered, phrase))
+        // Original Seedshift codes may give two phrases: the phrase must be one of them.
+        Ok(backup
+            .candidates(&all)?
+            .iter()
+            .any(|found| holds_phrase(&found.recovered, phrase)))
     }
 }
 
@@ -424,18 +420,9 @@ pub struct EncodedBackupCheck {
 }
 
 impl EncodedBackupCheck {
-    /// Whether a backup made in `mode` can be checked: not the Original Seedshift with a valid last
-    /// word, whose last word was replaced, so that only a search finds the seed phrase again.
-    pub const fn supports(mode: Mode) -> bool {
-        mode.capabilities().backup_check
-    }
-
-    /// The check of `original`; refused for a mode whose backup cannot be checked.
-    pub fn new(original: EncodedOriginal) -> Result<Self, CheckError> {
-        if !Self::supports(original.mode) {
-            return Err(CheckError::Uncheckable);
-        }
-        Ok(Self { original })
+    /// The check of `original`.
+    pub const fn new(original: EncodedOriginal) -> Self {
+        Self { original }
     }
 
     /// Reads the codes as written down, in the form and mode of the result.
@@ -595,8 +582,7 @@ mod tests {
             mode,
             codes: masked.shifted.clone(),
             dates: Dates::new(dates),
-        })
-        .unwrap();
+        });
         (check, text)
     }
 
@@ -673,11 +659,5 @@ mod tests {
             })
             .unwrap();
         assert_eq!(result.verdict, BackupVerdict::Unreadable);
-    }
-
-    #[test]
-    fn a_mode_whose_last_word_was_replaced_cannot_be_checked() {
-        assert!(!EncodedBackupCheck::supports(Mode::SeedshiftLegacyValid));
-        assert!(EncodedBackupCheck::supports(Mode::Direct));
     }
 }

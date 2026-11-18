@@ -124,6 +124,7 @@ fn a_pdf_sidecar_and_share_qrs_use_the_same_hidden_format() {
             "--page-size",
             "a5",
             "--qr-hidden",
+            "--card-qr-png",
             "--card-name",
             "Public Test",
         ],

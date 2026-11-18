@@ -58,6 +58,7 @@ libm.workspace = true
 miniz_oxide.workspace = true
 pdf-writer.workspace = true
 png.workspace = true
+sha2.workspace = true
 skrifa.workspace = true
 subsetter.workspace = true
 tiny-skia.workspace = true

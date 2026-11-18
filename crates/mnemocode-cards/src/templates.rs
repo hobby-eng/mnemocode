@@ -443,7 +443,7 @@ impl CardTemplate {
         if fragment.is_some() && !self.draws_separate_cards() {
             return Err(TemplateError::SheetsOnly);
         }
-        match self.style {
+        let mut page = match self.style {
             CardStyle::Business(style) => render_business_cards(
                 drawing,
                 random,
@@ -453,7 +453,33 @@ impl CardTemplate {
                 business_offset,
             ),
             CardStyle::Material(style) => render_material_card(drawing, random, style, cards),
+        }?;
+        // A separate card keeps its own code, a sheet every code of the set; every file of one
+        // export has one document ID, of the real codes and the export's mark, which a sheet and
+        // separate cards share whatever decoys each keeps, and another export does not.
+        let all = cards.codes.colors.len();
+        let numbered: Vec<String> = (0..all)
+            .map(|index| cards.codes.numbered(index, " "))
+            .collect();
+        let real = cards.own().map_or(all, |own| own.min(all));
+        let places = fragment.map_or(0..all, |at| at..at + 1);
+        let mut identified = numbered[..real].to_vec();
+        if let Some(mark) = cards.export {
+            identified.push(format!("export {mark:016x}"));
         }
+        page.kept = Some(crate::printed::Kept {
+            document: crate::printed::document_id(&identified),
+            share: cards.reference.clone(),
+            swatches: places
+                .map(|index| {
+                    (
+                        numbered[index].clone(),
+                        cards.codes.colors[index].as_str().to_owned(),
+                    )
+                })
+                .collect(),
+        });
+        Ok(page)
     }
 
     /// What `then` gives with the shape of a sheet of `page_size` for `cards` in this design.

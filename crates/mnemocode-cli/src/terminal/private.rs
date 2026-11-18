@@ -34,6 +34,9 @@ struct SummaryLine {
 #[derive(Debug, Default)]
 struct Steps {
     title: String,
+    /// The steps of the task under the title, where it has them: those passed, the one asked and
+    /// those to come.
+    progress: Option<String>,
     startup_warnings: Vec<String>,
     context: Vec<(Vec<String>, Lifetime)>,
     begun: bool,
@@ -125,8 +128,11 @@ pub(crate) fn step_begin() -> bool {
         steps.begun = true;
         let mut lines = vec![
             CLEAR_SCREEN.to_owned(),
-            format!("{}\n", heading_line(Channel::Error, &steps.title)),
+            heading_line(Channel::Error, &steps.title),
         ];
+        lines.extend(steps.progress.iter().cloned());
+        lines.push(String::new());
+        let heading_rows = lines.len();
         for (context, _) in &steps.context {
             lines.extend(context.iter().cloned());
         }
@@ -140,6 +146,14 @@ pub(crate) fn step_begin() -> bool {
             lines.extend(notice_lines(warning, NoticeKind::Warning));
         }
         steps.warnings_drawn = !steps.warnings.is_empty();
+        // What is said under the heading stands apart from the question after it, by one blank
+        // line, also where the context brings its own.
+        if lines.len() > heading_rows {
+            if let Some(last) = lines.last_mut() {
+                last.truncate(last.trim_end_matches('\n').len());
+            }
+            lines.push(String::new());
+        }
         Some(lines)
     });
     let Some(lines) = drawing else {
@@ -153,6 +167,29 @@ pub(crate) fn step_begin() -> bool {
         error_line(&line);
     }
     true
+}
+
+/// The private screen's title, where it is shown.
+pub(crate) fn screen_title() -> Option<String> {
+    with_steps(|steps| steps.as_ref().map(|steps| steps.title.clone()))
+}
+
+/// Titles the private screen `title`: the task and the way it goes, such as "Encode · Embroidery".
+pub(crate) fn set_screen_title(title: &str) {
+    with_steps(|steps| {
+        if let Some(steps) = steps {
+            title.clone_into(&mut steps.title);
+        }
+    });
+}
+
+/// Shows `progress`, the steps of the task, under the title of each step's screen; none removes it.
+pub(crate) fn set_progress(progress: Option<String>) {
+    with_steps(|steps| {
+        if let Some(steps) = steps {
+            steps.progress = progress;
+        }
+    });
 }
 
 /// A typed answer was accepted: the warnings of its step and the context kept for its question
@@ -215,6 +252,7 @@ pub(crate) fn question_ended() {
 
 /// A result shows, which the questions after it are drawn under.
 pub(crate) fn show_result() {
+    super::note_result_shown();
     with_steps(|steps| {
         if let Some(steps) = steps {
             steps.begun = true;

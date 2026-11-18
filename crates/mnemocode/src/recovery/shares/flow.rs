@@ -24,7 +24,6 @@ use crate::sskr::restore::{SetBackup, ShareSet};
 use crate::sskr::typed::{ShareInput, TroubleKind};
 
 /// What a restore asks of a [`RestoreFlow`].
-#[derive(Debug)]
 pub struct ShareRestoreRequest {
     /// The shares as typed.
     pub input: ShareInput,
@@ -40,6 +39,15 @@ pub struct ShareRestoreRequest {
     pub limits: SearchLimits,
     /// Whether the person said yes to the long search that a question announced.
     pub confirmed: bool,
+    /// The last word Encode named, an index, for Original Seedshift shares; none otherwise.
+    pub last_word: Option<u16>,
+}
+
+/// Redacted: the shares, the dates and the last word are secret.
+impl std::fmt::Debug for ShareRestoreRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        crate::secret::redacted(f, "a share restore request")
+    }
 }
 
 /// A phrase that shares restored, the phrase they hold, and what a repair filled in.
@@ -66,11 +74,42 @@ pub struct PhrasesFound {
     pub listed: Vec<Phrase>,
 }
 
+/// Why enough shares gave no seed phrase where no wallet was given to rule them out.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NoPhrase {
+    /// The last word Encode named fits no phrase of the shares under their dates.
+    LastWord,
+    /// The shares and their dates give no phrase with a valid checksum.
+    Checksum,
+}
+
+impl std::fmt::Display for NoPhrase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::LastWord => "The last word given fits no phrase that these shares and dates give: check it against the word Encode named, and the dates.",
+            Self::Checksum => "These shares and dates give no seed phrase with a valid checksum: a date or a share is wrong.",
+        })
+    }
+}
+
+impl std::error::Error for NoPhrase {}
+
+impl crate::refusal::Refusal for NoPhrase {
+    fn code(&self) -> &'static str {
+        match self {
+            Self::LastWord => "core.share-restore.last-word-fits-no-phrase",
+            Self::Checksum => "core.share-restore.no-valid-phrase",
+        }
+    }
+}
+
 /// What the sets of a restore give as seed phrases.
 #[derive(Debug)]
 pub enum RestoredPhrases {
     /// The phrases found.
     Phrases(PhrasesFound),
+    /// No phrase, and no wallet given: why.
+    NoPhrase(NoPhrase),
     /// The dates are more than a set's phrase takes: why, for the person.
     Dates(String),
     /// No phrase is the wallet's: why, for the person.
@@ -82,6 +121,13 @@ pub enum RestoredPhrases {
 /// What a restore of shares ends with.
 #[derive(Debug)]
 pub enum ShareRestoreOutcome {
+    /// No phrase, and no wallet given: why, after the lines of the report.
+    NoPhrase {
+        /// Why.
+        refusal: NoPhrase,
+        /// The lines of the report.
+        lines: Vec<ReportLine>,
+    },
     /// A trouble to say, which names any share by its place, after the lines of the report.
     Trouble {
         /// The trouble.
@@ -146,12 +192,14 @@ fn sets_of(phrases: &[UnmaskedPhrase]) -> Vec<Rc<ShareSet>> {
 
 /// The seed phrases of what `unmasked` gave of `sets`, each with the phrase its shares hold, what a
 /// repair filled in, its shares named by `places`, and the backup in the form of its shares; or why
-/// the dates do not fit, or why none is the wallet's.
+/// the dates do not fit, why none is the wallet's where one is `given`, and otherwise why none came
+/// out: the last word `given` fits none, or no phrase keeps the checksum.
 pub fn phrases_of(
     unmasked: Unmasked,
     sets: usize,
     searched_combinations: Option<u64>,
     places: &[usize],
+    (wallet_given, last_word_given): (bool, bool),
 ) -> RestoredPhrases {
     let (phrases, listed, matches) = match unmasked {
         Unmasked::Dates(message) => return RestoredPhrases::Dates(message),
@@ -163,10 +211,14 @@ pub fn phrases_of(
         } => (phrases, listed, matches),
     };
     if phrases.is_empty() {
-        return RestoredPhrases::Mismatch(ShareSet::wallet_mismatch(
-            sets as u64,
-            searched_combinations,
-        ));
+        return match (wallet_given, last_word_given) {
+            (true, _) => RestoredPhrases::Mismatch(ShareSet::wallet_mismatch(
+                sets as u64,
+                searched_combinations,
+            )),
+            (false, true) => RestoredPhrases::NoPhrase(NoPhrase::LastWord),
+            (false, false) => RestoredPhrases::NoPhrase(NoPhrase::Checksum),
+        };
     }
     let found_sets = sets_of(&phrases);
     let phrases = phrases
@@ -242,7 +294,8 @@ impl RestoreFlow {
             request.dates.clone(),
             request.wallet.clone(),
             limits,
-        )?;
+        )?
+        .with_last_word(request.last_word);
         Ok(Self {
             needs_wallet: unmasking.needs_wallet(),
             phase: Phase::Waiting(Box::new(request.input)),
@@ -458,9 +511,11 @@ impl RestoreFlow {
             return;
         };
         let searched = self.unmasking.searched_combinations();
-        let restored = phrases_of((*search).finish(), sets, searched, &places);
+        let given = (self.wallet_given, self.unmasking.last_word_given());
+        let restored = phrases_of((*search).finish(), sets, searched, &places, given);
         self.ended(match restored {
             RestoredPhrases::Stopped => ShareRestoreOutcome::Stopped { lines },
+            RestoredPhrases::NoPhrase(refusal) => ShareRestoreOutcome::NoPhrase { refusal, lines },
             RestoredPhrases::Dates(message) | RestoredPhrases::Mismatch(message) => {
                 ShareRestoreOutcome::Trouble { message, lines }
             }

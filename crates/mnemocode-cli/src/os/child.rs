@@ -31,6 +31,7 @@ pub(crate) struct CommandEnd {
 pub(crate) fn run_own_process(arguments: &[String]) -> io::Result<CommandEnd> {
     Command::new(own_program()?)
         .args(arguments)
+        .env(super::env::FOR_MENU, "1")
         .status()
         .map(command_end)
 }

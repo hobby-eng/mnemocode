@@ -177,8 +177,14 @@ impl Report {
             ));
             let muted = |line: &str| paint(Channel::Output, style::MUTED, line);
             for (name, detail) in &self.0 {
-                let mark = paint(Channel::Output, style::GOOD, CHECK_MARK);
-                let mark = format!("{mark}{name:<NAME_WIDTH$} ");
+                let check = paint(Channel::Output, style::GOOD, CHECK_MARK);
+                // A name longer than its column stands alone; its detail goes under the column.
+                let mark = if name.chars().count() > NAME_WIDTH {
+                    lines.push(format!("{check}{name}"));
+                    " ".repeat(DETAIL_COLUMN)
+                } else {
+                    format!("{check}{name:<NAME_WIDTH$} ")
+                };
                 lines.extend(report_lines(&mark, DETAIL_COLUMN, detail, &muted));
             }
             let mark = format!("{} ", paint(Channel::Output, style::GOOD, PASSED));

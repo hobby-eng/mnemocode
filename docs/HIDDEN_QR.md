@@ -13,12 +13,13 @@ backup QR to an online decoder.
 
 ## Use
 
-For a separate PNG, the menu asks what a QR scanner shows of the code: a business card that
-MnemoCode invents, as it invents the details of cards; your own business card, typed as name,
-company, phone and email on one line with the details left out invented; a web link; a short text;
-or nothing hidden, an ordinary QR code of the backup codes. Whatever a scanner shows, MnemoCode reads
-the backup hidden in the same code. In a PDF, the public text is a vCard built from the printed name, company, role,
-email and phone. It has no website field. Its hidden record contains the backup codes without
+The menu asks one question about the QR code: none, an ordinary one or one with hidden data, and
+where it goes: on the cards only, on the cards and as a PNG file, or as a PNG file only. Any scanner
+shows the backup codes of an ordinary QR code. Of a QR code with hidden data, regular scanners see
+only a contact card: the one printed on the cards, or one that MnemoCode invents for a PNG made
+without cards. MnemoCode reads the backup hidden in the same code. From the command line,
+`--qr-text` gives a separate PNG another visible text. In a PDF, the public text is a vCard built
+from the printed name, company, role, email and phone. It has no website field. Its hidden record contains the backup codes without
 extra decoy cards. Each SSKR share keeps its own record and QR; shares are never combined here.
 
 The card's `Details` choice controls the PDF's public contact: random details create a fictitious

@@ -1,11 +1,9 @@
-//! `mnemocode recover-word`: finds forgotten or missing words of a seed phrase, or the
-//! checksum-valid last words of a legacy Seedshift phrase, and compares each candidate with the
-//! wallet. With --ask-secrets, a search with no usable result or too many candidates to show offers
+//! `mnemocode recover-word`: finds forgotten or missing words of a seed phrase and compares each
+//! candidate with the wallet. With --ask-secrets, a search with no usable result or too many candidates to show offers
 //! what to change, keeping the list and its passphrase.
 
 use std::fmt;
 
-use mnemocode::bip39::phrase::{Phrase, legacy_valid_last_words};
 use mnemocode::bip39::sizes::entropy_bytes;
 use mnemocode::bip39::table::english;
 use mnemocode::candidates::format::{
@@ -46,10 +44,9 @@ use crate::terminal::{
 };
 
 /// The options `recover-word` takes.
-pub(crate) const OPTIONS: [&str; 24] = [
+pub(crate) const OPTIONS: [&str; 23] = [
     "mnemonic",
     "mnemonic-file",
-    "legacy-valid-last-word",
     "missing-word",
     "ask-secrets",
     "candidates-file",
@@ -84,7 +81,6 @@ const POSITION: Column = ("position", "Position");
 const WORD: Column = ("word", "Word");
 const WORD_NUMBER: Column = ("word-index", "Word number");
 const CHECKSUM_BITS: Column = ("checksum-bits", "Checksum bits");
-const LEGACY_TAIL: Column = ("legacy-tail", "Old word's data");
 const WORDS: Column = ("words", "Words");
 const WALLET: Column = ("evidence", "Wallet");
 const PHRASE: Column = ("mnemonic", "Phrase");
@@ -94,10 +90,6 @@ const PHRASE: Column = ("mnemonic", "Phrase");
 enum RecoverWordError {
     /// Codes where words are searched.
     CodesNotWords,
-    /// Two kinds of search asked for.
-    LegacyAndMissing,
-    /// A candidate list of replacements, which are no wallets.
-    LegacyList,
 }
 
 impl fmt::Display for RecoverWordError {
@@ -107,12 +99,6 @@ impl fmt::Display for RecoverWordError {
                 f,
                 "These are the codes of an encoded seed phrase, not its words: {} reads them, with ? for each unread code.",
                 super::menu_entries::DECODE.label
-            ),
-            Self::LegacyAndMissing => {
-                f.write_str("--legacy-valid-last-word and --missing-word cannot be combined.")
-            }
-            Self::LegacyList => f.write_str(
-                "--legacy-valid-last-word lists replacements, not wallets: no candidate list.",
             ),
         }
     }
@@ -124,12 +110,6 @@ impl Refusal for RecoverWordError {
     fn code(&self) -> &'static str {
         match self {
             Self::CodesNotWords => "cli.recover-word-command.codes-not-words",
-            Self::LegacyAndMissing => {
-                "cli.recover-word-command.legacy-valid-last-word-missing-word-cannot-combined"
-            }
-            Self::LegacyList => {
-                "cli.recover-word-command.legacy-valid-last-word-lists-replacements-not-wallets"
-            }
         }
     }
 }
@@ -185,69 +165,6 @@ fn word_columns(index: u16) -> [String; 2] {
     [english()[index].to_owned(), (index + 1).to_string()]
 }
 
-/// The candidates of a legacy last word: a short fixed list, each compared with the wallet.
-fn legacy_replacements(text: &str, wallet: &GivenWallet) -> Result<Found, Stop> {
-    let replacements = legacy_valid_last_words(text)?;
-    let preserving = replacements
-        .iter()
-        .find(|candidate| candidate.preserves_entropy);
-    let position = replacements.first().map_or(0, |first| first.phrase.len());
-    let (mut rows, mut matched, mut warning) = (Vec::new(), 0, None);
-    for (place, candidate) in replacements.iter().enumerate() {
-        let phrase = &candidate.phrase;
-        let answer = wallet
-            .check
-            .as_ref()
-            .map(|check| check.check(phrase))
-            .transpose()?;
-        matched += u64::from(answer.as_ref().is_some_and(|answer| answer.matched));
-        warning = warning.or(answer.as_ref().and_then(|answer| answer.warning));
-        let [word, number] = word_columns(candidate.index as u16);
-        let kept = if candidate.preserves_entropy {
-            "preserved"
-        } else {
-            "alternative"
-        };
-        rows.push(Row {
-            columns: vec![word, number, last_word_bits(phrase), kept.to_owned()],
-            phrase: phrase.text(),
-            number: place as u64 + 1,
-            answer,
-        });
-    }
-    Ok(Found {
-        facts: vec![
-            ("Mode", "Legacy final-word replacement".to_owned()),
-            ("Position", position.to_string()),
-            (
-                "Entropy-preserving replacement",
-                preserving.map_or("unavailable".to_owned(), |candidate| {
-                    english()[candidate.index].to_owned()
-                }),
-            ),
-        ],
-        columns: vec![WORD, WORD_NUMBER, CHECKSUM_BITS, LEGACY_TAIL],
-        about: "All checksum-valid last words; the candidate marked preserved keeps the old word's data.",
-        compared_with: Some(
-            "Evidence was compared with the replacements, not with the original legacy phrases.",
-        ),
-        count: rows.len() as u64,
-        rows,
-        entropies: None,
-        matched,
-        warning,
-    })
-}
-
-/// The checksum bits of the last word of `phrase`.
-fn last_word_bits(phrase: &Phrase) -> String {
-    let indexes: Vec<u16> = (0..phrase.len())
-        .filter_map(|place| phrase.index(place))
-        .map(|index| index as u16)
-        .collect();
-    mnemocode::recovery::places::last_word_checksum_bits(&indexes)
-}
-
 /// The columns and facts of a search with the places `unknown`, and the values of a candidate.
 fn row_of(shown: &ShownCandidate, unknown: &[usize]) -> Result<Row, Stop> {
     let words = shown.candidate.words();
@@ -282,11 +199,10 @@ fn row_of(shown: &ShownCandidate, unknown: &[usize]) -> Result<Row, Stop> {
 /// How the phrase is read: the options that say what it holds.
 #[derive(Clone, Copy)]
 struct PhraseRules {
-    legacy: bool,
     missing: bool,
 }
 
-/// What a phrase asks for: the replacements of a legacy last word, or a search of words.
+/// What a phrase asks for: a search of words.
 struct PhraseSearch {
     /// The phrase as typed.
     text: SecretText,
@@ -307,10 +223,6 @@ fn word_search(text: &str, rules: PhraseRules) -> Result<WordSearch, Stop> {
 /// surely finds more candidates than a list holds (`listed`). The messages name only places.
 fn parse_phrase(text: &str, rules: PhraseRules, listed: bool) -> Result<PhraseSearch, Stop> {
     let read = || -> Result<(), Stop> {
-        if rules.legacy {
-            legacy_valid_last_words(text)?;
-            return Ok(());
-        }
         // The same rules that the run keeps; nothing is searched yet.
         let search =
             WordCandidateSearch::new(word_search(text, rules)?, None, WordLimits::default())?;
@@ -750,11 +662,7 @@ fn search_and_show(phrase: &PhraseSearch, mut context: SearchContext<'_>) -> Res
     // The search is a step of its own: its screen shows the title and the search, then the result,
     // no longer the words typed (CORE-39).
     step_begin();
-    let found = if phrase.rules.legacy {
-        legacy_replacements(&phrase.text, context.wallet)
-    } else {
-        words_search(phrase, context.target.is_some(), context.wallet)
-    };
+    let found = words_search(phrase, context.target.is_some(), context.wallet);
     let mut found = match found {
         Ok(found) => found,
         Err(Stop::Refused(refusal)) if refusal.code() == TOO_MANY_FOR_LIST && context.asked => {
@@ -783,12 +691,10 @@ fn search_and_show(phrase: &PhraseSearch, mut context: SearchContext<'_>) -> Res
 }
 
 /// Whether recover-word may offer a candidate list after a search, on its private screen: where no
-/// --candidates-file names one, not for a legacy last word, whose replacements are no wallets, and
-/// not where a wallet given with an option stays, as it does without --ask-secrets. The command then
-/// keeps the right to write files.
+/// --candidates-file names one, and not where a wallet given with an option stays, as it does
+/// without --ask-secrets. The command then keeps the right to write files.
 pub(crate) fn offers_candidate_list(parsed: &Parsed) -> bool {
     terminal_available()
-        && !is_on(parsed, "legacy-valid-last-word")
         && !parsed.contains_key("candidates-file")
         && (is_on(parsed, "ask-secrets") || !wallet_option_given(parsed))
 }
@@ -807,17 +713,9 @@ fn list_of(mut options: Vec<String>) -> Result<Option<CandidatesFile>, Stop> {
 /// Runs the command.
 pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
     let rules = PhraseRules {
-        legacy: is_on(parsed, "legacy-valid-last-word"),
         missing: is_on(parsed, "missing-word"),
     };
-    if rules.legacy && rules.missing {
-        return Err(RecoverWordError::LegacyAndMissing.into());
-    }
     let mut target = CandidatesFile::of(parsed)?;
-    // The replacements are stored phrases, not wallets: the Scanner would search the wrong ones.
-    if rules.legacy && target.is_some() {
-        return Err(RecoverWordError::LegacyList.into());
-    }
     let mut wallet = given_wallet(parsed)?;
     // A list chosen after a search holds the BIP39 passphrase too; it is offered only where it can.
     let offers_list =
@@ -829,9 +727,7 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
     if asked {
         assert_asked_not_given(parsed, &PHRASE_SECRET_OPTIONS)?;
     }
-    let prompt = if rules.legacy {
-        "Exact legacy Seedshift phrase (old final word), or text file path:"
-    } else if rules.missing {
+    let prompt = if rules.missing {
         "The words you have, in order, or text file path:"
     } else {
         "Seed phrase or text file path, ? for each forgotten word:"

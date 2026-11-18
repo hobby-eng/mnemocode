@@ -132,7 +132,7 @@ pub(crate) fn build(root: &Path, target: &str) -> Result<(), Failure> {
     let executable = executable_name(target, system, &version);
     let notices = format!("{name}-licenses.txt");
     fs::copy(&built, folder.join(&executable))?;
-    fs::copy(root.join("THIRD_PARTY_NOTICES.md"), folder.join(&notices))?;
+    fs::write(folder.join(&notices), license_companion(root)?)?;
     let mut checksums = String::new();
     for file in [&executable, &notices] {
         checksums.push_str(&checksum_line(&fs::read(folder.join(file))?, file));
@@ -150,6 +150,21 @@ const DISTRIBUTION_NOTICES: [&str; 4] = [
     "NOTICE",
     "THIRD_PARTY_NOTICES.md",
 ];
+
+/// The text beside an executable: MnemoCode's own licenses and notice, then those of what it
+/// includes, each under the name of its file.
+fn license_companion(root: &Path) -> Result<String, Failure> {
+    let mut text = String::new();
+    for name in DISTRIBUTION_NOTICES {
+        let _infallible = write!(
+            text,
+            "{}==> {name} <==\n\n{}",
+            if text.is_empty() { "" } else { "\n" },
+            fs::read_to_string(root.join(name))?
+        );
+    }
+    Ok(text)
+}
 
 /// Packs every page's file with the license and notices, in a tar archive that holds no time and no
 /// owner.
@@ -372,8 +387,12 @@ pub(crate) fn verify_executable(root: &Path, path: &Path) -> Result<(), Failure>
     let notices = executable.with_file_name(format!("{name}-licenses.txt"));
     let text = fs::read_to_string(&notices).unwrap_or_default();
     check(
-        text.contains("DejaVu") && text.contains("Card artwork"),
-        "has its license notices next to it",
+        DISTRIBUTION_NOTICES
+            .iter()
+            .all(|name| text.contains(&format!("==> {name} <==")))
+            && text.contains("DejaVu")
+            && text.contains("Card artwork"),
+        "has its licenses and notices next to it",
     )
 }
 

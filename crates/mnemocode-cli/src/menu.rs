@@ -8,9 +8,7 @@ mod typed_line;
 
 use mnemocode::bip39::sizes::WORD_COUNTS;
 use mnemocode::bip39::table::Lookup;
-use mnemocode::forms::Form;
 use mnemocode::modes::Mode;
-use mnemocode::qr::admission::MAX_PNG_BYTES;
 use mnemocode::recovery::date_search::wallet_needed;
 use mnemocode::wallet::coins::AddressLocation;
 use mnemocode::wallet::evidence::{KeyNetwork, Place};
@@ -25,14 +23,12 @@ use crate::commands::candidates_file::ask_candidate_list;
 use crate::commands::card_questions::ask_design;
 use crate::commands::date_search::wallet_explanation;
 use crate::commands::encode_questions::{
-    QR_FILE, RECORD_FILE, ask_encoding, example, file_questions, sample_of, seedshift_explanation,
-    variant_explanation,
+    ask_encoding, file_questions, seedshift_explanation, variant_explanation,
 };
 use crate::commands::menu_entries::{
     self, Guide, MENU_GUIDE, MenuEntry, PHRASE_WORDS_QUESTION, TYPED_SOURCE, phrase_words_answer,
 };
 use crate::commands::output_questions::{forget_claimed, input_file, output_file};
-use crate::commands::pattern_questions::PATTERN_FILE;
 use crate::commands::wallet_question::{Asker, WalletAnswer, ask_wallet_evidence_by};
 use crate::commands::{help, named, self_test};
 use crate::gate::Stop;
@@ -41,8 +37,8 @@ use crate::os::{self, Protection};
 use crate::terminal::{
     self, Channel, Choice, Chosen, Explanation, LEAVE_ALTERNATE_SCREEN, LineQuestion, ListQuestion,
     NoticeKind, Shortcut, answer_mark, ask_line, choose, choose_from, error_line, error_raw,
-    heading_line, more_line, notes_room, notice, paint, printable, readme_link,
-    redraw_answer_record, start_answer_record, style, terminal_available, wait_for_enter_or_escape,
+    heading_line, more_line, notice, paint, printable, readme_link, redraw_answer_record,
+    start_answer_record, style, terminal_available, wait_for_enter_or_escape,
 };
 use typed_line::command_display;
 
@@ -50,7 +46,6 @@ use typed_line::command_display;
 const CANCELLED_EXIT_CODE: i32 = 130;
 /// What a shell reports for a process that a signal stopped: more than this.
 /// What stands between the two samples beside the answer that types the codes.
-const SAMPLES_APART: &str = " · ";
 /// Said once when the entries that ask for a secret are no longer offered.
 const SECRET_ENTRIES_LEFT_OUT: &str =
     "The entries that ask for a seed phrase or a share are not offered.";
@@ -137,18 +132,37 @@ fn ask_phrase_words() -> Result<Option<Option<usize>>, Stop> {
 /// Where the encoded phrase of a source is.
 #[derive(Clone, Copy)]
 enum Source {
+    /// Whatever a folder holds, found by Decode.
+    Found,
     Typed,
     Record,
     Qr,
     Pattern,
+    /// Printed cards, whose files keep the codes they print.
+    Cards,
+}
+
+/// How many words the phrase of printed cards has, which end with codes that belong to nothing:
+/// its --words; none for back.
+fn ask_card_words() -> Result<Option<Vec<String>>, Stop> {
+    let choices: Vec<Choice<usize>> = WORD_COUNTS
+        .map(|words| Choice::new(&phrase_words_answer(words), words))
+        .to_vec();
+    Ok(ask_list(PHRASE_WORDS_QUESTION, "Words", &choices, None)?
+        .map(|words| vec!["--words".to_owned(), words.to_string()]))
 }
 
 /// Where an encoded seed phrase is read from, as options: typed on the private screen, with how many
 /// words the phrase has, or a file encode saved.
 fn ask_source() -> Result<Option<Vec<String>>, Stop> {
+    let found = Choice::noted(
+        "Autodetect",
+        "in a folder: cards, patterns, QR codes, shares",
+        Source::Found,
+    );
     let typed = Choice::noted(
         TYPED_SOURCE,
-        "numbers, codes, colors, a record or a stitch legend",
+        "numbers, codes, colors, a record or a legend",
         Source::Typed,
     );
     let record = Choice::noted(
@@ -167,68 +181,69 @@ fn ask_source() -> Result<Option<Vec<String>>, Stop> {
         "a pattern's PDF, or the folder of the patterns",
         Source::Pattern,
     );
-    // Two samples share the room beside the labels, with what stands between them.
-    let room = (notes_room(&[typed.clone(), record.clone(), qr.clone(), pattern.clone()])
-        - SAMPLES_APART.chars().count())
-        / 2;
-    let samples = [
-        sample_of(&example(Form::Indexes)?, room),
-        sample_of(&example(Form::Colors)?, room),
-    ];
-    let typed = Choice {
-        example: Some(samples.join(SAMPLES_APART)),
-        ..typed
-    };
+    // The codes that the files of cards keep, which Decode reads from the files themselves.
+    let cards = Choice::noted(
+        "On printed cards",
+        "their folder, or a PDF or image file of them",
+        Source::Cards,
+    );
     let source = ask_list(
         "Where is the encoded seed phrase?",
         "Source",
-        &[typed, record, qr, pattern],
+        &[found, typed, record, qr, pattern, cards],
         None,
     )?;
-    // Patterns, often several shares, are read from their folder: the one MnemoCode started in
-    // unless another is named.
-    let pattern = matches!(source, Some(Source::Pattern));
-    let (question, fallback, limit, option) = match source {
+    // Every source is looked for in the folder MnemoCode started in, unless another is named.
+    let question = match source {
         None => return Ok(None),
         Some(Source::Typed) => return Ok(ask_phrase_words()?.map(words_option)),
-        Some(Source::Record) => (
-            file_questions::RECORD,
-            RECORD_FILE,
-            crate::commands::given::SHARE_SET_LIMIT,
-            "--input-file",
-        ),
-        Some(Source::Qr) => (file_questions::QR, QR_FILE, MAX_PNG_BYTES, "--qr-file"),
-        Some(Source::Pattern) => (
-            file_questions::PDF,
-            PATTERN_FILE,
-            MAX_PATTERN_PDF_BYTES,
-            "--input-file",
-        ),
+        Some(Source::Found) => file_questions::FOUND,
+        Some(Source::Record) => file_questions::RECORD,
+        Some(Source::Qr) => file_questions::QR,
+        Some(Source::Pattern) => file_questions::PDF,
+        Some(Source::Cards) => file_questions::CARDS,
     };
-    let here = crate::terminal::environment().current.as_ref().map_or_else(
-        || ".".to_owned(),
-        |path| path.to_string_lossy().into_owned(),
-    );
+    let note = "Give the folder that holds the files, and MnemoCode finds every backup and share in it and in the folders inside it; or give one file. Shares of one set found together are read together.";
+    let here = crate::terminal::started_folder();
     let how = LineQuestion {
-        fallback: Some(if pattern { &here } else { fallback }),
-        note: pattern.then_some(
-            "Give the folder that holds the patterns, or one pattern's PDF. If they are in different places, copy them into one folder first.",
-        ),
+        fallback: Some(&here),
+        note: Some(note),
         limit: crate::commands::given::PATH_LIMIT,
         ..LineQuestion::default()
     };
-    Ok(
-        match ask_line(question, "File", how, |answer: &str| {
-            if pattern && let Some(folder) = crate::input::folder_answer(answer) {
-                return Ok(folder.to_string_lossy().into_owned());
+    // Every source takes a folder too, which Decode reads whole, the folders inside it included.
+    // Every question takes any file of a backup, a PDF, PNG or JPEG too, whatever source was
+    // chosen: Decode tells them apart, a QR code image among them.
+    let file = match ask_line(question, "File", how, |answer: &str| {
+        if let Some(folder) = crate::input::folder_answer(answer) {
+            return Ok(folder.to_string_lossy().into_owned());
+        }
+        input_file(answer, MAX_PATTERN_PDF_BYTES)
+    })? {
+        Chosen::One(path) => {
+            // The source chosen narrows what a folder is searched for.
+            let find = match source {
+                Some(Source::Pattern) => Some("patterns"),
+                Some(Source::Qr) => Some("qr"),
+                Some(Source::Cards) => Some("cards"),
+                _ => None,
+            };
+            let mut options = vec!["--input-file".to_owned(), path.clone()];
+            if let Some(find) = find
+                && crate::input::local_folder(std::path::Path::new(&path)).is_some()
+            {
+                options.extend(["--find".to_owned(), find.to_owned()]);
             }
-            input_file(answer, limit)
-        })? {
-            Chosen::One(path) => Some(vec![option.to_owned(), path]),
-            Chosen::Back => None,
-            Chosen::Cancelled => return Err(Stop::Cancelled),
-        },
-    )
+            options
+        }
+        Chosen::Back => return Ok(None),
+        Chosen::Cancelled => return Err(Stop::Cancelled),
+    };
+    // Cards end with codes that belong to nothing: how many words are theirs.
+    if matches!(source, Some(Source::Cards)) {
+        return Ok(ask_card_words()?.map(|words| [file, words].concat()));
+    }
+    Ok(Some(file))
 }
 
 /// Entry 3: an encoded seed phrase turned back into the words.
@@ -241,9 +256,11 @@ fn decode_action() -> Result<Action, Stop> {
 
 /// Whether `options` of a source name a record file, which names its own mode.
 fn names_its_mode(options: &[String]) -> bool {
+    // The codes of cards name none.
     options
         .first()
         .is_some_and(|option| option == "--input-file")
+        && !options.iter().any(|option| option == "--words")
 }
 
 /// Where an encoded backup is and how it was masked, as options with its mode under `mode_flag`;
@@ -373,6 +390,7 @@ fn recover_action() -> Result<Action, Stop> {
             Forgotten::Share,
         ),
     ];
+    let before = answer_mark();
     let forgotten = ask_list("What is forgotten?", "Forgotten", &choices, None)?;
     if let Some(forgotten) = forgotten {
         let guide = match forgotten {
@@ -381,7 +399,8 @@ fn recover_action() -> Result<Action, Stop> {
             Forgotten::Date => menu_entries::DATE_GUIDE,
             Forgotten::Share => menu_entries::SHARE_GUIDE,
         };
-        redraw_answer_record(&heading_lines(None, guide), answer_mark());
+        // The title names what is forgotten, as for a task of the menu.
+        redraw_answer_record(&heading_lines(None, guide), before);
     }
     match forgotten {
         None => Ok(Action::Back),
@@ -658,7 +677,7 @@ fn closed_at_start(protection: &mut Protection) -> Option<Closure> {
 fn heading_lines(closure: Option<&Closure>, guide: Guide) -> Vec<String> {
     let mut lines = vec![
         String::new(),
-        heading_line(Channel::Error, "Offline seed phrase encoding"),
+        heading_line(Channel::Error, guide.title),
         String::new(),
         guide.description.to_owned(),
         more_line(guide.anchor),
@@ -675,7 +694,10 @@ fn heading_lines(closure: Option<&Closure>, guide: Guide) -> Vec<String> {
             NoticeKind::Warning,
         ));
     }
-    lines.push(String::new());
+    // A task's answers follow after a blank line; the main menu's question brings its own.
+    if guide != MENU_GUIDE {
+        lines.push(String::new());
+    }
     lines
 }
 
@@ -755,7 +777,7 @@ fn ask_entry(closure: Option<&Closure>, selected: usize) -> Result<Option<usize>
         })
         .collect();
     let asked = ListQuestion {
-        question: "What do you want to do?",
+        question: "Choose an action",
         label: "Task",
         quit: "quits",
         explanation: None,
@@ -796,9 +818,11 @@ pub(crate) fn run(protection: &mut Protection) -> Result<(), Stop> {
     redraw_answer_record(&heading_lines(closure.as_ref(), guide), 0);
     let mut selected = 0;
     let mut again = None;
+    // Shift+Tab at the first question of a command: the task's questions come again.
+    let mut redo = false;
     loop {
         let before = answer_mark();
-        if again.is_none() {
+        if again.is_none() && !redo {
             if guide != MENU_GUIDE {
                 guide = MENU_GUIDE;
                 start_answer_record();
@@ -808,12 +832,16 @@ pub(crate) fn run(protection: &mut Protection) -> Result<(), Stop> {
                 Some(index) => selected = index,
                 None => return Ok(()),
             }
+            // A new task: its questions start with no answer marked.
+            crate::terminal::remember_choices(true);
         }
+        redo = false;
         if ENTRIES[selected].name == menu_entries::QUIT {
             return Ok(());
         }
         guide = ENTRIES[selected].name.guide;
-        redraw_answer_record(&heading_lines(closure.as_ref(), guide), answer_mark());
+        // The title names the task now, so the chosen entry leaves no line of its own.
+        redraw_answer_record(&heading_lines(closure.as_ref(), guide), before);
         forget_claimed();
         // In the task's questions Shift+Tab goes back a step and Escape to this menu.
         crate::terminal::set_steps_back(true);
@@ -845,6 +873,10 @@ pub(crate) fn run(protection: &mut Protection) -> Result<(), Stop> {
                 show_command(&run);
                 // The command reports its own result, error or cancellation.
                 let code = match run_command(&run)? {
+                    Some(code) if code == i32::from(crate::terminal::BACK_STATUS) => {
+                        redo = true;
+                        continue;
+                    }
                     Some(code) if code != CANCELLED_EXIT_CODE => code,
                     _ => continue,
                 };

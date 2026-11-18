@@ -2,16 +2,18 @@
 //! each a key and a label. The menu lists them, and the messages and the sheet for heirs that send
 //! a person to an entry name it from here, so that every text names an entry as the menu shows it.
 
-/// A task's explanation and the README section that describes it.
+/// A task's title after "MnemoCode ·", its explanation and the README section that describes it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Guide {
+    pub(crate) title: &'static str,
     pub(crate) description: &'static str,
     pub(crate) anchor: &'static str,
 }
 
 impl Guide {
-    const fn new(description: &'static str, anchor: &'static str) -> Self {
+    const fn new(title: &'static str, description: &'static str, anchor: &'static str) -> Self {
         Self {
+            title,
             description,
             anchor,
         }
@@ -19,22 +21,27 @@ impl Guide {
 }
 
 pub(crate) const MENU_GUIDE: Guide = Guide::new(
+    "Offline seed phrase encoding",
     "Choose a backup, recovery or lookup task. Everything is processed on this computer.",
     "menu",
 );
 pub(crate) const WORD_GUIDE: Guide = Guide::new(
+    "Recovery · Forgotten word",
     "Find missing seed words and compare candidates with a known wallet reference.",
     "forgotten-word-recovery",
 );
 pub(crate) const CODE_GUIDE: Guide = Guide::new(
+    "Recovery · Unreadable code",
     "Repair unreadable backup codes, with dates and a wallet check where needed.",
     "codes-that-cannot-be-read",
 );
 pub(crate) const DATE_GUIDE: Guide = Guide::new(
+    "Recovery · Forgotten date digit",
     "Search missing date digits and check the recovered phrase against your wallet.",
     "date-recovery-helper",
 );
 pub(crate) const SHARE_GUIDE: Guide = Guide::new(
+    "Recovery · Unreadable share code",
     "Repair unreadable share codes using the shares and any wallet reference you have.",
     "damaged-shares",
 );
@@ -50,78 +57,89 @@ pub(crate) struct MenuEntry {
 const fn entry(
     key: char,
     label: &'static str,
+    title: &'static str,
     description: &'static str,
     anchor: &'static str,
 ) -> MenuEntry {
     MenuEntry {
         key: Some(key),
         label,
-        guide: Guide::new(description, anchor),
+        guide: Guide::new(title, description, anchor),
     }
 }
 
 pub(crate) const ENCODE: MenuEntry = entry(
     '1',
     "Encode your seed phrase",
+    "Encode",
     "Make a backup in another form, with optional date masking, shares or printable cards.",
     "1-encode",
 );
 pub(crate) const RE_ENCODE: MenuEntry = entry(
     '2',
     "Re-encode a backup with other dates or in another form",
+    "Re-encode",
     "Restore an existing backup, confirm the original phrase and make its replacement.",
     "2-re-encode",
 );
 pub(crate) const DECODE: MenuEntry = entry(
     '3',
     "Recover a seed phrase from a backup",
+    "Decode",
     "Recover seed words from codes, cards, QR or a cross-stitch pattern.",
     "3-decode",
 );
 pub(crate) const SPLIT: MenuEntry = entry(
     '4',
     "Split a seed phrase into standard Shamir shares",
+    "Split into shares",
     "Make standard Shamir shares and choose how many are needed to restore the phrase.",
     "4-split-into-shares",
 );
 pub(crate) const RESTORE: MenuEntry = entry(
     '5',
     "Restore a seed phrase from Shamir shares",
+    "Restore from shares",
     "Combine enough shares and undo date masking if it was used.",
     "5-restore-from-shares",
 );
 pub(crate) const RECOVER: MenuEntry = entry(
     '6',
     "Find a forgotten word, code, date digit or share code",
+    "Recovery",
     "Choose which recovery material is missing; keep every part you can still read.",
     "6-recovery",
 );
 pub(crate) const PREVIEW: MenuEntry = entry(
     '7',
     "Print sample cards with a random sample phrase",
+    "Preview cards",
     "Try card designs with sample data before making your own backup.",
     "7-preview-cards",
 );
 pub(crate) const TABLE: MenuEntry = entry(
     '8',
     "Look up a seed word, its number or its Unicode code",
+    "Word lookup",
     "Look up a word or export dictionaries and a guide for recovery without MnemoCode.",
     "8-word-lookup",
 );
 pub(crate) const SELF_TEST: MenuEntry = entry(
     '0',
     "Run the self-test",
+    "Self-test",
     "Check this installation, including transformations, recovery, shares and drawing.",
     "0-self-test",
 );
 pub(crate) const HELP: MenuEntry = entry(
     's',
     "Show every command and option",
+    "Commands and options",
     "Read the available commands and their options.",
     "s-help",
 );
 /// The last entry: q, which every list reads as going back, and Escape quit as well.
-pub(crate) const QUIT: MenuEntry = entry('q', "Quit", "Leave MnemoCode.", "quit");
+pub(crate) const QUIT: MenuEntry = entry('q', "Quit", "Quit", "Leave MnemoCode.", "quit");
 
 /// The answer of the menu that types an encoded seed phrase in, which the sheet for heirs names.
 pub(crate) const TYPED_SOURCE: &str = "Type or paste it";

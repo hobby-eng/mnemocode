@@ -25,6 +25,7 @@ browser-probe = [
   "browser-recovery",
   "browser-cards",
   "browser-embroidery",
+  "browser-files",
   "template-material-tile",
   "coin-bitcoin",
 ]
@@ -36,8 +37,15 @@ browser-candidates = []
 browser-cards = ["dep:mnemocode-cards"]
 # Cross-stitch patterns, written with the cards' PDF writer but none of their designs.
 browser-embroidery = ["dep:mnemocode-embroidery"]
+# Backups read from the files a page is given: cards, patterns and QR codes, alone or together.
+browser-files = ["browser-embroidery", "browser-sskr", "dep:mnemocode-cards"]
 # Shamir shares: the library's sskr, and the browser backend of its engine's randomness crate.
-browser-sskr = ["mnemocode/sskr", "dep:getrandom03", "mnemocode-cards?/sskr"]
+browser-sskr = [
+  "mnemocode/sskr",
+  "dep:getrandom03",
+  "mnemocode-cards?/sskr",
+  "mnemocode-embroidery?/sskr",
+]
 browser-recovery = [
   "browser-sskr",
   "mnemocode/search-date",

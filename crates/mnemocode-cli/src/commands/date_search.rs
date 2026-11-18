@@ -100,7 +100,7 @@ const NUMBER_WORDS: [&str; 5] = ["zero", "one", "two", "three", "four"];
 /// The question for dates that may hold ?, as recover-date asks it.
 pub(crate) fn recovery_dates_prompt(word_count: Option<usize>) -> String {
     format!(
-        "Dates with ? for what is forgotten ({}one to {} of them incomplete):",
+        "Enter the dates with ? for what is forgotten ({}one to {} of them incomplete):",
         most_dates(word_count),
         NUMBER_WORDS[MAX_INCOMPLETE_DATES]
     )
@@ -110,7 +110,7 @@ pub(crate) fn recovery_dates_prompt(word_count: Option<usize>) -> String {
 fn dates_question(word_count: Option<usize>, patterns: bool) -> String {
     if patterns {
         format!(
-            "Dates that mask the seed phrase ({}{DATE_FORMAT_TEXT}, ? for what is forgotten, separated by spaces):",
+            "Enter the dates that mask the seed phrase ({}{DATE_FORMAT_TEXT}, ? for what is forgotten, separated by spaces):",
             most_dates(word_count)
         )
     } else {
@@ -263,7 +263,7 @@ const MATCHES_TITLE: &str = "Date recovery";
 fn match_facts(result: &DateSearchOutcome, mode: Mode) -> [(&'static str, String); 3] {
     [
         ("Phrases", format!("{ORIGINAL}, for each set of dates")),
-        ("Mode", mode.id().to_owned()),
+        super::backup_questions::seedshift_fact(mode),
         ("Matches", result.match_count.to_string()),
     ]
 }

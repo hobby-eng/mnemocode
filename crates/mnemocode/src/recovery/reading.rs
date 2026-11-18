@@ -368,7 +368,8 @@ impl BackupReading {
 /// when either is missing or they agree.
 pub fn mode_conflict_of(recorded: Option<Mode>, given: Option<Mode>) -> Option<String> {
     let (recorded, given) = (recorded?, given?);
-    (recorded != given).then(|| {
+    // The two ways of the Original Seedshift are one mode, as a record names it.
+    (recorded.id() != given.id()).then(|| {
         format!(
             "The record was made with {}, not with {}.",
             recorded.name(),

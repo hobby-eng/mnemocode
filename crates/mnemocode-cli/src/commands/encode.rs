@@ -24,7 +24,7 @@ use super::cards::{
     export_card_files, export_page_images, image_format, publish_pdf, saved_pages_notice,
     validate_card_options, validate_image_options,
 };
-use super::configure::asked_options;
+use super::configure::run_configured;
 use super::given::{check_date_input, encode_format, phrase_and_dates, transform_mode};
 use super::heir_sheet::{save_heir_sheet, validate_heir_sheet_options};
 use super::resolved;
@@ -34,12 +34,14 @@ use super::sskr_split::{CheckedSplit, prepare_split, split_checked};
 use crate::args::{Parsed, choice_option, is_on, option_label, value};
 use crate::gate::Stop;
 use crate::os::{self, FileError, SystemRandom};
-use crate::output::{report_renamed, shown_path};
+use crate::output::{report_renamed, saves_anything, shown_path};
 use crate::terminal::result::{
-    backup_code_lines, plain_fingerprint_line, print, print_phrase, print_sentence, result_header,
+    backup_code_lines, plain_fingerprint_line, print, print_part, print_phrase, print_sentence,
+    result_header,
 };
 use crate::terminal::{
-    self, Channel, NoticeKind, can_redraw, clear_private_screen, hint, more_line, notice, saved,
+    self, Channel, NoticeKind, can_redraw, clear_private_screen, notice, paint, result_hint, saved,
+    style,
 };
 use mnemocode_cards::content::backup_card_content;
 use mnemocode_cards::export::{CardJob, card_pages, individual_cards};
@@ -74,10 +76,9 @@ pub(crate) const SSKR_ONLY_OPTIONS: [&str; 5] = [
 /// The rest of Encode's own: the check of the backup, and --sskr, which chooses between its modes.
 pub(crate) const OWN_OPTIONS: [&str; 2] = ["backup-check", "sskr"];
 
-/// The one value --show-original takes.
-/// Why the codes of the Original Seedshift have no encoded fingerprint.
-const NO_ENCODED_FINGERPRINT: &str =
-    "unavailable because legacy Seedshift output may have an invalid BIP39 checksum";
+/// Why codes have no encoded fingerprint: every mode writes a valid phrase, so only codes read
+/// from elsewhere can lack one.
+const NO_ENCODED_FINGERPRINT: &str = "none: these codes are no valid BIP39 phrase";
 
 /// The refusal of --show-masked-words without a mask.
 #[derive(Debug)]
@@ -121,8 +122,11 @@ pub(crate) fn fingerprint_of(phrase: &Phrase) -> Result<String, Stop> {
 pub(crate) fn print_encoded_backup(backup: &Backup, title: &str) -> Result<(), Stop> {
     let label = encoded_output_label(backup.form(), backup.mode());
     let facts = [
-        ("Mode", backup.mode().id().to_owned()),
-        ("Format", backup.form().name().to_owned()),
+        super::backup_questions::seedshift_fact(backup.mode()),
+        (
+            "Format",
+            super::encode_questions::form_label(backup.form()).to_owned(),
+        ),
         ("Content", label.clone()),
     ];
     if !result_header(title, &facts, Channel::Output) {
@@ -139,15 +143,18 @@ pub(crate) fn print_encoded_backup(backup: &Backup, title: &str) -> Result<(), S
 /// Both fingerprints: the original's, and the codes', where they are a valid phrase.
 pub(crate) fn print_fingerprints(mode: Mode, original: &str, encoded: Option<&str>) {
     if can_redraw(Channel::Error) {
-        terminal::error_line("");
+        print_part("Fingerprints", true, Channel::Error);
         terminal::status(ORIGINAL_FINGERPRINT, original, true);
         let label = mode.encoded_fingerprint_label();
         match encoded {
             None => terminal::status(label, NO_ENCODED_FINGERPRINT, false),
             Some(encoded) => terminal::status(label, encoded, true),
         }
+        let empty = format!("With an {}.", terminal::result::FINGERPRINT_NOTE);
         if mode.masked() {
-            hint(FINGERPRINT_ROLES);
+            result_hint(&format!("{FINGERPRINT_ROLES} {empty}"));
+        } else {
+            result_hint(&empty);
         }
         return;
     }
@@ -176,28 +183,25 @@ pub(crate) fn masked_words_requested(parsed: &Parsed, mode: Mode) -> Result<bool
 }
 
 /// The masked phrase in English words, for codes in another form.
-pub(crate) fn print_masked_words(words: &str, mode: Mode) {
-    let facts = [
-        ("Mode", mode.id().to_owned()),
-        (
-            "Content",
-            "your seed phrase masked with your dates".to_owned(),
-        ),
-    ];
-    if !result_header("Seed phrase after Seedshift", &facts, Channel::Output) {
+pub(crate) fn print_masked_words(words: &str) {
+    // A part of the result under its heading, as the other parts are.
+    if can_redraw(Channel::Output) {
+        print_part("Seed phrase after Seedshift", true, Channel::Output);
+    } else {
         print(
             Channel::Output,
             &["Seed phrase after Seedshift (not the wallet's own phrase):".to_owned()],
         );
     }
     print_phrase(words, Channel::Output);
-    hint("Only your dates turn these words back into the wallet's seed phrase.");
+    result_hint("Only your dates turn these words back into the wallet's seed phrase.");
 }
 
 /// The original phrase, for checking it by eye.
 pub(crate) fn print_original_copy(phrase: &str) {
-    let facts = [("Content", "English words for visual checking".to_owned())];
-    if !result_header("Original seed phrase", &facts, Channel::Output) {
+    if can_redraw(Channel::Output) {
+        print_part("Original seed phrase", true, Channel::Output);
+    } else {
         print(
             Channel::Output,
             &["Original seed phrase (words for visual checking):".to_owned()],
@@ -215,74 +219,85 @@ pub(crate) fn print_original_copy(phrase: &str) {
 fn print_result(
     encoding: &Encoding,
     phrase: &Phrase,
-    mode: Mode,
     masked_words: bool,
     original_copy: bool,
 ) -> Result<(), Stop> {
     let backup = &encoding.backup;
-    let legacy = mode.with_valid_last_word().is_some();
-    if legacy && encoding.last_word_changed {
-        terminal::error_line(&more_line("transformation-modes"));
-    }
     print_encoded_backup(backup, "Encoded result")?;
     let english = |indexes: &[u16]| Form::English.codes(indexes);
     if masked_words && !backup.form().written_in_words() {
-        print_masked_words(
-            english(encoding.result().shifted.as_slice())?.as_str(),
-            backup.mode(),
-        );
+        print_masked_words(english(encoding.result().shifted.as_slice())?.as_str());
     }
     let text = phrase.text();
     if original_copy {
         print_original_copy(text.as_str());
     }
+    if let (Some(original), Some(&written)) = (encoding.original_last_word, backup.indexes().last())
+    {
+        print_last_word(original, written);
+    }
     let encoded = backup.fingerprint()?.map(fingerprint_hex);
     print_fingerprints(backup.mode(), &fingerprint_of(phrase)?, encoded.as_deref());
-    if !legacy {
-        return Ok(());
-    }
-    for sentence in legacy_sentences(encoding)? {
-        print_sentence(&sentence);
-    }
     Ok(())
 }
 
-/// What became of the last word in the legacy mode, in TS's sentences for standard error.
-fn legacy_sentences(encoding: &Encoding) -> Result<Vec<String>, Stop> {
-    let english = |indexes: &[u16]| Form::English.codes(indexes);
-    // The last of the words: a single index is no phrase that a form writes.
-    let last = |indexes: &[u16]| -> Result<String, Stop> {
-        let words = english(indexes)?;
-        let words = words.as_str();
-        Ok(words
-            .rsplit_once(' ')
-            .map_or(words, |(_, last)| last)
-            .to_owned())
-    };
-    Ok(match &encoding.valid_last_word {
-        _ if !encoding.last_word_changed => vec![
-            "Legacy shifted phrase already has a valid BIP39 checksum; no final-word replacement is needed."
-                .to_owned(),
-        ],
-        Some(valid) if !encoding.replaced => {
-            let words = valid.shifted.as_slice();
-            vec![
-                format!("Optional checksum-valid final word: {}", last(words)?),
-                format!(
-                    "Optional checksum-valid legacy phrase: {}",
-                    english(words)?.as_str()
-                ),
-            ]
+/// The English word of `index`.
+fn word_of(index: u16) -> &'static str {
+    mnemocode::bip39::table::english()[usize::from(index)]
+}
+
+/// The word to remember with the Original Seedshift, `original`, the last word its shift gave,
+/// where the codes end with `written`: recovery material, so on the private screen a part of its
+/// own before the fingerprints, the word in bold, and elsewhere sentences where the result goes,
+/// never on a terminal outside the private screen.
+pub(crate) fn print_last_word(original: u16, written: u16) {
+    let channel = terminal::secret_channel();
+    if channel != Channel::Error || !can_redraw(channel) {
+        for sentence in legacy_sentences(original, written) {
+            print_sentence(&sentence);
         }
-        _ => vec![
-            format!(
-                "Replaced legacy final word {} with checksum-valid word {}.",
-                last(encoding.base.shifted.as_slice())?,
-                last(encoding.result().shifted.as_slice())?
-            ),
-            "The shifted last word is not stored; decoding lists the candidates.".to_owned(),
-        ],
-    })
+        return;
+    }
+    let (original, written) = (word_of(original), word_of(written));
+    print_part("Last word", true, channel);
+    terminal::hint(if original == written {
+        "The decoy phrase passes the BIP39 checksum with its own last word."
+    } else {
+        "The backup ends with a matching word, so that the decoy phrase passes the BIP39 checksum."
+    });
+    let shown = paint(channel, style::STRONG, original);
+    terminal::error_line("");
+    terminal::error_line(&terminal::fact_line(
+        channel,
+        "Word to remember:",
+        &shown,
+        18,
+    ));
+    terminal::error_line("");
+    for line in terminal::notice_lines(REMEMBER_WORD, NoticeKind::Warning) {
+        terminal::error_line(&line);
+    }
+}
+
+/// Why the word is remembered.
+const REMEMBER_WORD: &str = "Remember this word: Decode asks for it to give back your seed phrase exactly. Without it, Decode may give two seed phrases.";
+
+/// The word to remember with the Original Seedshift, as sentences.
+fn legacy_sentences(original: u16, written: u16) -> Vec<String> {
+    let (original, written) = (word_of(original), word_of(written));
+    let first = if original == written {
+        "The masked words pass the BIP39 checksum as they are.".to_owned()
+    } else {
+        format!(
+            "The last masked word {original} is written as {written}, which passes the BIP39 checksum."
+        )
+    };
+    vec![
+        first,
+        format!(
+            "Remember the word {original}: Decode asks for it to give back the seed phrase exactly."
+        ),
+    ]
 }
 
 /// What the options settled of the cards of a backup, once, so that every output of the command
@@ -302,7 +317,6 @@ pub(crate) struct CheckedEncode {
     form: Form,
     original_copy: bool,
     masked_words: bool,
-    valid_last_word: bool,
     check_answer: Option<bool>,
     cards: Option<EncodeCards>,
 }
@@ -391,16 +405,8 @@ pub(crate) fn prepare_encode(parsed: &Parsed) -> Result<PreparedEncode, Stop> {
     let original_copy = original_copy_requested(parsed)?;
     let masked_words = masked_words_requested(parsed, mode)?;
     let form = encode_format(parsed)?;
-    let valid_last_word = is_on(parsed, "legacy-valid-last-word");
-    Backup::check_encodable(mode, valid_last_word, Some(form))?;
+    Backup::check_encodable(mode, Some(form))?;
     check_date_input(parsed, mode, DateWords::Codes)?;
-    // The sheet leads through the menu, whose Decode does not offer a replaced last word.
-    if valid_last_word
-        && parsed.contains_key("heir-sheet")
-        && let Some(replacement) = mode.with_valid_last_word()
-    {
-        replacement.check_heir_sheet()?;
-    }
     if is_on(parsed, "cards") && !form.written_in_colors() {
         return Err(EncodeOptionError::ColorCards.into());
     }
@@ -416,7 +422,6 @@ pub(crate) fn prepare_encode(parsed: &Parsed) -> Result<PreparedEncode, Stop> {
             form,
             original_copy,
             masked_words,
-            valid_last_word,
             check_answer,
             cards,
         },
@@ -516,16 +521,19 @@ fn save_cards(
     Ok((pdf, images))
 }
 
-/// The QR code that the sheets print with --card-qr, also saved as an image where they were saved:
-/// beside the PDF, or else in the folder of their images. Not when --qr names an image of its own,
-/// which holds the same codes.
+/// The QR code that the sheets print with --card-qr, also saved as an image with --card-qr-png where
+/// they were saved: beside the PDF, or else in the folder of their images. Not when --qr names an
+/// image of its own, which holds the same codes.
 fn save_sheet_qr(
     parsed: &Parsed,
     text: &str,
     cards: Option<&EncodeCards>,
     (pdf, images): (Option<&str>, Option<&str>),
 ) -> Result<(), Stop> {
-    if !cards.is_some_and(|c| c.settings.card_qr) || value(parsed, "qr").is_some() {
+    if !cards.is_some_and(|c| c.settings.card_qr)
+        || !is_on(parsed, "card-qr-png")
+        || value(parsed, "qr").is_some()
+    {
         return Ok(());
     }
     let contact = cards
@@ -562,16 +570,18 @@ fn save_results(
 ) -> Result<Parsed, Stop> {
     let mut outputs = parsed.clone();
     let backup = &encoding.backup;
-    let record = backup.record()?;
-    let record = SecretText::copy_of("record", &format!("{}\n", record.as_str()));
+    // The codes alone, as the screen shows them: nothing in the file names the program, the mode
+    // or the form, which Decode tells by the codes themselves.
+    let codes = backup.text()?;
+    let record = SecretText::copy_of("record", &format!("{}\n", codes.as_str()));
     let record_saved = save_output(
         &mut outputs,
         "output",
-        ResultName::one("The record"),
+        ResultName::one("The codes"),
         |path| os::publish_new_file(&resolved(path), record.as_str().as_bytes()),
     )?;
     if let Some(path) = record_saved {
-        saved(&format!("Saved MnemoCode record: {}", shown_path(&path)));
+        saved(&format!("Saved the codes: {}", shown_path(&path)));
     }
     // The colour cards on the terminal come after the record.
     if is_on(parsed, "cards") {
@@ -616,7 +626,6 @@ fn encode_checked(
         form,
         original_copy,
         masked_words,
-        valid_last_word,
         check_answer,
         ref cards,
     } = *checked;
@@ -624,24 +633,25 @@ fn encode_checked(
         Ok(given) => given,
         Err(_) => return Err(Stop::Cancelled),
     };
-    let encoding = Backup::encode(&phrase, &dates, form, mode, valid_last_word)?;
+    let encoding = Backup::encode(&phrase, &dates, form, mode)?;
     // The result is a step of its own: the questions are cleared away (CORE-39).
     clear_private_screen();
-    print_result(&encoding, &phrase, mode, masked_words, original_copy)?;
+    print_result(&encoding, &phrase, masked_words, original_copy)?;
+    // The files saved come last, under their heading.
+    if can_redraw(Channel::Error) && saves_anything(parsed) {
+        print_part("Saved files", true, Channel::Error);
+    }
     let mut outputs = save_results(parsed, &encoding, cards.as_ref())?;
     let backup = &encoding.backup;
-    // A record with a replaced last word never gets a sheet.
-    if backup.mode().capabilities().heir_sheet {
-        let facts = HeirSheetFacts {
-            backup: HeirBackup::Encoded {
-                form: backup.form(),
-                words: backup.words(),
-            },
-            mode: backup.mode(),
-            dates: dates.len(),
-        };
-        save_heir_sheet(&mut outputs, &facts)?;
-    }
+    let facts = HeirSheetFacts {
+        backup: HeirBackup::Encoded {
+            form: backup.form(),
+            words: backup.words(),
+        },
+        mode: backup.mode(),
+        dates: dates.len(),
+    };
+    save_heir_sheet(&mut outputs, &facts)?;
     report_renamed();
     offer_encoded_check(
         EncodedOriginal {
@@ -651,21 +661,25 @@ fn encode_checked(
             codes: mnemocode::modes::seedshift::Indexes::new(backup.indexes().to_vec()),
             dates: mnemocode::dates::Dates::new(&dates),
         },
-        &mut || print_result(&encoding, &phrase, mode, masked_words, original_copy),
+        &mut || print_result(&encoding, &phrase, masked_words, original_copy),
         check_answer,
     )
 }
 
 /// Runs the command.
 pub(crate) fn run(parsed: &Parsed, protection: &mut crate::os::Protection) -> Result<(), Stop> {
-    let (fresh, dates) = asked_options(parsed, protection, || {
-        if is_on(parsed, "sskr") {
-            super::encode_questions::ask_splitting()
-        } else {
-            super::encode_questions::ask_encoding_in(encode_format(parsed)?)
-        }
-    })?;
-    prepare_encode(&fresh)?.with_dates(dates).run(None)
+    run_configured(
+        parsed,
+        protection,
+        |finish| {
+            if is_on(parsed, "sskr") {
+                super::encode_questions::ask_splitting(finish)
+            } else {
+                super::encode_questions::ask_encoding_in(encode_format(parsed)?, finish)
+            }
+        },
+        |fresh, dates| prepare_encode(fresh)?.with_dates(dates).run(None),
+    )
 }
 
 #[cfg(test)]
@@ -677,38 +691,15 @@ mod tests {
 
     const PHRASE: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
-    fn legacy(valid_last_word: bool) -> Vec<String> {
+    #[test]
+    fn the_legacy_sentences_name_the_word_to_remember() {
         let phrase = Phrase::parse(PHRASE).unwrap();
         let dates = [parse_date("23-09-2026").unwrap()];
-        let encoding = Backup::encode(
-            &phrase,
-            &dates,
-            Form::English,
-            Mode::SeedshiftLegacy,
-            valid_last_word,
-        )
-        .unwrap();
-        legacy_sentences(&encoding).unwrap()
-    }
-
-    #[test]
-    fn the_legacy_sentences_name_the_final_words() {
-        let offered = legacy(false);
-        let phrase = offered[1]
-            .strip_prefix("Optional checksum-valid legacy phrase: ")
-            .unwrap();
-        let word = offered[0]
-            .strip_prefix("Optional checksum-valid final word: ")
-            .unwrap();
-        assert!(!word.is_empty());
-        assert_eq!(phrase.rsplit(' ').next(), Some(word));
-        let replaced = legacy(true);
-        let words = replaced[0]
-            .strip_prefix("Replaced legacy final word ")
-            .unwrap();
-        let (old, new) = words.split_once(" with checksum-valid word ").unwrap();
-        assert!(!old.is_empty());
-        assert_eq!(new, format!("{word}."));
-        assert_ne!(format!("{old}."), new);
+        let encoding =
+            Backup::encode(&phrase, &dates, Form::English, Mode::SeedshiftLegacy).unwrap();
+        let original = encoding.original_last_word.unwrap();
+        let written = *encoding.backup.indexes().last().unwrap();
+        let sentences = legacy_sentences(original, written);
+        assert!(sentences[1].starts_with(&format!("Remember the word {}:", word_of(original))));
     }
 }

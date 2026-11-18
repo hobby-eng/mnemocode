@@ -16,8 +16,8 @@ pub struct ReEncoding(Confirmation);
 
 #[wasm_bindgen]
 impl ReEncoding {
-    /// The phrase that `codes`, written in `form` and masked in `mode`, give with `dates`; for the
-    /// Original Seedshift with a valid last word, the one that ends with `last_word`.
+    /// The phrase that `codes`, written in `form` and masked in `mode`, give with `dates`; where
+    /// Original Seedshift codes give two, the one that `last_word`, the word Encode named, gives.
     #[wasm_bindgen(constructor)]
     pub fn new(
         codes: JsValue,

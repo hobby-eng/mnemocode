@@ -8,10 +8,12 @@ use std::rc::Rc;
 
 use mnemocode::backup::Backup;
 use mnemocode::bip32::fingerprint_hex;
-use mnemocode::bip39::phrase::Phrase;
+use mnemocode::bip39::phrase::{Phrase, english_tokens};
+use mnemocode::bip39::table::index_of_english;
 use mnemocode::dates::Date;
 use mnemocode::dates::answer::DatesAnswer;
 use mnemocode::forms::Form;
+use mnemocode::forms::hints::BIP39;
 use mnemocode::modes::phrase_words::{ORIGINAL, ORIGINAL_FINGERPRINT};
 use mnemocode::modes::seedshift::Unmasked;
 use mnemocode::modes::{DateWords, Mode};
@@ -35,8 +37,8 @@ use super::date_search::{
 use super::encode::fingerprint_of;
 use super::found::{candidate_label, report_checksum, show_original_phrase};
 use super::given::{
-    assert_asked_encoded_input, assert_one_encoded_source, backup_from_options, dates, given_form,
-    transform_mode,
+    PHRASE_LIMIT, assert_asked_encoded_input, assert_one_encoded_source, backup_from_options,
+    dates, given_form, last_word_option, transform_mode,
 };
 use super::marked_search::{
     MissingCodesAnswers, MissingOutcome, report_found, search_missing_codes,
@@ -47,6 +49,7 @@ use super::wallet_options::{GivenWallet, WALLET_EVIDENCE_OPTIONS, given_wallet};
 use super::wallet_question::{WalletAnswer, ask_wallet_evidence};
 use crate::args::{Parsed, is_on, value};
 use crate::gate::Stop;
+use crate::input::{Ask, Left, ask_until, secret_ask};
 use crate::terminal::result::{FINGERPRINT_NOTE, print, print_part, print_phrase, result_header};
 use crate::terminal::{
     Channel, Choice, Explanation, NoticeKind, TEXT_WIDTH, can_redraw, clear_private_screen,
@@ -65,8 +68,10 @@ const SCREEN_ANSWERS: [&str; 6] = [
 ];
 
 /// The options `decode` takes.
-pub(crate) const OPTIONS: [&str; 29] = [
+pub(crate) const OPTIONS: [&str; 31] = [
     "ask-secrets",
+    "find",
+    "last-word-file",
     "mode",
     "input",
     "input-file",
@@ -156,12 +161,14 @@ pub(crate) fn show_recovered(
 ) -> Result<(), Stop> {
     let (words, phrase) = words_of(result)?;
     let facts = [
-        ("Mode", mode.id().to_owned()),
-        ("Input format", form.name().to_owned()),
-        ("Words", result.recovered.as_slice().len().to_string()),
+        super::backup_questions::seedshift_fact(mode),
+        (
+            "Read from",
+            super::encode_questions::form_label(form).to_owned(),
+        ),
     ];
     if result_header("Recovered result", &facts, channel) {
-        return show_original_phrase(words.as_str(), phrase.as_ref(), channel);
+        return show_original_phrase(words.as_str(), phrase.as_ref(), None, channel);
     }
     print(channel, &[words.as_str().to_owned()]);
     report_checksum(phrase.as_ref())
@@ -196,8 +203,11 @@ fn report_shorter_phrases(backup: &Backup, dates: &[Date]) -> Result<(), Stop> {
 fn show_candidate_parts(candidates: &[(String, String)], summary: &str, mode: Mode, form: Form) {
     let count = candidates.len();
     let facts = [
-        ("Mode", mode.id().to_owned()),
-        ("Input format", form.name().to_owned()),
+        super::backup_questions::seedshift_fact(mode),
+        (
+            "Read from",
+            super::encode_questions::form_label(form).to_owned(),
+        ),
         ("Candidates", count.to_string()),
     ];
     result_header("Recovered candidates", &facts, Channel::Output);
@@ -217,20 +227,25 @@ fn show_candidate_parts(candidates: &[(String, String)], summary: &str, mode: Mo
     }
 }
 
-/// Every phrase that a record with a replaced last word may hold, each with its fingerprint: on
-/// the private screen as a result, elsewhere one row each, for a script.
-fn show_legacy_valid_candidates(backup: &Backup, dates: &[Date]) -> Result<(), Stop> {
+/// Every phrase that Original Seedshift codes give without the last word Encode named, one or two,
+/// each with its fingerprint: one alone as Decode shows a phrase; two on the private screen as a
+/// result, elsewhere one row each, for a script.
+fn show_original_candidates(backup: &Backup, dates: &[Date]) -> Result<(), Stop> {
+    let found = backup.candidates(dates)?;
+    let (mode, form) = (backup.mode(), backup.form());
+    if let [only] = found.as_slice() {
+        return show_recovered(only, mode, form, Channel::Output);
+    }
     let mut candidates = Vec::new();
-    for candidate in backup.candidates(dates)? {
-        let (words, phrase) = words_of(&candidate)?;
+    for candidate in &found {
+        let (words, phrase) = words_of(candidate)?;
         let fingerprint = phrase.as_ref().map_or(Ok(String::new()), fingerprint_of)?;
         candidates.push((words.as_str().to_owned(), fingerprint));
     }
     let summary = format!(
-        "Recovered {} checksum-valid candidates for {ORIGINAL}.",
+        "Without the last word Encode named, these codes give {} seed phrases: one is {ORIGINAL}. The wallet tells which.",
         candidates.len()
     );
-    let (mode, form) = (backup.mode(), backup.form());
     if on_private_screen() && can_redraw(Channel::Output) {
         show_candidate_parts(&candidates, &summary, mode, form);
         return Ok(());
@@ -248,6 +263,61 @@ fn show_legacy_valid_candidates(backup: &Backup, dates: &[Date]) -> Result<(), S
         )],
     );
     Ok(())
+}
+
+/// The question of the Original Seedshift's own last word, which Encode named for the person to
+/// remember.
+const LAST_WORD_PROMPT: &str = "Enter the last word Encode asked you to remember:";
+/// What that question says of the word and of Enter alone.
+const LAST_WORD_NOTE: &str = "Encode named it when it made this backup with the Original Seedshift; with it, the seed phrase comes back exactly. If you do not have it, press Enter: you may get two seed phrases, and the wallet tells which one is yours.";
+
+/// What the question of the last word gave.
+pub(crate) enum LastWordAnswer {
+    /// The phrase the codes, the dates and the word give, and the word's index.
+    Phrase(Unmasked, u16),
+    /// No word: Enter alone.
+    Without,
+    /// The person went back.
+    Back,
+}
+
+/// Asks for the last word Encode named, for Original Seedshift codes that may give two phrases
+/// without it, until it fits the codes.
+pub(crate) fn ask_original_last_word(
+    backup: &Backup,
+    dates: &[Date],
+) -> Result<LastWordAnswer, Stop> {
+    let ask = Ask {
+        hints: Some(&*BIP39),
+        note: Some(LAST_WORD_NOTE.to_owned()),
+        fallback: Some(String::new()),
+        ..secret_ask(LAST_WORD_PROMPT, "the last word Encode named", PHRASE_LIMIT)
+    };
+    let read = ask_until(
+        &ask,
+        true,
+        |answer: &str| -> Result<Option<(Unmasked, u16)>, String> {
+            let words = english_tokens(answer);
+            let word = match words.as_slice() {
+                [] => return Ok(None),
+                [word] => word,
+                _ => return Err("Type one word.".to_owned()),
+            };
+            let index = index_of_english(word)
+                .and_then(|index| u16::try_from(index).ok())
+                .ok_or_else(|| "This is not a BIP39 word.".to_owned())?;
+            backup
+                .decode_with_last_word(dates, index)
+                .map(|result| Some((result, index)))
+                .map_err(|error| error.to_string())
+        },
+    )?;
+    Ok(match read {
+        Ok(Some((result, word))) => LastWordAnswer::Phrase(result, word),
+        Ok(None) => LastWordAnswer::Without,
+        Err(Left::Cancelled) => return Err(Stop::Cancelled),
+        Err(Left::Back) => LastWordAnswer::Back,
+    })
 }
 
 /// The encoded seed phrase and its complete dates from the options, as Decode reads them; Re-encode
@@ -274,8 +344,16 @@ fn decode_from_options(parsed: &Parsed) -> Result<(), Stop> {
         return Err(DecodeError::ScreenAnswer((*key).to_owned()).into());
     }
     let (backup, entered) = backup_and_dates_from_options(parsed)?;
+    let last_word = last_word_option(parsed)?;
     if backup.gives_several() {
-        return show_legacy_valid_candidates(&backup, &entered);
+        if let Some(word) = last_word {
+            let result = backup.decode_with_last_word(&entered, word)?;
+            return show_recovered(&result, backup.mode(), backup.form(), Channel::Output);
+        }
+        return show_original_candidates(&backup, &entered);
+    }
+    if last_word.is_some() {
+        return Err(mnemocode::backup::re_encoding::ReEncodingError::LastWordNotTaken.into());
     }
     let result = backup.decode(&entered)?;
     show_recovered(&result, backup.mode(), backup.form(), Channel::Output)?;
@@ -321,7 +399,6 @@ pub(crate) enum Step {
     Wallet,
     Search,
     Decode,
-    LastWord,
     Done,
 }
 
@@ -334,10 +411,10 @@ pub(crate) trait DecodeUse {
     fn restore(&mut self, handed: &Parsed, share: FirstShare) -> Result<Restored, Stop>;
     /// The choice that ends after a phrase whose checksum fails, beside typing again.
     fn stop(&self) -> Choice<Step>;
-    /// What follows a record that gives several phrases.
+    /// What follows Original Seedshift codes that may give two phrases, the last word not given.
     fn several(&mut self, backup: &Backup, dates: &[Date]) -> Result<Step, Stop>;
-    /// What follows a phrase with a valid checksum, shown already.
-    fn decoded(&mut self, backup: &Backup, dates: &[Date]) -> Result<Step, Stop>;
+    /// What follows `result`, a phrase with a valid checksum, shown already.
+    fn decoded(&mut self, backup: &Backup, result: Unmasked) -> Result<Step, Stop>;
     /// Shows the decoded phrase: Decode's result on standard output, re-encode's on the terminal.
     fn show(&self, result: &Unmasked, mode: Mode, form: Form) -> Result<(), Stop>;
 }
@@ -361,11 +438,11 @@ impl DecodeUse for DecodeItself {
     fn several(&mut self, backup: &Backup, dates: &[Date]) -> Result<Step, Stop> {
         // The result is a step of its own: the questions are cleared away.
         clear_private_screen();
-        show_legacy_valid_candidates(backup, dates)?;
+        show_original_candidates(backup, dates)?;
         Ok(Step::Done)
     }
 
-    fn decoded(&mut self, _backup: &Backup, _dates: &[Date]) -> Result<Step, Stop> {
+    fn decoded(&mut self, _backup: &Backup, _result: Unmasked) -> Result<Step, Stop> {
         Ok(Step::Done)
     }
 
@@ -538,13 +615,6 @@ pub(crate) fn decode_with_questions(
                     }
                 }
             }
-            Step::LastWord => {
-                let current = codes
-                    .backup()
-                    .and_then(|backup| backup.last_word_replacement().transpose());
-                codes.backup = current.transpose()?;
-                Step::Decode
-            }
             Step::Dates => {
                 let word_count = codes.backup().map(Backup::words);
                 let asked = ask_dates(word_count, purpose.searches(), None, |_| Ok(()))?;
@@ -613,9 +683,10 @@ fn asked_wallet(
     })
 }
 
-/// Decodes with complete dates and shows the result, then does what `purpose` says with it. A
-/// phrase without a valid checksum, which the Original Seedshift gives for a wrong date or code,
-/// offers to type the dates or the codes again; `backup_parsed` are the options the codes were read
+/// Decodes with complete dates, with the last word Encode named where Original Seedshift codes ask
+/// for it, and shows the result, then does what `purpose` says with it. A phrase without a valid
+/// checksum, which the Original Seedshift gives for a wrong date, code or word, offers to type the
+/// dates or the codes again; `backup_parsed` are the options the codes were read
 /// with.
 fn decode_and_show(
     codes: &Codes,
@@ -636,10 +707,15 @@ fn decode_and_show(
             .map_or_else(Vec::new, |dates| dates.iter().collect()),
     );
     let (mode, form) = (backup.mode(), backup.form());
-    if backup.gives_several() {
-        return purpose.several(backup, &known);
-    }
-    let result = backup.decode(&known)?;
+    let result = if backup.gives_several() {
+        match ask_original_last_word(backup, &known)? {
+            LastWordAnswer::Phrase(result, _) => result,
+            LastWordAnswer::Without => return purpose.several(backup, &known),
+            LastWordAnswer::Back => return Ok(Step::Dates),
+        }
+    } else {
+        backup.decode(&known)?
+    };
     // The result is a step of its own: the questions are cleared away.
     clear_private_screen();
     if let Some((marked, found)) = &codes.found {
@@ -647,18 +723,12 @@ fn decode_and_show(
     }
     purpose.show(&result, mode, form)?;
     if result.checksum_valid {
-        return purpose.decoded(backup, &known);
+        return purpose.decoded(backup, result);
     }
-    report_shorter_phrases(backup, &known)?;
-    let replaced = backup.last_word_replacement()?;
+    if !backup.gives_several() {
+        report_shorter_phrases(backup, &known)?;
+    }
     let mut choices = Vec::new();
-    if replaced.is_some() {
-        notice(
-            "A date or code may be wrong. If the Legacy backup's last word was replaced to make its checksum valid, choose that option; the original last word is needed to restore the phrase.",
-            NoticeKind::Warning,
-        );
-        choices.push(Choice::new("The last word was replaced", Step::LastWord));
-    }
     if mode.masked() {
         choices.push(dates_again_choice(Step::Dates));
     }

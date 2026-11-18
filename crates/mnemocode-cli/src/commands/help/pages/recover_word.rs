@@ -17,14 +17,6 @@ const OWN_0_3: HelpOption = HelpOption {
         "Give the 11, 14, 17, 20 or 23 words you have, in their order; every place and every word is tried.",
     ],
 };
-const OWN_0_4: HelpOption = HelpOption {
-    flag: "--legacy-valid-last-word",
-    value: None,
-    summary: "List the valid last words of a whole seedshift-legacy phrase",
-    details: &[
-        "For an old seedshift-legacy phrase whose last word fails the checksum. Give the whole phrase without ?. Every valid last word is listed; the row marked preserved keeps the data bits of the old word, the word legacy encoding suggests. Recover the original wallet phrase from it with the dates.",
-    ],
-};
 
 pub(in super::super) const PAGE: CommandHelp = CommandHelp {
     summary: "Find forgotten words of a phrase",
@@ -35,7 +27,7 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
     groups: &[
         HelpGroup {
             heading: "The phrase:",
-            options: &[&[&ASK_SECRETS, &PATTERN_FILE, &MNEMONIC, &OWN_0_3, &OWN_0_4]],
+            options: &[&[&ASK_SECRETS, &PATTERN_FILE, &MNEMONIC, &OWN_0_3]],
         },
         HelpGroup {
             heading: "Recovery checks (one of them finds the wallet among the candidates):",
@@ -81,10 +73,6 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
         (
             "mnemocode recover-word --ask-secrets --candidates-file ./candidates.age --candidates-key age1…",
             "Every candidate, encrypted for the Discovery Scanner",
-        ),
-        (
-            "mnemocode recover-word --legacy-valid-last-word --ask-secrets",
-            "Valid last words for a stored legacy phrase",
         ),
     ],
     notes: None,

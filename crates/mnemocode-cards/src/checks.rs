@@ -138,6 +138,7 @@ fn phrase_cards(settings: CardSettings) -> Result<ColorCards, CheckFailure> {
             PUBLIC_UNICODE_CODES.concat(),
         ),
         decoys: None,
+        export: None,
         title: None,
         reference: None,
         qr_card: false,
@@ -470,17 +471,6 @@ fn heir_words() -> Result<(), CheckFailure> {
             heir_sheet_text(
                 &ROUTE,
                 &HeirSheetFacts {
-                    mode: Mode::SeedshiftLegacy,
-                    ..SHARES_FACTS
-                },
-            ),
-            "core.masking.split-modes-only",
-            "Heir sheet for shares of the Original Seedshift",
-        )?;
-        expect_refused(
-            heir_sheet_text(
-                &ROUTE,
-                &HeirSheetFacts {
                     backup: HeirBackup::Shares {
                         format: ShareFormat::Colors,
                         threshold: 4,
@@ -654,13 +644,7 @@ fn card_export(tier: Tier) -> Result<(), CheckFailure> {
     }
     let drawing = CardDrawing::new();
     let phrase = ok(Phrase::parse(PUBLIC_MNEMONIC))?;
-    let encoding = ok(Backup::encode(
-        &phrase,
-        &[],
-        Form::Colors,
-        Mode::Direct,
-        false,
-    ))?;
+    let encoding = ok(Backup::encode(&phrase, &[], Form::Colors, Mode::Direct))?;
     for template in CARD_TEMPLATES {
         if matches!(
             template.style,

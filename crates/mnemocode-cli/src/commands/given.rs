@@ -33,6 +33,29 @@ use crate::terminal::{
 
 /// A phrase of 24 words of eight letters and the spaces between them: 215 bytes.
 pub(crate) const PHRASE_LIMIT: usize = 256;
+
+/// The last word Encode named for Original Seedshift codes, read from --last-word-file: its index;
+/// none without the option. Refused where it is not one BIP39 word.
+pub(crate) fn last_word_option(parsed: &Parsed) -> Result<Option<u16>, Stop> {
+    if value(parsed, "last-word-file").is_none() {
+        return Ok(None);
+    }
+    let text = text_input(
+        parsed,
+        "last-word",
+        ("the last word", "The last-word file", "in a file"),
+        PHRASE_LIMIT,
+    )?;
+    let words = mnemocode::bip39::phrase::english_tokens(text.as_str());
+    let index = match words.as_slice() {
+        [word] => mnemocode::bip39::table::index_of_english(word),
+        _ => None,
+    };
+    match index.and_then(|index| u16::try_from(index).ok()) {
+        Some(index) => Ok(Some(index)),
+        None => Err(mnemocode::backup::BackupError::LastWord.into()),
+    }
+}
 /// Eight dates DD-MM-YYYY and the spaces between them: 87 bytes.
 pub(crate) const DATES_LIMIT: usize = 128;
 const _: () = assert!(24 * 8 + 23 <= PHRASE_LIMIT && 8 * 10 + 7 <= DATES_LIMIT);
@@ -217,8 +240,9 @@ pub(crate) fn transform_mode(parsed: &Parsed, recorded: Option<Mode>) -> Result<
 /// The words of the seed phrase that --words gives: of codes from printed cards, which end with
 /// decoys, only those of so many words from the start are read.
 pub(crate) fn phrase_words(parsed: &Parsed) -> Result<Option<usize>, Stop> {
+    // Cards chosen among the files found have their words asked there.
     if value(parsed, "words").is_none() {
-        return Ok(None);
+        return Ok(super::card_files::chosen_words());
     }
     let words = integer_option(parsed, "words", WORD_COUNT_RANGE, None, None)? as usize;
     if !WORD_COUNTS.contains(&words) {
@@ -245,16 +269,22 @@ fn encoded_input_at(parsed: &Parsed, regular_only: bool) -> Result<SecretText, S
 
 /// The text of --input, --input-file or --qr-file, as given.
 fn encoded_text(parsed: &Parsed, regular_only: bool) -> Result<SecretText, Stop> {
-    // A folder of patterns or shares' QR codes gives its one backup, or the shares the person
-    // confirms.
+    // Cards give the codes they keep, a file or a folder of them, in the order of their numbers.
     if let (None, Some(path), None) = (
         value(parsed, "input"),
         value(parsed, "input-file"),
         value(parsed, "qr-file"),
     ) && path != "-"
-        && let Some(folder) = crate::input::local_folder(Path::new(path))
+        && let Some(codes) = super::card_files::card_codes(
+            Path::new(path),
+            super::card_files::Wanted::of_option(parsed)?,
+            (
+                is_on(parsed, "ask-secrets"),
+                value(parsed, "words").is_some(),
+            ),
+        )?
     {
-        return super::pattern_folder::folder_backup(&folder, is_on(parsed, "ask-secrets"));
+        return Ok(codes);
     }
     // A pattern's PDF gives the legend line it keeps; with a QR image as well, it is refused below
     // as any second source is.
@@ -357,7 +387,7 @@ pub(crate) fn detected_form(fitting: &[Form], quit: &str) -> Result<Option<Form>
     };
     keep_context(
         notice_lines(
-            &format!("Detected input format: {}.", form.name()),
+            &format!("Read as {}.", super::encode_questions::form_label(form)),
             NoticeKind::Info,
         ),
         Lifetime::Question,
@@ -472,7 +502,7 @@ pub(crate) fn most_dates(word_count: Option<usize>) -> String {
 /// The question for the dates of a phrase of `word_count` words.
 pub(crate) fn dates_prompt(word_count: Option<usize>) -> String {
     format!(
-        "Dates that mask the seed phrase ({}{DATE_FORMAT_TEXT}, separated by spaces):",
+        "Enter the dates that mask the seed phrase ({}{DATE_FORMAT_TEXT}, separated by spaces):",
         most_dates(word_count)
     )
 }
@@ -486,7 +516,7 @@ pub(crate) fn ask_phrase() -> Result<Asked<Phrase>, Stop> {
     let ask = Ask {
         hints: Some(&*BIP39),
         ..secret_ask(
-            "Seed phrase (English BIP39 words):",
+            "Enter the seed phrase (English BIP39 words):",
             "the words of the seed phrase",
             PHRASE_LIMIT,
         )
@@ -541,8 +571,14 @@ pub(crate) fn phrase_and_dates(
             .map_or_else(ask_phrase, |phrase| Ok(Ok(phrase)))?
         {
             Ok(phrase) => phrase,
+            Err(Left::Back) if crate::terminal::steps_back() => {
+                crate::terminal::go_back_a_step();
+                return Ok(Err(Left::Back));
+            }
             Err(left) => return Ok(Err(left)),
         };
+        // What follows the seed phrase has no step to go back to.
+        crate::terminal::set_steps_back(false);
         let dates = if let Some(dates) =
             known_dates.filter(|dates| dates.len() <= maximum_dates(phrase.len()))
         {
@@ -624,11 +660,11 @@ mod tests {
         assert!(input_format("6").is_err());
         assert_eq!(
             dates_prompt(Some(12)),
-            "Dates that mask the seed phrase (up to 4, DD-MM-YYYY, separated by spaces):"
+            "Enter the dates that mask the seed phrase (up to 4, DD-MM-YYYY, separated by spaces):"
         );
         assert_eq!(
             dates_prompt(None),
-            "Dates that mask the seed phrase (DD-MM-YYYY, separated by spaces):"
+            "Enter the dates that mask the seed phrase (DD-MM-YYYY, separated by spaces):"
         );
     }
 }

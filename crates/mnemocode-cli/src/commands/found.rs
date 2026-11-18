@@ -4,14 +4,13 @@
 //! its fingerprint, as labelled facts on a terminal and as plain lines for a file or a pipe.
 
 use mnemocode::bip39::phrase::Phrase;
-use mnemocode::modes::phrase_words::ORIGINAL_FINGERPRINT;
+use mnemocode::modes::phrase_words::{self, ORIGINAL_FINGERPRINT};
 use mnemocode::wallet::evidence::MASTER_KEY_PATH;
 
 use super::encode::fingerprint_of;
 use crate::gate::Stop;
 use crate::terminal::result::{
-    FINGERPRINT_NOTE, part_line, plain_fingerprint_line, print, print_fingerprint, print_part,
-    print_phrase,
+    FINGERPRINT_NOTE, part_line, plain_fingerprint_line, print, print_part, print_phrase,
 };
 use crate::terminal::{self, Channel, can_redraw, fact_line, hint_lines, status_line};
 
@@ -101,19 +100,43 @@ pub(crate) fn report_checksum(phrase: Option<&Phrase>) -> Result<(), Stop> {
 pub(crate) fn show_original_phrase(
     words: &str,
     phrase: Option<&Phrase>,
+    encoded: Option<(&str, String)>,
     channel: Channel,
 ) -> Result<(), Stop> {
-    print_part("The original seed phrase, the wallet's", true, channel);
+    print_part("Original seed phrase", true, channel);
     print_phrase(words, channel);
-    print(channel, &[String::new()]);
+    // The fingerprints under their heading, as Encode shows them.
+    let title = if encoded.is_some() {
+        "Fingerprints"
+    } else {
+        "Fingerprint"
+    };
+    print_part(title, true, channel);
     match phrase {
-        None => terminal::status("BIP39 checksum", CHECKSUM_INVALID, false),
-        Some(phrase) => print_fingerprint(
-            ORIGINAL_FINGERPRINT,
-            &fingerprint_of(phrase)?,
-            FINGERPRINT_NOTE,
+        None => print(
             channel,
+            &[status_line("BIP39 checksum", CHECKSUM_INVALID, false)],
+        ),
+        Some(phrase) => print(
+            channel,
+            &[status_line(
+                ORIGINAL_FINGERPRINT,
+                &fingerprint_of(phrase)?,
+                true,
+            )],
         ),
     }
+    if let Some((label, value)) = &encoded {
+        print(channel, &[status_line(label, value, true)]);
+    }
+    let note = if encoded.is_some() {
+        format!(
+            "{} With an {FINGERPRINT_NOTE}.",
+            phrase_words::FINGERPRINT_ROLES
+        )
+    } else {
+        format!("With an {FINGERPRINT_NOTE}.")
+    };
+    terminal::result_hint(&note);
     Ok(())
 }

@@ -33,8 +33,9 @@ Code for macOS and Windows is not compiled into this measurement; CI runs the wo
 both systems without measuring them.
 
 The WebAssembly binding's figure is low because a native test cannot cross into JavaScript: most of
-its entries run only in the browser, under `cargo xtask wasm verify`, which this measurement does
-not count.
+its entries run only as WebAssembly, which `cargo xtask wasm verify` and its probe load in the wasmi
+interpreter. This measurement does not count them, and no test runs the generated JavaScript glue
+in a real browser.
 
 ## Reproduce on Linux
 

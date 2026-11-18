@@ -9,7 +9,7 @@ use super::options::{
 pub(in super::super) const PAGE: CommandHelp = CommandHelp {
     summary: "Write a phrase in another form, masked with dates if given",
     about: &[
-        "Writes an English BIP39 phrase as words, numbers, Unicode codes or colors, after masking it with dates in seedshift mode. It can show the result in the terminal, save it as a record file or a QR code, print it as cards, or split it into Shamir shares. After encoding it prints the fingerprint of the original phrase and of the masked phrase.",
+        "Writes an English BIP39 phrase as words, numbers, Unicode codes or colors, after masking it with dates in seedshift mode. It can show the result in the terminal, save it as a text file or a QR code, print it as cards, or split it into Shamir shares. After encoding it prints the fingerprint of the original phrase and of the masked phrase.",
     ],
     usage: "[OPTIONS] (--ask-secrets | --mnemonic-file <PATH>)",
     groups: &[
@@ -47,8 +47,12 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
             "A real phrase, dates asked for, as Unicode",
         ),
         (
-            "printf '%s\\n' \"$TEST_PHRASE\" | mnemocode encode --mode direct --mnemonic-file - --format 5 --cards",
-            "The test phrase as colors, shown as cards in the terminal",
+            "printf '%s\\n' \"$TEST_PHRASE\" > test-phrase.txt",
+            "Save the test phrase in a file",
+        ),
+        (
+            "mnemocode encode --mode direct --mnemonic-file test-phrase.txt --format 5 --cards",
+            "The test phrase as colors, shown as cards on the private screen",
         ),
         (
             "mnemocode encode --mode seedshift --ask-secrets --format 1",
@@ -56,11 +60,11 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
         ),
         (
             "mnemocode encode --mnemonic-file phrase.txt --dates-file dates.txt --format 5 --output shifted.txt",
-            "Use protected local files and save the record; Decode also needs the dates",
+            "Use protected local files and save the codes; Decode needs the mode and the dates too",
         ),
         (
             "mnemocode encode --mode seedshift-legacy --ask-secrets --format 1",
-            "Use the original Seedshift mode with private inputs",
+            "Use the Original Seedshift with private inputs",
         ),
         (
             "mnemocode encode --mode seedshift --ask-secrets --format 5 --template business-it --page-size a4 --pdf cards.pdf",
@@ -84,7 +88,7 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
         ),
     ],
     notes: Some(&[
-        "Fingerprints are calculated for an empty BIP39 passphrase. A legacy result is a valid phrase only by chance; when it is not, only the original fingerprint is shown.",
+        "Fingerprints are calculated for an empty BIP39 passphrase. With seedshift-legacy the last word is replaced by one that passes the checksum, and the original last word is shown to remember: Decode asks for it.",
         "Note the encoded fingerprint too: decode, recover-date and sskr-combine show it again on the private screen once the codes or shares are read, before the dates, so that a code written or typed wrongly shows before the dates are typed.",
         "Individual cards are not Shamir sharing: every real card is needed, and each reveals a part of the encoded phrase; the decoy cards after them, one on separate cards, are not needed.",
     ]),

@@ -31,7 +31,7 @@ The shares are shown on the result screen. `--output NEW_FILE` also saves them, 
 
 `sskr-split` splits a phrase as `encode --sskr` does, with two differences. Its `--format` selects the share format, as `--share-format` does there, so it cannot also show the complete backup; `sskr-export` reads `--format` the same way. The display options `--show-original` and `--show-masked-words` are not available; use `encode --sskr` for them. A text file saved with `--output` holds the shares in the share format, one per line.
 
-The menu offers the original words separately, off by default. Keep them apart from the shares. The original phrase is never shown as a second set of codes, and neither display choice adds it to exported share files. `--format` does not change the original words shown with `--show-original words`. Restoring shares without Seedshift also shows only the recovered English words, without an extra code block.
+The menu does not show the original words; from the command line, keep them apart from the shares. The original phrase is never shown as a second set of codes, and neither display choice adds it to exported share files. `--format` does not change the original words shown with `--show-original words`. Restoring shares without Seedshift also shows only the recovered English words, without an extra code block.
 
 ### Date masking before splitting
 
@@ -46,7 +46,7 @@ mnemocode encode --sskr --mode seedshift --ask-secrets \
 mnemocode sskr-combine --mode seedshift --ask-secrets
 ```
 
-With `--mode seedshift`, the phrase is first masked with the dates and then split. Give the same `--mode seedshift` and dates to `sskr-combine` to get the original phrase. The mode and the dates are not stored in the shares and are not printed on share cards: keep them yourself. The legacy Seedshift modes cannot be used with shares.
+With `--mode seedshift`, the phrase is first masked with the dates and then split. Give the same `--mode seedshift` and dates to `sskr-combine` to get the original phrase. The mode and the dates are not stored in the shares and are not printed on share cards: keep them yourself. The Original Seedshift (`--mode seedshift-legacy`) works the same way; its restore also asks for the last word that the split named to remember.
 
 The split shows the fingerprint of the original phrase and that of the masked phrase, the encoded fingerprint. They do not reveal the phrase. On the private screen (`sskr-combine --ask-secrets --mode seedshift`, or Restore in the menu), complete shares show the encoded fingerprint again before the dates are asked for: if it is not the one you noted, a share is wrong, and you find out before typing the dates.
 
@@ -100,7 +100,7 @@ The cards of a share end with a few random codes that belong to nothing, so that
 
 In Unicode codes, the cards of one code have one color, and different codes get colors that look as different as possible. The colors only decorate the cards; the printed codes are the share.
 
-Each file or folder in `--cards-dir` holds one share: keep them in different places. In the folder of a share's separate cards, each file is named after its card's number alone, such as `01.pdf`. A file written with `--pdf` and a folder written with `--images-dir` hold **all** shares. Existing files and folders are never replaced; a taken name is numbered as `name-1`.
+Each file or folder in `--cards-dir` holds one share: keep them in different places. In the folder of a share's separate cards, each file is named after its card's number alone, such as `01.pdf`. A file written with `--pdf` and a folder written with `--images-dir` hold **all** shares. Existing files and folders are never replaced: a taken file name is numbered before its ending, as `cards_1.pdf`, and a taken folder name as `cards-1`.
 
 The reference printed on a share sheet shows the numbers of the set, the group and the share.
 

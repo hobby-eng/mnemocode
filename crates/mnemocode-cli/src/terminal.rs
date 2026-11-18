@@ -23,8 +23,9 @@ use crate::os::{self, Environment, Stream};
 pub(crate) use answer::Hints;
 pub(crate) use choice::{
     Choice, Chosen, Explanation, LineQuestion, ListQuestion, Shortcut, answer_mark, ask_line,
-    choose, choose_from, choose_many, list_rows, notes_room, redraw_answer_record, rows_of,
-    start_answer_record, type_hint, wait_for_enter, wait_for_enter_or_escape, write_prompt,
+    choose, choose_from, choose_many, list_rows, notes_room, redraw_answer_record,
+    remember_choices, rows_of, start_answer_record, type_hint, wait_for_enter,
+    wait_for_enter_or_escape, write_prompt,
 };
 pub(crate) use hints::InputHints;
 pub(crate) use keys::{Interrupted, Keys};
@@ -32,8 +33,8 @@ pub(crate) use line::{LineOptions, LineOutcome, read_line};
 pub(crate) use private::{
     ANSWER_LABEL_WIDTH, CLOSING_ROWS, Lifetime, PrivateScreen, answer_accepted,
     clear_private_screen, end_warnings, keep_context, keep_result_from_start, leave_result,
-    on_private_screen, question_ended, remember_warning, show_protection, show_result,
-    showing_result, step_begin,
+    on_private_screen, question_ended, remember_warning, screen_title, set_progress,
+    set_screen_title, show_protection, show_result, showing_result, step_begin,
 };
 pub(crate) use progress::{ProgressLine, SEARCH_PROGRESS_SECONDS, seconds_of};
 
@@ -152,6 +153,15 @@ fn context() -> &'static Context {
 /// The environment read at start.
 pub(crate) fn environment() -> &'static Environment {
     &context().environment
+}
+
+/// The folder MnemoCode started in, the answer Enter gives to a question of a folder; "." where it
+/// is not known.
+pub(crate) fn started_folder() -> String {
+    environment().current.as_ref().map_or_else(
+        || ".".to_owned(),
+        |path| path.to_string_lossy().into_owned(),
+    )
 }
 
 /// A stream that a result or a message is written to.
@@ -344,18 +354,32 @@ pub(crate) fn fact_line(channel: Channel, label: &str, value: &str, width: usize
     beside_mark(&mark, indent, value, &|line| line.to_owned()).join("\n")
 }
 
-/// The lines of a result: its heading after a blank line, then its facts as grey labels with their
-/// values, like the summary of `mhfe`.
-pub(crate) fn result_lines(channel: Channel, title: &str, rows: &[(&str, String)]) -> Vec<String> {
+/// `rows` as facts, each a grey label and its value, the labels in one column.
+fn fact_lines<'a>(
+    channel: Channel,
+    rows: &'a [(&str, String)],
+) -> impl Iterator<Item = String> + 'a {
     let width = rows
         .iter()
         .map(|(label, _)| text_width(label))
         .fold(MIN_LABEL_WIDTH, usize::max);
+    rows.iter()
+        .map(move |(label, value)| fact_line(channel, label, value, width))
+}
+
+/// A part of a result under its heading: the heading in the colour of headings after a blank line,
+/// then `rows`, each a grey label and its value.
+pub(crate) fn part_lines(channel: Channel, title: &str, rows: &[(&str, String)]) -> Vec<String> {
+    let mut lines = vec![String::new(), paint(channel, style::HEADING, title)];
+    lines.extend(fact_lines(channel, rows));
+    lines
+}
+
+/// The lines of a result: its heading after a blank line, then its facts as grey labels with their
+/// values, like the summary of `mhfe`.
+pub(crate) fn result_lines(channel: Channel, title: &str, rows: &[(&str, String)]) -> Vec<String> {
     let mut lines = vec![format!("\n{}", heading_line(channel, title))];
-    lines.extend(
-        rows.iter()
-            .map(|(label, value)| fact_line(channel, label, value, width)),
-    );
+    lines.extend(fact_lines(channel, rows));
     lines
 }
 
@@ -523,6 +547,14 @@ pub(crate) fn hint(message: &str) {
     }
 }
 
+/// A grey note about a result's data, a blank line apart from the data above it on a terminal.
+pub(crate) fn result_hint(message: &str) {
+    if can_redraw(Channel::Error) {
+        error_line("");
+    }
+    hint(message);
+}
+
 /// A notice on standard error; a warning is remembered for the step screens.
 pub(crate) fn notice(message: &str, kind: NoticeKind) {
     if kind == NoticeKind::Warning {
@@ -536,7 +568,19 @@ pub(crate) fn notice(message: &str, kind: NoticeKind) {
 /// A result saved, after a green ✓; after a private screen it stays in the summary.
 pub(crate) fn saved(message: &str) {
     private::add_summary(NoticeKind::Success, message, None);
+    // Each file saved after the first stands apart on a terminal, its path easy to read.
+    if can_redraw(Channel::Error) && SAVED_LAST.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        error_line("");
+    }
     notice(message, NoticeKind::Success);
+}
+
+/// Whether a file saved was named since the last heading of a result.
+static SAVED_LAST: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// A heading of a result was written: the next file saved is the first under it.
+pub(crate) fn heading_written() {
+    SAVED_LAST.store(false, std::sync::atomic::Ordering::Relaxed);
 }
 
 /// A warning that still holds once the command has ended; after a private screen it stays in the
@@ -627,8 +671,78 @@ pub(crate) fn take_to_menu() -> bool {
     TO_MENU.swap(false, std::sync::atomic::Ordering::Relaxed)
 }
 
+/// Whether Shift+Tab at the seed phrase went back to the questions before it.
+static STEP_BACK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Notes that the seed phrase went back a step; its question then ends as cancelled.
+pub(crate) fn go_back_a_step() {
+    STEP_BACK.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether the seed phrase went back a step, the note forgotten.
+pub(crate) fn take_step_back() -> bool {
+    STEP_BACK.swap(false, std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Whether this process has shown its result; until then, a command of the menu goes back to the
+/// menu's question with Shift+Tab.
+static RESULT_SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Notes that this process has shown its result.
+pub(crate) fn note_result_shown() {
+    RESULT_SHOWN.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether Shift+Tab here goes back to the question the menu asked before this command: at any of
+/// its questions before its result, outside the steps of a task. What was typed in the command is
+/// wiped as it ends.
+pub(crate) fn back_to_menu_question() -> bool {
+    for_menu() && !steps_back() && !RESULT_SHOWN.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The exit status of a command of the menu left with Shift+Tab, for the menu's question again.
+pub(crate) const BACK_STATUS: u8 = 3;
+
 /// The keys of a task of the menu, under its questions.
 pub(crate) const STEP_KEYS: &str = "Shift+Tab back · Esc menu";
+/// The key under a secret that a command of the menu asks with no question before it to go back to.
+pub(crate) const MENU_KEY: &str = "Esc menu";
+
+/// `text` in grey with the names of the keys in it in yellow, so that they stand out under a
+/// question and under the pages of a result.
+pub(crate) fn key_line(text: &str) -> String {
+    let mut line = String::new();
+    let mut rest = text;
+    while let Some((at, key)) = [
+        "Shift+Tab",
+        "Esc",
+        "Enter",
+        "↑ ↓",
+        "↑/PgUp",
+        "↓/PgDn",
+        "Home/End",
+        "Ctrl+C",
+    ]
+    .iter()
+    .filter_map(|key| rest.find(key).map(|at| (at, *key)))
+    .min_by_key(|&(at, _)| at)
+    {
+        if at > 0 {
+            line.push_str(&paint(Channel::Error, style::MUTED, &rest[..at]));
+        }
+        line.push_str(&paint(Channel::Error, style::WARNING, key));
+        rest = &rest[at + key.len()..];
+    }
+    if !rest.is_empty() {
+        line.push_str(&paint(Channel::Error, style::MUTED, rest));
+    }
+    line
+}
+
+/// Whether the menu started this command, which Escape returns to.
+pub(crate) fn for_menu() -> bool {
+    environment().for_menu
+}
 
 /// Says that the command was cancelled.
 pub(crate) fn cancelled() {

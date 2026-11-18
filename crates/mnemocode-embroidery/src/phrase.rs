@@ -13,7 +13,7 @@ use mnemocode::refusal::{Refusal, RefusalKind};
 use mnemocode::secret::{SecretBytes, SecretText};
 use zeroize::{Zeroize, Zeroizing};
 
-use crate::legend::{self, LegendError, Masking, Reading};
+use crate::legend::{self, Holds, LegendError, Reading};
 
 /// Why a phrase cannot be masked for a pattern, or a legend line read back.
 #[derive(Debug)]
@@ -28,11 +28,9 @@ pub enum SeedStitchError {
     NotRead,
     /// Changes of different rows read as different phrases.
     Ambiguous,
-    /// The mode is one that only a replaced last word gives, which is no phrase to hide.
-    Mode,
     /// The legend holds one share of a set, where a whole backup is asked for.
     Share,
-    /// The phrase cannot be split into shares, as Encode refuses it.
+    /// The phrase cannot be split into shares, as Encode refuses it, such as for its threshold.
     #[cfg(feature = "sskr")]
     Split(mnemocode::sskr::split::SplitError),
 }
@@ -48,9 +46,6 @@ impl fmt::Display for SeedStitchError {
             ),
             Self::Ambiguous => f.write_str(
                 "The legend reads in more than one way: more than one row may be wrong. Check each row against the paper.",
-            ),
-            Self::Mode => f.write_str(
-                "A pattern holds a phrase masked with either Seedshift, or the phrase itself; seedshift-legacy-valid names a result whose last word was replaced already.",
             ),
             Self::Share => f.write_str(
                 "This legend holds one share of a set, not a whole backup: restore the seed phrase from shares, with enough of the set's patterns.",
@@ -71,7 +66,6 @@ impl Refusal for SeedStitchError {
             Self::Legend(error) => error.code(),
             Self::NotRead => "embroidery.phrase.legend-not-read",
             Self::Ambiguous => "embroidery.phrase.legend-ambiguous",
-            Self::Mode => "embroidery.phrase.mode",
             Self::Share => "embroidery.phrase.share",
             #[cfg(feature = "sskr")]
             Self::Split(error) => error.code(),
@@ -83,19 +77,27 @@ impl Refusal for SeedStitchError {
             Self::Backup(error) => error.kind(),
             Self::Phrase(error) => error.kind(),
             Self::Legend(error) => error.kind(),
-            Self::NotRead | Self::Ambiguous | Self::Mode | Self::Share => RefusalKind::Error,
+            Self::NotRead | Self::Ambiguous | Self::Share => RefusalKind::Error,
             #[cfg(feature = "sskr")]
             Self::Split(error) => error.kind(),
         }
     }
 }
 
-/// The entropy a pattern's legend holds and whether its phrase is masked: made only by
-/// [`masked_entropy`] or, where the person chooses it, [`unmasked_entropy`] ([`crate::hide::hide`]).
-#[derive(Debug)]
+/// The entropy a pattern's legend holds, what it is, and with the Original Seedshift the last word
+/// its shift gave and the one the legend's phrase ends with: made by [`legend_entropy`] and the
+/// functions it calls, and by [`share_entropies`] ([`crate::hide::hide`]).
 pub struct LegendEntropy {
     entropy: SecretBytes,
-    masking: Masking,
+    holds: Holds,
+    last_words: Option<(u16, u16)>,
+}
+
+/// Redacted: it holds the entropy and the word to remember.
+impl fmt::Debug for LegendEntropy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("LegendEntropy(..)")
+    }
 }
 
 impl LegendEntropy {
@@ -103,7 +105,8 @@ impl LegendEntropy {
     pub(crate) fn known(entropy: &[u8]) -> Self {
         Self {
             entropy: SecretBytes::copy_of("a known answer's entropy", entropy),
-            masking: Masking::Seedshift,
+            holds: Holds::Entropy,
+            last_words: None,
         }
     }
 
@@ -115,8 +118,15 @@ impl LegendEntropy {
 
     /// Whether its phrase is masked.
     #[must_use]
-    pub const fn masking(&self) -> Masking {
-        self.masking
+    pub const fn holds(&self) -> Holds {
+        self.holds
+    }
+
+    /// With the Original Seedshift, the last word its shift gave, which the person keeps to restore
+    /// the phrase exactly, and the one the phrase held ends with, both indexes; none otherwise.
+    #[must_use]
+    pub const fn last_words(&self) -> Option<(u16, u16)> {
+        self.last_words
     }
 }
 
@@ -126,51 +136,17 @@ impl LegendEntropy {
 ///
 /// [`SeedStitchError::Backup`] for the dates Seedshift refuses, as Encode refuses them.
 pub fn masked_entropy(phrase: &Phrase, dates: &[Date]) -> Result<LegendEntropy, SeedStitchError> {
-    shifted_entropy(phrase, dates)
+    written_entropy(phrase, dates, Mode::Seedshift)
 }
 
-/// The word numbers of `phrase` masked with `dates` by the original Seedshift, 11 bits each, packed
-/// from the first: its last word is usually no phrase's checksum, so it is kept whole.
+/// The entropy of `phrase` masked with `dates` by the Original Seedshift, as Encode writes it: with
+/// a last word that keeps the checksum, so that it is a phrase's entropy as every other mode's.
 ///
 /// # Errors
 ///
 /// [`SeedStitchError::Backup`] for the dates Seedshift refuses, as Encode refuses them.
 pub fn legacy_entropy(phrase: &Phrase, dates: &[Date]) -> Result<LegendEntropy, SeedStitchError> {
-    let encoding = Backup::encode(phrase, dates, Form::Indexes, Mode::SeedshiftLegacy, false)
-        .map_err(SeedStitchError::Backup)?;
-    Ok(LegendEntropy {
-        entropy: packed_words(encoding.backup.indexes()),
-        masking: Masking::SeedshiftLegacy,
-    })
-}
-
-/// `words`, 11 bits each from the most significant, the last byte filled with zeros.
-fn packed_words(words: &[u16]) -> SecretBytes {
-    let mut packed = SecretBytes::zeroed("word numbers", (words.len() * 11).div_ceil(8));
-    for (place, &word) in words.iter().enumerate() {
-        for bit in 0..11 {
-            if word >> (10 - bit) & 1 == 1 {
-                let at = place * 11 + bit;
-                packed[at / 8] |= 0x80 >> (at % 8);
-            }
-        }
-    }
-    packed
-}
-
-/// The word numbers that `packed` holds, 11 bits each; none where the bits after the last word are
-/// not zero, as no legend written whole has them.
-fn unpacked_words(packed: &[u8]) -> Option<Zeroizing<Vec<u16>>> {
-    let count = packed.len() * 8 / 11;
-    let bit = |at: usize| packed[at / 8] >> (7 - at % 8) & 1;
-    if (count * 11..packed.len() * 8).any(|at| bit(at) == 1) {
-        return None;
-    }
-    let mut words = Zeroizing::new(Vec::with_capacity(count));
-    for place in 0..count {
-        words.push((0..11).fold(0_u16, |word, b| word << 1 | u16::from(bit(place * 11 + b))));
-    }
-    Some(words)
+    written_entropy(phrase, dates, Mode::SeedshiftLegacy)
 }
 
 /// What the legends of the `count` SSKR shares of `phrase` hold, `threshold` of them needed: the
@@ -178,8 +154,7 @@ fn unpacked_words(packed: &[u8]) -> Option<Zeroizing<Vec<u16>>> {
 ///
 /// # Errors
 ///
-/// [`SeedStitchError::Mode`] and [`SeedStitchError::Split`] for what a split refuses, the original
-/// Seedshift among them.
+/// [`SeedStitchError::Split`] for what a split refuses.
 #[cfg(feature = "sskr")]
 pub fn share_entropies(
     phrase: &Phrase,
@@ -187,29 +162,34 @@ pub fn share_entropies(
     (threshold, count): (usize, usize),
     random: &mut dyn mnemocode::random::Random,
 ) -> Result<Vec<LegendEntropy>, SeedStitchError> {
-    let mode = legend_mode(mode)?;
     let split = mnemocode::sskr::split::split_backup(phrase, mode, dates, threshold, count, random)
         .map_err(SeedStitchError::Split)?;
-    let masking = if mode.masked() {
-        Masking::Share
-    } else {
-        Masking::ShareUnmasked
-    };
+    let holds = Holds::Share;
+    let written = split
+        .held
+        .index(split.held.len() - 1)
+        .and_then(|index| u16::try_from(index).ok());
+    let last_words = split.original_last_word.zip(written);
     Ok(split
         .shares
         .iter()
         .map(|share| LegendEntropy {
             entropy: SecretBytes::copy_of("a share", share.payload()),
-            masking,
+            holds,
+            last_words,
         })
         .collect())
 }
 
-/// The entropy of `phrase` masked with `dates` by MnemoCode Seedshift.
-fn shifted_entropy(phrase: &Phrase, dates: &[Date]) -> Result<LegendEntropy, SeedStitchError> {
-    let masking = Masking::Seedshift;
-    let encoding = Backup::encode(phrase, dates, Form::Indexes, Mode::Seedshift, false)
-        .map_err(SeedStitchError::Backup)?;
+/// The entropy of the codes `phrase` masked with `dates` in `mode` gives, which keep the checksum.
+fn written_entropy(
+    phrase: &Phrase,
+    dates: &[Date],
+    mode: Mode,
+) -> Result<LegendEntropy, SeedStitchError> {
+    let holds = Holds::Entropy;
+    let encoding =
+        Backup::encode(phrase, dates, Form::Indexes, mode).map_err(SeedStitchError::Backup)?;
     let mut indexes: Vec<usize> = encoding
         .backup
         .indexes()
@@ -218,9 +198,15 @@ fn shifted_entropy(phrase: &Phrase, dates: &[Date]) -> Result<LegendEntropy, See
         .collect();
     let masked = Phrase::of_indexes(&indexes);
     indexes.zeroize();
+    let written = encoding.backup.indexes().last().copied();
+    let last_words = encoding.original_last_word.zip(written);
     masked
         .and_then(|masked| masked.entropy())
-        .map(|entropy| LegendEntropy { entropy, masking })
+        .map(|entropy| LegendEntropy {
+            entropy,
+            holds,
+            last_words,
+        })
         .map_err(SeedStitchError::Phrase)
 }
 
@@ -234,42 +220,28 @@ pub fn unmasked_entropy(phrase: &Phrase) -> Result<LegendEntropy, SeedStitchErro
         .entropy()
         .map(|entropy| LegendEntropy {
             entropy,
-            masking: Masking::Unmasked,
+            holds: Holds::Entropy,
+            last_words: None,
         })
         .map_err(SeedStitchError::Phrase)
-}
-
-/// `mode` where a pattern can hold its result: either Seedshift, or none. The original's masked
-/// words are kept whole (`legacy_entropy`).
-///
-/// # Errors
-///
-/// [`SeedStitchError::Mode`] for a mode that only a replaced last word gives.
-pub const fn legend_mode(mode: Mode) -> Result<Mode, SeedStitchError> {
-    match mode {
-        Mode::Seedshift | Mode::Direct | Mode::SeedshiftLegacy => Ok(mode),
-        Mode::SeedshiftLegacyValid => Err(SeedStitchError::Mode),
-    }
 }
 
 /// What a legend holds of `phrase` in `mode`: its entropy masked with `dates`, or its own.
 ///
 /// # Errors
 ///
-/// [`SeedStitchError::Mode`] for a mode that only a replaced last word gives;
 /// [`SeedStitchError::Backup`] for dates.
 pub fn legend_entropy(
     phrase: &Phrase,
     mode: Mode,
     dates: &[Date],
 ) -> Result<LegendEntropy, SeedStitchError> {
-    let mode = legend_mode(mode)?;
     mode.check_date_count(dates.len(), false, DateWords::Codes)
         .map_err(|refusal| SeedStitchError::Backup(refusal.into()))?;
     match mode {
         Mode::Direct => unmasked_entropy(phrase),
-        Mode::SeedshiftLegacy => legacy_entropy(phrase, dates),
-        _ => masked_entropy(phrase, dates),
+        Mode::SeedshiftLegacy | Mode::SeedshiftLegacyValid => legacy_entropy(phrase, dates),
+        Mode::Seedshift => masked_entropy(phrase, dates),
     }
 }
 
@@ -375,30 +347,21 @@ fn without_threads(text: &str) -> Option<Zeroizing<String>> {
 /// number read as format 2, and also as format 1 without the numbers, as a person types a format 1
 /// sheet whose key prints each row's thread: a reading as typed beats one that corrects a row.
 fn record_of_line(text: &str) -> Result<LineRecord, SeedStitchError> {
-    let (held, masking, corrected, misread) = held_of_line(text)?;
-    let (mut indexes, mode): (Zeroizing<Vec<u16>>, Mode) = match masking {
-        Masking::Share | Masking::ShareUnmasked => return Err(SeedStitchError::Share),
-        Masking::SeedshiftLegacy => (
-            unpacked_words(&held).ok_or(SeedStitchError::NotRead)?,
-            Mode::SeedshiftLegacy,
-        ),
-        Masking::Seedshift | Masking::Unmasked => {
-            let masked = Phrase::of_entropy(&held).map_err(SeedStitchError::Phrase)?;
-            let indexes = (0..masked.len())
-                .map(|place| masked.index(place).map_or(0, |index| index as u16))
-                .collect();
-            let mode = if masking == Masking::Seedshift {
-                Mode::Seedshift
-            } else {
-                Mode::Direct
-            };
-            (Zeroizing::new(indexes), mode)
-        }
-    };
-    let backup = Backup::of(&indexes, Form::Indexes, mode);
+    let (held, holds, corrected, misread) = held_of_line(text)?;
+    if holds.is_share() {
+        return Err(SeedStitchError::Share);
+    }
+    // A phrase's entropy says nothing of its mode: its word numbers alone, whose mode Decode asks.
+    let phrase = Phrase::of_entropy(&held).map_err(SeedStitchError::Phrase)?;
+    let mut indexes: Zeroizing<Vec<u16>> = Zeroizing::new(
+        (0..phrase.len())
+            .map(|place| phrase.index(place).map_or(0, |index| index as u16))
+            .collect(),
+    );
+    let backup = Backup::of(&indexes, Form::Indexes, Mode::Direct);
     indexes.zeroize();
     let record = backup
-        .and_then(|backup| backup.record())
+        .and_then(|backup| backup.text())
         .map_err(SeedStitchError::Backup)?;
     Ok(LineRecord {
         record,
@@ -407,15 +370,13 @@ fn record_of_line(text: &str) -> Result<LineRecord, SeedStitchError> {
     })
 }
 
-/// A legend line of one SSKR share read back: the share, whether its phrase is masked, and a row
-/// taken as misread, as [`LineRecord`] tells it.
+/// A legend line of one SSKR share read back: the share, and a row taken as misread, as
+/// [`LineRecord`] tells it.
 #[cfg(feature = "sskr")]
 #[derive(Debug)]
 pub struct ShareLine {
     /// The share.
     pub share: mnemocode::sskr::share::Share,
-    /// Whether the phrase that its set holds is masked with MnemoCode Seedshift.
-    pub masked: bool,
     /// The row, from 1, read as misread, where only it explains the change.
     pub corrected_row: Option<usize>,
     /// Whether a row was read as misread.
@@ -432,15 +393,14 @@ pub fn share_of_legend(text: &str) -> Result<Option<ShareLine>, SeedStitchError>
     if !legend::is_line(text) {
         return Ok(None);
     }
-    let (held, masking, corrected_row, corrected) = held_of_line(text)?;
-    if !masking.is_share() {
+    let (held, holds, corrected_row, corrected) = held_of_line(text)?;
+    if !holds.is_share() {
         return Ok(None);
     }
     let share =
         mnemocode::sskr::share::Share::of_payload(&held).map_err(|_| SeedStitchError::NotRead)?;
     Ok(Some(ShareLine {
         share,
-        masked: masking == Masking::Share,
         corrected_row,
         corrected,
     }))
@@ -448,9 +408,7 @@ pub fn share_of_legend(text: &str) -> Result<Option<ShareLine>, SeedStitchError>
 
 /// What the legend line `text` holds, how, and the row read as misread: as [`record_of_line`]
 /// reads it.
-fn held_of_line(
-    text: &str,
-) -> Result<(SecretBytes, Masking, Option<usize>, bool), SeedStitchError> {
+fn held_of_line(text: &str) -> Result<(SecretBytes, Holds, Option<usize>, bool), SeedStitchError> {
     let first = reading_of(text);
     let reading = if matches!(first, Ok(Reading::Read { .. })) {
         first?
@@ -462,17 +420,17 @@ fn held_of_line(
             (first, _) => first?,
         }
     };
-    let (entropy, masking, corrected, misread) = match reading {
-        Reading::Read { entropy, masking } => (entropy, masking, None, false),
+    let (entropy, holds, corrected, misread) = match reading {
+        Reading::Read { entropy, holds } => (entropy, holds, None, false),
         Reading::Corrected {
             entropy,
-            masking,
+            holds,
             row,
-        } => (entropy, masking, row, true),
+        } => (entropy, holds, row, true),
         Reading::NotRead => return Err(SeedStitchError::NotRead),
         Reading::Ambiguous => return Err(SeedStitchError::Ambiguous),
     };
-    Ok((entropy, masking, corrected, misread))
+    Ok((entropy, holds, corrected, misread))
 }
 
 #[cfg(test)]
@@ -499,8 +457,9 @@ mod tests {
         let plain = record_of_line(EXAMPLE).unwrap();
         let with_threads = record_of_line(&typed.join(" ")).unwrap();
         assert_eq!(with_threads.record().as_str(), plain.record().as_str());
+        // A record holds the word numbers alone, as a backup file does.
         let ordered = record_of_line(crate::legend::EXAMPLE_ORDERED).unwrap();
-        assert!(ordered.record().as_str().starts_with("MNC1:"));
+        assert_eq!(ordered.record().as_str().split(' ').count(), 24);
     }
 
     #[test]
@@ -510,10 +469,7 @@ mod tests {
         let numbers: Vec<String> = (0..24)
             .map(|place| (void.index(place).unwrap() + 1).to_string())
             .collect();
-        assert_eq!(
-            read.record().as_str(),
-            format!("MNC1:seedshift:indexes:{}", numbers.join(" "))
-        );
+        assert_eq!(read.record().as_str(), numbers.join(" "));
         assert_eq!(read.corrected_row(), None);
     }
 
@@ -535,39 +491,17 @@ mod tests {
                 .code(),
             "core.masking.assert-date-count-refused"
         );
-        assert_eq!(own.masking(), Masking::Unmasked);
+        assert_eq!(own.holds(), Holds::Entropy);
         assert_eq!(&**own.bytes(), &*void.entropy().unwrap());
         let masked = legend_entropy(&void, Mode::Seedshift, &date).unwrap();
-        assert_eq!(masked.masking(), Masking::Seedshift);
+        assert_eq!(masked.holds(), Holds::Entropy);
         assert_ne!(&**masked.bytes(), &**own.bytes());
-        // The original Seedshift keeps every masked word, the last too; a record whose last word
-        // was replaced already is no phrase to hide.
+        // The Original Seedshift's codes, with the last word Encode writes, are a phrase's entropy
+        // as long as every other mode's.
         let original = legend_entropy(&void, Mode::SeedshiftLegacy, &date).unwrap();
-        assert_eq!(original.masking(), Masking::SeedshiftLegacy);
+        assert_eq!(original.holds(), Holds::Entropy);
+        assert_eq!(original.bytes().len(), own.bytes().len());
         assert_ne!(&**original.bytes(), &**masked.bytes());
-        assert_eq!(
-            legend_entropy(&void, Mode::SeedshiftLegacyValid, &date)
-                .unwrap_err()
-                .code(),
-            "embroidery.phrase.mode"
-        );
-    }
-
-    // The word numbers of the original Seedshift fill whole bytes with zero bits, and nothing else
-    // reads as words.
-    #[test]
-    fn packed_words_read_back_only_with_their_filling_bits_zero() {
-        let words: Vec<u16> = (0..12).map(|place| 2047 - place * 170).collect();
-        let packed = packed_words(&words);
-        assert_eq!(packed.len(), 17);
-        assert_eq!(
-            unpacked_words(&packed).map(|read| read.to_vec()),
-            Some(words)
-        );
-        let mut filled = packed.to_vec();
-        filled[16] |= 1;
-        assert_eq!(unpacked_words(&filled), None);
-        assert_eq!(unpacked_words(&filled[..16]), None);
     }
 
     #[test]
@@ -608,7 +542,7 @@ mod tests {
         );
         assert_eq!(
             masked_entropy(&phrase, &[]).unwrap_err().code(),
-            Backup::encode(&phrase, &[], Form::Indexes, Mode::Seedshift, false)
+            Backup::encode(&phrase, &[], Form::Indexes, Mode::Seedshift)
                 .unwrap_err()
                 .code()
         );

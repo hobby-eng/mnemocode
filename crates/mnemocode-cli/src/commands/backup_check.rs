@@ -25,11 +25,11 @@ use super::backup_questions::CODES_AGAIN_LABEL;
 use super::date_search::{DATES_AGAIN_LABEL, ask_dates};
 use super::given::{DECODE_ENTRY, PHRASE_LIMIT, SHARE_SET_LIMIT};
 use super::share_repair::share_answer_hint;
-use crate::args::{Parsed, choice_option, is_on};
+use crate::args::{Parsed, choice_option};
 use crate::gate::Stop;
 use crate::input::{Ask, secret_ask};
 use crate::terminal::{
-    Choice, Chosen, ListQuestion, NoticeKind, choose, clear_private_screen, error_line, notice,
+    Choice, Chosen, ListQuestion, NoticeKind, choose, clear_private_screen, notice,
     on_private_screen, terminal_available,
 };
 
@@ -37,7 +37,6 @@ use crate::terminal::{
 #[derive(Debug)]
 enum BackupCheckError {
     NeedsPrivateScreen,
-    NothingToCheck,
 }
 
 impl fmt::Display for BackupCheckError {
@@ -45,9 +44,6 @@ impl fmt::Display for BackupCheckError {
         f.write_str(match self {
             Self::NeedsPrivateScreen => {
                 "--backup-check answers a question of the private screen after the result, which needs a terminal."
-            }
-            Self::NothingToCheck => {
-                "--backup-check has nothing to check: a record with a replaced last word cannot be checked."
             }
         })
     }
@@ -61,9 +57,6 @@ impl Refusal for BackupCheckError {
             Self::NeedsPrivateScreen => {
                 "cli.backup-check.backup-check-answers-question-private-screen"
             }
-            Self::NothingToCheck => {
-                "cli.backup-check.backup-check-nothing-check-record-replaced-last-word"
-            }
         }
     }
 }
@@ -76,9 +69,6 @@ pub(crate) fn backup_check_answer(parsed: &Parsed) -> Result<Option<bool>, Stop>
     };
     if !terminal_available() {
         return Err(BackupCheckError::NeedsPrivateScreen.into());
-    }
-    if is_on(parsed, "legacy-valid-last-word") {
-        return Err(BackupCheckError::NothingToCheck.into());
     }
     Ok(Some(given == "yes"))
 }
@@ -152,7 +142,7 @@ where
 
 /// Asks whether to check the backup now; Escape answers No.
 fn ask_to_check(what: &str, dated: bool) -> Result<bool, Stop> {
-    error_line("");
+    // The question brings its own blank line above it.
     let dates = if dated { ", and the dates" } else { "" };
     let note = format!("type {what} you wrote down{dates}");
     let asked = ListQuestion {
@@ -197,21 +187,21 @@ fn offer_check(
     }
 }
 
-/// The check after an encoded seed phrase; not for a legacy record with a replaced last word.
+/// The check after an encoded seed phrase.
 pub(crate) fn offer_encoded_check(
     original: EncodedOriginal,
     show: &mut dyn FnMut() -> Result<(), Stop>,
     answer: Option<bool>,
 ) -> Result<(), Stop> {
-    if !on_private_screen() || !EncodedBackupCheck::supports(original.mode) {
+    if !on_private_screen() {
         return Ok(());
     }
-    let check = EncodedBackupCheck::new(original)?;
+    let check = EncodedBackupCheck::new(original);
     let hints = LineWordHints::new(codes_list, |line| line);
     let ask = Ask {
         hints: Some(&hints),
         ..secret_ask(
-            "Your backup, as written down:",
+            "Enter your backup as written down:",
             "the backup you wrote down",
             PHRASE_LIMIT,
         )
@@ -236,7 +226,7 @@ fn ask_shares(check: &ShareBackupCheck, problem: Option<&str>) -> Result<Vec<Str
     }
     let hints = share_word_hints();
     let prompt = format!(
-        "{} shares as written down ({}):",
+        "Enter {} shares as written down ({}):",
         check.threshold(),
         share_answer_hint()
     );
@@ -257,7 +247,7 @@ fn ask_shares(check: &ShareBackupCheck, problem: Option<&str>) -> Result<Vec<Str
         };
         notice(&trouble.message, NoticeKind::Warning);
         let place = index + 1;
-        let prompt = format!("Share {place} as written down:");
+        let prompt = format!("Enter share {place} as written down:");
         let what = format!("share {place}");
         let ask = Ask {
             hints: Some(&hints),

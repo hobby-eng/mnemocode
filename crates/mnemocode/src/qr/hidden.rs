@@ -103,6 +103,15 @@ pub fn png(visible: &str, record: &str) -> Result<SecretBytes, QrError> {
     Ok(image)
 }
 
+/// The PNG of `record`: behind `contact` for ordinary scanners where one is given, else the
+/// ordinary QR code of the record itself; read back before it is returned.
+pub fn png_behind(contact: Option<&str>, record: &str) -> Result<SecretBytes, QrError> {
+    match contact {
+        Some(visible) => png(visible, record),
+        None => super::png(record),
+    }
+}
+
 /// Reads an exact hidden record from an admitted PNG, correcting level-M QR codewords.
 /// Ordinary QR codes and damaged hidden records are refused, never returned as a visible contact.
 pub fn read_png(bytes: &[u8]) -> Result<SecretText, QrError> {

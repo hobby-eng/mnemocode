@@ -19,6 +19,7 @@ use super::encode_questions::{
 use super::given::format_number;
 use super::output_questions::{claims_back_to, claims_now, folder_chosen};
 use crate::gate::Stop;
+use crate::terminal::{Channel, paint, screen_title, set_progress, set_screen_title, style};
 
 /// A way of hiding the phrase that the menu's Encode offers.
 #[derive(Clone, Copy)]
@@ -35,6 +36,14 @@ impl Way {
         match self {
             Self::Form(form) => form.always_masked(),
             Self::Embroidery => false,
+        }
+    }
+
+    /// Its name, as the menu's list of forms shows it.
+    fn label(self) -> &'static str {
+        match self {
+            Self::Form(form) => super::encode_questions::form_label(form),
+            Self::Embroidery => "Embroidery",
         }
     }
 
@@ -57,7 +66,7 @@ impl Way {
                 }
                 places
             }
-            Self::Embroidery => vec![Place::Legend, Place::LegendQr],
+            Self::Embroidery => vec![Place::Pattern, Place::Legend, Place::LegendQr],
         }
     }
 
@@ -96,26 +105,55 @@ pub(crate) fn answered<T>(answer: Option<T>) -> Answered {
     }
 }
 
-/// `answer` of a question that names a file in the task's folder: `Nothing` where the folder was
-/// asked before, as then nothing is asked.
+/// `answer` of a question that names a file in the task's folder: `Nothing` unless the folder was
+/// asked here, as otherwise nothing is asked: it was asked before, or no file is saved.
 pub(crate) fn named_file<T>(
     ask: impl FnOnce() -> Result<Option<T>, Stop>,
 ) -> Result<(Option<T>, Answered), Stop> {
     let asked_before = folder_chosen();
     let answer = ask()?;
-    let step = match (&answer, asked_before) {
-        (None, _) => Answered::Back,
-        (Some(_), true) => Answered::Nothing,
-        (Some(_), false) => Answered::Next,
+    let asked_here = !asked_before && folder_chosen();
+    let step = match answer {
+        None => Answered::Back,
+        Some(_) if asked_here => Answered::Next,
+        Some(_) => Answered::Nothing,
     };
     Ok((answer, step))
 }
 
+/// The steps of a task as a ruler under the title: a grey dot before each step passed, a cyan one
+/// before the step `at` with its name in bold, a hollow one before each to come. Steps without a
+/// name, and those passed over without a question, are left out.
+fn ruler(names: &[Option<&str>], asked: &[bool], at: usize) -> String {
+    let channel = Channel::Error;
+    let mut parts = Vec::new();
+    for (place, name) in names.iter().enumerate() {
+        let Some(name) = name else {
+            continue;
+        };
+        if place < at && !asked.get(place).copied().unwrap_or(true) {
+            continue;
+        }
+        parts.push(match place.cmp(&at) {
+            std::cmp::Ordering::Less => paint(channel, style::MUTED, &format!("● {name}")),
+            std::cmp::Ordering::Equal => format!(
+                "{} {}",
+                paint(channel, style::HEADING, "●"),
+                paint(channel, style::STRONG, name)
+            ),
+            std::cmp::Ordering::Greater => paint(channel, style::MUTED, &format!("○ {name}")),
+        });
+    }
+    parts.join("  ")
+}
+
 /// Asks `count` steps in order, each through `ask`, Shift+Tab going back to the last step before
 /// that asked something; true when the last is answered, false when the first goes back. What the
-/// steps gone back over claimed of the task's files is given back.
+/// steps gone back over claimed of the task's files is given back. Where `names` names the steps,
+/// one more for what comes after them, a ruler of them stands under the screen's title.
 pub(crate) fn run_steps(
     count: usize,
+    names: &[Option<&str>],
     mut ask: impl FnMut(usize) -> Result<Answered, Stop>,
 ) -> Result<bool, Stop> {
     let mut marks = vec![claims_now(); count];
@@ -123,6 +161,9 @@ pub(crate) fn run_steps(
     let mut step = 0;
     while step < count {
         marks[step] = claims_now();
+        if !names.is_empty() {
+            set_progress(Some(ruler(names, &asked, step)));
+        }
         match ask(step)? {
             Answered::Next => {
                 asked[step] = true;
@@ -135,6 +176,9 @@ pub(crate) fn run_steps(
             Answered::Back => loop {
                 if step == 0 {
                     claims_back_to(marks[0]);
+                    if !names.is_empty() {
+                        set_progress(None);
+                    }
                     return Ok(false);
                 }
                 step -= 1;
@@ -145,7 +189,25 @@ pub(crate) fn run_steps(
             },
         }
     }
+    // What comes after the steps, such as the seed phrase, is asked under the ruler too.
+    if names.len() > count {
+        set_progress(Some(ruler(names, &asked, count)));
+    }
     Ok(true)
+}
+
+/// What the last step of a new backup does with its answers: true once done, false to go back to
+/// the step before it, such as Shift+Tab at the seed phrase.
+pub(crate) type Finish<'a> = dyn FnMut(EncodingAnswers) -> Result<bool, Stop> + 'a;
+
+/// A [`Finish`] that only keeps the answers, for a command that goes on without them.
+pub(crate) fn kept(
+    answers: &mut Option<EncodingAnswers>,
+) -> impl FnMut(EncodingAnswers) -> Result<bool, Stop> + '_ {
+    move |given| {
+        *answers = Some(given);
+        Ok(true)
+    }
 }
 
 /// The step of the dates that mask the phrase in `mode`, which keeps them in `dates`; nothing is
@@ -161,18 +223,42 @@ pub(crate) fn dates_step(mode: Mode, dates: &mut SecretVec<Date>) -> Result<Answ
 }
 
 /// The new backup made the `way` chosen: the common block, with the way's own questions after the
-/// dates; the command line and the dates kept apart from it, or none for back. Shift+Tab goes back
-/// a step.
-pub(crate) fn ask_new_backup(way: Way) -> Result<Option<EncodingAnswers>, Stop> {
+/// dates, then `finish` with the command line and the dates; false for back from the first step.
+/// Shift+Tab goes back a step, from the seed phrase too.
+pub(crate) fn ask_new_backup(way: Way, finish: &mut Finish<'_>) -> Result<bool, Stop> {
     let mut mode = Mode::Seedshift;
     let mut dates = SecretVec::new(Vec::new());
     let mut own = Vec::new();
     let mut set = None;
     let mut heir_size = None;
     let mut run = Vec::new();
-    let mut files = Vec::new();
     let mut heirs = Vec::new();
-    let done = run_steps(7, |step| {
+    // The title names the task and the way chosen; a ruler under it names the steps.
+    let task = match screen_title().as_deref() {
+        Some("Re-encode") => "Re-encode",
+        _ => "Encode",
+    };
+    set_screen_title(&format!("{task} · {}", way.label()));
+    let after = if task == "Encode" {
+        "Phrase"
+    } else {
+        "Old backup"
+    };
+    let pattern_step = match way {
+        Way::Embroidery => Some("Pattern"),
+        Way::Form(_) => None,
+    };
+    let names = [
+        Some("Seedshift"),
+        Some("Dates"),
+        pattern_step,
+        Some("Shares"),
+        Some("Heirs"),
+        Some("Saving"),
+        None,
+        Some(after),
+    ];
+    let done = run_steps(8, &names, |step| {
         Ok(match step {
             0 => answered(
                 ask_seedshift("Use Seedshift?", way.always_masked(), Takes::Either)?
@@ -188,48 +274,37 @@ pub(crate) fn ask_new_backup(way: Way) -> Result<Option<EncodingAnswers>, Stop> 
                     Answered::Nothing
                 }
             },
-            // The original Seedshift cannot be split into shares (mnemocode encode --help).
-            3 if mode.capabilities().split => answered(
+            3 => answered(
                 ask_share_set("Split it into Shamir shares?", &shares_explanation(), true)?
                     .map(|chosen| set = chosen),
             ),
-            3 => {
-                set = None;
-                Answered::Nothing
-            }
-            4 => answered(ask_heir_sheet(mode)?.map(|size| heir_size = size)),
+            4 => answered(ask_heir_sheet()?.map(|size| heir_size = size)),
             // Where it is saved comes last, just before the seed phrase.
             5 => answered(saved_where(way, mode, &own, set)?.map(|saved| run = saved)),
             // The files the answers above ask for, named in the same folder.
-            _ => {
-                let (asked, step) = named_file(|| {
-                    let pattern = match (way, set) {
-                        (Way::Form(_), _) => Some(Vec::new()),
-                        (Way::Embroidery, None) => super::pattern_questions::pattern_file()?,
-                        (Way::Embroidery, Some(_)) => super::pattern_questions::pattern_folder()?,
-                    };
-                    let Some(pattern) = pattern else {
-                        return Ok(None);
-                    };
-                    Ok(heir_sheet_files(heir_size)?.map(|sheet| (pattern, sheet)))
-                })?;
-                if let Some((pattern, sheet)) = asked {
-                    files = pattern;
+            6 => {
+                let (asked, step) = named_file(|| heir_sheet_files(heir_size))?;
+                if let Some(sheet) = asked {
                     heirs = sheet;
                 }
                 step
             }
+            // The seed phrase, or the old backup: what the answers are for.
+            _ => {
+                // Codes in words are the masked words already; shares never are.
+                let words_already = set.is_none() && way.written_in_words();
+                let mut command = run.clone();
+                command.extend(shown_masked_words(mode, words_already));
+                command.extend(heirs.iter().cloned());
+                if finish((command, SecretVec::new(dates.to_vec())))? {
+                    Answered::Next
+                } else {
+                    Answered::Back
+                }
+            }
         })
     })?;
-    if !done {
-        return Ok(None);
-    }
-    // Codes in words are the masked words already; shares never are.
-    let words_already = set.is_none() && way.written_in_words();
-    run.extend(files);
-    run.extend(shown_masked_words(mode, words_already));
-    run.extend(heirs);
-    Ok(Some((run, dates)))
+    Ok(done)
 }
 
 /// Where the backup of `way` in `mode` is saved, with the way's `own` answers and the share `set`

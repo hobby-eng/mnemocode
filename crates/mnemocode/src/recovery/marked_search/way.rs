@@ -188,7 +188,12 @@ impl WaySearch {
                     .iter()
                     .map(|&code| usize::from(code))
                     .collect();
-                let matched = fingerprint_of(&Phrase::of_indexes(&indexes)?)? == *fingerprint;
+                // Codes of the original Seedshift program need not keep the checksum: such a
+                // filling has no fingerprint, so it is not the one.
+                let matched = match Phrase::of_indexes(&indexes) {
+                    Ok(phrase) => fingerprint_of(&phrase)? == *fingerprint,
+                    Err(_) => false,
+                };
                 if matched {
                     self.warning = Some(FINGERPRINT_WARNING);
                 }
@@ -299,7 +304,7 @@ impl WaySearch {
         let mut rows = Vec::new();
         for backup in &self.found {
             for phrase in phrases_of(backup, &dates)? {
-                // One set of legacy valid-last-word codes may decode to several phrases.
+                // One set of Original Seedshift codes may decode to two phrases.
                 if rows.len() as u64 == MAX_LISTED {
                     return Err(overflow);
                 }

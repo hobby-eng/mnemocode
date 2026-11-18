@@ -197,7 +197,7 @@ fn ask_address(
     words: &AddressWords,
     asker: Asker,
 ) -> Result<Option<AskedEvidence>, Stop> {
-    let prompt = format!("Address ({})", words.prompt);
+    let prompt = format!("Enter the address ({})", words.prompt);
     let counted = |text: &str, count: Option<u64>| -> Result<Evidence, Stop> {
         Ok(Evidence::address(None, text, place.location, count)?)
     };
@@ -239,7 +239,7 @@ fn ask_address(
 /// Asks the master fingerprint; none when the person goes back.
 fn ask_fingerprint(asker: Asker) -> Result<Option<AskedEvidence>, Stop> {
     let value = Value {
-        prompt: "Original fingerprint of the wallet, such as 73c5da0a (not the encoded one)",
+        prompt: "Enter the original fingerprint of the wallet, such as 73c5da0a (not the encoded one)",
         what: "the eight characters of the fingerprint",
         label: "Fingerprint",
         fallback: None,

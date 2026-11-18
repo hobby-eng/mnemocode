@@ -10,6 +10,8 @@ pub mod candidates;
 pub mod cards;
 #[cfg(feature = "browser-embroidery")]
 pub mod embroidery;
+#[cfg(feature = "browser-files")]
+pub mod files;
 pub mod host;
 #[cfg(feature = "browser-phrase")]
 pub mod phrase;

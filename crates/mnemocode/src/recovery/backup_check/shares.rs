@@ -245,7 +245,10 @@ impl RestoredShares {
     fn unmasks_to(&self, phrase: &Phrase, mode: Mode, dates: &Dates) -> Result<bool, CheckError> {
         let masked = Backup::read(self.phrase.text().as_str(), Form::English, mode)?;
         let all: Vec<Date> = dates.iter().collect();
-        Ok(holds_phrase(&masked.decode(&all)?.recovered, phrase))
+        Ok(masked
+            .candidates(&all)?
+            .iter()
+            .any(|found| holds_phrase(&found.recovered, phrase)))
     }
 
     /// Places of the shares that took no part, or that hold elements nothing settles.
@@ -282,7 +285,6 @@ impl ShareBackupCheck {
     /// which a phrase typed in place of the shares is sent to. Refused for a mode in which no
     /// shares are made, and a threshold below what a share records.
     pub fn new(original: ShareOriginal, decode_entry: &str) -> Result<Self, ShareCheckError> {
-        original.mode.check_split().map_err(ShareCheckError::Mode)?;
         if original.threshold < MIN_RECORDED_THRESHOLD {
             return Err(ShareCheckError::Threshold);
         }

@@ -100,13 +100,13 @@ The mode decides whether the phrase itself changes; the format decides how the r
 | ------------------ | ------------------------------------------------------ | -------- |
 | `direct`           | Writes the original phrase in another form             | None     |
 | `seedshift`        | Masks the phrase and calculates a valid BIP39 checksum | Required |
-| `seedshift-legacy` | Reproduces Original Seedshift                          | Required |
+| `seedshift-legacy` | Masks the words as Original Seedshift does             | Required |
 
 Without `--mode`, a `--dates-file` selects `seedshift`; otherwise the mode is `direct`. Dates accept `DD-MM-YYYY` or `YYYY-MM-DD`, with years `0001`–`9999`. Their input order does not matter. You can use up to one date per three words: at most 4–8 dates for 12–24 words.
 
 **Wrong dates can produce a valid phrase for a different wallet.** A checksum cannot confirm the dates. Keep an original wallet fingerprint, address or public key for a [recovery check](#exact-local-recovery-checks).
 
-Original Seedshift usually produces an invalid BIP39 checksum. Its `--legacy-valid-last-word` option makes the checksum valid but loses information from the last word. Such a record is named `seedshift-legacy-valid`; decoding leaves 128, 64, 32, 16 or 8 possible last words for 12, 15, 18, 21 or 24 words. A wallet reference distinguishes them. MnemoCode also accepts 21-word legacy phrases, which Original Seedshift did not support.
+Original Seedshift shifts each word number, so its result usually fails the BIP39 checksum. MnemoCode writes it with a last word that passes the checksum, so the backup is a valid phrase like that of every other mode, and shows the original last word to remember. Decode asks for that word: with it the phrase comes back exactly; without it, one or two phrases remain, each with its fingerprint, and a wallet reference tells them apart. Codes made by the original Seedshift program, whose last word fails the checksum, decode exactly without it. MnemoCode also accepts 21-word phrases, which Original Seedshift did not support.
 
 #### How checksum-valid Seedshift works
 
@@ -135,13 +135,13 @@ mnemocode encode --mode seedshift-legacy --ask-secrets --format english \
 mnemocode decode --input-file legacy-words.txt --ask-secrets
 ```
 
-A record stores its mode and format, so Decode does not need them again. [File-based examples](docs/CLI.md#public-command-examples) use public test data for scripts; [input files and limits](docs/CLI.md#input-files-and-limits) list the available sources.
+The file holds only the codes, as the screen shows them: Decode asks how they were masked, finds the form itself, and asks for the dates. Keep the mode with the dates. [File-based examples](docs/CLI.md#public-command-examples) use public test data for scripts; [input files and limits](docs/CLI.md#input-files-and-limits) list the available sources.
 
 ### Check what you saved
 
 Encode offers to check the backup by asking for the written copy and dates again. This checks your transcription. Every generated QR PNG is separately read back and compared with the expected content before saving; a mismatch offers another try.
 
-Encode shows an **original** fingerprint for the wallet with an empty BIP39 passphrase and an **encoded** fingerprint for the stored phrase. They do not reveal the phrase. The encoded fingerprint checks the codes before dates are removed; an original wallet reference checks the recovered phrase. An invalid legacy phrase has no encoded fingerprint.
+Encode shows an **original** fingerprint for the wallet with an empty BIP39 passphrase and an **encoded** fingerprint for the stored phrase. They do not reveal the phrase. The encoded fingerprint checks the codes before dates are removed; an original wallet reference checks the recovered phrase. Every backup MnemoCode writes is a valid phrase, so each has an encoded fingerprint; codes of the original Seedshift program, whose last word fails the checksum, have none.
 
 You can also show the masked phrase as English words with `--show-masked-words`, or the original words for visual checking with `--show-original words`. These screen-only choices never add the original phrase to encoded files or share exports. Keep the original words apart from the backup.
 
@@ -154,24 +154,26 @@ Cards need format 3, 4 or 5; `preview --list` lists the thirteen designs.
 ```bash
 # Seedshift colors on A4 sheets, with a QR code and its PNG copy.
 mnemocode encode --mode seedshift --ask-secrets --format colors \
-  --template business-it --page-size a4 --pdf color-cards.pdf --card-qr
+  --template business-it --page-size a4 --pdf color-cards.pdf --card-qr \
+  --card-qr-png
 mnemocode decode --mode seedshift --format colors \
   --qr-file color-cards-qr.png --ask-secrets
 
-# Direct Unicode as separate JPEG business cards, plus a record to decode.
+# Direct Unicode as separate JPEG business cards, read back from their folder.
 mnemocode encode --mode direct --ask-secrets --format unicode \
-  --template business-it --cards-dir unicode-cards --image-format jpg \
-  --output unicode-record.txt
-mnemocode decode --input-file unicode-record.txt --ask-secrets
+  --template business-it --cards-dir unicode-cards --image-format jpg
+mnemocode decode --input-file unicode-cards --ask-secrets
 
-# A standalone QR backup in legacy Unicode, without printable cards.
+# A standalone QR backup in Original Seedshift Unicode, without printable cards.
 mnemocode encode --mode seedshift-legacy --ask-secrets --format unicode \
   --qr legacy-unicode.png
 mnemocode decode --mode seedshift-legacy --format unicode \
   --qr-file legacy-unicode.png --ask-secrets
 ```
 
-A QR code contains the real codes, **without a mode, format header or dates**. Keep that information yourself. `--card-qr` puts the QR on a collection sheet and saves a PNG copy beside the PDF or in the image folder; individual cards never have a QR. `--qr PATH` saves a standalone PNG. Decode reads the PNG, not a PDF or a photograph of the whole sheet.
+A QR code contains the real codes, **without a mode, format header or dates**. Keep that information yourself. `--card-qr` puts the QR on a collection sheet; `--card-qr-png` also saves it as a PNG beside the PDF or in the image folder; individual cards never have a QR. `--qr PATH` saves a standalone PNG. In the menu one question covers all of this: no QR code, an ordinary one or one with hidden data, on the cards only, on the cards and as a PNG file, or as a PNG file only.
+
+Each file of the cards, a PDF, PNG or JPEG, also keeps the codes as named color swatches in its design metadata (XMP), as files from design programs do. Decode reads them from the file, or from the folder of the cards, without typing; it does not read a photograph or a scan of a sheet.
 
 Printed sets also contain extra random codes. When typing codes from cards, give `--words` for the original phrase length and omit those extra codes. The sheet for heirs records the length. Recheck a backup before relying on it.
 
@@ -201,7 +203,7 @@ The QR export choice shows a public contact or text to compatible ordinary scann
 
 `--heir-sheet heirs.pdf` adds a double-sided A5 guide, for codes, shares or a cross-stitch pattern; `--heir-sheet-size a6` makes a smaller one. It records the backup type, phrase length, share threshold and number of dates, but no recovery material, fingerprints or storage locations.
 
-Keep it apart from the backup. A handwritten hint should help heirs remember dates without disclosing them. The sheet cannot restore the wallet on its own; [A guide for heirs](docs/HEIRS.md) explains what else they need.
+Keep it apart from the backup. A handwritten hint should help heirs remember dates without disclosing them. For the Original Seedshift the sheet also asks for the last word the owner was told to remember. The sheet cannot restore the wallet on its own; [A guide for heirs](docs/HEIRS.md) explains what else they need.
 
 ### Embroidery
 
@@ -217,11 +219,11 @@ The PDF looks like a pattern bought from a designer, in three pages: a cover wit
 
 The menu asks for the fabric: Aida 14 unless you choose 11, 16 or 18, or linen of 28 threads an inch stitched over one thread, whose stitches are half the size of those on Aida 14 and take one strand, for detail in a small piece. Then it asks how large the embroidery is: a paper size from A6 to A2, each shown with the stitches your picture takes in it and their size in centimetres, or a width in centimetres or in stitches. A sheet that gives no more stitches than a smaller one is not offered. The picture is fitted into the sheet inside a 1 cm margin, turned whichever way holds it larger, and the chart is drawn on a sheet of that size: on Aida 14, A4 holds up to 104 by 152 stitches. `stitch` takes `--stitches-across` and `--fabric`, such as `14` or `linen-28`; 200 stitches across make about 36 cm on Aida 14 and 18 cm on linen 28. The width can be 40 to 500, and a pattern is at most 800 stitches high. A photograph with smooth shades works best. A flat picture with a few colors cannot hold a phrase: MnemoCode says so and asks for another picture or size, offering the sheets again, and keeps what you typed.
 
-Decode needs the legend and, for a masked phrase, the dates, not the picture. Give it the pattern's PDF (In a cross-stitch pattern, or `--input-file` with the PDF): the PDF keeps the legend line, compressed where no viewer shows it. Or type the legend. Type each row from the top as the symbol's number, a colon and its stitches: `28:1725 25:2163 57:3275 …`. A small pattern, too small for the phrase otherwise, also uses the order of its rows, and its line names each row's DMC number between them: `15:407:38 23:703:169 …`. The PDF shows the symbols; [the SeedStitch format](docs/SEEDSTITCH.md#the-symbols) numbers them 1 to 70, and `--output` saves the legend already typed out. A single mistyped row is corrected: Decode names the row to check on paper, or asks you to check them all where a change of any of several rows gives the same phrase. A legend of the usual form typed with the DMC numbers that its key prints reads too.
+Decode needs the legend, not the picture; it asks whether Seedshift was used, and which, and then the dates, since the legend does not say. Give it the pattern's PDF (In a cross-stitch pattern, or `--input-file` with the PDF): the PDF keeps the legend line, compressed where no viewer shows it. Or type the legend. Type each row from the top as the symbol's number, a colon and its stitches: `28:1725 25:2163 57:3275 …`. A small pattern, too small for the phrase otherwise, also uses the order of its rows, and its line names each row's DMC number between them: `15:407:38 23:703:169 …`. The PDF shows the symbols; [the SeedStitch format](docs/SEEDSTITCH.md#the-symbols) numbers them 1 to 70, and `--output` saves the legend already typed out. A single mistyped row is corrected: Decode names the row to check on paper, or asks you to check them all where a change of any of several rows gives the same phrase. A legend of the usual form typed with the DMC numbers that its key prints reads too.
 
-A pattern is a new backup like the others: it also offers the legend line as a text file, a QR code image of it, the phrase after Seedshift on the screen and the sheet for heirs (`--output`, `--qr`, `--show-masked-words`, `--heir-sheet`; `stitch` also takes `--show-original`). Either Seedshift keeps every word of the phrase in the legend.
+A pattern is a new backup like the others: it also offers the legend line as a text file, a QR code image of it, the phrase after Seedshift on the screen and the sheet for heirs (`--output`, `--qr`, `--show-masked-words`, `--heir-sheet`; `stitch` also takes `--show-original`). In every mode the legend holds a phrase of the same length, so nothing in it tells which mode was used.
 
-A pattern can also be split into [Shamir shares](#splitting-a-mnemonic-into-shares): choose a set such as 2 of 3 at "Split it into Shamir shares?", or give `--threshold` and `--shares`. MnemoCode makes one pattern per share from the same picture, numbered `share-1-pattern.pdf`, `share-2-pattern.pdf` and so on in a new folder (`--pdf-dir`). The embroideries look almost the same; their legends differ. Restore from shares reads any threshold of them back: give the folder that holds their PDFs, each pattern's PDF, or its legend line typed. With a folder, MnemoCode lists the patterns it found before it restores; if the PDFs are in different places, copy them into one folder first. `--output` saves every share's legend line, one per line, and `--qr-dir` a QR code image of each. Decode recognises a share's pattern and sends it to the restore. A share holds 5 bytes more than the phrase, so its pattern needs a few more threads; with too few, MnemoCode asks for another picture or size.
+A pattern can also be split into [Shamir shares](#splitting-a-mnemonic-into-shares): choose a set such as 2 of 3 at "Split it into Shamir shares?", or give `--threshold` and `--shares`. MnemoCode makes one pattern per share from the same picture, numbered `share-1-pattern.pdf`, `share-2-pattern.pdf` and so on in a new folder (`--pdf-dir`). The embroideries look almost the same; their legends differ. Restore from shares reads any threshold of them back: give the folder that holds their PDFs, each pattern's PDF, or its legend line typed. Given a folder, MnemoCode looks through it and the folders inside it: a set found alone is taken and named, and several are listed to choose from. `--output` saves every share's legend line, one per line, and `--qr-dir` a QR code image of each. Decode recognises a share's pattern and sends it to the restore. A share holds 5 bytes more than the phrase, so its pattern needs a few more threads; with too few, MnemoCode asks for another picture or size.
 
 ```bash
 mnemocode stitch --ask-secrets --picture cat.jpg --threshold 2 --shares 3 \
@@ -251,24 +253,33 @@ For scripts, `--old-mode`, `--old-format` and `--old-dates-file` describe the in
 
 ## 3. Decode
 
-Read a saved record, pasted codes, a text file, a QR PNG or the legend of a [cross-stitch pattern](#embroidery). With Seedshift, enter the original dates to recover the original words. For damaged codes or dates, use the corresponding [recovery option](#6-recovery).
+Read pasted codes, a text file, a QR PNG, the legend of a [cross-stitch pattern](#embroidery) or the files of [printed cards](#cards-and-qr-codes), or give a folder: Decode reads it with the folders inside it and lists every backup and set of shares it finds, with the kind of codes and the files, and you choose one (**Autodetect** in the menu; `--find` narrows the search). With Seedshift, enter the original dates to recover the original words. For damaged codes or dates, use the corresponding [recovery option](#6-recovery).
 
 The [Encode examples](#make-a-backup-and-read-it-back) read records back directly; the [card and QR examples](#cards-and-qr-codes) give the mode and format needed for a headerless QR. To read Unicode codes copied into your own text file:
 
 ```bash
 mnemocode decode --mode seedshift --format unicode \
   --input-file copied-unicode.txt --ask-secrets
+
+# Every backup and set of shares in a folder, listed to choose from.
+mnemocode decode --ask-secrets --input-file ./backups
+
+# The cards of a 12-word Seedshift backup in colors, found in a folder, read without questions.
+mnemocode decode --input-file ./backups --find cards --words 12 \
+  --mode seedshift --format colors --dates-file dates.txt
+
+# Original Seedshift codes with the last word Encode named to remember, kept in a file.
+mnemocode decode --mode seedshift-legacy --input-file legacy-words.txt \
+  --dates-file dates.txt --last-word-file last-word.txt
 ```
 
 The private screen also accepts Shamir shares and opens share restoration, keeping all shares you supplied. If marked text could be either a backup or a share, choose which it is, or use `--input-kind codes|share`.
 
-### Versioned records and legacy compatibility
+### Saved codes and older records
 
-A record from `encode --output` has the form `MNC1:<mode>:<format>:<data>`. It contains no dates. Explicit options that conflict with the header are refused; on the private screen you can choose to use the header's values.
+A file from `encode --output` holds only the codes, as the screen shows them: no mode, format or dates. Keep the mode; when the format cannot be determined unambiguously, give `--format` too. With `--sskr`, an output file holds one share per line. A record saved by an earlier version has the form `MNC1:<mode>:<format>:<data>` and still reads: options that conflict with its header are refused, and on the private screen you can choose to use the header's values.
 
-Typed codes and QR payloads lack the header. Keep the mode; when the format cannot be determined unambiguously, give `--format` too. With `--sskr`, an output file contains one share per line instead of an MNC1 record.
-
-For legacy-valid input, provide the original final word privately or with `--last-word-file`. If ordinary legacy decoding fails its checksum, the private screen can offer the replaced-final-word path when applicable. Choose it only if that word was replaced when making the backup. Wrong dates or mistyped codes can also fail a checksum; a word outside the BIP39 list is a separate input error.
+For Original Seedshift codes that MnemoCode wrote, Decode asks for the last word Encode named; Re-encode reads it from `--last-word-file` in scripts. Without it, Decode shows the one or two phrases the codes give, each with its fingerprint. Wrong dates or mistyped codes can still give a wrong phrase; a word outside the BIP39 list is a separate input error.
 
 <a id="splitting-a-mnemonic-into-shares"></a>
 
@@ -302,7 +313,7 @@ mnemocode encode --mode direct --ask-secrets --sskr \
 mnemocode sskr-combine --share-file color-shares.txt
 ```
 
-For the Seedshift restore above, enter `unicode-shares.txt` at the private share prompt, then enter the same dates used for the split. Unicode, word-number and color shares need MnemoCode. Dates and mode are not stored in shares: a Seedshift set needs both to restore the original wallet. Legacy Seedshift modes cannot be combined with shares. A PDF or image folder can contain **every share**; separate them before storage.
+For the Seedshift restore above, enter `unicode-shares.txt` at the private share prompt, then enter the same dates used for the split. Unicode, word-number and color shares need MnemoCode. Dates and mode are not stored in shares: a Seedshift set needs both to restore the original wallet. Either Seedshift can be used; with the Original Seedshift the restore also asks for the last word Encode named. A PDF or image folder can contain **every share**; separate them before storage.
 
 Use `sskr-export` to print or change the presentation of existing shares without making a new set:
 
@@ -328,7 +339,7 @@ mnemocode sskr-combine --mode seedshift --ask-secrets
 mnemocode sskr-combine --share-qr first-share.png --share-qr second-share.png
 ```
 
-If Seedshift was used, select it and enter its dates. On the private screen, complete shares show the encoded fingerprint before asking for dates, so you can compare it with the one from the split. A forgotten digit can be marked with `?`; MnemoCode asks for a wallet reference to search the dates. Mark damaged share codes with `?` too; see [Damaged shares](#damaged-shares).
+If Seedshift was used, select which one and enter its dates; with the Original Seedshift, also the last word Encode named. On the private screen, complete shares show the encoded fingerprint before asking for dates, so you can compare it with the one from the split. A forgotten digit can be marked with `?`; MnemoCode asks for a wallet reference to search the dates. Mark damaged share codes with `?` too; see [Damaged shares](#damaged-shares).
 
 <a id="recovery"></a>
 
@@ -387,7 +398,7 @@ mnemocode recover-date --input-file shifted-colors.txt --ask-secrets \
   --master-fingerprint 73c5da0a
 ```
 
-The example fingerprint belongs to a public test wallet; use your original wallet's reference for your own backup. MnemoCode Seedshift and legacy-valid searches need a wallet reference because every date can give a valid phrase. Original Seedshift can instead use its checksum as a weak filter. Searches estimated above 12 hours need confirmation, and no date search exceeds 2,147,483,648 attempts. See [date search details](docs/CLI.md#date-search-details).
+The example fingerprint belongs to a public test wallet; use your original wallet's reference for your own backup. Every date search needs a wallet reference: with MnemoCode Seedshift every wrong date gives a valid phrase; with the Original Seedshift, codes that MnemoCode writes give one or two valid phrases for most wrong dates unless the last word to remember is given, and codes of the original program, whose last word fails the checksum, still pass for one wrong date in 16 to 256. Searches estimated above 12 hours need confirmation, and no date search exceeds 2,147,483,648 attempts. See [date search details](docs/CLI.md#date-search-details).
 
 ### Damaged shares
 
@@ -488,7 +499,7 @@ Damaged backup codes use `decode`; damaged share codes use `sskr-combine` or `ss
 
 ## Quit
 
-Choose Quit, press `q`, or press Escape at the main menu to leave MnemoCode. At a task's question, Shift+Tab goes back to the question before, keeping the answers before it, and Escape returns to the main menu; each question names these keys under it. An answer changed after going back replaces the old one. After a result, follow the prompt: it may offer Escape to quit, while a repeated word lookup returns to the menu. Ctrl+C cancels the current operation.
+Choose Quit, press `q`, or press Escape at the main menu to leave MnemoCode. At a task's question, Shift+Tab goes back to the question before, keeping the answers before it, and Escape returns to the main menu; each question names these keys under it. At the seed phrase of Encode, Embroidery and Split, Shift+Tab goes back to the last question; the folder chosen then stays the folder for the files, because the other folders were closed to writing before the seed phrase was asked. An answer changed after going back replaces the old one. After a result, follow the prompt: it may offer Escape to quit, while a repeated word lookup returns to the menu. Ctrl+C cancels the current operation.
 
 ## Compatibility and safety notes
 

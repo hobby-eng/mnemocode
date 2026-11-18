@@ -118,6 +118,18 @@ pub(crate) enum Chosen<T> {
     Cancelled,
 }
 
+/// Starts drawing a question below `warned`: a blank line first, unless the step's screen was just
+/// drawn anew or the menu's heading is right above, which end with one already. The blank lines
+/// written, 0 or 1.
+fn start_question(warned: &[String]) -> usize {
+    let lead = usize::from(!step_begin() && !right_under_heading());
+    error_raw(&"\n".repeat(lead));
+    for line in warned {
+        error_line(line);
+    }
+    lead
+}
+
 /// The rows that `lines` take now; a line may hold line breaks.
 pub(crate) fn rows_of(lines: &[String]) -> usize {
     lines
@@ -159,13 +171,12 @@ pub(crate) fn notes_room<T>(choices: &[Choice<T>]) -> usize {
     TEXT_WIDTH.saturating_sub(LABEL_INDENT + label_width(choices) + NOTE_GAP.len())
 }
 
-/// The lines of a list; the chosen entry has a cyan marker and a bold label. Where any entry has an
-/// example, every entry reserves that second row so that their labels stand equally far apart.
+/// The lines of a list; the chosen entry has a cyan marker and a bold label. An entry with an
+/// example shows it on a second row.
 fn list_lines<T>(choices: &[Choice<T>], selected: usize) -> Vec<String> {
     let channel = Channel::Error;
     let width = label_width(choices);
     let room = notes_room(choices);
-    let has_examples = choices.iter().any(|choice| choice.example.is_some());
     let beside = " ".repeat(LABEL_INDENT + width + NOTE_GAP.len());
     choices
         .iter()
@@ -181,31 +192,46 @@ fn list_lines<T>(choices: &[Choice<T>], selected: usize) -> Vec<String> {
             } else {
                 " ".to_owned()
             };
-            let label = if !choice.enabled {
-                paint(channel, style::MUTED, &choice.label)
-            } else if chosen {
-                paint(channel, style::STRONG, &choice.label)
-            } else {
-                choice.label.clone()
-            };
-            let first = match &choice.note {
+            let label = shown_label(choice, chosen);
+            // A note longer than its column goes on under it rather than being cut.
+            let notes = choice
+                .note
+                .as_deref()
+                .map_or_else(Vec::new, |note| super::wrap_text(note, room));
+            let first = match notes.first() {
                 None => format!("{marker} {number}  {label}"),
                 Some(note) => format!(
                     "{marker} {number}  {label}{}{NOTE_GAP}{}",
                     " ".repeat(width - choice.label.chars().count()),
-                    paint(channel, style::MUTED, &shortened(note, room))
+                    paint(channel, style::MUTED, note)
                 ),
             };
             let mut rows = vec![first];
-            if has_examples {
-                rows.push(choice.example.as_ref().map_or_else(String::new, |example| {
-                    let shown = paint(channel, style::MUTED, &shortened(example, room));
-                    format!("{beside}{shown}")
-                }));
+            rows.extend(
+                notes
+                    .iter()
+                    .skip(1)
+                    .map(|note| format!("{beside}{}", paint(channel, style::MUTED, note))),
+            );
+            if let Some(example) = &choice.example {
+                let shown = paint(channel, style::MUTED, &shortened(example, room));
+                rows.push(format!("{beside}{shown}"));
             }
             rows
         })
         .collect()
+}
+
+/// The label of an entry: grey where it cannot be chosen, bold where it is selected.
+fn shown_label<T>(choice: &Choice<T>, chosen: bool) -> String {
+    let channel = Channel::Error;
+    if !choice.enabled {
+        paint(channel, style::MUTED, &choice.label)
+    } else if chosen {
+        paint(channel, style::STRONG, &choice.label)
+    } else {
+        choice.label.clone()
+    }
 }
 
 /// The digits of a list in words: "1 to 9", or "7, 8, 9 or 0" where the entries that ask for a
@@ -276,6 +302,15 @@ fn back_from_list<T>(drawn: &[String], above: usize) -> Chosen<T> {
     Chosen::Back
 }
 
+/// Shift+Tab at the first question of a command of the menu: the list is left as cancelled, for
+/// the menu's question again.
+fn to_menu_question_from_list<T>(drawn: &[String], above: usize) -> Chosen<T> {
+    redraw_from(rows_of(drawn) + above);
+    question_ended();
+    super::go_back_a_step();
+    Chosen::Cancelled
+}
+
 /// Escape in a task of the menu: the list is left as cancelled, for the main menu.
 fn to_menu_from_list<T>(drawn: &[String], above: usize) -> Chosen<T> {
     redraw_from(rows_of(drawn) + above);
@@ -308,7 +343,7 @@ fn key_hint<T>(choices: &[Choice<T>], quit: &str) -> String {
     } else {
         String::new()
     };
-    if super::steps_back() {
+    if super::steps_back() || super::back_to_menu_question() {
         return format!("↑ ↓ choose · Enter selects{range} · {}", super::STEP_KEYS);
     }
     format!("↑ ↓ choose · Enter selects{range} · Esc {quit}")
@@ -317,8 +352,9 @@ fn key_hint<T>(choices: &[Choice<T>], quit: &str) -> String {
 /// The lines of `explanation`: each indented and wrapped beside its indent, then the links under
 /// "More:" and a blank line.
 fn explanation_lines(explanation: Option<&Explanation>) -> Vec<String> {
+    // A blank line keeps the question apart from its answers, with or without an explanation.
     let Some(explanation) = explanation else {
-        return Vec::new();
+        return vec![String::new()];
     };
     let mut lines = Vec::new();
     for line in &explanation.lines {
@@ -384,6 +420,8 @@ struct AnswerRecord {
     heading_rows: usize,
     /// A width change makes the old heading's cursor position uncertain.
     heading_columns: usize,
+    /// Whether the heading ends with a blank line, which the first question then needs not.
+    heading_blank: bool,
 }
 
 static RECORD: Mutex<AnswerRecord> = Mutex::new(AnswerRecord {
@@ -391,6 +429,7 @@ static RECORD: Mutex<AnswerRecord> = Mutex::new(AnswerRecord {
     reached: 1,
     heading_rows: 0,
     heading_columns: 0,
+    heading_blank: false,
 });
 
 /// The record; a poisoned lock holds labels and answers, which stay usable.
@@ -413,6 +452,13 @@ pub(crate) fn start_answer_record() {
     record.reached = 1;
     record.heading_rows = 0;
     record.heading_columns = 0;
+    record.heading_blank = false;
+}
+
+/// Whether a question comes right under a heading that ends with a blank line.
+fn right_under_heading() -> bool {
+    let record = record();
+    record.heading_blank && record.lines.is_empty()
 }
 
 /// A place in the record, for [`redraw_answer_record`].
@@ -463,6 +509,7 @@ pub(crate) fn redraw_answer_record(heading: &[String], keep: usize) {
     record.reached = rows_of(&shown_answers(&kept)) + 1;
     record.heading_rows = rows_of(heading);
     record.heading_columns = columns();
+    record.heading_blank = heading.last().is_some_and(String::is_empty);
 }
 
 /// Asks `asked` with `warning` above it, and lets the person choose an entry with the arrow keys
@@ -472,7 +519,40 @@ pub(crate) fn choose<T: Clone>(
     warning: Option<&str>,
     choices: &[Choice<T>],
 ) -> Result<Chosen<T>, Interrupted> {
-    choose_from(asked, warning, choices, 0)
+    let initial = chosen_before(asked.question).unwrap_or(0);
+    choose_from(asked, warning, choices, initial)
+}
+
+/// The entries chosen in the menu's questions, by question, while it remembers them.
+static CHOSEN: Mutex<Option<Vec<(String, usize)>>> = Mutex::new(None);
+
+/// Starts or ends remembering the entries chosen, which the same question then shows selected:
+/// after Shift+Tab, the answer given before is the one marked.
+pub(crate) fn remember_choices(on: bool) {
+    *CHOSEN.lock().unwrap_or_else(PoisonError::into_inner) = on.then(Vec::new);
+}
+
+/// The entry chosen before at `question`, while the choices are remembered.
+fn chosen_before(question: &str) -> Option<usize> {
+    CHOSEN
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .as_ref()?
+        .iter()
+        .find(|(asked, _)| asked == question)
+        .map(|&(_, index)| index)
+}
+
+/// Remembers `index` as chosen at `question`, where the choices are remembered.
+fn remember_chosen(question: &str, index: usize) {
+    if let Some(chosen) = CHOSEN
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .as_mut()
+    {
+        chosen.retain(|(asked, _)| asked != question);
+        chosen.push((question.to_owned(), index));
+    }
 }
 
 /// [`choose`] with the entry at `initial` selected.
@@ -483,19 +563,15 @@ pub(crate) fn choose_from<T: Clone>(
     initial: usize,
 ) -> Result<Chosen<T>, Interrupted> {
     let warned = warning.map_or_else(Vec::new, |text| notice_lines(text, NoticeKind::Warning));
-    let hint = paint(Channel::Error, style::MUTED, &key_hint(choices, asked.quit));
+    let hint = super::key_line(&key_hint(choices, asked.quit));
     let explanation = explanation_lines(asked.explanation);
     let question = shown_question(asked.question);
     let rows = list_rows(asked, choices) + rows_of(&warned);
     if !before_question(rows)? {
         return Ok(Chosen::Cancelled);
     }
-    step_begin();
+    let lead = start_question(&warned);
     let mut keys = Keys::open();
-    error_raw("\n");
-    for line in &warned {
-        error_line(line);
-    }
     error_line(&question);
     let Some(mut selected) = choices
         .get(initial)
@@ -506,7 +582,7 @@ pub(crate) fn choose_from<T: Clone>(
         return Ok(Chosen::Back);
     };
     // Counted at the width of each drawing: a resize moves the rows.
-    let above = || rows_of(&warned) + question_rows(&question);
+    let above = || rows_of(&warned) + question_rows(&question) + lead - 1;
     let draw = |selected| draw_choices(choices, selected, &explanation, &hint, above);
     let mut drawn = draw(selected);
     loop {
@@ -514,7 +590,12 @@ pub(crate) fn choose_from<T: Clone>(
         // skeleton remains separate. Key decoding, drawing and leaving behavior are shared.
         let index = match read_key(&mut keys)? {
             Key::Cancel => return Ok(Chosen::Cancelled),
-            Key::Back if super::steps_back() => return Ok(to_menu_from_list(&drawn, above())),
+            Key::Back if super::steps_back() || super::back_to_menu_question() => {
+                return Ok(to_menu_from_list(&drawn, above()));
+            }
+            Key::Previous if super::back_to_menu_question() => {
+                return Ok(to_menu_question_from_list(&drawn, above()));
+            }
             Key::Back => return Ok(back_from_list(&drawn, above())),
             Key::Previous if super::steps_back() => return Ok(back_from_list(&drawn, above())),
             Key::Enter => selected,
@@ -534,6 +615,7 @@ pub(crate) fn choose_from<T: Clone>(
         };
         redraw_from(rows_of(&drawn) + above());
         write_answer(asked.label, &choices[index].label);
+        remember_chosen(asked.question, index);
         // The lines kept for this question go with its answer.
         question_ended();
         return Ok(Chosen::One(choices[index].value.clone()));
@@ -548,7 +630,7 @@ fn checklist_hint<T>(choices: &[Choice<T>], quit: &str) -> String {
     } else {
         format!(" or {}", shortcuts_in_words(&keys))
     };
-    if super::steps_back() {
+    if super::steps_back() || super::back_to_menu_question() {
         return format!(
             "↑ ↓ choose · Space{tick} ticks · Enter confirms · {}",
             super::STEP_KEYS
@@ -579,21 +661,18 @@ pub(crate) fn choose_many<T: Clone>(
 ) -> Result<Chosen<Vec<T>>, Interrupted> {
     let mut ticked = ticked.to_vec();
     ticked.resize(choices.len(), false);
-    let hint = paint(
-        Channel::Error,
-        style::MUTED,
-        &checklist_hint(choices, asked.quit),
-    );
+    let hint = super::key_line(&checklist_hint(choices, asked.quit));
     let explanation = explanation_lines(asked.explanation);
     let question = shown_question(asked.question);
     if !before_question(list_rows(asked, choices))? {
         return Ok(Chosen::Cancelled);
     }
-    step_begin();
+    // A screen drawn anew has a blank line under its heading already.
+    let lead = usize::from(!step_begin());
     let mut keys = Keys::open();
-    error_raw("\n");
+    error_raw(&"\n".repeat(lead));
     error_line(&question);
-    let above = || question_rows(&question);
+    let above = || question_rows(&question) + lead - 1;
     let draw = |selected, ticked: &[bool]| {
         draw_choices(
             &checklist_entries(choices, ticked),
@@ -610,7 +689,12 @@ pub(crate) fn choose_many<T: Clone>(
     loop {
         match read_key(&mut keys)? {
             Key::Cancel => return Ok(Chosen::Cancelled),
-            Key::Back if super::steps_back() => return Ok(to_menu_from_list(&drawn, above())),
+            Key::Back if super::steps_back() || super::back_to_menu_question() => {
+                return Ok(to_menu_from_list(&drawn, above()));
+            }
+            Key::Previous if super::back_to_menu_question() => {
+                return Ok(to_menu_question_from_list(&drawn, above()));
+            }
             Key::Back => return Ok(back_from_list(&drawn, above())),
             Key::Previous if super::steps_back() => return Ok(back_from_list(&drawn, above())),
             Key::Enter => break,
@@ -701,6 +785,10 @@ fn ask_line_once<E: Display>(
         .note
         .map_or_else(Vec::new, |text| notice_lines(text, NoticeKind::Info));
     if let Some(text) = warning {
+        // The note and the warning are said apart.
+        if !warned.is_empty() {
+            warned.push(String::new());
+        }
         warned.extend(notice_lines(text, NoticeKind::Warning));
     }
     // A blank line keeps what is said above apart from the line typed into.
@@ -713,13 +801,11 @@ fn ask_line_once<E: Display>(
     if !before_question(rows_of(&above))? {
         return Ok(LineStep::Cancelled);
     }
-    step_begin();
+    let lead = start_question(&warned);
     let mut keys = Keys::open();
-    error_raw("\n");
-    for line in &warned {
-        error_line(line);
-    }
     write_prompt(shown);
+    // The question's own hints, then the keys that leave it, as under every question.
+    let keys_hint = super::InputHints::new(how.hints, false);
     let outcome = read_line(
         &mut keys,
         &LineOptions {
@@ -729,12 +815,12 @@ fn ask_line_once<E: Display>(
             previous: super::steps_back(),
             prompt_width,
             pasted_line_break: None,
-            hints: how.hints,
+            hints: Some(&keys_hint),
         },
     )?;
     let end_of = |answer: &str| answer_end_row(prompt_width, answer, columns());
     let erase = |end_row: usize| {
-        let rows = 1 + rows_of(&warned) + end_row;
+        let rows = lead + rows_of(&warned) + end_row;
         reach_answers(rows + 1);
         redraw_from(rows);
     };
@@ -855,7 +941,8 @@ fn wait_after(message: &str, mut keys: Keys) -> Result<Chosen<()>, Interrupted> 
     if !keep_readable(rows_of(&[message.to_owned()]))? {
         return Ok(Chosen::Cancelled);
     }
-    write_prompt(message);
+    // A line that waits for a key looks like the key lines under the questions.
+    error_raw(&super::key_line(message));
     loop {
         let key = read_key(&mut keys)?;
         if matches!(key, Key::Enter | Key::Back | Key::Cancel) {

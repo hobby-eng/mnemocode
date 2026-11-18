@@ -7,7 +7,7 @@
 use bip39::{Language, Mnemonic};
 use zeroize::Zeroize;
 
-use crate::bip39::phrase::{Phrase, PhraseError, valid_last_word_indexes};
+use crate::bip39::phrase::{Phrase, PhraseError};
 use crate::bip39::sizes::{
     DICTIONARY_SIZE, SizesError, check_word_count, check_word_indexes, last_word_entropy_bits,
 };
@@ -250,8 +250,8 @@ pub fn mask_legacy(phrase: &Phrase, dates: &[Date]) -> Result<Masked, ShiftError
     })
 }
 
-/// The masked indexes of a legacy record with only their checksum bits replaced, so that they keep a
-/// valid checksum while the entropy they show stays.
+/// The Original Seedshift's masked indexes with only the checksum bits of the last word replaced,
+/// so that they keep a valid checksum while the entropy they show stays: what MnemoCode writes.
 pub fn legacy_checksum_valid(shifted: &Indexes) -> Result<Indexes, ShiftError> {
     shifted.check()?;
     let word_count = shifted.0.len();
@@ -295,7 +295,7 @@ impl std::fmt::Debug for Unmasked {
 }
 
 /// Whether the indexes keep the BIP39 checksum.
-fn keeps_checksum(indexes: &[u16]) -> bool {
+pub(crate) fn keeps_checksum(indexes: &[u16]) -> bool {
     Phrase::of_indexes(
         &indexes
             .iter()
@@ -343,29 +343,30 @@ pub fn unmask_legacy(indexes: &Indexes, dates: &[Date]) -> Result<Unmasked, Shif
     Ok(unmasked(recovered, dates, shifts))
 }
 
-/// Every phrase an old legacy record may hold after its final word was replaced by a valid one:
-/// the replacement discards bits, so other evidence selects a candidate.
-pub fn unmask_legacy_valid(indexes: &Indexes, dates: &[Date]) -> Result<Vec<Unmasked>, ShiftError> {
+/// Every phrase that Original Seedshift codes whose last word keeps the checksum may hold under
+/// `dates`: that word keeps the masked entropy bits, so each value of its checksum bits is tried and
+/// the phrases that keep their own checksum stay, one or two.
+pub fn unmask_legacy_matching(
+    indexes: &Indexes,
+    dates: &[Date],
+) -> Result<Vec<Unmasked>, ShiftError> {
     let (dates, shifts) = checked_and_dated(indexes, dates)?;
-    let prefix = shifted_indexes(
-        &indexes.0[..indexes.0.len() - 1],
-        &shifts,
-        Direction::Unmask,
-    );
-    let prefix_usize: Vec<usize> = prefix.iter().map(|&index| usize::from(index)).collect();
-    Ok(valid_last_word_indexes(&prefix_usize)?
-        .into_iter()
-        .map(|last| {
-            let mut recovered = prefix.clone();
-            recovered.push(u16::try_from(last).unwrap_or(0));
-            Unmasked {
-                recovered: Indexes::new(recovered),
-                dates: Dates::new(&dates),
-                shifts: Shifts::new(&shifts),
-                checksum_valid: true,
-            }
-        })
-        .collect())
+    let mut tried = indexes.as_slice().to_vec();
+    let last = tried.len() - 1;
+    let free = 11 - last_word_entropy_bits(tried.len());
+    let kept = tried[last] >> free << free;
+    let mut found = Vec::new();
+    for low in 0..1_u16 << free {
+        tried[last] = kept | low;
+        let mut recovered = shifted_indexes(&tried, &shifts, Direction::Unmask);
+        if keeps_checksum(&recovered) {
+            found.push(unmasked(recovered, dates.clone(), shifts.clone()));
+        } else {
+            recovered.zeroize();
+        }
+    }
+    tried.zeroize();
+    Ok(found)
 }
 
 /// The indexes of a record written without date shifting: the words themselves.
@@ -410,5 +411,22 @@ mod tests {
             back.recovered.as_slice(),
             phrase_indexes(&phrase).as_slice()
         );
+    }
+
+    #[test]
+    fn a_matching_last_word_leaves_the_phrase_among_one_or_two() {
+        let phrase = Phrase::parse(ABANDON).unwrap();
+        for day in 1..=28 {
+            let dates = [Date::new(1990, 6, day).unwrap()];
+            let written =
+                legacy_checksum_valid(&mask_legacy(&phrase, &dates).unwrap().shifted).unwrap();
+            let found = unmask_legacy_matching(&written, &dates).unwrap();
+            assert!((1..=2).contains(&found.len()));
+            assert!(
+                found
+                    .iter()
+                    .any(|one| one.recovered.as_slice() == phrase_indexes(&phrase).as_slice())
+            );
+        }
     }
 }

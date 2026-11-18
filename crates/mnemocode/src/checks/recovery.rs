@@ -495,13 +495,13 @@ fn check_share_backup() -> Result<(), CheckFailure> {
 /// with a wrong word; in the full self-test the shares.
 fn backup_check(tier: Tier) -> Result<(), CheckFailure> {
     let date = ok(parse_date(MASKED_DATE))?;
-    let check = ok(EncodedBackupCheck::new(EncodedOriginal {
+    let check = EncodedBackupCheck::new(EncodedOriginal {
         phrase: ok(Phrase::parse(PUBLIC_MNEMONIC))?,
         form: Form::English,
         mode: Mode::Seedshift,
         codes: Indexes::new(masked_indexes()),
         dates: Dates::new(&[date]),
-    }))?;
+    });
     let wrong_word = MASKED_ENGLISH.replacen("actual", "wool", 1);
     let right = (BackupVerdict::Restores, None, Vec::new());
     let at = |part, place| (BackupVerdict::Differs, Some(part), vec![place]);

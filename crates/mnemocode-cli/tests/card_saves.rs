@@ -263,14 +263,14 @@ fn a_pdf_saved_under_another_name_shows_the_cards_of_the_one_plan() {
         return;
     };
     screen.press(ANOTHER_NAME);
-    screen.wait_for("New name for the PDF:");
+    screen.wait_for("Enter a new name for the PDF:");
     screen.press(&format!("{other}\r"));
     let written = end_with_the_closed_folder_empty(&folder, screen);
     assert!(
         written.contains(&format!("Saved PDF: {}", full(&folder, other))),
         "{written}"
     );
-    assert_eq!(written.matches("New name for the PDF:").count(), 1);
+    assert_eq!(written.matches("Enter a new name for the PDF:").count(), 1);
     assert_eq!(page_sizes(&read(&folder, other)), [(90, 50); CARDS]);
     let cards = folder.join("for-cards/cards");
     assert_eq!(names(&cards), numbered("", CARDS, ".pdf"));

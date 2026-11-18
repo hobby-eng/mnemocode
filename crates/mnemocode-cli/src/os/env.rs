@@ -34,7 +34,12 @@ pub(crate) struct Environment {
     pub(crate) onedrive: Vec<PathBuf>,
     /// The current folder, against which relative paths are resolved.
     pub(crate) current: Option<PathBuf>,
+    /// Whether the menu started this command, which Escape returns to.
+    pub(crate) for_menu: bool,
 }
+
+/// The variable that the menu sets for each command it starts.
+pub(crate) const FOR_MENU: &str = "MNEMOCODE_MENU";
 
 /// The settings of the colour rule. The tests remove them from every program they start: their
 /// helper `tests/common/colour.rs` keeps a deliberate copy, which a test below keeps in step.
@@ -57,6 +62,7 @@ impl Environment {
                 .map(PathBuf::from)
                 .collect(),
             current: std::env::current_dir().ok(),
+            for_menu: set(FOR_MENU).is_some(),
         }
     }
 }

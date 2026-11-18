@@ -38,6 +38,8 @@ pub(crate) enum NameError {
     NotAFolder,
     /// The folder for the files may not be written.
     FolderUnwritable,
+    /// Back from the seed phrase, another folder than these, closed to writing before it.
+    LockedFolder(String),
 }
 
 impl fmt::Display for NameError {
@@ -60,6 +62,12 @@ impl fmt::Display for NameError {
             Self::NoSuchFolder => "There is no such folder; type the name of one that exists.",
             Self::NotAFolder => "That is no folder; type the name of a folder.",
             Self::FolderUnwritable => "MnemoCode may not write in that folder; choose another one.",
+            Self::LockedFolder(folders) => {
+                return write!(
+                    f,
+                    "Files can be saved only in {folders} now: MnemoCode closed every other folder to writing before it asked for the seed phrase. For another folder, press Esc and start the task again."
+                );
+            }
             Self::TooLarge(limit) => {
                 return write!(
                     f,
@@ -89,6 +97,7 @@ impl Refusal for NameError {
             Self::NoSuchFolder => "cli.output-questions.no-such-folder",
             Self::NotAFolder => "cli.output-questions.not-a-folder",
             Self::FolderUnwritable => "cli.output-questions.folder-unwritable",
+            Self::LockedFolder(_) => "cli.output-questions.folder-locked",
             Self::Output(error) => error.code(),
         }
     }
@@ -188,7 +197,7 @@ pub(crate) fn input_file(answer: &str, limit: usize) -> Result<String, NameError
 }
 
 /// What the question of the folder says above it.
-const SAVED_HERE: &str = "Every file of this task is saved in this folder. Files already in it are never replaced: a new file whose name is taken gets a number at the end, such as cross-stitch-pattern_1.pdf.";
+const SAVED_HERE: &str = "Every file of this task is saved in this folder. Files already in it are never replaced: a new file whose name is taken gets a number at the end, such as backup_1.pdf.";
 
 /// The folder that every file of the task goes to: asked once, the folder MnemoCode started in by
 /// default; none when the person goes back.
@@ -196,10 +205,7 @@ fn task_folder() -> Result<Option<String>, Stop> {
     if let Some(folder) = chosen_folder().clone() {
         return Ok(Some(folder));
     }
-    let here = terminal::environment().current.as_ref().map_or_else(
-        || ".".to_owned(),
-        |path| path.to_string_lossy().into_owned(),
-    );
+    let here = terminal::started_folder();
     let how = LineQuestion {
         fallback: Some(&here),
         what: Some("the name of a folder that exists"),
@@ -207,16 +213,26 @@ fn task_folder() -> Result<Option<String>, Stop> {
         limit: PATH_LIMIT,
         ..LineQuestion::default()
     };
-    let answer = ask_line("Folder for the files", "Folder", how, |answer: &str| {
-        let path = typed_path(answer)?;
-        let folder = resolved(&path);
-        match os::look_at_file(&folder) {
-            Ok(FileLook::Folder) if os::may_write(&folder) => Ok(path),
-            Ok(FileLook::Folder) => Err(NameError::FolderUnwritable),
-            Ok(FileLook::Nothing) => Err(NameError::NoSuchFolder),
-            _ => Err(NameError::NotAFolder),
-        }
-    })?;
+    let answer = ask_line(
+        "Enter the folder for the files",
+        "Folder",
+        how,
+        |answer: &str| {
+            let path = typed_path(answer)?;
+            let folder = resolved(&path);
+            // Back from the seed phrase, writes are closed already but for the folder chosen then.
+            crate::output::check_ruled(&path).map_err(|error| match error {
+                OutputError::OutsideRuled(folders) => NameError::LockedFolder(folders),
+                other => NameError::Output(other),
+            })?;
+            match os::look_at_file(&folder) {
+                Ok(FileLook::Folder) if os::may_write(&folder) => Ok(path),
+                Ok(FileLook::Folder) => Err(NameError::FolderUnwritable),
+                Ok(FileLook::Nothing) => Err(NameError::NoSuchFolder),
+                _ => Err(NameError::NotAFolder),
+            }
+        },
+    )?;
     match answer {
         Chosen::One(folder) => {
             *chosen_folder() = Some(folder.clone());

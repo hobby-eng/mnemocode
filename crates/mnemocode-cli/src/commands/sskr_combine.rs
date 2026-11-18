@@ -5,11 +5,14 @@
 use std::fmt;
 use std::rc::Rc;
 
+use mnemocode::backup::Backup;
 use mnemocode::candidates::format::LIST_KEEP;
+use mnemocode::dates::Date;
 use mnemocode::dates::answer::DatesAnswer;
+use mnemocode::forms::Form;
 use mnemocode::modes::{DateWords, Mode};
 use mnemocode::recovery::date_search::{MAX_SHOWN_MATCHES, MatchLimits};
-use mnemocode::recovery::shares::flow::{PhrasesFound, RestoredPhrases, phrases_of};
+use mnemocode::recovery::shares::flow::{NoPhrase, PhrasesFound, RestoredPhrases, phrases_of};
 use mnemocode::recovery::shares::unmasking::ShareUnmasking;
 use mnemocode::recovery::shares::{
     SearchLimits, SharesRead, date_search_decision, several_sets_note,
@@ -29,6 +32,7 @@ use super::date_search::{
     CHANGE_DATES_LABEL, DATES_AGAIN, PROGRESS_EVERY, ask_dates, max_candidates_of,
     wallet_explanation, with_date_progress,
 };
+use super::decode::{LastWordAnswer, ask_original_last_word};
 use super::given::{DATES_OPTION, dates, transform_mode};
 use super::restored_output::show_restored_phrases;
 use super::searching::ask_to_search;
@@ -51,7 +55,8 @@ use crate::terminal::{
 const CHANGE_SHARES: &str = "Which shares to change?";
 
 /// The options `sskr-combine` takes.
-pub(crate) const OPTIONS: [&str; 28] = [
+pub(crate) const OPTIONS: [&str; 29] = [
+    "last-word-file",
     "share",
     "share-file",
     "share-qr",
@@ -93,6 +98,8 @@ enum RestoreRefused {
     Phrases(String),
     /// No phrase is the wallet's.
     Mismatch(String),
+    /// No phrase came out, and no wallet was given: why.
+    NoPhrase(NoPhrase),
     /// Too few shares.
     Few,
 }
@@ -103,6 +110,7 @@ impl fmt::Display for RestoreRefused {
             Self::Dates(text) | Self::After(text) | Self::Phrases(text) | Self::Mismatch(text) => {
                 f.write_str(text)
             }
+            Self::NoPhrase(refusal) => refusal.fmt(f),
             Self::Few => f.write_str("Too few shares to restore the phrase."),
         }
     }
@@ -117,6 +125,7 @@ impl Refusal for RestoreRefused {
             Self::After(_) => "cli.sskr-restore-command.after-refused-refused",
             Self::Phrases(_) => "cli.sskr-restore-command.restore-phrases-refused",
             Self::Mismatch(_) => "cli.sskr-restore-command.after-mismatch-refused",
+            Self::NoPhrase(refusal) => refusal.code(),
             Self::Few => "cli.sskr-restore-command.too-few-shares-restore-phrase",
         }
     }
@@ -124,7 +133,6 @@ impl Refusal for RestoreRefused {
 
 /// The answers of a restore of shares: read and checked before the first question, then answered
 /// on the private screen. What the answers give, and the steps of the restore, the library decides.
-#[derive(Debug)]
 pub(crate) struct Recovery {
     /// Whether the shares are asked on the private screen, so that a problem is asked about.
     pub(crate) interactive: bool,
@@ -139,16 +147,33 @@ pub(crate) struct Recovery {
     pub(crate) shares: TypedShares,
     /// The dates of a Seedshift phrase: given with the options, or asked once the shares are read.
     pub(crate) dates: Option<Rc<DatesAnswer>>,
+    /// The last word Encode named, for Original Seedshift shares.
+    pub(crate) last_word: Option<u16>,
+}
+
+/// Redacted: the shares, the dates and the last word are secret.
+impl std::fmt::Debug for Recovery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        mnemocode::secret::redacted(f, "a restore of shares")
+    }
 }
 
 /// What a restore settles before the shares.
-#[derive(Debug)]
 pub(crate) struct RecoverySettings {
     pub(crate) interactive: bool,
     pub(crate) mode: Mode,
     pub(crate) limits: SearchLimits,
     pub(crate) wallet: GivenWallet,
     pub(crate) dates: Option<Rc<DatesAnswer>>,
+    /// The last word Encode named, from --last-word-file.
+    pub(crate) last_word: Option<u16>,
+}
+
+/// Redacted: the dates and the last word are secret.
+impl std::fmt::Debug for RecoverySettings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        mnemocode::secret::redacted(f, "the settings of a restore")
+    }
 }
 
 impl RecoverySettings {
@@ -162,15 +187,14 @@ impl RecoverySettings {
             listing,
             shares,
             dates: self.dates,
+            last_word: self.last_word,
         }
     }
 }
 
-/// Direct mode or checksum-valid Seedshift, the two modes in which shares are made.
+/// The mode the shares' phrase was masked in, if any.
 fn share_mode(parsed: &Parsed) -> Result<Mode, Stop> {
-    let mode = transform_mode(parsed, None)?;
-    mode.check_split()?;
-    Ok(mode)
+    Ok(transform_mode(parsed, None)?)
 }
 
 /// Reads and checks the options that a restore uses, before any question: the mode, the dates, the
@@ -180,8 +204,9 @@ pub(crate) fn recovery_settings(parsed: &Parsed) -> Result<RecoverySettings, Sto
     let interactive = is_on(parsed, "ask-secrets");
     // Dates are secret: with --ask-secrets they are asked on the private screen, as every command
     // that takes them does, and never also taken from the command line.
-    assert_asked_not_given(parsed, &[DATES_OPTION, "dates-file"])?;
+    assert_asked_not_given(parsed, &[DATES_OPTION, "dates-file", "last-word-file"])?;
     let given = dates(parsed)?;
+    let last_word = super::given::last_word_option(parsed)?;
     mode.check_date_count(given.len(), interactive, DateWords::Recovery)?;
     let wallet = given_wallet(parsed)?;
     let limits = SearchLimits {
@@ -195,6 +220,7 @@ pub(crate) fn recovery_settings(parsed: &Parsed) -> Result<RecoverySettings, Sto
         limits,
         wallet,
         dates,
+        last_word,
     })
 }
 
@@ -271,7 +297,39 @@ fn unmasking_of(r: &Recovery) -> Result<ShareUnmasking, Stop> {
             max_shown: Some(MAX_SHOWN_MATCHES),
             keep: r.listing.then_some(LIST_KEEP as u64),
         },
-    )?)
+    )?
+    .with_last_word(r.last_word))
+}
+
+/// The last word Encode named, asked on the private screen for one set of Original Seedshift
+/// shares whose complete dates may give two phrases without it: the step after it, the search, or
+/// the dates when the person goes back.
+fn last_word_for(r: &mut Recovery, hand: &SharesInHand) -> Result<Step, Stop> {
+    // Without the private screen, the word comes from --last-word-file, if at all.
+    if !r.interactive {
+        return Ok(Step::Search);
+    }
+    r.last_word = None;
+    let dates = match &r.dates {
+        Some(dates) if r.interactive && !dates.has_forgotten_digits() => Rc::clone(dates),
+        _ => return Ok(Step::Search),
+    };
+    let Some([set]) = hand.sets.as_deref() else {
+        return Ok(Step::Search);
+    };
+    let backup = Backup::read(set.phrase().text().as_str(), Form::English, r.mode)?;
+    if !backup.gives_several() {
+        return Ok(Step::Search);
+    }
+    let known: Vec<Date> = dates.known().iter().collect();
+    Ok(match ask_original_last_word(&backup, &known)? {
+        LastWordAnswer::Phrase(_, word) => {
+            r.last_word = Some(word);
+            Step::Search
+        }
+        LastWordAnswer::Without => Step::Search,
+        LastWordAnswer::Back => Step::Dates,
+    })
 }
 
 /// The date search that each phrase of the shares needs, for its time: none without dates with ?.
@@ -312,6 +370,7 @@ fn unmasked(
         sets.len(),
         combinations,
         places,
+        (r.wallet.check.is_some(), r.last_word.is_some()),
     ))
 }
 
@@ -321,6 +380,7 @@ enum Step {
     Shares,
     Dates,
     Wallet,
+    LastWord,
     Search,
 }
 
@@ -396,7 +456,12 @@ fn phrases_of_sets(
     let found = match unmasked(r, sets, places, told)? {
         // The person stopped the date search with Ctrl+C.
         RestoredPhrases::Stopped => return Err(Stop::Cancelled),
-        RestoredPhrases::Mismatch(message) => return after_mismatch(r, &message).map(Err),
+        RestoredPhrases::Mismatch(message) => {
+            return after_missed(r, Missed::Wallet(&message)).map(Err);
+        }
+        RestoredPhrases::NoPhrase(refusal) => {
+            return after_missed(r, Missed::NoPhrase(refusal)).map(Err);
+        }
         RestoredPhrases::Dates(message) => {
             if !r.interactive {
                 return Err(RestoreRefused::After(message).into());
@@ -554,7 +619,11 @@ pub(crate) fn restore_phrases(r: &mut Recovery, rules: &RestoreRules) -> Result<
                 r.dates = Some(Rc::new(ask_share_dates(r, hand.words)?));
                 Step::Wallet
             }
-            Step::Wallet => wallet_for_search(r)?,
+            Step::Wallet => match wallet_for_search(r)? {
+                Step::Search => Step::LastWord,
+                step => step,
+            },
+            Step::LastWord => last_word_for(r, &hand)?,
             Step::Search => match searched_sets(r, &mut hand)? {
                 Err(next) => next,
                 Ok(told) => {
@@ -570,68 +639,97 @@ pub(crate) fn restore_phrases(r: &mut Recovery, rules: &RestoreRules) -> Result<
     }
 }
 
-/// Takes the other of the two modes in which shares are made, after the person said that the phrase
-/// was, or was not, masked with Seedshift before splitting: the menu asks that before the shares,
-/// and a wrong answer there shows only as a wallet that nothing matches. The phrases found are kept;
-/// a masked one needs its dates.
-fn other_mode(r: &mut Recovery) -> Step {
-    if r.mode.masked() {
-        r.mode = Mode::Direct;
+/// Asks again which Seedshift masked the phrase before splitting: the menu asks that before the
+/// shares, and a wrong answer there shows only as a wallet that nothing matches. The phrases found
+/// are kept; a masked one needs its dates.
+fn other_mode(r: &mut Recovery) -> Result<Step, Stop> {
+    let asked = ListQuestion {
+        question: SHARE_SEEDSHIFT_QUESTION,
+        label: "Seedshift",
+        quit: "goes back",
+        explanation: None,
+    };
+    let mode = match choose(&asked, None, &share_seedshift_choices())? {
+        Chosen::One(mode) => mode,
+        Chosen::Back => return Ok(Step::Search),
+        Chosen::Cancelled => return Err(Stop::Cancelled),
+    };
+    r.mode = mode;
+    r.last_word = None;
+    if !mode.masked() {
         r.dates = None;
-        return Step::Search;
+        return Ok(Step::Search);
     }
-    r.mode = Mode::Seedshift;
-    Step::Dates
+    Ok(if r.dates.is_some() {
+        Step::LastWord
+    } else {
+        Step::Dates
+    })
 }
 
-/// What can be changed after a wallet that nothing matched.
+/// What a restore ran into instead of a phrase to use: the wallet given matched none of them, or
+/// none came out at all.
+enum Missed<'a> {
+    Wallet(&'a str),
+    NoPhrase(NoPhrase),
+}
+
+/// What can be changed after a restore that gave no phrase to use.
 #[derive(Clone, Copy)]
 enum AfterMismatch {
+    LastWord,
     Dates,
     Wallet,
     Shares,
     Mode,
 }
 
-/// After phrases of which none matches the wallet given: says so, and asks what to change, the
-/// dates, the wallet, the shares or whether Seedshift was used; Stop cancels. Escape at the wallet
-/// or share question that follows comes back here. Without a private screen the mismatch ends the
-/// command.
-fn after_mismatch(r: &mut Recovery, message: &str) -> Result<Step, Stop> {
-    if !r.interactive {
-        return Err(RestoreRefused::Mismatch(message.to_owned()).into());
-    }
-    notice(message, NoticeKind::Warning);
+/// After phrases of which none matches the wallet given, or after none at all: says so, and asks
+/// what to change: the last word where one was given and none came out, the dates, the wallet where
+/// one was given, the shares or whether Seedshift was used; Stop cancels. Escape at the wallet or
+/// share question that follows comes back here. Without a private screen it ends the command.
+fn after_missed(r: &mut Recovery, missed: Missed<'_>) -> Result<Step, Stop> {
+    let (message, wallet) = match missed {
+        Missed::Wallet(message) if !r.interactive => {
+            return Err(RestoreRefused::Mismatch(message.to_owned()).into());
+        }
+        Missed::NoPhrase(refusal) if !r.interactive => {
+            return Err(RestoreRefused::NoPhrase(refusal).into());
+        }
+        Missed::Wallet(message) => (message.to_owned(), true),
+        Missed::NoPhrase(refusal) => (refusal.to_string(), false),
+    };
+    notice(&message, NoticeKind::Warning);
     loop {
-        let masked = r.mode.masked();
         let mut choices = Vec::new();
-        if masked {
+        if !wallet && r.last_word.is_some() {
+            choices.push(Choice::noted(
+                "Change the last word",
+                "the word Encode named to remember",
+                AfterMismatch::LastWord,
+            ));
+        }
+        if r.mode.masked() {
             choices.push(Choice::new(CHANGE_DATES_LABEL, AfterMismatch::Dates));
         }
-        choices.push(change_wallet_answer(AfterMismatch::Wallet));
+        if wallet {
+            choices.push(change_wallet_answer(AfterMismatch::Wallet));
+        }
         choices.push(Choice::noted(
             "Change a share",
             "or add more",
             AfterMismatch::Shares,
         ));
-        choices.push(if masked {
-            Choice::noted(
-                "It was not masked with Seedshift",
-                "no dates",
-                AfterMismatch::Mode,
-            )
-        } else {
-            Choice::noted(
-                "It was masked with Seedshift",
-                "type its dates",
-                AfterMismatch::Mode,
-            )
-        });
-        let next = or_back_or_cancel(WHAT_NOW, &choices, false)?;
-        match next {
+        choices.push(Choice::noted(
+            "Another Seedshift answer",
+            "none, MnemoCode or Original",
+            AfterMismatch::Mode,
+        ));
+        match or_back_or_cancel(WHAT_NOW, &choices, false)? {
             None => {}
+            Some(AfterMismatch::LastWord) => return Ok(Step::LastWord),
             Some(AfterMismatch::Dates) => return Ok(Step::Dates),
-            Some(AfterMismatch::Mode) => return Ok(other_mode(r)),
+            Some(AfterMismatch::Mode) => return other_mode(r),
             Some(AfterMismatch::Shares) => {
                 if ask_share_fix(&mut r.shares, Some(CHANGE_SHARES), true)? {
                     return Ok(Step::Shares);
@@ -665,7 +763,7 @@ pub(crate) fn restore_from_share(
     purpose: Option<RestoredUse<'_>>,
 ) -> Result<Restored, Stop> {
     let named = value(handed, "mode").and_then(|name| Mode::named(name).ok());
-    let mode = match named.filter(|mode| mode.check_split().is_ok()) {
+    let mode = match named {
         Some(mode) => mode,
         None => {
             let asked = ListQuestion {

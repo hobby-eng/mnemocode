@@ -21,7 +21,6 @@ const WORD_GAP: usize = 3;
 /// The cells of a word's number and its point.
 const NUMBER_CELL: usize = 5;
 /// What every row of a phrase begins with.
-const ROW_INDENT: &str = "  ";
 /// What the fingerprints are computed with.
 pub(crate) const FINGERPRINT_NOTE: &str = "empty BIP39 passphrase";
 
@@ -52,44 +51,59 @@ pub(crate) fn phrase_lines(phrase: &str, channel: Channel) -> Option<Vec<String>
     if !can_redraw(channel) {
         return None;
     }
-    let mut lines = phrase_grid(phrase, channel);
+    let mut lines = phrase_grid(phrase, channel, WORDS_PER_ROW);
+    lines.push(String::new());
     lines.push(paint(channel, style::MUTED, "On one line, for copying:"));
     lines.push(phrase.to_owned());
     Some(lines)
 }
 
-/// The words of `phrase` numbered in rows on a terminal, or the phrase as it is elsewhere.
-pub(crate) fn phrase_grid(phrase: &str, channel: Channel) -> Vec<String> {
+/// The columns of one numbered word of [`phrase_grid`]: "  1. ", then the word.
+const WORD_CELL: usize = NUMBER_CELL + LONGEST_WORD;
+/// The columns the frame of [`phrase_grid`] adds: a border and a space on each side.
+const FRAME: usize = 4;
+
+/// How many words a row of [`phrase_grid`] holds on a terminal `columns` wide: 4, or up to 6
+/// where they fit.
+pub(crate) fn words_per_row(columns: usize) -> usize {
+    ((columns.saturating_sub(FRAME) + WORD_GAP) / (WORD_CELL + WORD_GAP)).clamp(WORDS_PER_ROW, 6)
+}
+
+/// The words of `phrase` numbered in rows of `per_row` in a grey frame on a terminal, as a phrase
+/// is written down, or the phrase as it is elsewhere.
+pub(crate) fn phrase_grid(phrase: &str, channel: Channel, per_row: usize) -> Vec<String> {
     if !can_redraw(channel) {
         return vec![phrase.to_owned()];
     }
     let words: Vec<&str> = phrase.split(' ').collect();
-    words
-        .chunks(WORDS_PER_ROW)
-        .enumerate()
-        .map(|(row, items)| {
-            let cells: Vec<String> = items
-                .iter()
-                .enumerate()
-                .map(|(column, item)| {
-                    let place = row * WORDS_PER_ROW + column + 1;
-                    let number = paint(
-                        channel,
-                        style::MUTED,
-                        &format!("{place:>width$}.", width = NUMBER_CELL - 2),
-                    );
-                    // The last item of a row needs no padding to line up the next one.
-                    let padded = if column + 1 == items.len() {
-                        (*item).to_owned()
-                    } else {
-                        format!("{item:<LONGEST_WORD$}")
-                    };
-                    format!("{number} {}", paint(channel, style::STRONG, &padded))
-                })
-                .collect();
-            format!("{ROW_INDENT}{}", cells.join(&" ".repeat(WORD_GAP)))
-        })
-        .collect()
+    let columns = per_row.min(words.len()).max(1);
+    let inner = columns * WORD_CELL + (columns - 1) * WORD_GAP + 2;
+    let grey = |text: &str| paint(channel, style::MUTED, text);
+    let mut lines = vec![grey(&format!("┌{}┐", "─".repeat(inner)))];
+    for (row, items) in words.chunks(columns).enumerate() {
+        let cells: Vec<String> = items
+            .iter()
+            .enumerate()
+            .map(|(column, item)| {
+                let place = row * columns + column + 1;
+                let number = grey(&format!("{place:>width$}.", width = NUMBER_CELL - 2));
+                format!(
+                    "{number} {}",
+                    paint(channel, style::STRONG, &format!("{item:<LONGEST_WORD$}"))
+                )
+            })
+            .collect();
+        let filled = items.len() * WORD_CELL + (items.len() - 1) * WORD_GAP;
+        lines.push(format!(
+            "{} {}{} {}",
+            grey("│"),
+            cells.join(&" ".repeat(WORD_GAP)),
+            " ".repeat(inner - 2 - filled),
+            grey("│")
+        ));
+    }
+    lines.push(grey(&format!("└{}┘", "─".repeat(inner))));
+    lines
 }
 
 /// Prints `phrase` as [`phrase_lines`] lays it out, or as it is where `channel` is no terminal.
@@ -107,10 +121,8 @@ fn code_parts(text: &str, form: Form) -> (Vec<String>, Vec<String>) {
     let shown = apart
         .as_ref()
         .map_or_else(|| text.to_owned(), |codes| codes.join(" "));
-    let data = wrap_text(&shown, super::TEXT_WIDTH)
-        .iter()
-        .map(|line| paint(Channel::Output, style::STRONG, line))
-        .collect();
+    // One line, which the terminal wraps at its own width: no line of codes breaks short.
+    let data = vec![paint(Channel::Output, style::STRONG, &shown)];
     let copy = if apart.is_some() {
         vec![
             paint(Channel::Output, style::MUTED, "Joined, for copying:"),
@@ -139,7 +151,6 @@ pub(crate) fn backup_code_lines(text: &str, form: Form, kind: &str) -> Vec<Strin
     if !can_redraw(Channel::Output) {
         return vec![text.to_owned()];
     }
-    let (data, copy) = code_parts(text, form);
     let mut lines = vec![
         String::new(),
         paint(
@@ -147,43 +158,47 @@ pub(crate) fn backup_code_lines(text: &str, form: Form, kind: &str) -> Vec<Strin
             style::HEADING,
             &format!("SAVE THIS {}", kind.to_uppercase()),
         ),
+        // How to keep it is said in grey, as every hint about the codes is.
         paint(
             Channel::Output,
-            style::STRONG,
+            style::MUTED,
             "Copy the entire block below in this exact order.",
         ),
     ];
-    lines.extend(data);
+    lines.push(String::new());
+    lines.extend(code_block_lines(text, form, kind));
+    lines
+}
+
+/// The codes of a backup or a share, `kind`, to save: in order, then where they end, then their
+/// joined form after a blank line; as they are where standard output is no terminal.
+pub(crate) fn code_block_lines(text: &str, form: Form, kind: &str) -> Vec<String> {
+    if !can_redraw(Channel::Output) {
+        return vec![text.to_owned()];
+    }
+    let (mut lines, copy) = code_parts(text, form);
     lines.push(paint(
         Channel::Output,
         style::MUTED,
         &format!("End of {kind}."),
     ));
+    if !copy.is_empty() {
+        lines.push(String::new());
+    }
     lines.extend(copy);
-    lines.push(String::new());
     lines
 }
 
 /// The label of a part of a result, after a blank line: bold where `strong`, otherwise grey.
 pub(crate) fn part_line(label: &str, strong: bool, channel: Channel) -> String {
-    let code = if strong { style::STRONG } else { style::MUTED };
+    let code = if strong { style::HEADING } else { style::MUTED };
     format!("\n{}", paint(channel, code, label))
 }
 
 /// Writes the label of a part of a result.
 pub(crate) fn print_part(label: &str, strong: bool, channel: Channel) {
+    super::heading_written();
     print(channel, &[part_line(label, strong, channel)]);
-}
-
-/// A fingerprint on one line: its label, its value and its note.
-pub(crate) fn print_fingerprint(label: &str, value: &str, note: &str, channel: Channel) {
-    let line = format!(
-        "{}  {}  {}",
-        paint(channel, style::MUTED, label),
-        paint(channel, style::STRONG, value),
-        paint(channel, style::MUTED, &format!("({note})"))
-    );
-    print(channel, &[line]);
 }
 
 /// A note after a result: a notice, a warning that still holds once the command has ended, or a

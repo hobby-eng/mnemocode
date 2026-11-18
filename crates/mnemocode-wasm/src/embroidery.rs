@@ -34,6 +34,12 @@ fn fabric_of(named: Option<String>) -> Result<Fabric, JsValue> {
 pub struct StitchPattern {
     hidden: Hidden,
     seen_difference: f64,
+    original_last_word: Option<u16>,
+}
+
+/// The English word of `index`.
+fn english_word(index: u16) -> String {
+    mnemocode::bip39::table::english()[usize::from(index)].to_owned()
 }
 
 impl StitchPattern {
@@ -57,6 +63,7 @@ impl StitchPattern {
         Ok(Self {
             hidden,
             seen_difference,
+            original_last_word: entropy.last_words().map(|(original, _)| original),
         })
     }
 
@@ -73,7 +80,7 @@ impl StitchPattern {
     /// `phrase`, masked with `dates` (a typed line) by Seedshift, hidden in the legend of a pattern
     /// of `picture` (PNG, JPEG or WebP), `stitchesAcross` wide (0: 200). `mode` may be left out, or
     /// is "seedshift", "direct" (the phrase itself, no dates, readable by anyone) or
-    /// "seedshift-legacy", the original Seedshift, whose masked words the legend keeps whole.
+    /// "seedshift-legacy", the Original Seedshift, with the last word Encode writes.
     /// Refused as the library refuses its inputs, and where the picture has too few colors to hold
     /// the phrase.
     #[wasm_bindgen(constructor)]
@@ -117,6 +124,13 @@ impl StitchPattern {
         self.hidden.rows().len()
     }
 
+    /// With the Original Seedshift, the English word the page shows the person to remember: Decode
+    /// asks for it to give the phrase back exactly. Undefined in any other mode.
+    #[wasm_bindgen(js_name = originalLastWord)]
+    pub fn original_last_word(&self) -> Option<String> {
+        self.original_last_word.map(english_word)
+    }
+
     /// The stitches across.
     #[wasm_bindgen(getter)]
     pub fn width(&self) -> usize {
@@ -140,6 +154,149 @@ impl StitchPattern {
     #[wasm_bindgen(getter, js_name = seenDifference)]
     pub fn seen_difference(&self) -> f64 {
         self.seen_difference
+    }
+}
+
+/// The patterns of the Shamir shares of a phrase, one share to a pattern, all of the same picture so
+/// that they look alike, as `stitch --threshold --shares` makes them.
+#[cfg(feature = "browser-sskr")]
+#[wasm_bindgen]
+pub struct StitchShares {
+    hidden: Vec<Hidden>,
+    seen_differences: Vec<f64>,
+    original_last_word: Option<u16>,
+}
+
+#[cfg(feature = "browser-sskr")]
+#[wasm_bindgen]
+impl StitchShares {
+    /// `phrase`, masked with `dates` as [`StitchPattern::new`] masks it in `mode`, split into
+    /// `shares` Shamir shares of which `threshold` restore it, each hidden in a pattern of
+    /// `picture`, `stitchesAcross` wide (0: 200). Refused as the split and the library refuse their
+    /// inputs, and where the picture has too few colors to hold a share.
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        phrase: JsValue,
+        dates: JsValue,
+        picture: &[u8],
+        stitches_across: f64,
+        mode: Option<String>,
+        threshold: f64,
+        shares: f64,
+    ) -> Result<StitchShares, JsValue> {
+        let width = match whole(stitches_across) {
+            0 => DEFAULT_WIDTH as u64,
+            width => width,
+        };
+        let width = WIDTHS
+            .contains(width)
+            .then_some(width as usize)
+            .ok_or_else(|| refused(&picture::PictureError::WidthOutOfRange))?;
+        let set = (place(threshold), place(shares));
+        after_secret(|| {
+            let mode = mode.as_deref().map_or(Ok(Mode::Seedshift), Mode::named);
+            let mode = mode.map_err(|refusal| refused(&refusal))?;
+            let (phrase, dates) = phrase_and_dates(&text(&phrase)?, &text(&dates)?)?;
+            let entropies = mnemocode_embroidery::phrase::share_entropies(
+                &phrase,
+                (mode, &dates),
+                set,
+                &mut BrowserRandom,
+            )
+            .map_err(|refusal| refused(&refusal))?;
+            let grid = picture::grid(picture, width).map_err(|refusal| refused(&refusal))?;
+            let hidden = entropies
+                .iter()
+                .map(|entropy| hide(&grid, entropy, &mut BrowserRandom))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|refusal| refused(&refusal))?;
+            let original_last_word = entropies
+                .first()
+                .and_then(|entropy| entropy.last_words())
+                .map(|(original, _)| original);
+            let seen_differences = hidden
+                .iter()
+                .map(|one| one.pattern().seen_difference(&grid))
+                .collect();
+            Ok(Self {
+                hidden,
+                seen_differences,
+                original_last_word,
+            })
+        })
+    }
+
+    /// How many patterns there are, one for each share.
+    #[wasm_bindgen(getter)]
+    pub fn count(&self) -> usize {
+        self.hidden.len()
+    }
+
+    /// The rows of the legend of the pattern of share `at` (from 0), as [`StitchPattern::rows`];
+    /// none past the last.
+    pub fn rows(&self, at: f64) -> Option<usize> {
+        self.hidden.get(place(at)).map(|hidden| hidden.rows().len())
+    }
+
+    /// How far the pattern of share `at` looks from the picture, as
+    /// [`StitchPattern::seen_difference`]; none past the last.
+    #[wasm_bindgen(js_name = seenDifference)]
+    pub fn seen_difference(&self, at: f64) -> Option<f64> {
+        self.seen_differences.get(place(at)).copied()
+    }
+
+    /// With the Original Seedshift, the English word the page shows the person to remember: the
+    /// restore asks for it to give the phrase back exactly. Undefined in any other mode.
+    #[wasm_bindgen(js_name = originalLastWord)]
+    pub fn original_last_word(&self) -> Option<String> {
+        self.original_last_word.map(english_word)
+    }
+
+    /// The legend of the pattern of share `at` (from 0) as a person types it back; none past the
+    /// last.
+    pub fn legend(&self, at: f64) -> Result<Option<String>, JsValue> {
+        after_secret(|| {
+            self.hidden
+                .get(place(at))
+                .map(|hidden| {
+                    legend::line(hidden.rows())
+                        .map(|line| line.as_str().to_owned())
+                        .map_err(|refusal| refused(&refusal))
+                })
+                .transpose()
+        })
+    }
+
+    /// The PDF of the pattern of share `at` for `fabric`, as [`StitchPattern::pdf`] makes it; none
+    /// past the last.
+    pub fn pdf(&self, at: f64, fabric: Option<String>) -> Result<Option<Vec<u8>>, JsValue> {
+        after_secret(|| {
+            let fabric = fabric_of(fabric)?;
+            self.hidden
+                .get(place(at))
+                .map(|hidden| {
+                    chart::chart(hidden, fabric)
+                        .map(|pdf| pdf.to_vec())
+                        .map_err(|refusal| refused(&refusal))
+                })
+                .transpose()
+        })
+    }
+
+    /// The stitches across, the same in every pattern.
+    #[wasm_bindgen(getter)]
+    pub fn width(&self) -> usize {
+        self.hidden
+            .first()
+            .map_or(0, |hidden| hidden.pattern().width())
+    }
+
+    /// The stitches down, the same in every pattern.
+    #[wasm_bindgen(getter)]
+    pub fn height(&self) -> usize {
+        self.hidden
+            .first()
+            .map_or(0, |hidden| hidden.pattern().height())
     }
 }
 
@@ -275,8 +432,8 @@ pub struct StitchLegend(LineRecord);
 
 #[wasm_bindgen]
 impl StitchLegend {
-    /// The record of the phrase: `MNC1:seedshift:indexes:…`, which the recovery part decodes with
-    /// the dates, or `MNC1:direct:indexes:…` for a legend made with `--mode direct`.
+    /// The word numbers of the phrase the legend holds, which the recovery part decodes with the
+    /// mode and the dates the page asks for: the legend does not say whether or how it was masked.
     pub fn record(&self) -> String {
         after_secret(|| self.0.record().as_str().to_owned())
     }
@@ -295,6 +452,64 @@ impl StitchLegend {
     pub fn corrected(&self) -> bool {
         self.0.corrected()
     }
+}
+
+/// One share read back from the legend line of its pattern, with whether a row was read as
+/// misread.
+#[cfg(feature = "browser-sskr")]
+#[wasm_bindgen]
+pub struct StitchShareLegend(mnemocode_embroidery::phrase::ShareLine);
+
+#[cfg(feature = "browser-sskr")]
+#[wasm_bindgen]
+impl StitchShareLegend {
+    /// The share in the standard form, ur:sskr/…, which the restore from shares reads.
+    pub fn share(&self) -> String {
+        after_secret(|| self.0.share.ur().as_str().to_owned())
+    }
+
+    /// The identifier of its set, four hexadecimal digits.
+    #[wasm_bindgen(getter)]
+    pub fn set(&self) -> String {
+        format!("{:04X}", self.0.share.info().identifier)
+    }
+
+    /// Its member number, from 1.
+    #[wasm_bindgen(getter)]
+    pub fn member(&self) -> usize {
+        self.0.share.info().member_index + 1
+    }
+
+    /// How many shares of its set restore the phrase.
+    #[wasm_bindgen(getter)]
+    pub fn threshold(&self) -> usize {
+        self.0.share.info().member_threshold
+    }
+
+    /// The row, from 1, read as misread, where only it explains the change.
+    #[wasm_bindgen(getter, js_name = correctedRow)]
+    pub fn corrected_row(&self) -> Option<usize> {
+        self.0.corrected_row
+    }
+
+    /// Whether a row was read as misread.
+    #[wasm_bindgen(getter)]
+    pub fn corrected(&self) -> bool {
+        self.0.corrected
+    }
+}
+
+/// The legend line `line` of a share's pattern read back, typed as a person reads it from the
+/// key; undefined where the text is no legend line of a share. Refused for a line that does not
+/// read.
+#[cfg(feature = "browser-sskr")]
+#[wasm_bindgen(js_name = readStitchShareLegend)]
+pub fn read_stitch_share_legend(line: JsValue) -> Result<Option<StitchShareLegend>, JsValue> {
+    after_secret(|| {
+        mnemocode_embroidery::phrase::share_of_legend(&text(&line)?)
+            .map(|read| read.map(StitchShareLegend))
+            .map_err(|refusal| refused(&refusal))
+    })
 }
 
 /// The legend line `line` read back; undefined where the text is no legend line, such as codes or a
@@ -373,6 +588,7 @@ pub fn self_check_embroidery(full: bool) -> Result<(), JsValue> {
 
 #[cfg(test)]
 mod tests {
+    use mnemocode::forms::Form;
     use mnemocode_embroidery::legend::EXAMPLE;
     use mnemocode_embroidery::sample::{gradient_png, narrow_png};
 
@@ -444,7 +660,9 @@ mod tests {
             StitchPattern::of_text((VOID, ""), &gradient_png(), 120, Mode::Direct).unwrap();
         let line = direct.legend().unwrap();
         let read = record_of_legend(&line).unwrap().unwrap();
-        assert!(read.record().as_str().starts_with("MNC1:direct:indexes:"));
+        // Without Seedshift the legend gives the phrase's own word numbers, which name no mode.
+        let indexes = Form::Indexes.read(read.record().as_str()).unwrap();
+        assert_eq!(Form::English.codes(&indexes).unwrap().as_str(), VOID);
         // The gradient is 240 by 160 pixels: no sheet gives it more stitches than its pixels.
         let sizes = StitchSizes::new(&gradient_png(), None).unwrap();
         assert_eq!(sizes.name(0.0).as_deref(), Some("A6"));
@@ -459,11 +677,8 @@ mod tests {
         assert!(sizes.name(9.0).is_none() && sizes.centimetres_across(-1.0).is_none());
         let read = record_of_legend(&legend).unwrap().unwrap();
         assert_eq!(read.corrected_row(), None);
-        assert!(
-            read.record()
-                .as_str()
-                .starts_with("MNC1:seedshift:indexes:")
-        );
+        // A masked legend gives word numbers too, the same count, which name no mode either.
+        assert_eq!(read.record().as_str().split(' ').count(), 24);
         assert!(record_of_legend(EXAMPLE).unwrap().is_some());
         assert!(record_of_legend("1 2 3").unwrap().is_none());
         assert!(self_check_embroidery(false).is_ok());

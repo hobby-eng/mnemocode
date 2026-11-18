@@ -11,7 +11,7 @@ use mnemocode::self_check::{Check, CheckFailure, Tier, expect_same, ok};
 use crate::chart::{chart, legend_of_pdf};
 use crate::fabric::DEFAULT_FABRIC;
 use crate::hide::hide;
-use crate::legend::{self, EXAMPLE, EXAMPLE_ORDERED, Masking, Reading};
+use crate::legend::{self, EXAMPLE, EXAMPLE_ORDERED, Holds, Reading};
 use crate::phrase::LegendEntropy;
 use crate::picture;
 use crate::sample::gradient_png;
@@ -37,19 +37,13 @@ const EXAMPLE_ORDERED_ENTROPY: [u8; 32] = [
     0x1f, 0xa0, 0x00, 0x40, 0x0f, 0xd0, 0x00, 0x20, 0x07, 0xe8, 0x00, 0x10, 0x03, 0xf4, 0x00, 0x09,
 ];
 
-/// The check of 16 zero bytes in each format and masking: format 1 and 2, a whole backup masked with
-/// either Seedshift and not, and a share masked and not, computed with Python's hashlib.
-const DOMAIN_CHECKS: [(Masking, bool, [u8; 4]); 10] = [
-    (Masking::Seedshift, false, [0x22, 0xbe, 0xc2, 0x2d]),
-    (Masking::Unmasked, false, [0x4b, 0x0a, 0x75, 0xea]),
-    (Masking::Seedshift, true, [0xb9, 0xc6, 0xe3, 0xb7]),
-    (Masking::Unmasked, true, [0xaa, 0xb9, 0x27, 0xfb]),
-    (Masking::SeedshiftLegacy, false, [0x3c, 0xa9, 0xe6, 0x2d]),
-    (Masking::SeedshiftLegacy, true, [0x81, 0x90, 0x92, 0x74]),
-    (Masking::Share, false, [0x48, 0x37, 0x6b, 0x33]),
-    (Masking::Share, true, [0xb7, 0xbc, 0x17, 0x1a]),
-    (Masking::ShareUnmasked, false, [0x0f, 0x4b, 0x83, 0x3c]),
-    (Masking::ShareUnmasked, true, [0xa3, 0x17, 0x59, 0xc5]),
+/// The check of 16 zero bytes in each format and kind: format 1 and 2, a whole backup and a share,
+/// computed with Python's hashlib.
+const DOMAIN_CHECKS: [(Holds, bool, [u8; 4]); 4] = [
+    (Holds::Entropy, false, [0x22, 0xbe, 0xc2, 0x2d]),
+    (Holds::Entropy, true, [0xb9, 0xc6, 0xe3, 0xb7]),
+    (Holds::Share, false, [0x48, 0x37, 0x6b, 0x33]),
+    (Holds::Share, true, [0xb7, 0xbc, 0x17, 0x1a]),
 ];
 
 /// The startup case of the row, before any secret is asked.
@@ -65,22 +59,22 @@ fn seedstitch(tier: Tier) -> Result<(), CheckFailure> {
     let rows = ok(legend::parse(EXAMPLE))?;
     expect_same(
         &read_entropy(&rows),
-        &Some((EXAMPLE_ENTROPY.to_vec(), Masking::Seedshift)),
+        &Some((EXAMPLE_ENTROPY.to_vec(), Holds::Entropy)),
         "The specification's legend",
     )?;
     if tier != Tier::Full {
         return Ok(());
     }
-    for (masking, ordered, expected) in DOMAIN_CHECKS {
+    for (holds, ordered, expected) in DOMAIN_CHECKS {
         expect_same(
-            &legend::check(&[0; 16], masking, ordered),
+            &legend::check(&[0; 16], holds, ordered),
             &expected,
-            "The check of each format and masking",
+            "The check of each format and holds",
         )?;
     }
     expect_same(
         &read_entropy(&ok(legend::parse(EXAMPLE_ORDERED))?),
-        &Some((EXAMPLE_ORDERED_ENTROPY.to_vec(), Masking::Seedshift)),
+        &Some((EXAMPLE_ORDERED_ENTROPY.to_vec(), Holds::Entropy)),
         "The specification's legend that names its threads",
     )?;
     let mut one = rows.clone();
@@ -98,7 +92,7 @@ fn seedstitch(tier: Tier) -> Result<(), CheckFailure> {
     let grid = ok(picture::grid(&gradient_png(), 120))?;
     let entropy = LegendEntropy::known(&EXAMPLE_ENTROPY);
     let hidden = ok(hide(&grid, &entropy, &mut Counting(0)))?;
-    let read = Some((EXAMPLE_ENTROPY.to_vec(), Masking::Seedshift));
+    let read = Some((EXAMPLE_ENTROPY.to_vec(), Holds::Entropy));
     expect_same(&read_entropy(hidden.rows()), &read, "A picture's legend")?;
     let pdf = ok(chart(&hidden, DEFAULT_FABRIC))?;
     let kept = legend_of_pdf(&pdf).and_then(|line| legend::parse(line.as_str()).ok());
@@ -110,9 +104,9 @@ fn seedstitch(tier: Tier) -> Result<(), CheckFailure> {
 }
 
 /// The entropy `rows` read as, without a correction, and how it is masked.
-fn read_entropy(rows: &[legend::Row]) -> Option<(Vec<u8>, Masking)> {
+fn read_entropy(rows: &[legend::Row]) -> Option<(Vec<u8>, Holds)> {
     match legend::read(rows) {
-        Reading::Read { entropy, masking } => Some((entropy.to_vec(), masking)),
+        Reading::Read { entropy, holds } => Some((entropy.to_vec(), holds)),
         _ => None,
     }
 }
@@ -150,10 +144,10 @@ mod tests {
         crate::legend::line(hidden.rows()).unwrap()
     }
 
-    // The original Seedshift in a legend keeps every word, the last one too: it reads back as the
-    // record of the masked words themselves.
+    // The Original Seedshift in a legend reads back as the codes Encode writes, whose last word
+    // keeps the checksum.
     #[test]
-    fn a_legend_of_the_original_seedshift_reads_back_with_every_word() {
+    fn a_legend_of_the_original_seedshift_reads_back_as_its_codes() {
         let void = Phrase::parse(VOID).unwrap();
         let dates = [mnemocode::dates::parse_date("23-09-2026").unwrap()];
         let entropy = crate::phrase::legend_entropy(&void, Mode::SeedshiftLegacy, &dates).unwrap();
@@ -166,12 +160,11 @@ mod tests {
             &dates,
             mnemocode::forms::Form::Indexes,
             Mode::SeedshiftLegacy,
-            false,
         )
         .unwrap();
         assert_eq!(
             read.record().as_str(),
-            masked.backup.record().unwrap().as_str()
+            masked.backup.text().unwrap().as_str()
         );
     }
 
@@ -196,7 +189,7 @@ mod tests {
                 let read = crate::phrase::share_of_legend(line.as_str())
                     .unwrap()
                     .unwrap();
-                assert!(!read.masked && !read.corrected);
+                assert!(!read.corrected);
                 read.share.ur()
             })
             .collect();

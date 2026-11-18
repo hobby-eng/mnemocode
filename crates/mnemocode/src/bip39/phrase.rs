@@ -10,8 +10,8 @@ use unicode_normalization::UnicodeNormalization;
 use zeroize::Zeroize;
 
 use super::sizes::{
-    WORD_NUMBER_DIGITS, WORD_NUMBER_RANGE, check_word_count, checksum_bits, entropy_bytes,
-    is_word_count, last_word_entropy_bits, word_counts_text,
+    WORD_NUMBER_DIGITS, WORD_NUMBER_RANGE, check_word_count, entropy_bytes, is_word_count,
+    last_word_entropy_bits, word_counts_text,
 };
 use super::table::{english, index_of_english, index_of_number, index_of_unicode};
 use crate::refusal::Refusal;
@@ -317,47 +317,6 @@ pub fn valid_last_word_indexes(prefix: &[usize]) -> Result<Vec<usize>, PhraseErr
         found.push(last);
     }
     Ok(found)
-}
-
-/// A replacement of the final word of an old exact-legacy phrase: the phrase with it, its index,
-/// from 0, and whether it keeps the old final word's entropy bits.
-#[derive(Debug)]
-pub struct LastWordCandidate {
-    /// The phrase with this last word.
-    pub phrase: Phrase,
-    /// The word's index, from 0.
-    pub index: usize,
-    /// Whether it keeps the entropy-bearing high bits of the old final word.
-    pub preserves_entropy: bool,
-}
-
-/// The checksum-valid replacements of the final word of `text`, an old shifted phrase whose final
-/// word may fail the checksum; refused for a ? among the words and what [`canonical_words`]
-/// refuses.
-pub fn legacy_valid_last_words(text: &str) -> Result<Vec<LastWordCandidate>, PhraseError> {
-    if english_tokens(text).iter().any(|word| word == "?") {
-        return Err(PhraseError::QuestionMark);
-    }
-    let words = canonical_words(text)?;
-    let indexes: Vec<usize> = words
-        .iter()
-        .filter_map(|word| index_of_english(word))
-        .collect();
-    let (last, prefix) = indexes.split_last().ok_or(PhraseError::WordCount)?;
-    let checksum = checksum_bits(words.len());
-    let old_tail = last >> checksum;
-    valid_last_word_indexes(prefix)?
-        .into_iter()
-        .map(|index| {
-            let mut all = prefix.to_vec();
-            all.push(index);
-            Ok(LastWordCandidate {
-                phrase: Phrase::of_indexes(&all)?,
-                index,
-                preserves_entropy: index >> checksum == old_tail,
-            })
-        })
-        .collect()
 }
 
 #[cfg(test)]

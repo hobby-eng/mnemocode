@@ -18,7 +18,7 @@ use common::{
     DATES, LONG_PHRASE, MOST_DATES, NEVER, PDF_START, PHRASE, PNG_START, PUBLIC_SHARES, SHARE,
     SHARES, assert_no_metadata, assert_private, assert_refused, assert_same_cards,
     assert_same_pictures, folder, full, names, numbered, outputs, page_sizes, printed_pages, read,
-    saved,
+    run, saved,
 };
 use mnemocode::recovery::shares::flow::PhrasesFound;
 use mnemocode::recovery::shares::repair::{ShareExportDecision, export_decision};
@@ -235,7 +235,8 @@ fn a_sheet_with_a_qr_code_saves_its_image_beside_it_and_without_one_its_pdf_alon
         args.extend_from_slice(more);
         saved(&folder, &args)
     };
-    let errors = encode("public.pdf", &["--card-qr"]);
+    // --card-qr prints it on the sheet; --card-qr-png saves its image beside it too.
+    let errors = encode("public.pdf", &["--card-qr", "--card-qr-png"]);
     assert!(
         errors.contains(&format!(
             "Saved the QR code of the sheet as an image: {}",
@@ -303,7 +304,8 @@ fn a_record_and_a_standalone_qr_image_plan_no_cards() {
     assert_eq!(outputs(&folder), ["public.png", "public.txt"]);
     assert!(errors.contains("QR code verified."), "{errors}");
     assert!(read(&folder, "public.png").starts_with(PNG_START));
-    assert!(read(&folder, "public.txt").starts_with(b"MNC1:direct:unicode:"));
+    // A record file holds the codes alone.
+    assert!(read(&folder, "public.txt").starts_with(b"7684"));
 }
 
 #[test]
@@ -515,7 +517,7 @@ fn the_sheet_for_heirs_leads_through_the_menu_in_its_own_words() {
     );
     for words in [
         "Choose \"5 Restore a seed phrase from Shamir shares\".",
-        "To \"Was Seedshift used before it was split?\" answer \"Yes\".",
+        "To \"Was Seedshift used before it was split?\" answer \"MnemoCode Seedshift\".",
         "Type any 3 shares, separated by \";\", then the secret dates as day-month-year (23-09-2026). MnemoCode shows the seed phrase.",
         "If a digit of a date is unclear, menu entry 6 tries every possibility.",
     ] {
@@ -579,18 +581,6 @@ fn a_sheet_for_heirs_that_cannot_be_made_is_refused_before_anything_is_written()
     assert_refused(&folder, &unknown_size, "must be a5 or a6");
     let no_sheet = with(&["--heir-sheet-size", "a6"]);
     assert_refused(&folder, &no_sheet, "--heir-sheet-size needs --heir-sheet");
-    let replaced = with(&[
-        "--mode",
-        "seedshift-legacy",
-        "--legacy-valid-last-word",
-        "--heir-sheet",
-        NEVER,
-    ]);
-    assert_refused(
-        &folder,
-        &replaced,
-        "A sheet for heirs cannot be made for the Original Seedshift with a valid last word",
-    );
 }
 
 #[test]
@@ -741,4 +731,31 @@ fn too_few_shares_are_repaired_each_alone_unless_a_wallet_is_checked_against_the
         export_decision(None, true),
         ShareExportDecision::Trouble(message) if message == WALLET_NEEDS_THRESHOLD
     ));
+}
+
+// AUD-008-API003: --find takes only its four kinds, and without a terminal to ask on a folder
+// holding none of the kind named is refused rather than read as another kind.
+#[test]
+fn find_names_one_kind_and_takes_no_other_without_asking() {
+    let folder = folder("find-kind");
+    saved(
+        &folder,
+        &[
+            "encode",
+            "--mnemonic-file",
+            PHRASE,
+            "--mode",
+            "direct",
+            "--format",
+            "unicode",
+            "--qr",
+            "public.png",
+        ],
+    );
+    let decode = |find: &'static str| ["decode", "--input-file", "public.png", "--find", find];
+    assert_refused(&folder, &decode("nosuch"), "--find must be");
+    assert_refused(&folder, &decode("patterns"), "These files hold no ");
+    let output = run(&folder, &decode("qr"));
+    let errors = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(0), "{errors}");
 }

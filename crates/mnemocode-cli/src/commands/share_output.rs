@@ -12,7 +12,7 @@ use mnemocode::sskr::share::{Share, TransportError};
 
 use super::resolved;
 use super::saving::{ResultName, folder_taken, save_output};
-use crate::args::{Parsed, parse_arguments, value};
+use crate::args::{Parsed, is_on, parse_arguments, value};
 use crate::gate::Stop;
 use crate::os::{self, FileError, Folder};
 use mnemocode_cards::content::SskrLayout;
@@ -30,10 +30,8 @@ use super::cards::{
 };
 use crate::os::SystemRandom;
 use crate::output::shown_path;
-use crate::terminal::result::{backup_code_lines, code_lines, print};
-use crate::terminal::{
-    self, Channel, NoticeKind, can_redraw, notice, result_lines, saved, show_result,
-};
+use crate::terminal::result::{backup_code_lines, code_block_lines, code_lines, print};
+use crate::terminal::{self, Channel, can_redraw, saved, show_result};
 
 /// Reports only images already verified and successfully published.
 pub(crate) fn report_qr_verified(count: usize) {
@@ -111,10 +109,29 @@ fn share_block_lines(
     purpose: Presentation,
 ) -> Vec<(Channel, String)> {
     let form = format.label();
+    let text = format.write(share);
+    // A share to save is a part of the one result under its heading alone: its form and what it
+    // holds stand once under the result's title.
+    if matches!(purpose, Presentation::Backup) && can_redraw(Channel::Output) {
+        let mut lines = vec![
+            (Channel::Output, String::new()),
+            (
+                Channel::Output,
+                crate::terminal::paint(Channel::Output, crate::terminal::style::HEADING, title),
+            ),
+        ];
+        lines.extend(
+            code_block_lines(&text, format.mirrored(), "share")
+                .into_iter()
+                .map(|line| (Channel::Output, line)),
+        );
+        return lines;
+    }
     let mut facts = vec![("Format", form.clone())];
     facts.extend(holds.map(|holds| ("Holds", holds.to_owned())));
+    // Each share a part of the one result, under its own heading.
     let mut lines: Vec<(Channel, String)> = if can_redraw(Channel::Output) {
-        result_lines(Channel::Output, title, &facts)
+        crate::terminal::part_lines(Channel::Output, title, &facts)
             .into_iter()
             .map(|line| (Channel::Output, line))
             .collect()
@@ -122,7 +139,6 @@ fn share_block_lines(
         let holding = holds.map_or_else(String::new, |holds| format!(", holds {holds}"));
         vec![(Channel::Error, format!("{title} — {form}{holding}:"))]
     };
-    let text = format.write(share);
     let codes = match purpose {
         Presentation::Backup => backup_code_lines(&text, format.mirrored(), "share"),
         Presentation::Candidate => code_lines(&text, format.mirrored()),
@@ -158,13 +174,27 @@ pub(crate) fn print_shares(
     holds: Option<&str>,
     purpose: Presentation,
 ) {
-    let lines: Vec<(Channel, String)> = shares
-        .iter()
-        .flat_map(|written| {
-            let title = format!("SSKR share {} of {total}", written.number);
-            share_block_lines(&title, &written.share, written.format, holds, purpose)
-        })
-        .collect();
+    let backup = matches!(purpose, Presentation::Backup);
+    let mut lines: Vec<(Channel, String)> = Vec::new();
+    if backup && can_redraw(Channel::Output) {
+        lines.push((Channel::Output, String::new()));
+        lines.push((
+            Channel::Output,
+            crate::terminal::paint(
+                Channel::Output,
+                crate::terminal::style::MUTED,
+                "Copy each share whole, in this exact order, and keep the shares apart.",
+            ),
+        ));
+    }
+    lines.extend(shares.iter().flat_map(|written| {
+        let title = if backup && can_redraw(Channel::Output) {
+            format!("Share {} of {total}", written.number)
+        } else {
+            format!("SSKR share {} of {total}", written.number)
+        };
+        share_block_lines(&title, &written.share, written.format, holds, purpose)
+    }));
     print_share_lines(&lines);
 }
 
@@ -249,12 +279,16 @@ impl ShareCards {
     }
 }
 
-/// The QR code of each share's sheets, also saved as an image where the cards went (`save`), which
-/// Restore reads back.
+/// The QR code of each share's sheets, also saved as an image where the cards went (`save`) with
+/// --card-qr-png, which Restore reads back.
 fn save_share_qrs(
+    parsed: &Parsed,
     set: &ShareCardSet,
     save: &dyn Fn(&ShareQrCode) -> Result<Option<String>, Stop>,
 ) -> Result<(), Stop> {
+    if !is_on(parsed, "card-qr-png") {
+        return Ok(());
+    }
     let mut count = 0;
     for code in set.qr_codes() {
         if save(&code)?.is_some() {
@@ -297,7 +331,7 @@ fn save_share_cards(
                 format_name(format),
                 shown_path(&directory)
             ));
-            save_share_qrs(set, &|code| {
+            save_share_qrs(parsed, set, &|code| {
                 super::cards::save_qr_inside_with(
                     &code.payload,
                     &directory,
@@ -323,7 +357,7 @@ fn save_share_cards(
     if let Some(pdf) = pdf {
         saved(&format!("Saved SSKR collection PDF: {}", shown_path(&pdf)));
         keep(Packaging::File)?;
-        save_share_qrs(set, &|code| {
+        save_share_qrs(parsed, set, &|code| {
             super::cards::save_qr_beside_with(
                 &code.payload,
                 &pdf,
@@ -346,7 +380,7 @@ fn save_share_cards(
     if let Some(images) = images {
         saved_pages_notice(parsed, count, &images, Some("SSKR"))?;
         keep(Packaging::Folder)?;
-        save_share_qrs(set, &|code| {
+        save_share_qrs(parsed, set, &|code| {
             super::cards::save_qr_inside_with(
                 &code.payload,
                 &images,
@@ -369,10 +403,8 @@ pub(crate) fn save_shares(
 ) -> Result<(), Stop> {
     let shares: Vec<Share> = shown.iter().map(|written| written.share.copy()).collect();
     let keep = |packaging: Packaging| -> Result<(), Stop> {
-        notice(
-            &share_keeping_note(&shares, packaging, masked)?,
-            NoticeKind::Info,
-        );
+        // How to keep them is a note, a blank line apart from the file saved.
+        terminal::result_hint(&share_keeping_note(&shares, packaging, masked)?);
         Ok(())
     };
     if let Some(cards) = cards {
@@ -400,7 +432,7 @@ pub(crate) fn save_shares(
                 terminal::environment().current.as_deref(),
                 taken,
             )?;
-            folder.publish(".mnemocode-share-qr-", |staging| {
+            folder.publish(".qr-codes-", |staging| {
                 for written in shown {
                     let text = written.format.write(&written.share);
                     let image =

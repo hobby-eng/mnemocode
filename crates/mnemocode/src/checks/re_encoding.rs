@@ -1,11 +1,12 @@
 //! The re-encoding row (MnemoCode TS 0.1.0's `core/re-encoding-self-test.ts`,
 //! CAP-PHRASE-FORMATS-REENCODING-CONFIRMATION): a backup decoded, held back until confirmed by the
-//! person or the wallet, and encoded again; the Original Seedshift, its valid last word, and the
-//! refusals.
+//! person or the wallet, and encoded again; the Original Seedshift both as the original program
+//! writes it and with the last word MnemoCode writes, and the refusals.
 
 use super::{Row, ok};
 use crate::backup::Backup;
 use crate::backup::re_encoding::{MatchedBy, ReEncoding};
+use crate::bip39::table::english;
 use crate::dates::{Date, parse_date};
 use crate::forms::Form;
 use crate::modes::Mode;
@@ -50,7 +51,6 @@ fn run(tier: Tier) -> Result<(), CheckFailure> {
         &[],
         Form::Unicode,
         Mode::Direct,
-        false,
     ))?;
     expect_same(
         ok(again.backup.text())?.as_str(),
@@ -78,40 +78,32 @@ fn run(tier: Tier) -> Result<(), CheckFailure> {
         "Original Seedshift with a wrong date",
     )?;
     let phrase = ok(crate::bip39::phrase::Phrase::parse(PUBLIC_MNEMONIC))?;
-    let several = ok(Backup::encode(
+    let matching = ok(Backup::encode(
         &phrase,
         &[right],
         Form::Indexes,
         Mode::SeedshiftLegacy,
-        true,
-    ))?
-    .backup;
+    ))?;
+    let several = &matching.backup;
+    expect_same(
+        &several.mode(),
+        &Mode::SeedshiftLegacyValid,
+        "Original Seedshift written with a last word keeping the checksum",
+    )?;
+    let named = usize::from(matching.original_last_word.unwrap_or(0));
+    expect_same(
+        &is_public(&ok(ReEncoding::of(
+            several,
+            &[right],
+            Some(english()[named]),
+        ))?),
+        &true,
+        "Last word Encode named",
+    )?;
     expect_refused(
-        ReEncoding::of(&several, &[right], None),
-        "core.re-encoding.last-word-needed",
-        "Valid last word without the original one",
-    )?;
-    expect_same(
-        &is_public(&ok(ReEncoding::of(&several, &[right], Some("about")))?),
-        &true,
-        "Last word",
-    )?;
-    let plain_legacy = ok(several.with_mode(Mode::SeedshiftLegacy))?;
-    let replacement = ok(plain_legacy.last_word_replacement())?.map(|backup| backup.mode());
-    expect_same(
-        &replacement,
-        &Some(Mode::SeedshiftLegacyValid),
-        "Possible replaced last word",
-    )?;
-    expect_same(
-        &ok(legacy.last_word_replacement())?.is_none(),
-        &true,
-        "Legacy without a valid checksum",
-    )?;
-    expect_same(
-        &ok(again.backup.last_word_replacement())?.is_none(),
-        &true,
-        "Direct input is not Legacy",
+        ReEncoding::of(several, &[right], Some(english()[named ^ 0x400])),
+        "core.re-encoding.no-such-last-word",
+        "Last word that does not fit",
     )?;
     if tier == Tier::Startup {
         return Ok(());

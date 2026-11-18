@@ -13,8 +13,8 @@ use super::keys::{Interrupted, Key, Keys, read_key};
 use super::private::result_stays_from_start;
 use super::screen_rows::{ScreenRows, screen_rows};
 use super::{
-    CLEAR_SCREEN, Channel, TAB_STOP, columns, error_raw, error_raw_unrecorded, output_rows, paint,
-    rows, showing_result, style, without_style,
+    CLEAR_SCREEN, TAB_STOP, columns, error_raw, error_raw_unrecorded, output_rows, rows,
+    showing_result, without_style,
 };
 
 /// The keys of the pages, under each page.
@@ -134,7 +134,7 @@ fn page_starts(rows: &[String], capacity: usize) -> Vec<usize> {
 
 /// The lines under page `page`, of `count`.
 fn footer(page: usize, count: usize) -> Vec<String> {
-    let mut lines = vec![format!("Page {}/{count}", page + 1)];
+    let mut lines = vec![String::new(), format!("Page {}/{count}", page + 1)];
     lines.extend(NAVIGATION.iter().map(|line| (*line).to_owned()));
     lines
 }
@@ -150,10 +150,11 @@ fn draw(shown: &[String], page: &mut usize, pages: usize) -> usize {
     *page = (*page).min(count - 1);
     let end = starts.get(*page + 1).copied().unwrap_or(shown.len());
     let mut lines: Vec<String> = shown[starts[*page]..end].to_vec();
+    // The keys in the colour of keys, as under every question.
     lines.extend(
         footer(*page, count)
             .iter()
-            .map(|line| paint(Channel::Error, style::MUTED, line)),
+            .map(|line| super::key_line(line)),
     );
     error_raw_unrecorded(&format!("{CLEAR_SCREEN}{}", lines.join("\n")));
     count

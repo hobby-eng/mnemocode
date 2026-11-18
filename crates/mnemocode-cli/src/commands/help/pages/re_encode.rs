@@ -35,9 +35,9 @@ const OWN_0_5: HelpOption = HelpOption {
 const OWN_0_6: HelpOption = HelpOption {
     flag: "--old-mode",
     value: Some("MODE"),
-    summary: "The mode of the old backup: direct, seedshift, seedshift-legacy or seedshift-legacy-valid",
+    summary: "The mode of the old backup: direct, seedshift or seedshift-legacy",
     details: &[
-        "Needed for typed text and QR codes, which carry no header; without it, --ask-secrets asks how they were masked. A record file names its own mode.",
+        "Needed for codes, which say nothing of how they were masked: without it, --ask-secrets asks. Only a record saved by an earlier version, which starts with MNC1, names its own mode.",
     ],
 };
 const OWN_0_7: HelpOption = HelpOption {
@@ -57,10 +57,10 @@ const OWN_0_9: HelpOption = HelpOption {
 const OWN_0_10: HelpOption = HelpOption {
     flag: "--last-word-file",
     value: Some("PATH"),
-    summary: "Read the original final word for seedshift-legacy-valid from a file or -",
+    summary: "Read the last word Encode named for a seedshift-legacy backup from a file or -",
     details: &[
         "The file may be up to 256 bytes.",
-        "The backup gives a phrase for each possible last word; the original one picks it. Not with --ask-secrets, which asks for that word privately.",
+        "Original Seedshift codes that MnemoCode wrote may give two phrases without it; the word picks the one. Not with --ask-secrets, which asks for that word privately.",
     ],
 };
 const OWN_6_0: HelpOption = HelpOption {
@@ -75,9 +75,9 @@ const OWN_6_0: HelpOption = HelpOption {
 pub(in super::super) const PAGE: CommandHelp = CommandHelp {
     summary: "Make an encoded backup again, with other dates or in another form",
     about: &[
-        "Reads a backup that MnemoCode encoded, from text, a file or a QR code, and decodes it as decode does; then encodes its seed phrase again as encode does: with other dates, another mode or in another form, as cards or as Shamir shares. The seed phrase is never typed.",
+        "Reads a backup that MnemoCode encoded, from text, a file, a QR code, a pattern or the files of its cards, or finds it in a folder, and decodes it as decode does; then encodes its seed phrase again as encode does: with other dates, another mode or in another form, as cards or as Shamir shares. The seed phrase is never typed.",
         "Its BIP39 checksum is no confirmation: with MnemoCode Seedshift every date gives a valid phrase. So the phrase is shown, and re-encoded only once you recognise it or your wallet matches it. With --ask-secrets you either recognise it or its fingerprint, or MnemoCode compares it with an address of your wallet, of Bitcoin or another coin, which confirms it, or with its fingerprint, which only accepts it: a fingerprint is a filter, not proof. On the command line give a wallet option or --recognised.",
-        "With --ask-secrets the new backup is asked first, with the questions of Encode in the menu, unless options give it; then the codes, then at once their dates, then the phrase is shown to confirm. A backup of the original Seedshift with a valid last word keeps nothing of the original last word: give it, as you remember it.",
+        "With --ask-secrets the new backup is asked first, with the questions of Encode in the menu, unless options give it; then the codes, then at once their dates, then the phrase is shown to confirm. A backup of the Original Seedshift that MnemoCode wrote asks for the last word Encode named; without it the codes may give two phrases.",
         "With --ask-secrets the old input may also be Shamir shares, in any share form, separated by semicolons or lines, or read from a text file. Restore's questions ask whether Seedshift was used and take its dates before the original seed phrase is shown for confirmation. Too few shares ask for more; the masked phrase is never the phrase to confirm.",
         "For an encoded phrase every code and date is needed: decode and recover-date find what is forgotten. Shamir input uses Restore's repair and date questions. Afterwards the old backup still restores the same wallet.",
     ],
@@ -122,17 +122,14 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
             "Format",
             "when the codes fit several forms, unless --old-format",
         ),
-        (
-            "Seedshift",
-            "whether and which, for codes without a header, unless --old-mode",
-        ),
+        ("Seedshift", "whether and which, unless --old-mode"),
         (
             "Old dates",
             "one line, right after the codes; none in direct mode",
         ),
         (
             "Last word",
-            "of the original seed phrase, for seedshift-legacy-valid",
+            "the one Encode named, for a seedshift-legacy backup",
         ),
         (
             "Confirmation",
@@ -158,7 +155,7 @@ pub(in super::super) const PAGE: CommandHelp = CommandHelp {
         ),
         (
             "mnemocode re-encode --ask-secrets --input-file shifted.txt --mode seedshift --format 5",
-            "A record file masked again with new dates, as colors",
+            "Saved codes masked again with new dates, as colors",
         ),
         (
             "mnemocode re-encode --input-file shifted.txt --old-mode seedshift --old-dates-file old-dates.txt --mode direct --format 3 --master-fingerprint 73c5da0a",

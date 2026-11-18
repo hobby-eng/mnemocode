@@ -254,6 +254,19 @@ pub(crate) fn files_ending(folder: &Path, endings: &[&str]) -> io::Result<Vec<Pa
     Ok(found)
 }
 
+/// The folders directly in `folder`, sorted by name: its files and links are left out.
+pub(crate) fn folders_in(folder: &Path) -> io::Result<Vec<PathBuf>> {
+    let mut found = Vec::new();
+    for entry in fs::read_dir(folder)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            found.push(entry.path());
+        }
+    }
+    found.sort();
+    Ok(found)
+}
+
 /// Whether this program may make a file in `folder`, its protections counted: tried with a private
 /// folder that is removed at once, as a look at the permissions would not see them.
 pub(crate) fn may_write(folder: &Path) -> bool {

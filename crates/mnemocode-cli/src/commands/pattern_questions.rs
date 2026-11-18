@@ -31,8 +31,8 @@ enum Size {
 }
 
 /// The questions of a cross-stitch pattern: those of every new backup, with the pattern's own.
-pub(crate) fn ask_pattern() -> Result<Option<super::encode_questions::EncodingAnswers>, Stop> {
-    super::new_backup::ask_new_backup(super::new_backup::Way::Embroidery)
+pub(crate) fn ask_pattern(finish: &mut super::new_backup::Finish<'_>) -> Result<bool, Stop> {
+    super::new_backup::ask_new_backup(super::new_backup::Way::Embroidery, finish)
 }
 
 /// The pattern's own questions, after the dates: the picture, the fabric and the size; stitch's
@@ -58,7 +58,7 @@ pub(crate) fn ask_pattern_own() -> Result<Option<Vec<String>>, Stop> {
     let mut fabric = DEFAULT_FABRIC;
     let mut across = 0;
     // The picture, the fabric and the size, Shift+Tab going back a step.
-    let done = run_steps(3, |step| {
+    let done = run_steps(3, &[], |step| {
         Ok(match step {
             0 => answered(ask_picture()?.map(|(picture, widths)| {
                 // The pattern may not be saved over its own picture.
@@ -195,7 +195,7 @@ pub(crate) fn ask_size(
                 limit: PATH_LIMIT,
                 ..LineQuestion::default()
             };
-            let question = format!("Width in centimetres ({range})");
+            let question = format!("Enter the width in centimetres ({range})");
             let typed = ask_line(&question, "Width", how, |answer: &str| {
                 typed_centimetres(answer, widths, count)
                     .map(|across| across.to_string())

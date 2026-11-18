@@ -5,6 +5,7 @@ use mnemocode::refusal::Refusal;
 use mnemocode::secret::SecretVec;
 
 use super::encode_questions::EncodingAnswers;
+use super::new_backup::Finish;
 use crate::args::{self, Parsed, is_on};
 use crate::gate::Stop;
 use crate::os::Protection;
@@ -51,26 +52,53 @@ pub(crate) fn check_options(parsed: &Parsed) -> Result<(), Stop> {
     Ok(())
 }
 
-/// Reads settings behind the secret gate, then limits writes to the selected destinations.
-/// A normal command line keeps its settings and has no retained dates; dates never enter arguments.
-pub(crate) fn asked_options(
+/// Runs the command with `run`: a normal command line with its own settings and no retained
+/// dates; with --configure, the settings asked behind the secret gate by `ask`, writes limited to
+/// the folders they name before the seed phrase is asked. Shift+Tab at the seed phrase comes back
+/// to the last answer; the folders stay closed then, so a folder chosen again must be the same.
+/// Dates never enter arguments.
+pub(crate) fn run_configured(
     parsed: &Parsed,
     protection: &mut Protection,
-    ask: impl FnOnce() -> Result<Option<EncodingAnswers>, Stop>,
-) -> Result<(Parsed, Option<SecretVec<Date>>), Stop> {
+    ask: impl FnOnce(&mut Finish<'_>) -> Result<bool, Stop>,
+    mut run: impl FnMut(&Parsed, Option<SecretVec<Date>>) -> Result<(), Stop>,
+) -> Result<(), Stop> {
     if !asks_options(parsed) {
-        return Ok((parsed.clone(), None));
+        return run(parsed, None);
     }
     super::output_questions::forget_claimed();
-    // The menu's task asked here: Shift+Tab goes back a step, Escape ends it for the main menu.
+    let mut ruled = false;
+    let mut finish = |(arguments, dates): EncodingAnswers| -> Result<bool, Stop> {
+        let mut fresh = args::parse_arguments(&arguments[1..])?;
+        let needs = crate::output::preflight(&mut fresh)?;
+        // Writes are closed once; a second time they could only be closed further.
+        if !ruled {
+            // With nothing to save, the start folder stays open: the folder question offers it
+            // first, so a file ticked after going back from the seed phrase can still be saved.
+            let folders = if needs.folders.is_empty() {
+                vec![crate::output::resolved(".")]
+            } else {
+                needs.folders.clone()
+            };
+            protection.rule_writes(&folders);
+            crate::terminal::show_protection(&protection.report());
+            ruled = true;
+        }
+        crate::output::warn_of_cloud_copies(&fresh);
+        match run(&fresh, Some(dates)) {
+            Err(Stop::Cancelled) if crate::terminal::take_step_back() => {
+                // The seed phrase is asked again with steps to go back to.
+                crate::terminal::set_steps_back(true);
+                Ok(false)
+            }
+            ended => ended.map(|()| true),
+        }
+    };
+    // The menu's task asked here: Shift+Tab goes back a step, Escape ends it for the main menu;
+    // a question asked again shows the answer chosen before.
     crate::terminal::set_steps_back(true);
-    let asked = ask();
+    crate::terminal::remember_choices(true);
+    let done = ask(&mut finish);
     crate::terminal::set_steps_back(false);
-    let (arguments, dates) = asked?.ok_or(Stop::Cancelled)?;
-    let mut fresh = args::parse_arguments(&arguments[1..])?;
-    let needs = crate::output::preflight(&mut fresh)?;
-    protection.rule_writes(&needs.folders);
-    crate::terminal::show_protection(&protection.report());
-    crate::output::warn_of_cloud_copies(&fresh);
-    Ok((fresh, Some(dates)))
+    if done? { Ok(()) } else { Err(Stop::Cancelled) }
 }
