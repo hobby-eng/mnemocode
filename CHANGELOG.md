@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Reading backups from files
+
+- A card file whose metadata names its share set or its document in another form than MnemoCode writes is not taken for cards: that text was shown in the list of what a folder holds, where a crafted file could send the terminal escape sequences.
+
 ## 0.2.0
 
 MnemoCode is now written in Rust. Each system gets one executable with nothing else to install, and each page of the wallet tools gets a WebAssembly file. It reads every backup, record and share that 0.1.0 made, and writes the same ones but for two changes described below: a saved file holds the codes alone, and the Original Seedshift ends with a last word that passes the checksum. Commands, questions and messages stay as in 0.1.0, apart from the changes below.

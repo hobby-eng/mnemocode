@@ -168,15 +168,21 @@ pub fn pages_in(file: &[u8]) -> Vec<Page> {
     pages
 }
 
-/// The page that an XMP `packet` of this program's cards keeps; none for any other packet.
+/// The page that an XMP `packet` of this program's cards keeps; none for any other packet. The
+/// document ID and a share's reference are taken only in the forms this program writes: they are
+/// shown in lists and handed to pages, so no other file's text reaches a terminal (CORE-55).
 fn page_of(packet: &str) -> Option<Page> {
-    let document = element(packet, "xmpMM:DocumentID", 0)?.0.to_owned();
+    let document = element(packet, "xmpMM:DocumentID", 0)?.0;
+    if !is_document_id(document) {
+        return None;
+    }
     let group = element(packet, "xmpG:groupName", 0)?.0;
     let share = match group.strip_prefix(SHARE_GROUP) {
-        Some(reference) => Some(reference.to_owned()),
+        Some(reference) if is_share_reference(reference) => Some(reference.to_owned()),
         None if group == BACKUP_GROUP => None,
-        None => return None,
+        _ => return None,
     };
+    let document = document.to_owned();
     let mut codes = Vec::new();
     let mut from = 0;
     while let Some((name, end)) = element(packet, "xmpG:swatchName", from) {
@@ -193,6 +199,36 @@ fn page_of(packet: &str) -> Option<Page> {
         share,
         codes,
     })
+}
+
+/// Whether `text` is a document ID as [`document_id`] writes it: `xmp.did:` and 32 lower-case
+/// hexadecimal digits in groups of 8, 4, 4, 4 and 12.
+fn is_document_id(text: &str) -> bool {
+    let lower_hex = |part: &str| {
+        part.bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    };
+    text.strip_prefix("xmp.did:").is_some_and(|hex| {
+        hex.split('-').map(str::len).eq([8, 4, 4, 4, 12]) && hex.split('-').all(lower_hex)
+    })
+}
+
+/// Whether `text` is a share's reference as the cards print it (`export::share_reference`): the
+/// set's four upper-case hexadecimal digits, then its group and its member, each 1 to 16.
+fn is_share_reference(text: &str) -> bool {
+    let place = |part: &str| {
+        !part.starts_with('0')
+            && part.bytes().all(|byte| byte.is_ascii_digit())
+            && part
+                .parse::<u8>()
+                .is_ok_and(|number| (1..=16).contains(&number))
+    };
+    let parts: Vec<&str> = text.split('-').collect();
+    matches!(parts[..], [set, group, member]
+        if set.len() == 4
+            && set.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'A'..=b'F'))
+            && place(group)
+            && place(member))
 }
 
 /// The text of the first element `name` in `text` from `from`, and where it ends.
@@ -371,4 +407,52 @@ fn in_order(mut numbered: Vec<(usize, &str)>) -> Result<SecretText, PrintedError
         at += code.len() + 1;
     }
     SecretText::from_bytes(text).map_err(|_| PrintedError::Unreadable)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The pages read back from the metadata of a card with `document` and `share` written in it.
+    fn read_back(document: &str, share: Option<&str>) -> Vec<Page> {
+        let kept = Kept {
+            document: document.to_owned(),
+            share: share.map(str::to_owned),
+            swatches: vec![("01 7684".to_owned(), "#000064".to_owned())],
+        };
+        pages_in(xmp(&kept).as_bytes())
+    }
+
+    // A file that names its set or its document in another form than this program writes is not
+    // taken for cards: the set is shown in a list, and an escape sequence in it would reach the
+    // terminal, such as OSC 52, which sets the clipboard.
+    #[test]
+    fn a_reference_or_a_document_in_another_form_is_not_taken() {
+        let document = document_id(&["01 7684".to_owned()]);
+        assert_eq!(read_back(&document, Some("4BBF-1-2")).len(), 1);
+        assert_eq!(read_back(&document, Some("0A1F-16-16")).len(), 1);
+        assert_eq!(read_back(&document, None).len(), 1);
+        for reference in [
+            "4BBF-1-2\u{1b}]52;c;ZWNobw==\u{7}",
+            "\u{1b}[2J4BBF-1-2",
+            "4bbf-1-2",
+            "4BBF-0-2",
+            "4BBF-1-17",
+            "4BBF-01-2",
+            "4BBF-1",
+            "4BBF-1-2-3",
+        ] {
+            assert!(
+                read_back(&document, Some(reference)).is_empty(),
+                "{reference:?}"
+            );
+        }
+        for other in [
+            format!("{document}\u{1b}[2J"),
+            document.to_uppercase(),
+            "xmp.did:1234".to_owned(),
+        ] {
+            assert!(read_back(&other, None).is_empty(), "{other:?}");
+        }
+    }
 }
