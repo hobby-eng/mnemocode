@@ -169,11 +169,15 @@ fn at_the_failed_save(
     Some(screen)
 }
 
-/// What the program wrote, once it ended well, with `closed` opened again.
+/// What the program wrote, once it ended well, with `closed` opened again: a folder the program
+/// made and left empty is gone where no rules on writes keep it, as on macOS.
 fn end_and_open(folder: &Path, screen: Session, closed: &[&str]) -> String {
     let (status, written) = finish(screen);
     for place in closed {
-        set_open(&folder.join(place), true);
+        let path = folder.join(place);
+        if path.exists() {
+            set_open(&path, true);
+        }
     }
     assert_eq!(status, 0, "{written}");
     written
