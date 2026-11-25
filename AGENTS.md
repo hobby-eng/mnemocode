@@ -18,3 +18,13 @@ The workspace `AGENTS.md` and its coding guide apply. This repository adds:
 - `vendor/` holds the SSKR engine exactly as `UPSTREAM.json` records it; never edit it. The
   `bc-crypto` stand-in in `shims/` replaces crates.io's through `[patch.crates-io]`.
 - Every browser-facing change goes to the wallet-tools session (workspace `AGENTS.md`).
+
+## Audits
+
+An audit, a review of findings or a remediation follow-up of this repository follows the workspace's
+audit procedure in `../.github/audits/`: `FULL_AUDIT_GUIDE_V2.md` (the checks and their order;
+section 17 for Rust crates and every target they are built for), `AUDIT_STANDARD.md`,
+`AUDIT_TEMPLATE.md` and `audit-report.schema.json`. Section 17 asks for `docs/audits/TARGETS.md`
+with the targets, their runners and the fuzzing budgets; until this repository has one, the audit
+derives the targets as section 17.3 says and records the missing file. Reports, their JSON twins and
+their harnesses stay in this repository's `docs/audits/`.
