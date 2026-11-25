@@ -26,6 +26,7 @@ use super::encode::{PreparedEncode, prepare_encode};
 use super::encode_questions::{ask_encoding_in, ask_form};
 use super::found::report_checksum;
 use super::given::{DATES_OPTION, PHRASE_LIMIT, given_form, text_input, transform_mode};
+use super::new_backup::Ending;
 use super::output_questions::forget_claimed;
 use super::share_repair::FirstShare;
 use super::sskr_combine::{self, PhrasesAt, Restored, RestoredNext};
@@ -37,8 +38,8 @@ use super::wallet_question::{WalletAnswer, ask_wallet_evidence};
 use crate::args::{self, OLD_DATES_KEY, Parsed, assert_asked_not_given, is_on, value};
 use crate::gate::Stop;
 use crate::input::assert_terminal;
-use crate::os::{Needs, Protection};
-use crate::output::{preflight, warn_of_cloud_copies};
+use crate::os::Protection;
+use crate::output::{preflight_answered, warn_of_cloud_copies};
 use crate::terminal::result::part_line;
 use crate::terminal::{
     Channel, Choice, Chosen, Explanation, Lifetime, ListQuestion, NoticeKind, can_redraw, choose,
@@ -497,12 +498,14 @@ fn report_checksum_of(result: &Unmasked) -> Result<(), Stop> {
     report_checksum(words_of(result)?.1.as_ref())
 }
 
-/// The new backup, asked until Encode takes it, with what it needs: a refusal, such as text that
-/// does not fit the cards, is shown at the top of the questions asked again; Escape cancels.
-fn new_backup_asked_until_taken() -> Result<(PreparedEncode, Needs), Stop> {
+/// The new backup, asked until Encode takes it, writes ruled to the folders it saves into before its
+/// dates are asked: a refusal, such as text that does not fit the cards, is shown at the top of the
+/// questions asked again; Escape cancels.
+fn new_backup_asked_until_taken(protection: &mut Protection) -> Result<PreparedEncode, Stop> {
     let mut refusal = None;
+    let mut ruled = false;
     loop {
-        match asked_new_backup(refusal.as_deref()) {
+        match asked_new_backup(refusal.as_deref(), protection, &mut ruled) {
             Err(Stop::Refused(reason)) => refusal = Some(reason.to_string()),
             other => return other,
         }
@@ -512,14 +515,19 @@ fn new_backup_asked_until_taken() -> Result<(PreparedEncode, Needs), Stop> {
 /// The new backup asked with Encode's questions on a screen of its own, under the `refusal` of the
 /// answers before, if any, each answer checked at once: Escape at a later question goes back to the
 /// first, and at the first it cancels. The names of the files are settled as the command line
-/// settles them, and every option checked as Encode checks it.
-fn asked_new_backup(refusal: Option<&str>) -> Result<(PreparedEncode, Needs), Stop> {
+/// settles them and every option checked as Encode checks it; then, once, writes are ruled to the
+/// folders of the files, and the dates are asked.
+fn asked_new_backup(
+    refusal: Option<&str>,
+    protection: &mut Protection,
+    ruled: &mut bool,
+) -> Result<PreparedEncode, Stop> {
     // Started from the menu, Shift+Tab goes back a step, from the first one to the menu's questions.
     let in_menu = crate::terminal::for_menu();
     crate::terminal::set_steps_back(in_menu);
     crate::terminal::remember_choices(in_menu);
-    // Encode's command line: its name, then the options.
-    let encoding = loop {
+    // The new backup, as Encode takes it.
+    let prepared = loop {
         new_backup_screen(&Notices::new());
         if let Some(refusal) = refusal {
             notice(refusal, NoticeKind::Warning);
@@ -531,21 +539,41 @@ fn asked_new_backup(refusal: Option<&str>) -> Result<(PreparedEncode, Needs), St
             }
             return Err(Stop::Cancelled);
         };
-        let mut answers = None;
-        if ask_encoding_in(form, &mut super::new_backup::kept(&mut answers))?
-            && let Some(encoding) = answers
+        let mut settled = None;
+        let mut taken = None;
+        let mut finish = |ending: Ending| -> Result<bool, Stop> {
+            match ending {
+                Ending::Named(encoding) => {
+                    let mut fresh = args::parse_arguments(&encoding[1..])?;
+                    let needs = preflight_answered(&mut fresh)?;
+                    // A refusal comes before writes are ruled, so the questions asked again may
+                    // choose another folder.
+                    let prepared = prepare_encode(&fresh)?;
+                    if !*ruled {
+                        protection.rule_writes(&needs.folders);
+                        show_protection(&protection.report());
+                        *ruled = true;
+                    }
+                    warn_of_cloud_copies(&fresh);
+                    settled = Some(prepared);
+                    Ok(true)
+                }
+                Ending::Dated(dates) => {
+                    taken = settled
+                        .take()
+                        .map(|prepared| prepared.with_dates(Some(dates)));
+                    Ok(taken.is_some())
+                }
+            }
+        };
+        if ask_encoding_in(form, &mut finish)?
+            && let Some(prepared) = taken
         {
-            break encoding;
+            break prepared;
         }
     };
     crate::terminal::set_steps_back(false);
-    let (encoding, dates) = encoding;
-    let mut fresh = args::parse_arguments(&encoding[1..])?;
-    let needs = preflight(&mut fresh)?;
-    // Only answers that are taken name files that will be saved.
-    let prepared = prepare_encode(&fresh)?.with_dates(Some(dates));
-    warn_of_cloud_copies(&fresh);
-    Ok((prepared, needs))
+    Ok(prepared)
 }
 
 /// Confirms the phrase of `re_encoding`, shown above: by --recognised or a wallet option, or else
@@ -642,6 +670,16 @@ fn check_old_backup(old: &Parsed) -> Result<(), Stop> {
     })
 }
 
+/// The checks of the new backup's options, which read no secret, before its outputs are made: where
+/// the private screen asks for the new backup, it checks them there.
+pub(crate) fn check(parsed: &Parsed) -> Result<(), Stop> {
+    if asks_new_backup(parsed) {
+        return Ok(());
+    }
+    let (_, fresh) = split_options(parsed);
+    prepare_encode(&fresh).map(drop)
+}
+
 /// Runs the command.
 pub(crate) fn run(parsed: &Parsed, protection: &mut Protection) -> Result<(), Stop> {
     // The secrets of both backups are asked on the private screen; none may be given beside it.
@@ -666,8 +704,7 @@ pub(crate) fn run(parsed: &Parsed, protection: &mut Protection) -> Result<(), St
         given_confirmation(parsed, wallet_evidence_given(&old))?;
         check_old_backup(&old)?;
         assert_terminal()?;
-        let (prepared, needs) = new_backup_asked_until_taken()?;
-        protection.rule_writes(&needs.folders);
+        let prepared = new_backup_asked_until_taken(protection)?;
         clear_private_screen();
         show_protection(&protection.report());
         prepared

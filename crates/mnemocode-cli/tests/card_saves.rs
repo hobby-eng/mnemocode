@@ -1,8 +1,10 @@
 //! The saves of cards that fail, as MnemoCode TS 0.1.0's tests pin them (aud-021-export,
-//! aud-026-export): off the private screen the failure ends the command before the outputs after
-//! it; on it, each output is tried again, renamed or skipped while the cards of the one plan stay
-//! as they were; and a folder that took a destination's name meanwhile is left as it is. The faults
-//! are real ones of the file system, from outside the program, which runs on public inputs.
+//! aud-026-export), with the outputs made before the seed phrase (CORE-55): off the private screen
+//! the failure ends the command before the outputs after it; on it, each output is tried again or
+//! skipped while the cards of the one plan stay as they were, and no other name is offered, as no
+//! folder is open to one. What was made and stayed unused is removed, or named where the rules on
+//! writes keep it. The faults are real ones of the file system, from outside the program, which
+//! runs on public inputs.
 
 // Test code throughout, so that clippy's allow-*-in-tests keys cover the helpers too.
 #![cfg(test)]
@@ -21,26 +23,21 @@ use std::fs::{self, Permissions};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::thread;
-use std::time::{Duration, Instant};
 
 use common::{
     PHRASE, assert_same_cards, assert_same_pictures, folder, full, names, numbered, outputs,
-    page_sizes, read, run,
+    page_sizes, read,
 };
 use mnemocode::self_check::vectors::PUBLIC_MNEMONIC;
 use terminal::{Session, Setting};
 
-/// How long the program has to come to a question: it draws cards, in a debug build, on a busy
-/// machine.
-const PATIENCE: Duration = Duration::from_secs(180);
 /// Where the private screen asks for the phrase.
 const PHRASE_ASKED: &str = " to cancel";
-/// What the private screen asks after a save that failed; "1", "2" and "3" choose an answer.
+/// What the private screen asks after a save that failed; "1" and "2" choose an answer: no other
+/// name is offered for what was made before the seed phrase.
 const WHAT_NOW: &str = "What now?";
 const TRY_AGAIN: &str = "1";
-const ANOTHER_NAME: &str = "2";
-const SKIP: &str = "3";
+const SKIP: &str = "2";
 /// What ends the private screen once every output was saved or skipped.
 const CLEAR_THE_SCREEN: &str = "Press Enter to clear this screen.";
 /// The folders of the outputs of a test on a terminal, each closed and opened on its own.
@@ -49,6 +46,10 @@ const FOR_IMAGES: &str = "for-images";
 const FOR_CARDS: &str = "for-cards";
 /// The PDF of a test on a terminal.
 const PDF: &str = "for-pdf/public.pdf";
+/// The folders that the command makes for the images and the card files before the seed phrase,
+/// which a test closes so that a save into them fails.
+const IMAGES: &str = "for-images/images";
+const CARD_FILES: &str = "for-cards/cards";
 /// Why a save into a closed folder fails.
 const NO_PERMISSION: &str = "there is no permission to write there.";
 /// What the private screen says while it draws cards.
@@ -66,9 +67,9 @@ const EVERY_OUTPUT: [&str; 14] = [
     "--pdf",
     PDF,
     "--images-dir",
-    "for-images/images",
+    IMAGES,
     "--cards-dir",
-    "for-cards/cards",
+    CARD_FILES,
     "--image-format",
     "png",
 ];
@@ -93,6 +94,11 @@ fn screen(folder: &Path, args: &[&str]) -> Session {
 fn finish(mut screen: Session) -> (u32, String) {
     screen.wait_for(CLEAR_THE_SCREEN);
     screen.press("\r");
+    ended(screen)
+}
+
+/// The exit status of the program, and all it wrote as a person reads it.
+fn ended(screen: Session) -> (u32, String) {
     let (status, written) = screen.end();
     let mut parts = written.split('\x1b');
     let mut text = parts.next().unwrap_or_default().to_owned();
@@ -138,8 +144,7 @@ fn encode_with_closed_folders(folder: &Path, saves: &[&str], closed: &[&str]) ->
         "no",
     ];
     args.extend_from_slice(saves);
-    let mut screen = screen(folder, &args);
-    screen.wait_for(PHRASE_ASKED);
+    let mut screen = at_the_phrase(folder, &args);
     for place in closed {
         set_open(&folder.join(place), false);
     }
@@ -147,26 +152,78 @@ fn encode_with_closed_folders(folder: &Path, saves: &[&str], closed: &[&str]) ->
     screen
 }
 
-/// That `encode`, with `FOR_PDF` closed, at the question after the failed save of `what`: none for
+/// That `encode`, with `closed` closed, at the question after the failed save of `what`: none for
 /// root, whose save no closed folder fails.
-fn at_the_failed_save(folder: &Path, saves: &[&str], what: &str) -> Option<Session> {
+fn at_the_failed_save(
+    folder: &Path,
+    saves: &[&str],
+    closed: &[&str],
+    what: &str,
+) -> Option<Session> {
     if !a_closed_folder_stops_a_write(folder) {
         return None;
     }
-    let mut screen = encode_with_closed_folders(folder, saves, &[FOR_PDF]);
+    let mut screen = encode_with_closed_folders(folder, saves, closed);
     screen.wait_for(&format!("{what} could not be saved as"));
     screen.wait_for(WHAT_NOW);
     Some(screen)
 }
 
-/// What the program wrote, once it ended well with nothing saved in `FOR_PDF`, opened again.
-fn end_with_the_closed_folder_empty(folder: &Path, screen: Session) -> String {
+/// What the program wrote, once it ended well, with `closed` opened again.
+fn end_and_open(folder: &Path, screen: Session, closed: &[&str]) -> String {
     let (status, written) = finish(screen);
-    let closed = folder.join(FOR_PDF);
-    set_open(&closed, true);
+    for place in closed {
+        set_open(&folder.join(place), true);
+    }
     assert_eq!(status, 0, "{written}");
-    assert_eq!(names(&closed), Vec::<String>::new());
     written
+}
+
+/// `name` in `folder`, made before the seed phrase: gone, or empty and named in `written` for the
+/// person to delete, where the rules on writes keep it.
+#[track_caller]
+fn gone_or_left_empty(folder: &Path, name: &str, written: &str) {
+    let path = folder.join(name);
+    if !path.exists() {
+        return;
+    }
+    if path.is_dir() {
+        assert_eq!(names(&path), Vec::<String>::new(), "{name}");
+    } else {
+        assert!(read(folder, name).is_empty(), "{name}");
+    }
+    assert!(written.contains(&full(folder, name)), "{written}");
+    assert!(
+        written.contains("made for the files before the seed phrase was read"),
+        "{written}"
+    );
+}
+
+#[test]
+fn the_outputs_are_made_before_the_seed_phrase_is_asked() {
+    let folder = folder("made-first");
+    for place in [FOR_PDF, FOR_IMAGES, FOR_CARDS] {
+        fs::create_dir(folder.join(place)).expect("a folder");
+    }
+    let mut args = vec!["encode", "--ask-secrets", "--mode", "direct"];
+    args.extend_from_slice(&EVERY_OUTPUT);
+    let mut screen = at_the_phrase(&folder, &args);
+    // Made, empty and private, before anything secret is asked.
+    let pdf = fs::metadata(folder.join(PDF)).expect("the PDF made");
+    assert_eq!((pdf.len(), pdf.mode() & 0o777), (0, 0o600));
+    for made in [IMAGES, CARD_FILES] {
+        let metadata = fs::metadata(folder.join(made)).expect("the folder made");
+        assert!(metadata.is_dir(), "{made}");
+        assert_eq!(metadata.mode() & 0o777, 0o700, "{made}");
+        assert_eq!(names(&folder.join(made)), Vec::<String>::new());
+    }
+    // Cancelled at the phrase: what was made is removed, or stays empty and is named.
+    screen.press("\x1b");
+    let (status, written) = ended(screen);
+    assert_eq!(status, 130, "{written}");
+    for made in [PDF, IMAGES, CARD_FILES] {
+        gone_or_left_empty(&folder, made, &written);
+    }
 }
 
 #[test]
@@ -175,78 +232,64 @@ fn each_output_tries_its_failed_save_again_and_every_file_shows_the_one_plan() {
     if !a_closed_folder_stops_a_write(&folder) {
         return;
     }
-    let closed = [FOR_PDF, FOR_IMAGES, FOR_CARDS];
+    // The PDF reserved before the seed phrase is written through its open file, whatever its
+    // folder allows since; the folders of the images and the card files fail while closed.
+    let closed = [FOR_PDF, IMAGES, CARD_FILES];
     let mut screen = encode_with_closed_folders(&folder, &EVERY_OUTPUT, &closed);
-    for (what, place) in [
-        ("The PDF", FOR_PDF),
-        ("The images", FOR_IMAGES),
-        ("The card files", FOR_CARDS),
-    ] {
+    for (what, place) in [("The images", IMAGES), ("The card files", CARD_FILES)] {
         screen.wait_for(&format!("{what} could not be saved as"));
         screen.wait_for(WHAT_NOW);
         set_open(&folder.join(place), true);
         screen.press(TRY_AGAIN);
     }
-    let (status, written) = finish(screen);
-    assert_eq!(status, 0, "{written}");
-    assert_eq!(written.matches(WHAT_NOW).count(), 3, "{written}");
+    let written = end_and_open(&folder, screen, &[FOR_PDF]);
+    assert_eq!(written.matches(WHAT_NOW).count(), 2, "{written}");
     for notice in [
         format!(
-            "The PDF could not be saved as {}: {NO_PERMISSION}",
-            full(&folder, PDF)
-        ),
-        format!(
             "The images could not be saved as {}: {NO_PERMISSION}",
-            full(&folder, "for-images/images")
+            full(&folder, IMAGES)
         ),
         format!(
             "The card files could not be saved as {}: {NO_PERMISSION}",
-            full(&folder, "for-cards/cards")
+            full(&folder, CARD_FILES)
         ),
         format!("Saved PDF: {}", full(&folder, PDF)),
-        format!(
-            "Saved {CARDS} PNG pages to: {}",
-            full(&folder, "for-images/images")
-        ),
+        format!("Saved {CARDS} PNG pages to: {}", full(&folder, IMAGES)),
         format!(
             "Saved {CARDS} individual card files to: {}",
-            full(&folder, "for-cards/cards")
+            full(&folder, CARD_FILES)
         ),
     ] {
         assert!(written.contains(&notice), "{notice}: {written}");
     }
+    assert!(!written.contains("The PDF could not be saved"), "{written}");
     // What says below that a record alone renders no cards, written where cards are.
     assert!(written.contains(RENDERING), "{written}");
     assert_eq!(page_sizes(&read(&folder, PDF)), [(90, 50); CARDS]);
-    assert_same_pictures(
-        &folder.join("for-images/images"),
-        &folder.join("for-cards/cards"),
-        CARDS,
-    );
+    assert_same_pictures(&folder.join(IMAGES), &folder.join(CARD_FILES), CARDS);
 }
 
 #[test]
-fn a_skipped_pdf_leaves_the_one_plan_to_the_outputs_after_it() {
+fn a_skipped_folder_leaves_the_one_plan_to_the_outputs_after_it() {
     let folder = folder("skip");
-    let Some(mut screen) = at_the_failed_save(&folder, &EVERY_OUTPUT, "The PDF") else {
+    let Some(mut screen) = at_the_failed_save(&folder, &EVERY_OUTPUT, &[IMAGES], "The images")
+    else {
         return;
     };
     screen.press(SKIP);
-    let written = end_with_the_closed_folder_empty(&folder, screen);
-    assert!(written.contains("The PDF was not saved."), "{written}");
-    assert!(!written.contains("Saved PDF:"), "{written}");
+    let written = end_and_open(&folder, screen, &[IMAGES]);
+    assert!(written.contains("The images were not saved."), "{written}");
+    assert!(!written.contains("PNG pages to:"), "{written}");
     assert_eq!(written.matches(WHAT_NOW).count(), 1, "{written}");
-    assert_same_pictures(
-        &folder.join("for-images/images"),
-        &folder.join("for-cards/cards"),
-        CARDS,
-    );
+    gone_or_left_empty(&folder, IMAGES, &written);
+    let cards = folder.join(CARD_FILES);
+    assert_eq!(names(&cards), numbered("", CARDS, ".png"));
+    assert_eq!(page_sizes(&read(&folder, PDF)), [(90, 50); CARDS]);
 }
 
 #[test]
-fn a_pdf_saved_under_another_name_shows_the_cards_of_the_one_plan() {
-    let folder = folder("renamed");
-    let other = "for-cards/other.pdf";
+fn a_folder_made_before_the_phrase_offers_no_other_name() {
+    let folder = folder("no-other-name");
     let saves = [
         "--format",
         "colors",
@@ -257,52 +300,87 @@ fn a_pdf_saved_under_another_name_shows_the_cards_of_the_one_plan() {
         "--pdf",
         PDF,
         "--cards-dir",
-        "for-cards/cards",
+        CARD_FILES,
     ];
-    let Some(mut screen) = at_the_failed_save(&folder, &saves, "The PDF") else {
+    let Some(mut screen) = at_the_failed_save(&folder, &saves, &[CARD_FILES], "The card files")
+    else {
         return;
     };
-    screen.press(ANOTHER_NAME);
-    screen.wait_for("Enter a new name for the PDF:");
-    screen.press(&format!("{other}\r"));
-    let written = end_with_the_closed_folder_empty(&folder, screen);
-    assert!(
-        written.contains(&format!("Saved PDF: {}", full(&folder, other))),
-        "{written}"
-    );
-    assert_eq!(written.matches("Enter a new name for the PDF:").count(), 1);
-    assert_eq!(page_sizes(&read(&folder, other)), [(90, 50); CARDS]);
-    let cards = folder.join("for-cards/cards");
+    set_open(&folder.join(CARD_FILES), true);
+    screen.press(TRY_AGAIN);
+    let written = end_and_open(&folder, screen, &[]);
+    assert!(!written.contains("Another folder name"), "{written}");
+    assert!(written.contains("Skip"), "{written}");
+    let cards = folder.join(CARD_FILES);
     assert_eq!(names(&cards), numbered("", CARDS, ".pdf"));
-    assert_same_cards(&folder.join(other), &cards, CARDS);
+    assert_same_cards(&folder.join(PDF), &cards, CARDS);
 }
 
-#[test]
-fn a_qr_image_is_called_verified_only_once_it_is_saved() {
-    let folder = folder("qr-saved");
-    let Some(mut screen) = at_the_failed_save(&folder, &QR_IMAGE, "The QR code") else {
-        return;
-    };
-    set_open(&folder.join(FOR_PDF), true);
-    screen.press(TRY_AGAIN);
+/// `name`, a new folder of a test that holds the folder of [`QR_IMAGE`], and encode on a terminal
+/// there, at the question of the seed phrase.
+fn at_the_phrase_of_a_qr_image(name: &str) -> (std::path::PathBuf, Session) {
+    let folder = folder(name);
+    fs::create_dir(folder.join(FOR_PDF)).expect("a folder");
+    let mut args = vec![
+        "encode",
+        "--ask-secrets",
+        "--mode",
+        "direct",
+        "--backup-check",
+        "no",
+    ];
+    args.extend_from_slice(&QR_IMAGE);
+    let screen = at_the_phrase(&folder, &args);
+    (folder, screen)
+}
+
+/// The program on a terminal with `args` in `folder`, at the question of the seed phrase.
+fn at_the_phrase(folder: &Path, args: &[&str]) -> Session {
+    let mut screen = screen(folder, args);
+    screen.wait_for(PHRASE_ASKED);
+    screen
+}
+
+/// All the program wrote once the public phrase was typed at `screen` and every output saved.
+fn given_the_phrase(mut screen: Session) -> String {
+    screen.press(&format!("{PUBLIC_MNEMONIC}\r"));
     let (status, written) = finish(screen);
     assert_eq!(status, 0, "{written}");
-    let (before, after) = written.split_once(WHAT_NOW).expect("the question");
-    assert!(!before.contains(QR_VERIFIED), "{written}");
-    assert!(after.contains(QR_VERIFIED), "{written}");
-    assert_eq!(names(&folder.join(FOR_PDF)), ["public.png"]);
+    written
 }
 
 #[test]
-fn a_qr_image_that_is_skipped_is_never_called_verified() {
-    let folder = folder("qr-skipped");
-    let Some(mut screen) = at_the_failed_save(&folder, &QR_IMAGE, "The QR code") else {
-        return;
-    };
+fn a_qr_image_is_called_verified_once_it_is_saved() {
+    let (folder, screen) = at_the_phrase_of_a_qr_image("qr-saved");
+    let written = given_the_phrase(screen);
+    // Verified beside the line that names it saved, on the private screen and after it.
+    let saved = format!(
+        "{QR_VERIFIED} ✓ Saved QR code (unicode): {}",
+        full(&folder, "for-pdf/public.png")
+    );
+    assert!(written.contains(&saved), "{written}");
+    assert_eq!(names(&folder.join(FOR_PDF)), ["public.png"]);
+    assert!(!read(&folder, "for-pdf/public.png").is_empty());
+}
+
+#[test]
+fn a_qr_image_whose_reserved_file_was_removed_is_never_called_verified() {
+    let (folder, mut screen) = at_the_phrase_of_a_qr_image("qr-removed");
+    // Another program removes the file made for the image before the phrase.
+    fs::remove_file(folder.join("for-pdf/public.png")).expect("the file made");
+    screen.press(&format!("{PUBLIC_MNEMONIC}\r"));
+    screen.wait_for("The QR code could not be saved as");
+    screen.wait_for(WHAT_NOW);
     screen.press(SKIP);
-    let written = end_with_the_closed_folder_empty(&folder, screen);
+    let (status, written) = finish(screen);
+    assert_eq!(status, 0, "{written}");
+    assert!(
+        written.contains("was removed or replaced meanwhile"),
+        "{written}"
+    );
     assert!(written.contains("The QR code was not saved."), "{written}");
     assert!(!written.contains(QR_VERIFIED), "{written}");
+    assert_eq!(names(&folder.join(FOR_PDF)), Vec::<String>::new());
 }
 
 #[test]
@@ -322,11 +400,7 @@ fn a_record_and_a_standalone_qr_image_render_no_cards() {
         "--backup-check",
         "no",
     ];
-    let mut screen = screen(&folder, &args);
-    screen.wait_for(PHRASE_ASKED);
-    screen.press(&format!("{PUBLIC_MNEMONIC}\r"));
-    let (status, written) = finish(screen);
-    assert_eq!(status, 0, "{written}");
+    let written = given_the_phrase(at_the_phrase(&folder, &args));
     assert!(!written.contains(RENDERING), "{written}");
     assert_eq!(outputs(&folder), ["public.png", "public.txt"]);
 }
@@ -334,9 +408,9 @@ fn a_record_and_a_standalone_qr_image_render_no_cards() {
 /// `args` of encode, whose cards of the tile design only a save can fail, as a full disk fails it:
 /// the program runs with no room for a file of more than a few hundred bytes, which the options
 /// cannot foresee and which ends a write with an error, its signal being ignored. It ends refused,
-/// after it has shown its result, with the words of the file system.
+/// after it has shown its result, with the words of the file system, which it gives.
 #[track_caller]
-fn assert_save_fails(folder: &Path, saves: &[&str]) {
+fn assert_save_fails(folder: &Path, saves: &[&str]) -> String {
     const LITTLE_ROOM: &str = r#"trap '' XFSZ; ulimit -f 1; exec "$0" "$@""#;
     let encode = [
         "encode",
@@ -358,11 +432,12 @@ fn assert_save_fails(folder: &Path, saves: &[&str]) {
         .stdin(Stdio::null())
         .output()
         .expect("the program runs");
-    let errors = String::from_utf8_lossy(&output.stderr);
+    let errors = String::from_utf8_lossy(&output.stderr).into_owned();
     assert_ne!(output.status.code(), Some(0), "{errors}");
     assert!(errors.contains("File too large"), "{errors}");
     // The result is on the screen already: this was the save, not a refusal of the options.
     assert!(!output.stdout.is_empty());
+    errors
 }
 
 #[test]
@@ -376,73 +451,26 @@ fn a_save_that_fails_ends_the_command_before_the_outputs_after_it() {
         "--images-dir",
         "images",
     ];
-    assert_save_fails(&folder, &saves);
-    // The record before it is saved, and of the PDF no staging folder stays.
-    assert_eq!(outputs(&folder), ["public.txt"]);
-}
-
-#[test]
-fn a_folder_that_cannot_be_filled_leaves_neither_itself_nor_its_staging() {
-    let folder = folder("failed-folder");
-    assert_save_fails(&folder, &["--images-dir", "images"]);
-    assert_eq!(outputs(&folder), Vec::<String>::new());
-}
-
-/// Makes the folder `images` in `folder` once the staging folder of the page images is there: the
-/// name was free when it was claimed, and is taken when the images are published. With `keep`, a
-/// file in it; the inode of the folder.
-fn take_the_name_while_staged(folder: &Path, keep: bool) -> u64 {
-    let deadline = Instant::now() + PATIENCE;
-    while !names(folder)
-        .iter()
-        .any(|name| name.starts_with(".mnemocode-images-"))
-    {
-        assert!(Instant::now() < deadline, "no staging folder");
-        thread::sleep(Duration::from_millis(1));
-    }
-    let target = folder.join("images");
-    fs::create_dir(&target).expect("the folder");
-    if keep {
-        fs::write(target.join("keep"), "public fixture").expect("a file");
-    }
-    fs::metadata(&target).expect("the folder").ino()
-}
-
-#[test]
-fn a_folder_made_while_the_images_were_staged_stays_as_it_is() {
-    let args = [
-        "encode",
-        "--mnemonic-file",
-        PHRASE,
-        "--mode",
-        "direct",
-        "--format",
-        "colors",
-        "--template",
-        "material-tile",
-        "--images-dir",
-        "images",
-    ];
-    for (name, keep) in [("staged-empty", false), ("staged-kept", true)] {
-        let folder = folder(name);
-        let (output, made) = thread::scope(|scope| {
-            let made = scope.spawn(|| take_the_name_while_staged(&folder, keep));
-            let output = run(&folder, &args);
-            (output, made.join().expect("the folder made"))
-        });
-        let errors = String::from_utf8_lossy(&output.stderr);
-        assert_ne!(output.status.code(), Some(0), "{errors}");
+    let errors = assert_save_fails(&folder, &saves);
+    // The record before it is saved; the PDF, emptied, and the folder of the images after it, made
+    // before the phrase, are removed or named; no staging folder stays.
+    assert!(!read(&folder, "public.txt").is_empty());
+    gone_or_left_empty(&folder, "public.pdf", &errors);
+    gone_or_left_empty(&folder, "images", &errors);
+    for name in outputs(&folder) {
         assert!(
-            errors.contains(
-                "The image folder already exists. Choose a new folder for the exported images."
-            ),
-            "{errors}"
+            ["images", "public.pdf", "public.txt"].contains(&name.as_str()),
+            "{name}"
         );
-        // Neither its contents nor the folder itself changed, and no staging folder stays.
-        let target = folder.join("images");
-        assert_eq!(fs::metadata(&target).expect("the folder").ino(), made);
-        let kept = if keep { vec!["keep"] } else { Vec::new() };
-        assert_eq!(names(&target), kept);
-        assert_eq!(outputs(&folder), ["images"]);
+    }
+}
+
+#[test]
+fn a_folder_that_cannot_be_filled_leaves_no_staging_and_no_files() {
+    let folder = folder("failed-folder");
+    let errors = assert_save_fails(&folder, &["--images-dir", "images"]);
+    gone_or_left_empty(&folder, "images", &errors);
+    for name in outputs(&folder) {
+        assert_eq!(name, "images");
     }
 }

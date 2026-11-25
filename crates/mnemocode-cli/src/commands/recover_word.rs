@@ -705,7 +705,7 @@ fn list_of(mut options: Vec<String>) -> Result<Option<CandidatesFile>, Stop> {
     // A passphrase chosen for the list is asked on this private screen.
     options.push("--ask-secrets".to_owned());
     let mut parsed = args::parse_arguments(&options)?;
-    preflight(&mut parsed)?;
+    preflight(&mut parsed, false)?;
     warn_of_cloud_copies(&parsed);
     CandidatesFile::of(&parsed)
 }

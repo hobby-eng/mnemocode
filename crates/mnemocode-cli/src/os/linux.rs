@@ -139,10 +139,12 @@ pub(super) fn rule_writes(protection: &mut Protection, folders: &[std::path::Pat
     protection.attempt("Landlock", |protection| {
         landlock::restrict_writes(folders)?;
         Protection::writes_ruled(folders);
-        let what = if folders.is_empty() {
-            "no file writes"
-        } else {
-            "file writes only to the chosen folders"
+        // Files reserved before the seed phrase are written through the descriptors held open.
+        let what = match (folders.is_empty(), super::prepared::holds_reservations()) {
+            (true, false) => "no file writes",
+            (true, true) => "no file writes but to the files reserved before",
+            (false, false) => "file writes only to the chosen folders",
+            (false, true) => "file writes only to the chosen folders and the files reserved before",
         };
         protection.claim(what, writes_refused(), "/dev/null opened for writing");
         Ok(())

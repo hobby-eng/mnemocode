@@ -3,7 +3,6 @@
 //! beside the non-secret arguments.
 
 use mnemocode::bip39::phrase::Phrase;
-use mnemocode::dates::Date;
 use mnemocode::forms::Form;
 use mnemocode::modes::Mode;
 use mnemocode::secret::SecretVec;
@@ -796,9 +795,6 @@ pub(crate) fn ask_form() -> Result<Option<Form>, Stop> {
     ask_list(FORM_QUESTION, "Form", &form_choices()?, None)
 }
 
-/// Non-secret command arguments and separately owned dates from the private screen.
-pub(crate) type EncodingAnswers = (Vec<String>, SecretVec<Date>);
-
 /// Asks the new backup's settings in `form`, as every new backup is asked them, and keeps its dates
 /// outside the command arguments.
 pub(crate) fn ask_encoding_in(
@@ -811,7 +807,7 @@ pub(crate) fn ask_encoding_in(
 /// Protected setup for the menu entry that creates standard SSKR shares, in the steps of every new
 /// backup; Shift+Tab goes back a step.
 pub(crate) fn ask_splitting(finish: &mut super::new_backup::Finish<'_>) -> Result<bool, Stop> {
-    use super::new_backup::{Answered, answered, named_file, run_steps};
+    use super::new_backup::{Answered, answered, dated, files_named, named_file, run_steps};
     // Either Seedshift writes a valid phrase, which standard shares split.
     let shares = Takes::EitherNoting {
         unmasked: "the shares alone restore it",
@@ -835,33 +831,36 @@ pub(crate) fn ask_splitting(finish: &mut super::new_backup::Finish<'_>) -> Resul
         ],
         more: vec![readme_link("splitting-a-mnemonic-into-shares")],
     };
-    let mut mode = Mode::Seedshift;
-    let mut dates = mnemocode::secret::SecretVec::new(Vec::new());
+    let mode = std::cell::Cell::new(Mode::Seedshift);
+    let mut dates = SecretVec::new(Vec::new());
     let mut format = ShareFormat::Words;
     let mut set = None;
     let mut heir_size = None;
     let mut saved = Vec::new();
     let mut heirs = Vec::new();
     crate::terminal::set_screen_title("Split into shares");
-    let names = [
-        Some("Seedshift"),
-        Some("Dates"),
-        Some("Format"),
-        Some("Shares"),
-        Some("Heirs"),
-        Some("Saving"),
-        None,
-        Some("Phrase"),
-    ];
-    let done = run_steps(8, &names, |step| {
+    // Dates only where Seedshift is chosen.
+    let names = || {
+        vec![
+            Some("Seedshift"),
+            Some("Format"),
+            Some("Shares"),
+            Some("Heirs"),
+            Some("Saving"),
+            None,
+            None,
+            mode.get().masked().then_some("Dates"),
+            Some("Phrase"),
+        ]
+    };
+    let done = run_steps(9, names, |step| {
         Ok(match step {
             0 => answered(
                 ask_seedshift("Use Seedshift before splitting?", false, shares)?
-                    .map(|chosen| mode = chosen),
+                    .map(|chosen| mode.set(chosen)),
             ),
-            1 => super::new_backup::dates_step(mode, &mut dates)?,
-            // Its own question, after the dates, as every new backup asks its way's.
-            2 => answered(
+            // Its own question, after Seedshift, as every new backup asks its way's.
+            1 => answered(
                 ask_list(
                     "How should each share be written?",
                     "Shares as",
@@ -870,7 +869,7 @@ pub(crate) fn ask_splitting(finish: &mut super::new_backup::Finish<'_>) -> Resul
                 )?
                 .map(|chosen| format = chosen),
             ),
-            3 => match ask_share_set(
+            2 => match ask_share_set(
                 "How many shares, and how many of them restore the seed phrase?",
                 &explanation,
                 false,
@@ -881,34 +880,38 @@ pub(crate) fn ask_splitting(finish: &mut super::new_backup::Finish<'_>) -> Resul
                 }
                 _ => Answered::Back,
             },
-            4 => answered(ask_heir_sheet()?.map(|size| heir_size = size)),
-            // Last, where the shares are saved.
-            5 => match set {
+            3 => answered(ask_heir_sheet()?.map(|size| heir_size = size)),
+            // The last of the settings, where the shares are saved.
+            4 => match set {
                 Some(set) => answered(ask_shares(set, format)?.map(|chosen| saved = chosen)),
                 None => Answered::Back,
             },
-            6 => {
+            5 => {
                 let (files, step) = named_file(|| heir_sheet_files(heir_size))?;
                 if let Some(files) = files {
                     heirs = files;
                 }
                 step
             }
-            // The seed phrase, Shift+Tab there coming back to the answers.
-            _ => {
-                let mut run = ["encode", "--sskr", "--ask-secrets", "--mode", mode.id()]
-                    .map(str::to_owned)
-                    .to_vec();
+            // Every file named, every other folder is closed before anything secret is typed.
+            6 => {
+                let mut run = [
+                    "encode",
+                    "--sskr",
+                    "--ask-secrets",
+                    "--mode",
+                    mode.get().id(),
+                ]
+                .map(str::to_owned)
+                .to_vec();
                 run.extend(saved.iter().cloned());
-                run.extend(super::new_backup::shown_masked_words(mode, false));
+                run.extend(super::new_backup::shown_masked_words(mode.get(), false));
                 run.extend(heirs.iter().cloned());
-                let dates = mnemocode::secret::SecretVec::new(dates.to_vec());
-                if finish((run, dates))? {
-                    Answered::Next
-                } else {
-                    Answered::Back
-                }
+                files_named(finish, run)?
             }
+            7 => super::new_backup::dates_step(mode.get(), &mut dates)?,
+            // The seed phrase, Shift+Tab there coming back to the dates.
+            _ => dated(finish, &dates)?,
         })
     })?;
     Ok(done)

@@ -170,12 +170,27 @@ fn run_command_line(argv: &[String], protection: &mut Protection) -> Result<(), 
     if command.name != "qr-hide" {
         commands::hidden_qr::validate(&parsed)?;
     }
-    // Before the seed phrase is read: the outputs checked, their folders made, the rest given up.
-    // A command whose answers name its outputs rules its writes once they are answered.
-    let mut needs = output::preflight(&mut parsed)?;
-    needs.answers_name_folders = command.asks_outputs.is_some_and(|asks| asks(&parsed));
-    protection.restrict(&needs);
+    // Before the seed phrase is read: the outputs checked, each file reserved and each folder made,
+    // the rest given up. A command whose answers name its outputs rules its writes once they are
+    // answered.
+    let checked = output::checked_outputs(&mut parsed)?;
+    // The known answers before anything is made for the outputs: a damaged build stops at once.
     self_test::assert_core()?;
+    let answers_name_folders = command.asks_outputs.is_some_and(|asks| asks(&parsed));
+    let mut needs = if command.secret && !answers_name_folders {
+        // The command's own options first, so that a mistyped one leaves no file behind.
+        if let Some(check) = command.check {
+            check(&parsed)?;
+        }
+        let shares =
+            matches!(command.name, "sskr-split" | "sskr-export") || args::is_on(&parsed, "sskr");
+        output::make_outputs(&parsed, checked, shares)?
+    } else {
+        // Nothing secret is read, or the answers name the outputs later: as before.
+        output::parents_of(checked)
+    };
+    needs.answers_name_folders = answers_name_folders;
+    protection.restrict(&needs);
     let body = |protection: &mut Protection| match command.run {
         Run::Options(run) => run(&parsed),
         Run::Ruling(run) => run(&parsed, protection),
@@ -207,6 +222,7 @@ fn main() -> ExitCode {
         (ended, None) => ended,
     };
     let left = os::remove_left();
+    let unused = os::remove_unused();
     let mut status = match ended {
         Ok(()) => 0,
         Err(Stop::Refused(refusal)) => {
@@ -239,6 +255,25 @@ fn main() -> ExitCode {
             &format!(
                 "A private temporary folder, which may hold a copy of the export, could not be removed: {}. Delete it.",
                 terminal::printable(&folder.to_string_lossy())
+            ),
+            terminal::NoticeKind::Warning,
+        );
+    }
+    // What was made before the seed phrase and stayed unused, kept by the rules on writes.
+    for left in unused {
+        let (what, path, end) = match &left {
+            os::LeftPrepared::EmptyFile(path) => ("The empty file", path, "could not be removed"),
+            os::LeftPrepared::EmptyFolder(path) => {
+                ("The empty folder", path, "could not be removed")
+            }
+            os::LeftPrepared::PartlyFilled(path) => {
+                ("The folder", path, "holds part of a save that failed")
+            }
+        };
+        terminal::notice(
+            &format!(
+                "{what} {}, made for the files before the seed phrase was read, {end}: delete it.",
+                terminal::printable(&path.to_string_lossy())
             ),
             terminal::NoticeKind::Warning,
         );

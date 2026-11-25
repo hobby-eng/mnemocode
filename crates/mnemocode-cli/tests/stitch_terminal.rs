@@ -74,27 +74,60 @@ fn at_decode_of_patterns() -> Session {
     session
 }
 
-/// The files of the task saved in `folder`, the QR code answered `qr`, the public phrase then
-/// typed.
-fn saved_in(session: &mut Session, folder: &Path, qr: &str) {
+/// The files of the task saved in `folder`, the QR code answered `qr`.
+fn in_the_folder(session: &mut Session, folder: &Path, qr: &str) {
     session.wait_for("Enter the folder for the files");
     session.press(&format!("{}\r", folder.display()));
     session.wait_for("Add a QR code?");
     session.press(qr);
+}
+
+/// No shares and no sheet for heirs, then the pattern's PDF alone saved.
+fn the_pattern_alone(session: &mut Session) {
+    session.wait_for("Split it into Shamir shares?");
+    session.press("1");
+    session.wait_for("Instructions for your heirs?");
+    session.press("1");
+    session.wait_for("Where should the result be saved?");
+    session.press("\r");
+}
+
+/// The names in `folder`, in order.
+fn entries(folder: &Path) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(folder)
+        .expect("the folder")
+        .map(|entry| {
+            entry
+                .expect("an entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+    names.sort();
+    names
+}
+
+/// [`in_the_folder`]; then, the folder made and every other closed to writing, the `dates` of
+/// Seedshift, if any, and the public phrase typed.
+fn saved_in(session: &mut Session, folder: &Path, qr: &str, dates: Option<&str>) {
+    in_the_folder(session, folder, qr);
+    if let Some(dates) = dates {
+        session.wait_for("DD-MM-YYYY, separated by spaces):");
+        session.wait_for_answer_keys();
+        session.press(&format!("{dates}\r"));
+    }
     session.wait_for("Enter the seed phrase");
     session.wait_for_answer_keys();
     session.press(&format!("{PHRASE}\r"));
 }
 
 /// The menu's Embroidery up to the size of the pattern: the questions of every new backup,
-/// MnemoCode Seedshift with `dates`, then the pattern's own, the `picture` and Aida 14.
-fn at_the_pattern_size(picture: &Path, dates: &str) -> Session {
+/// MnemoCode Seedshift, whose dates come last, then the pattern's own, the `picture` and Aida 14.
+fn at_the_pattern_size(picture: &Path) -> Session {
     let mut session = at_embroidery();
     session.wait_for("only they turn it back");
     session.press("1");
-    session.wait_for("DD-MM-YYYY, separated by spaces):");
-    session.wait_for(" back · ");
-    session.press(&format!("{dates}\r"));
     session.wait_for("Enter the picture's file name");
     session.press(&format!("{}\r", picture.display()));
     session.wait_for("Which fabric?");
@@ -105,21 +138,18 @@ fn at_the_pattern_size(picture: &Path, dates: &str) -> Session {
 
 #[test]
 fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen() {
-    // The picture bears the pattern's usual name: the pattern takes the next numbered one rather
-    // than be saved over its own picture.
+    // The picture bears the pattern's usual name: the pattern goes into the new folder of the
+    // task's files, which nothing else is in, so it takes its usual name there.
     let folder = file("menu-stitch");
     let _absent = fs::remove_dir_all(&folder);
     fs::create_dir_all(&folder).expect("a folder");
     let picture = folder.join("cross-stitch-pattern.pdf");
     fs::write(&picture, mnemocode_embroidery::sample::gradient_png()).expect("a picture");
-    let pdf = folder.join("cross-stitch-pattern_1.pdf");
+    let pdf = folder.join("design-files/cross-stitch-pattern.pdf");
     // Aida 14 first, then the sizes, each with the stitches that the picture of 240 by 160 pixels
     // takes in it inside the print margin, A4 turned to hold it larger; a width in centimetres
     // within the picture's own.
-    let mut session = at_the_pattern_size(
-        &picture,
-        "23-09-2026 22-09-2026 21-09-2026 20-09-2026 19-09-2026",
-    );
+    let mut session = at_the_pattern_size(&picture);
     session.wait_for("A4, 21 x 29.7 cm");
     session.wait_for("152 x 101 stitches, 27.6 x 18.3 cm");
     session.press("6");
@@ -138,12 +168,13 @@ fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen(
     session.wait_for("Where should the result be saved?");
     session.wait_for("the legend line, which Decode reads back");
     session.press("\r");
-    session.wait_for("Enter the folder for the files");
-    session.press(&format!("{}\r", folder.display()));
-    session.wait_for("Add a QR code?");
-    session.press("1");
+    in_the_folder(&mut session, &folder, "1");
 
-    // Dates were already entered; only the phrase remains, with checksum retry.
+    // The folder made and every other closed to writing, the dates; then the phrase, with
+    // checksum retry.
+    session.wait_for("DD-MM-YYYY, separated by spaces):");
+    session.wait_for_answer_keys();
+    session.press("23-09-2026 22-09-2026 21-09-2026 20-09-2026 19-09-2026\r");
     session.wait_for("Enter the seed phrase");
     session.wait_for_answer_keys();
     session.press(&format!("{}\r", PHRASE.replace("about", "abandon")));
@@ -160,6 +191,10 @@ fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen(
     let written = cleared_and_quit(session);
     let saved = fs::read(&pdf).expect("the pattern");
     assert!(saved.starts_with(b"%PDF-"));
+    assert_eq!(
+        entries(&folder),
+        ["cross-stitch-pattern.pdf", "design-files"]
+    );
     let outside = written.rsplit(LEAVE_PRIVATE_SCREEN).next().expect("a part");
     assert!(!outside.contains("abandon"), "{outside}");
     assert!(!outside.contains("23-09-2026"), "{outside}");
@@ -170,7 +205,7 @@ fn the_menu_makes_a_cross_stitch_pattern_with_the_secrets_on_the_private_screen(
 #[test]
 fn the_menu_makes_a_pattern_a_share() {
     let (folder, picture) = folder_with_picture("menu-stitch-shares");
-    let mut session = at_the_pattern_size(&picture, "23-09-2026");
+    let mut session = at_the_pattern_size(&picture);
     session.press("1");
     session.wait_for("Split it into Shamir shares?");
     session.press("2");
@@ -182,20 +217,25 @@ fn the_menu_makes_a_pattern_a_share() {
     session.press("2");
     session.press("\r");
     // A QR code of each legend with hidden data: a scanner sees a contact card MnemoCode invents.
-    saved_in(&mut session, &folder, "3");
+    saved_in(&mut session, &folder, "3", Some("23-09-2026"));
     // The phrase after Seedshift first, then its shares, all on one screen of a usual window.
     session.wait_for("Seed phrase after Seedshift");
     session.wait_for("That phrase split into Shamir shares");
     session.wait_for("Share 1 of 3");
     let written = cleared_and_quit(session);
     for place in 1..=3 {
-        let pattern = folder.join(format!("cross-stitch-patterns/share-{place}-pattern.pdf"));
+        let pattern = folder.join(format!(
+            "design-files/cross-stitch-patterns/share-{place}-pattern.pdf"
+        ));
         assert!(fs::read(&pattern).expect("a pattern").starts_with(b"%PDF-"));
     }
-    let legends = fs::read_to_string(folder.join("cross-stitch-legend.txt")).expect("legends");
+    let legends =
+        fs::read_to_string(folder.join("design-files/cross-stitch-legend.txt")).expect("legends");
     assert_eq!(legends.lines().count(), 3, "{legends}");
     for place in 1..=3 {
-        let image = folder.join(format!("cross-stitch-legend-qr/share-{place}-qr.png"));
+        let image = folder.join(format!(
+            "design-files/cross-stitch-legend-qr/share-{place}-qr.png"
+        ));
         assert!(fs::read(&image).expect("a QR code").starts_with(b"\x89PNG"));
     }
     let outside = written.rsplit(LEAVE_PRIVATE_SCREEN).next().expect("a part");
@@ -377,18 +417,16 @@ fn shift_tab_goes_back_a_step_and_escape_to_the_menu() {
     let mut session = at_embroidery();
     session.wait_for(" back · ");
     session.press("1");
-    session.wait_for("DD-MM-YYYY, separated by spaces):");
+    // The pattern's own questions follow Seedshift; its dates come last.
+    session.wait_for("Enter the picture's file name");
     session.wait_for(" back · ");
     session.press(SHIFT_TAB);
-    // Without Seedshift no dates are asked, and going back passes them.
     session.wait_for("Use Seedshift?");
     session.press("3");
     session.wait_for("Enter the picture's file name");
     session.press(SHIFT_TAB);
     session.wait_for("Use Seedshift?");
     session.press("1");
-    session.wait_for("DD-MM-YYYY, separated by spaces):");
-    session.press("23-09-2026\r");
     session.wait_for("Enter the picture's file name");
     session.press(&format!("{}\r", picture.display()));
     session.wait_for("Which fabric?");
@@ -493,12 +531,11 @@ fn a_folder_of_share_qr_codes_restores_the_phrase() {
 fn an_answer_changed_after_shift_tab_replaces_the_old_one() {
     const SHIFT_TAB: &str = "\x1b[Z";
     let (folder, picture) = folder_with_picture("menu-changed");
-    let mut session = at_the_pattern_size(&picture, "23-09-2026");
-    // Back from the size to the fabric, the picture, the dates and Seedshift.
+    let mut session = at_the_pattern_size(&picture);
+    // Back from the size to the fabric, the picture and Seedshift.
     for asked in [
         "Which fabric?",
         "Enter the picture's file name",
-        "DD-MM-YYYY",
         "Use Seedshift?",
     ] {
         session.press(SHIFT_TAB);
@@ -511,13 +548,8 @@ fn an_answer_changed_after_shift_tab_replaces_the_old_one() {
     session.press("\r");
     session.wait_for("How large, on Aida 14?");
     session.press("1");
-    session.wait_for("Split it into Shamir shares?");
-    session.press("1");
-    session.wait_for("Instructions for your heirs?");
-    session.press("1");
-    session.wait_for("Where should the result be saved?");
-    session.press("\r");
-    saved_in(&mut session, &folder, "1");
+    the_pattern_alone(&mut session);
+    saved_in(&mut session, &folder, "1", None);
     session.wait_for("Saved files");
     let written = cleared_and_quit(session);
     let result = written
@@ -526,7 +558,42 @@ fn an_answer_changed_after_shift_tab_replaces_the_old_one() {
         .expect("the result");
     assert!(!result.contains("Seed phrase after Seedshift"), "{result}");
     assert!(!result.contains("with your dates"), "{result}");
-    assert!(folder.join("cross-stitch-pattern.pdf").is_file());
+    assert!(
+        folder
+            .join("design-files/cross-stitch-pattern.pdf")
+            .is_file()
+    );
+}
+
+// The dates come after every setting, once the new folder of the task's files is made and every
+// other folder closed to writing: Shift+Tab at the seed phrase goes back to them, and from them to
+// where the result is saved, where the same folder chosen again keeps the same new folder.
+#[test]
+fn the_dates_come_after_the_folder_and_shift_tab_goes_back_through_them() {
+    const SHIFT_TAB: &str = "\x1b[Z";
+    let (folder, picture) = folder_with_picture("menu-dates-last");
+    let mut session = at_the_pattern_size(&picture);
+    session.press("1");
+    the_pattern_alone(&mut session);
+    in_the_folder(&mut session, &folder, "1");
+    session.wait_for("DD-MM-YYYY, separated by spaces):");
+    assert!(folder.join("design-files").is_dir());
+    session.wait_for_answer_keys();
+    session.press("23-09-2026\r");
+    session.wait_for("Enter the seed phrase");
+    session.wait_for_answer_keys();
+    session.press(SHIFT_TAB);
+    session.wait_for("DD-MM-YYYY, separated by spaces):");
+    session.wait_for_answer_keys();
+    session.press(SHIFT_TAB);
+    session.wait_for("Where should the result be saved?");
+    session.press("\r");
+    saved_in(&mut session, &folder, "1", Some("23-09-2026"));
+    session.wait_for("Saved files");
+    cleared_and_quit(session);
+    assert_eq!(entries(&folder), ["design-files", "picture.png"]);
+    let pdf = folder.join("design-files/cross-stitch-pattern.pdf");
+    assert!(fs::read(&pdf).expect("the pattern").starts_with(b"%PDF-"));
 }
 
 /// The menu's Restore from shares, answered `seedshift` about Seedshift, and given `folder` once

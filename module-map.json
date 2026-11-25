@@ -444,6 +444,8 @@
     "export.image-export.page-not-drawn": "the drawing of a page image: TS's Poppler has its own failures",
     "cli.protection.private-screen-required": "the owner's refusal of a secret result without a private screen (PLAN.md)",
     "cli.output-paths.outside-ruled-folders": "the owner's refusal of a retry outside the ruled folders (PLAN.md)",
+    "cli.file-system.reservation-gone": "a file reserved before the seed phrase that another program removed or replaced (CORE-55)",
+    "cli.output-paths.writes-closed": "a new name once no folder is open to writing: outputs are made before the seed phrase (CORE-55)",
     "not-utf8": "TS writes it outside its catalogs",
     "too-large": "TS writes it outside its catalogs",
     "ambiguous-marks": "TS writes it outside its catalogs",

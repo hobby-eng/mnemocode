@@ -16,9 +16,9 @@ use std::rc::Rc;
 
 use common::{
     DATES, LONG_PHRASE, MOST_DATES, NEVER, PDF_START, PHRASE, PNG_START, PUBLIC_SHARES, SHARE,
-    SHARES, assert_no_metadata, assert_private, assert_refused, assert_same_cards,
-    assert_same_pictures, folder, full, names, numbered, outputs, page_sizes, printed_pages, read,
-    run, saved,
+    SHARES, assert_no_metadata, assert_private, assert_refused, assert_refused_with_reserved,
+    assert_same_cards, assert_same_pictures, folder, full, names, numbered, outputs, page_sizes,
+    printed_pages, read, run, saved,
 };
 use mnemocode::recovery::shares::flow::PhrasesFound;
 use mnemocode::recovery::shares::repair::{ShareExportDecision, export_decision};
@@ -254,6 +254,43 @@ fn a_sheet_with_a_qr_code_saves_its_image_beside_it_and_without_one_its_pdf_alon
         outputs(&folder),
         ["public-qr.png", "public.pdf", "second.pdf"]
     );
+}
+
+#[test]
+fn the_qr_images_of_shares_beside_a_pdf_go_into_a_new_folder_named_after_it() {
+    // Their names come from the shares, known only once the shares are read: the folder is made
+    // before, and the images are written in it alone.
+    let folder = folder("share-sheet-qr");
+    let errors = saved(
+        &folder,
+        &[
+            "sskr-export",
+            "--share-file",
+            SHARES,
+            "--format",
+            "colors",
+            "--pdf",
+            "shares.pdf",
+            "--card-qr",
+            "--card-qr-png",
+        ],
+    );
+    assert!(
+        errors.contains(&format!(
+            "Saved the QR codes of the share sheets as images in {}: 2 PNG files.",
+            full(&folder, "shares-qr-codes")
+        )),
+        "{errors}"
+    );
+    assert_eq!(outputs(&folder), ["shares-qr-codes", "shares.pdf"]);
+    let images = folder.join("shares-qr-codes");
+    assert_private(&images);
+    let made = names(&images);
+    assert_eq!(made.len(), PUBLIC_SHARES.len(), "{made:?}");
+    for name in made {
+        assert!(name.ends_with("-qr.png"), "{name}");
+        assert!(read(&images, &name).starts_with(PNG_START));
+    }
 }
 
 #[test]
@@ -608,7 +645,8 @@ fn one_share_is_written_again_alone_and_a_wallet_check_of_it_is_refused() {
         "--output",
         NEVER,
     ];
-    assert_refused(&folder, &wallet, WALLET_NEEDS_THRESHOLD);
+    // Refused once the share is read: the file reserved for the export stays empty, or is gone.
+    assert_refused_with_reserved(&folder, &wallet, WALLET_NEEDS_THRESHOLD, &[NEVER]);
 }
 
 #[test]

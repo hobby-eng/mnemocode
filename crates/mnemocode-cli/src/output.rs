@@ -9,7 +9,9 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use mnemocode::refusal::Refusal;
 
-use crate::args::{FILE_OUTPUTS, FOLDER_OUTPUTS, Given, Parsed, option_label, value, values};
+use crate::args::{
+    FILE_OUTPUTS, FOLDER_OUTPUTS, Given, Parsed, is_on, option_label, value, values,
+};
 use crate::os::{self, Entry, FileError, FileLook, Needs};
 use crate::terminal::{self, lasting_warning, printable, warning_with_more};
 
@@ -63,6 +65,8 @@ pub(crate) enum OutputError {
     FileFolderUnwritable,
     /// A new name outside the folders that the rules on writes leave open: those folders.
     OutsideRuled(String),
+    /// A new name where the rules on writes leave no folder open.
+    WritesClosed,
     /// An output's place that cannot be told.
     NotResolved,
     /// An input that cannot be read, by its option's label.
@@ -122,6 +126,9 @@ impl std::fmt::Display for OutputError {
                 f,
                 "Files can be saved only in {folders} now: MnemoCode closed every other folder to writing before it asked for the seed phrase."
             ),
+            Self::WritesClosed => f.write_str(
+                "No other file can be saved now: MnemoCode closed every folder to writing before it asked for the seed phrase. To save files, start the task again.",
+            ),
             Self::NotResolved => f.write_str("The output path could not be resolved safely."),
             Self::UnreadableInput(label) => write!(
                 f,
@@ -166,6 +173,7 @@ impl Refusal for OutputError {
             Self::FileExists => "cli.output-paths.output-file-already-exists-choose-new-path",
             Self::FileFolderUnwritable => "cli.output-paths.folder-unwritable-file",
             Self::OutsideRuled(_) => "cli.output-paths.outside-ruled-folders",
+            Self::WritesClosed => "cli.output-paths.writes-closed",
             Self::NotResolved => "cli.output-paths.output-path-could-not-resolved-safely",
             Self::UnreadableInput(label) => FileError::Unreadable(label).code(),
             Self::ResultNotWritten(_) => "cli.output-paths.result-not-written",
@@ -224,10 +232,7 @@ pub(crate) fn numbered_name(path: &str, number: usize, folder: bool) -> String {
 
 /// `path`, or where something is there its first numbered name that nothing takes.
 pub(crate) fn first_free_name(path: &str) -> Result<String, OutputError> {
-    if os::entry_at(&resolved(path)).map_err(FileError::from)? == Entry::None {
-        return Ok(path.to_owned());
-    }
-    first_free_numbered(path, false)
+    free_name(path, false)
 }
 
 /// Re-resolves a file taken after preflight, retaining its original unsuffixed
@@ -307,6 +312,9 @@ pub(crate) fn check_ruled(path: &str) -> Result<(), OutputError> {
     let target = resolved(path);
     if ruled.iter().any(|folder| target.starts_with(folder)) {
         return Ok(());
+    }
+    if ruled.is_empty() {
+        return Err(OutputError::WritesClosed);
     }
     let names: Vec<String> = ruled
         .iter()
@@ -436,13 +444,16 @@ fn settle(parsed: &mut Parsed) -> Result<(), OutputError> {
     Ok(())
 }
 
-/// The preflight of a command's outputs, before the seed phrase is asked or read: a taken name
-/// numbered in `parsed`, refusals as above, each missing parent folder made, and the folders the
-/// command writes beneath, for the protections.
-pub(crate) fn preflight(parsed: &mut Parsed) -> Result<Needs, OutputError> {
+/// The name of the new folder that the files of a task asked on the private screen go into: it
+/// says nothing of what they hold, as the files' own names do not.
+pub(crate) const TASK_FOLDER: &str = "design-files";
+
+/// The outputs of `parsed`, each with whether it is a folder and where it lands: a taken name
+/// numbered, refusals as above, each missing parent folder made.
+pub(crate) fn checked_outputs(parsed: &mut Parsed) -> Result<Vec<(bool, PathBuf)>, OutputError> {
     settle(parsed)?;
     validate_output_paths(parsed)?;
-    let mut needs = Needs::default();
+    let mut checked = Vec::new();
     for (key, path) in outputs_of(parsed) {
         let folder = FOLDER_OUTPUTS.contains(&key);
         if folder {
@@ -461,11 +472,131 @@ pub(crate) fn preflight(parsed: &mut Parsed) -> Result<Needs, OutputError> {
                 OutputError::FileFolderUnwritable
             });
         }
+        checked.push((folder, target));
+    }
+    Ok(checked)
+}
+
+/// The preflight of the outputs that the command line names, before the seed phrase is asked or
+/// read: each made now, a file reserved and held open, a folder made, so that the command needs the
+/// right to write beneath its new folders alone and none beside them (CORE-55). The QR image that
+/// goes with the PDF of one backup is reserved beside it; those of shares, named after the shares
+/// that the secret makes (`shares`), go into a new folder named after the PDF.
+pub(crate) fn preflight(parsed: &mut Parsed, shares: bool) -> Result<Needs, OutputError> {
+    let checked = checked_outputs(parsed)?;
+    make_outputs(parsed, checked, shares)
+}
+
+/// The folders beneath which a command that reads no secret saves, its outputs `checked`: their
+/// parent folders, where it stages and links them as before.
+pub(crate) fn parents_of(checked: Vec<(bool, PathBuf)>) -> Needs {
+    let mut needs = Needs::default();
+    for (_, target) in checked {
+        let parent = target.parent().map(Path::to_path_buf).unwrap_or_default();
         if !needs.folders.contains(&parent) {
             needs.folders.push(parent);
         }
     }
+    needs
+}
+
+/// [`preflight`]'s second half, once the command's own options are checked: the outputs `checked`
+/// made, each file reserved and each folder new.
+pub(crate) fn make_outputs(
+    parsed: &Parsed,
+    checked: Vec<(bool, PathBuf)>,
+    shares: bool,
+) -> Result<Needs, OutputError> {
+    let mut needs = Needs::default();
+    for (folder, target) in checked {
+        if folder {
+            os::prepare_folder(&target, None)?;
+            needs.folders.push(target);
+        } else {
+            os::reserve_file(&target)?;
+        }
+    }
+    if is_on(parsed, "card-qr-png")
+        && let Some(pdf) = value(parsed, "pdf").map(str::to_owned)
+    {
+        if shares {
+            let folder = resolved(&free_name(&qr_folder_name(&pdf), true)?);
+            os::prepare_folder(&folder, Some(&resolved(&pdf)))?;
+            needs.folders.push(folder);
+        } else {
+            let image = free_name(&qr_beside(&pdf, "").to_string_lossy(), false)?;
+            os::reserve_file(&resolved(&image))?;
+        }
+    }
     Ok(needs)
+}
+
+/// The preflight of the outputs that the answers on the private screen name, all in the folder
+/// chosen there: they go into a new folder of the task, made in it now ([`TASK_FOLDER`]), beneath
+/// which alone the command may write (CORE-55); the files are staged and linked there as usual.
+pub(crate) fn preflight_answered(parsed: &mut Parsed) -> Result<Needs, OutputError> {
+    into_task_folder(parsed)?;
+    Ok(parents_of(checked_outputs(parsed)?))
+}
+
+/// Puts each output of `parsed` into the new folder of the task made in its folder, the one made
+/// there already where the answers come again after going back.
+fn into_task_folder(parsed: &mut Parsed) -> Result<(), OutputError> {
+    for (key, path) in outputs_of(parsed) {
+        if unusable(&path) {
+            continue;
+        }
+        let target = resolved(&path);
+        let (Some(chosen), Some(name)) = (target.parent(), target.file_name()) else {
+            continue;
+        };
+        let task = os::task_folder(chosen, TASK_FOLDER)?;
+        let moved = task.join(name).to_string_lossy().into_owned();
+        parsed.insert(key.to_owned(), Given::One(moved));
+    }
+    Ok(())
+}
+
+/// `path`, or where something is there its first numbered name that nothing takes.
+fn free_name(path: &str, folder: bool) -> Result<String, OutputError> {
+    if os::entry_at(&resolved(path)).map_err(FileError::from)? == Entry::None {
+        return Ok(path.to_owned());
+    }
+    first_free_numbered(path, folder)
+}
+
+/// The image of the QR code that a sheet prints, beside the sheet `sheet` and named after it,
+/// "cards.pdf" giving "cards-qr.png", with `suffix` before "-qr".
+pub(crate) fn qr_beside(sheet: &str, suffix: &str) -> PathBuf {
+    let path = Path::new(sheet);
+    let name = path
+        .file_stem()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    path.with_file_name(format!("{name}{suffix}-qr.png"))
+}
+
+/// The new folder of the QR images of the shares that the sheet `sheet` prints, beside it and named
+/// after it: "cards.pdf" giving "cards-qr-codes".
+fn qr_folder_name(sheet: &str) -> String {
+    let path = Path::new(sheet);
+    let name = path
+        .file_stem()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    path.with_file_name(format!("{name}-qr-codes"))
+        .to_string_lossy()
+        .into_owned()
+}
+
+/// [`check_ruled`] for the folder of a task's files, asked again after going back: the folder that
+/// the task's new folder was made in may be chosen again, as the files go into that new folder.
+pub(crate) fn check_ruled_folder(path: &str) -> Result<(), OutputError> {
+    let made = os::task_folder_in(&resolved(path));
+    if made.is_some_and(|task| check_ruled(&task.to_string_lossy()).is_ok()) {
+        return Ok(());
+    }
+    check_ruled(path)
 }
 
 /// Refuses a new file's name that cannot be saved: an unusable name, something there already, a
@@ -679,7 +810,7 @@ mod tests {
         let folder = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
         let mut parsed = Parsed::new();
         parsed.insert("output".to_owned(), Given::One(folder.to_owned()));
-        let refusal = preflight(&mut parsed).err();
+        let refusal = preflight(&mut parsed, false).err();
         assert!(matches!(refusal, Some(OutputError::FolderForFile)));
         assert_eq!(
             refusal.map(|refusal| refusal.to_string()).as_deref(),

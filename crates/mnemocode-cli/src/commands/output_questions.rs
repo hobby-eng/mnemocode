@@ -156,12 +156,6 @@ pub(crate) fn folder_chosen() -> bool {
     chosen_folder().is_some()
 }
 
-/// Claims `path`, a file that the task reads, so that no file it saves is given its name, which the
-/// command would refuse.
-pub(crate) fn claim_read(path: &str) {
-    claimed().push(path.to_owned());
-}
-
 /// A typed file or folder name as the file system knows it. A name that the command line would read
 /// as something else is refused: - stands for standard input or output there, and a name that starts
 /// with - for an option. So is a blank one: as a path it would be the current folder.
@@ -197,7 +191,7 @@ pub(crate) fn input_file(answer: &str, limit: usize) -> Result<String, NameError
 }
 
 /// What the question of the folder says above it.
-const SAVED_HERE: &str = "Every file of this task is saved in this folder. Files already in it are never replaced: a new file whose name is taken gets a number at the end, such as backup_1.pdf.";
+const SAVED_HERE: &str = "The files of this task go into a new folder made inside this one, named design-files, or design-files-1 where that is taken: once the seed phrase is asked, MnemoCode may write nowhere else.";
 
 /// The folder that every file of the task goes to: asked once, the folder MnemoCode started in by
 /// default; none when the person goes back.
@@ -221,12 +215,14 @@ fn task_folder() -> Result<Option<String>, Stop> {
             let path = typed_path(answer)?;
             let folder = resolved(&path);
             // Back from the seed phrase, writes are closed already but for the folder chosen then.
-            crate::output::check_ruled(&path).map_err(|error| match error {
+            crate::output::check_ruled_folder(&path).map_err(|error| match error {
                 OutputError::OutsideRuled(folders) => NameError::LockedFolder(folders),
                 other => NameError::Output(other),
             })?;
+            // The new folder made in it already, as after going back, is where the files go.
+            let written = os::task_folder_in(&folder).unwrap_or_else(|| folder.clone());
             match os::look_at_file(&folder) {
-                Ok(FileLook::Folder) if os::may_write(&folder) => Ok(path),
+                Ok(FileLook::Folder) if os::may_write(&written) => Ok(path),
                 Ok(FileLook::Folder) => Err(NameError::FolderUnwritable),
                 Ok(FileLook::Nothing) => Err(NameError::NoSuchFolder),
                 _ => Err(NameError::NotAFolder),
@@ -265,7 +261,7 @@ fn claimed_in_folder(
             .iter()
             .any(|earlier| paths_overlap(earlier, &path))
         {
-            match check(&path) {
+            match check(&as_saved(&path)) {
                 Ok(()) => {
                     claimed().push(path.clone());
                     return Ok(Some(path));
@@ -276,6 +272,20 @@ fn claimed_in_folder(
             }
         }
         number += 1;
+    }
+}
+
+/// Where the file `path` of the task, named in the folder chosen for its files, is saved: in the new
+/// folder made there for them, where it was made already, as after going back from the dates, when
+/// no other folder is open to writing.
+fn as_saved(path: &str) -> String {
+    let target = resolved(path);
+    match (target.parent(), target.file_name()) {
+        (Some(chosen), Some(name)) => os::task_folder_in(chosen).map_or_else(
+            || path.to_owned(),
+            |task| task.join(name).to_string_lossy().into_owned(),
+        ),
+        _ => path.to_owned(),
     }
 }
 

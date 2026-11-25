@@ -211,15 +211,15 @@ with evidence as data; bundled files are compiled in; page images are drawn in p
 The CLI's own platform code is selected by `cfg` per target in `mnemocode-cli::os`; no trait, except
 mhfe's `Probes` (`mhfe/src/bin/mhfe/protect.rs:329`), the one fake its report tests need:
 
-| Service                | Linux                                                                                         | macOS                   | Windows                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------- |
-| No core dumps          | RLIMIT_CORE 0, PR_SET_DUMPABLE 0, both read back                                              | RLIMIT_CORE 0 read back | WerSetFlags(NOHEAP) read back, LocalDumps named |
-| Readers, injected code | dumpable, TracerPid                                                                           | PT_DENY_ATTACH          | DLL search order, mitigation policies           |
-| Network, writes        | seccomp TSYNC; Landlock on the parent folder of each output, the private screen included (§5) | Seatbelt (network)      | – (no unprivileged sandbox)                     |
-| Memory cap             | RLIMIT_DATA, free-memory check                                                                | free-memory check       | job memory limit, free-memory check             |
-| Swap                   | /proc/swaps to dm-crypt, zram without backing_dev                                             | – (encrypted)           | – (cannot tell)                                 |
-| Terminal, signals      | termios, sigaction                                                                            | termios, sigaction      | console modes, console control handler          |
-| Files                  | create-new 0600/0700, staging beside, link or rename                                          | same                    | same, folder ACL named                          |
+| Service                | Linux                                                                                                                              | macOS                   | Windows                                         |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ----------------------------------------------- |
+| No core dumps          | RLIMIT_CORE 0, PR_SET_DUMPABLE 0, both read back                                                                                   | RLIMIT_CORE 0 read back | WerSetFlags(NOHEAP) read back, LocalDumps named |
+| Readers, injected code | dumpable, TracerPid                                                                                                                | PT_DENY_ATTACH          | DLL search order, mitigation policies           |
+| Network, writes        | seccomp TSYNC; Landlock only on new folders made before the secret, files reserved and held open, the private screen included (§5) | Seatbelt (network)      | – (no unprivileged sandbox)                     |
+| Memory cap             | RLIMIT_DATA, free-memory check                                                                                                     | free-memory check       | job memory limit, free-memory check             |
+| Swap                   | /proc/swaps to dm-crypt, zram without backing_dev                                                                                  | – (encrypted)           | – (cannot tell)                                 |
+| Terminal, signals      | termios, sigaction                                                                                                                 | termios, sigaction      | console modes, console control handler          |
+| Files                  | create-new 0600/0700, staging beside, link or rename                                                                               | same                    | same, folder ACL named                          |
 
 Measures and read-backs: `THREAT-MODEL.md` and `design/platform/protections.json`.
 
@@ -248,7 +248,10 @@ sequenceDiagram
 macOS: RLIMIT_CORE, PT_DENY_ATTACH, then Seatbelt once the needs are known. Windows:
 SetDefaultDllDirectories, WerSetFlags, the job with its memory cap, then the read-backs.
 
-Landlock grants writes beneath the parent folder of each output, opened before the secret; the
+Landlock grants writes only beneath folders made new before the secret: the menu task's folder
+(`design-files` in the folder chosen, `output::preflight_answered`) and a command line's output
+folders; a command line's output files are reserved then and written through the descriptors held
+open (`os::prepared`), so no existing folder gets a rule (CORE-55). The
 preflight makes a missing parent, with any missing folders above it, before the secret (owner, 2026-10-27;
 TS makes them at publication, `private-file.ts:271`), so staging beside the destination and the
 final reservation work as TS. Folders made so stay after a cancel: the restricted process cannot

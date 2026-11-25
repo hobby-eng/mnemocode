@@ -443,7 +443,13 @@ fn restored_places(restored: &Restoring) -> &[usize] {
 
 /// Runs the command: exports the shares given, or typed on the private screen, after repairing them
 /// where marked.
-pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
+/// The checks of the command's own options, which read no secret, before its outputs are made.
+pub(crate) fn check(parsed: &Parsed) -> Result<(), Stop> {
+    checked_options(parsed).map(drop)
+}
+
+/// The form given and the cards, every option of the export checked before a share is read.
+fn checked_options(parsed: &Parsed) -> Result<(Option<ShareFormat>, Option<ShareCards>), Stop> {
     // Again for the menu, which runs the command without the command line's checks.
     assert_single_values(parsed, &REPEATABLE_OPTIONS)?;
     // Without --format each share keeps the form it is written in, so that a share repaired from its
@@ -460,6 +466,11 @@ pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
             .check_printable(ShareFormat::Unicode)
             .map_err(|refusal| ExportError::CardsOwnForm(refusal.to_string()))?;
     }
+    Ok((given, checked))
+}
+
+pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
+    let (given, checked) = checked_options(parsed)?;
     let settings = recovery_settings(parsed)?;
     // Refused before the shares are asked.
     if let Some(refusal) = repair_refusal(settings.mode, settings.wallet.check.is_some()) {

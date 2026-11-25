@@ -12,10 +12,10 @@ use super::given::PATH_LIMIT;
 use crate::args::{FOLDER_OUTPUTS, Given, Parsed, value};
 use crate::gate::Stop;
 use crate::input::dropped_path;
-use crate::os::{FileError, Folder, pending_signal};
+use crate::os::{FileError, Folder, is_prepared_folder, is_reserved, pending_signal};
 use crate::output::{
     MAX_COPY_NUMBER, OutputError, check_new_file, check_new_folder, check_ruled, check_usable,
-    discard_renamed, renumber_collided_output, shown_path, validate_output_paths,
+    discard_renamed, renumber_collided_output, resolved, shown_path, validate_output_paths,
     warn_of_cloud_copy,
 };
 use crate::terminal::{
@@ -234,13 +234,21 @@ pub(crate) fn save_output(
             }
         }
         let another = format!("Another {} name", if folder { "folder" } else { "file" });
+        // A file reserved, or a folder made, before the seed phrase is the only place open to its
+        // save: no other name can be written now.
+        let made = resolved(&path);
+        let mut choices = vec![Choice::new("Try again", AfterFailedSave::Again)];
+        if !is_reserved(&made) && !is_prepared_folder(&made) {
+            choices.push(Choice::new(&another, AfterFailedSave::Other));
+        }
+        choices.push(Choice::noted(
+            "Skip",
+            "it is not saved",
+            AfterFailedSave::Skip,
+        ));
         let next = after_failure(
             WHAT_NOW,
-            &[
-                Choice::new("Try again", AfterFailedSave::Again),
-                Choice::new(&another, AfterFailedSave::Other),
-                Choice::noted("Skip", "it is not saved", AfterFailedSave::Skip),
-            ],
+            &choices,
             AfterFailure {
                 escape: "skips it",
                 ..AfterFailure::default()
@@ -308,7 +316,7 @@ mod tests {
                     }
                     let mut parsed = Parsed::new();
                     parsed.insert("output".into(), Given::One(original.to_owned()));
-                    crate::output::preflight(&mut parsed).unwrap();
+                    crate::output::preflight(&mut parsed, false).unwrap();
                     let requested = value(&parsed, "output").unwrap().to_owned();
                     let next = if preexisting { 2 } else { 1 };
                     let occupied = folder.join(format!("public_{next}.{extension}"));

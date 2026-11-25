@@ -1,11 +1,11 @@
-//! Protected menu configuration: dates stay in memory while output paths are settled.
+//! Protected menu configuration: the output paths settled and every other folder closed to writing,
+//! then the dates asked, which stay in memory.
 
 use mnemocode::dates::Date;
 use mnemocode::refusal::Refusal;
 use mnemocode::secret::SecretVec;
 
-use super::encode_questions::EncodingAnswers;
-use super::new_backup::Finish;
+use super::new_backup::{Ending, Finish};
 use crate::args::{self, Parsed, is_on};
 use crate::gate::Stop;
 use crate::os::Protection;
@@ -54,9 +54,9 @@ pub(crate) fn check_options(parsed: &Parsed) -> Result<(), Stop> {
 
 /// Runs the command with `run`: a normal command line with its own settings and no retained
 /// dates; with --configure, the settings asked behind the secret gate by `ask`, writes limited to
-/// the folders they name before the seed phrase is asked. Shift+Tab at the seed phrase comes back
-/// to the last answer; the folders stay closed then, so a folder chosen again must be the same.
-/// Dates never enter arguments.
+/// the folders they name before the dates and the seed phrase are asked. Shift+Tab at the seed
+/// phrase comes back to the dates, and on to the settings; the folders stay closed then, so a
+/// folder chosen again must be the same. Dates never enter arguments.
 pub(crate) fn run_configured(
     parsed: &Parsed,
     protection: &mut Protection,
@@ -68,30 +68,39 @@ pub(crate) fn run_configured(
     }
     super::output_questions::forget_claimed();
     let mut ruled = false;
-    let mut finish = |(arguments, dates): EncodingAnswers| -> Result<bool, Stop> {
-        let mut fresh = args::parse_arguments(&arguments[1..])?;
-        let needs = crate::output::preflight(&mut fresh)?;
-        // Writes are closed once; a second time they could only be closed further.
-        if !ruled {
-            // With nothing to save, the start folder stays open: the folder question offers it
-            // first, so a file ticked after going back from the seed phrase can still be saved.
-            let folders = if needs.folders.is_empty() {
-                vec![crate::output::resolved(".")]
-            } else {
-                needs.folders.clone()
-            };
-            protection.rule_writes(&folders);
-            crate::terminal::show_protection(&protection.report());
-            ruled = true;
-        }
-        crate::output::warn_of_cloud_copies(&fresh);
-        match run(&fresh, Some(dates)) {
-            Err(Stop::Cancelled) if crate::terminal::take_step_back() => {
-                // The seed phrase is asked again with steps to go back to.
-                crate::terminal::set_steps_back(true);
-                Ok(false)
+    let mut settled = None;
+    let mut finish = |ending: Ending| -> Result<bool, Stop> {
+        match ending {
+            Ending::Named(arguments) => {
+                let mut fresh = args::parse_arguments(&arguments[1..])?;
+                // The files go into a new folder of the task, the only one that stays open to
+                // writing.
+                let needs = crate::output::preflight_answered(&mut fresh)?;
+                // Writes are closed once, before the dates; a second time they could only be
+                // closed further. With nothing to save, every folder is closed: a file ticked after
+                // going back needs the task started again.
+                if !ruled {
+                    protection.rule_writes(&needs.folders);
+                    crate::terminal::show_protection(&protection.report());
+                    ruled = true;
+                }
+                crate::output::warn_of_cloud_copies(&fresh);
+                settled = Some(fresh);
+                Ok(true)
             }
-            ended => ended.map(|()| true),
+            Ending::Dated(dates) => {
+                let Some(fresh) = &settled else {
+                    return Ok(false);
+                };
+                match run(fresh, Some(dates)) {
+                    Err(Stop::Cancelled) if crate::terminal::take_step_back() => {
+                        // The seed phrase is asked again with steps to go back to.
+                        crate::terminal::set_steps_back(true);
+                        Ok(false)
+                    }
+                    ended => ended.map(|()| true),
+                }
+            }
         }
     };
     // The menu's task asked here: Shift+Tab goes back a step, Escape ends it for the main menu;

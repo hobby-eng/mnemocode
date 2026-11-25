@@ -133,11 +133,41 @@ pub(crate) fn saved(folder: &Path, args: &[&str]) -> String {
 #[track_caller]
 pub(crate) fn assert_refused(folder: &Path, args: &[&str], refusal: &str) {
     let before = names(folder);
+    refused(folder, args, refusal);
+    assert_eq!(names(folder), before, "{args:?}");
+}
+
+/// What `args` say on standard error, refused with words that hold `refusal`.
+#[track_caller]
+fn refused(folder: &Path, args: &[&str], refusal: &str) -> String {
     let output = run(folder, args);
-    let errors = String::from_utf8_lossy(&output.stderr);
+    let errors = String::from_utf8_lossy(&output.stderr).into_owned();
     assert_ne!(output.status.code(), Some(0), "{args:?}: {errors}");
     assert!(errors.contains(refusal), "{args:?}: {errors}");
-    assert_eq!(names(folder), before, "{args:?}");
+    errors
+}
+
+/// [`assert_refused`] for a command refused once it read a secret: the files `reserved` that its
+/// command line names were made before, and stay empty where the rules on writes keep them from
+/// being removed, each named for the person to delete; elsewhere they are gone.
+#[track_caller]
+pub(crate) fn assert_refused_with_reserved(
+    folder: &Path,
+    args: &[&str],
+    refusal: &str,
+    reserved: &[&str],
+) {
+    let before = names(folder);
+    let errors = refused(folder, args, refusal);
+    for name in names(folder) {
+        if before.contains(&name) {
+            continue;
+        }
+        assert!(reserved.contains(&name.as_str()), "{args:?}: {name}");
+        assert!(read(folder, &name).is_empty(), "{name}");
+        let named = format!("The empty file {}, made for the files", full(folder, &name));
+        assert!(errors.contains(&named), "{errors}");
+    }
 }
 
 /// The file `name` of `folder`.

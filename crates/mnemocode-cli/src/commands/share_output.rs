@@ -284,6 +284,7 @@ impl ShareCards {
 fn save_share_qrs(
     parsed: &Parsed,
     set: &ShareCardSet,
+    folder: Option<&std::path::Path>,
     save: &dyn Fn(&ShareQrCode) -> Result<Option<String>, Stop>,
 ) -> Result<(), Stop> {
     if !is_on(parsed, "card-qr-png") {
@@ -297,8 +298,12 @@ fn save_share_qrs(
     }
     if count > 0 {
         let files = if count == 1 { "file" } else { "files" };
+        let place = folder.map_or_else(
+            || "beside them".to_owned(),
+            |folder| format!("in {}", shown_path(&folder.to_string_lossy())),
+        );
         saved(&format!(
-            "Saved the QR codes of the share sheets as images beside them: {count} PNG {files}."
+            "Saved the QR codes of the share sheets as images {place}: {count} PNG {files}."
         ));
     }
     Ok(())
@@ -331,7 +336,7 @@ fn save_share_cards(
                 format_name(format),
                 shown_path(&directory)
             ));
-            save_share_qrs(parsed, set, &|code| {
+            save_share_qrs(parsed, set, None, &|code| {
                 super::cards::save_qr_inside_with(
                     &code.payload,
                     &directory,
@@ -357,7 +362,8 @@ fn save_share_cards(
     if let Some(pdf) = pdf {
         saved(&format!("Saved SSKR collection PDF: {}", shown_path(&pdf)));
         keep(Packaging::File)?;
-        save_share_qrs(parsed, set, &|code| {
+        let folder = crate::os::qr_folder_of(&resolved(&pdf));
+        save_share_qrs(parsed, set, folder.as_deref(), &|code| {
             super::cards::save_qr_beside_with(
                 &code.payload,
                 &pdf,
@@ -380,7 +386,7 @@ fn save_share_cards(
     if let Some(images) = images {
         saved_pages_notice(parsed, count, &images, Some("SSKR"))?;
         keep(Packaging::Folder)?;
-        save_share_qrs(parsed, set, &|code| {
+        save_share_qrs(parsed, set, None, &|code| {
             super::cards::save_qr_inside_with(
                 &code.payload,
                 &images,

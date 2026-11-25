@@ -232,6 +232,38 @@ fn share_set(parsed: &Parsed) -> Result<Option<(usize, usize)>, Stop> {
     Ok(Some((threshold, count)))
 }
 
+/// The checks of the command's own options, which read no secret and no picture, before its outputs
+/// are made: with --configure the private screen asks the settings, and checks them there.
+pub(crate) fn check(parsed: &Parsed) -> Result<(), Stop> {
+    if super::configure::asks_options(parsed) {
+        return Ok(());
+    }
+    let path = value(parsed, "picture").ok_or(StitchError::NoPicture)?;
+    share_set(parsed)?;
+    let width = integer_option(
+        parsed,
+        "stitches-across",
+        WIDTHS,
+        Some(DEFAULT_WIDTH as u64),
+        None,
+    )? as usize;
+    if let Some(text) = value(parsed, "fabric") {
+        Fabric::named(text)?;
+    }
+    let mode = given_mode(parsed)?.unwrap_or(Mode::Seedshift);
+    check_date_input(parsed, mode, DateWords::Codes)?;
+    super::hidden_qr::validate(parsed)?;
+    original_copy_requested(parsed)?;
+    masked_words_requested(parsed, mode)?;
+    validate_heir_sheet_options(parsed)?;
+    // A picture that makes no pattern of that width is refused before the PDF is reserved; on the
+    // private screen another picture is asked for instead, so it is read only there.
+    if !is_on(parsed, "ask-secrets") {
+        picture::grid(&read_picture(Path::new(path))?, width)?;
+    }
+    Ok(())
+}
+
 fn run_with_dates(parsed: &Parsed, dates: Option<&[mnemocode::dates::Date]>) -> Result<(), Stop> {
     let path = value(parsed, "picture").ok_or(StitchError::NoPicture)?;
     let set = share_set(parsed)?;

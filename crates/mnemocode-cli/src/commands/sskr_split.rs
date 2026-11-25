@@ -331,6 +331,11 @@ pub(crate) fn split_checked(
 }
 
 /// Runs the command.
+/// The checks of the command's own options, which read no secret, before its outputs are made.
+pub(crate) fn check(parsed: &Parsed) -> Result<(), Stop> {
+    prepare_split(parsed, false).map(drop)
+}
+
 pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
     let checked = prepare_split(parsed, false)?;
     split_checked(parsed, &checked, None, None)

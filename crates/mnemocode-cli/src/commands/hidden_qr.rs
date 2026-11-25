@@ -27,14 +27,41 @@ pub(crate) fn image(parsed: &Parsed, record: &str) -> Result<SecretBytes, QrErro
     }
 }
 
-/// Wrap an already protected record or a SeedStitch legend in a separate QR image.
-pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
+/// The most bytes of a record that qr-hide reads.
+const MOST_RECORD_BYTES: usize = 4096;
+
+/// The checks of qr-hide's options before its image is reserved. The record is secret and read
+/// only later; its size, which its file tells, says already where it cannot fit beside the text.
+pub(crate) fn check(parsed: &Parsed) -> Result<(), Stop> {
+    let input = required(parsed)?;
+    let Ok(os::FileLook::File { bytes, .. }) = os::look_at_file(&resolved(input)) else {
+        return Ok(());
+    };
+    let bytes = usize::try_from(bytes).unwrap_or(usize::MAX);
+    let shown = value(parsed, "qr-text").unwrap_or(DEFAULT_VISIBLE);
+    if bytes == 0 {
+        return Err(QrError::Empty.into());
+    }
+    if bytes <= MOST_RECORD_BYTES && !qr::hidden::fits(shown.len(), bytes) {
+        return Err(QrError::TooLarge.into());
+    }
+    Ok(())
+}
+
+/// The file of the record, where the image is named too: qr-hide needs both.
+fn required(parsed: &Parsed) -> Result<&str, Stop> {
     let input = value(parsed, "input-file")
         .ok_or_else(|| ArgsError::Required("--input-file PATH".to_owned()))?;
     if value(parsed, "qr").is_none() {
         return Err(ArgsError::Required("--qr PATH".to_owned()).into());
     }
-    let record = read_input_text(input, "The hidden record", 4096)?;
+    Ok(input)
+}
+
+/// Wrap an already protected record or a SeedStitch legend in a separate QR image.
+pub(crate) fn run(parsed: &Parsed) -> Result<(), Stop> {
+    let input = required(parsed)?;
+    let record = read_input_text(input, "The hidden record", MOST_RECORD_BYTES)?;
     let shown = value(parsed, "qr-text").unwrap_or(DEFAULT_VISIBLE);
     let image = qr::hidden::png(shown, record.as_str())?;
     if save_output(

@@ -11,7 +11,7 @@ use mnemocode_embroidery::picture::{self, DEFAULT_WIDTH};
 use super::asking::{ask_list, ask_list_at};
 use super::encode_questions::file_questions;
 use super::given::PATH_LIMIT;
-use super::output_questions::{claim_read, input_file, new_folder, output_file};
+use super::output_questions::{input_file, new_folder, output_file};
 use crate::gate::Stop;
 use crate::input::read_picture;
 use crate::terminal::{Choice, Chosen, Explanation, LineQuestion, ask_line};
@@ -35,7 +35,7 @@ pub(crate) fn ask_pattern(finish: &mut super::new_backup::Finish<'_>) -> Result<
     super::new_backup::ask_new_backup(super::new_backup::Way::Embroidery, finish)
 }
 
-/// The pattern's own questions, after the dates: the picture, the fabric and the size; stitch's
+/// The pattern's own questions, after Seedshift: the picture, the fabric and the size; stitch's
 /// options for them, or none for back. Its PDF is named last (pattern_file).
 pub(crate) fn ask_pattern_own() -> Result<Option<Vec<String>>, Stop> {
     use super::new_backup::{answered, run_steps};
@@ -58,11 +58,10 @@ pub(crate) fn ask_pattern_own() -> Result<Option<Vec<String>>, Stop> {
     let mut fabric = DEFAULT_FABRIC;
     let mut across = 0;
     // The picture, the fabric and the size, Shift+Tab going back a step.
-    let done = run_steps(3, &[], |step| {
+    let done = run_steps(3, Vec::new, |step| {
         Ok(match step {
             0 => answered(ask_picture()?.map(|(picture, widths)| {
-                // The pattern may not be saved over its own picture.
-                claim_read(&picture.path);
+                // The pattern goes into the new folder of the task, never over its own picture.
                 chosen = Some((picture, widths));
             })),
             1 => answered(

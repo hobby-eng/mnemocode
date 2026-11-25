@@ -249,13 +249,13 @@ fn expected(args: &[&str], text: &str) -> String {
             "The file may be up to 32 KiB.",
         );
     }
-    // Protected date-first setup is new in Rust; the recorded TS vectors remain unchanged.
+    // Protected setup, its dates last, is new in Rust; the recorded TS vectors remain unchanged.
     if args.contains(&"encode") {
         text = text.replace(
             "      --mnemonic-file <PATH>    ",
             concat!(
-                "      --configure               Choose Seedshift and enter its dates before the\n",
-                "                                other settings on the private screen\n",
+                "      --configure               Answer the settings on the private screen, the\n",
+                "                                Seedshift dates last\n",
                 "      --mnemonic-file <PATH>    ",
             ),
         );
@@ -263,11 +263,11 @@ fn expected(args: &[&str], text: &str) -> String {
             "      --mnemonic-file <PATH>\n",
             concat!(
                 "      --configure\n",
-                "          Choose Seedshift and enter its dates before the other settings on the\n",
-                "          private screen.\n\n",
+                "          Answer the settings on the private screen, the Seedshift dates last.\n\n",
                 "          Requires --ask-secrets. Encode also accepts --format, or --sskr for\n",
-                "          share setup; all remaining settings are asked. The start menu uses\n",
-                "          this order too.\n\n",
+                "          share setup; all remaining settings are asked. The dates come after\n",
+                "          where the result is saved, once every other folder is closed to\n",
+                "          writing. The start menu uses this order too.\n\n",
                 "      --mnemonic-file <PATH>\n",
             ),
         );

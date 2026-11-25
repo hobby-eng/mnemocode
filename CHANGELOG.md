@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Saving
+
+- The files of a menu task go into a new folder made inside the folder chosen, `design-files` (`design-files-1` where that name is taken). On Linux it is the only folder open to writing once the seed phrase is asked: nothing that runs in MnemoCode can add or change a file anywhere else, such as a shell's start-up file or an autostart entry in the home folder, which would run later outside its protections. A task left before anything is saved may leave the folder empty, and MnemoCode names it.
+- The Seedshift dates of a new backup are asked last in the menu, after where it is saved and just before the seed phrase, so that every other folder is closed to writing before they are typed. Shift+Tab at the seed phrase goes back to them. This holds for Encode, Embroidery, Split into shares, the new backup of Re-encode, and `--configure`.
+- On the command line each output is made before the seed phrase is read: a file empty, private and held open, then written in place; a folder new. Missing folders above an output are made private as well, as every folder MnemoCode makes. No existing folder stays open to writing. A command that ends before it saves, refused or cancelled, can leave those empty and names them; a failed save on the private screen can be tried again or skipped, not saved under another name. The QR images of shares that go with a PDF (`--card-qr-png`) go into a new folder named after it, such as `shares-qr-codes`.
+
 ### Reading backups from files
 
 - A card file whose metadata names its share set or its document in another form than MnemoCode writes is not taken for cards: that text was shown in the list of what a folder holds, where a crafted file could send the terminal escape sequences.

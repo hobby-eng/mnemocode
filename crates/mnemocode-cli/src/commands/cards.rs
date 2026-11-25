@@ -29,7 +29,7 @@ use super::share_output::{report_qr_verified, step_failed};
 use crate::args::{Given, Parsed, assert_text_values, is_on, parse_arguments, value};
 use crate::gate::Stop;
 use crate::os::{self, FileError, Folder, SystemRandom};
-use crate::output::{first_free_name, shown_path};
+use crate::output::{MAX_COPY_NUMBER, first_free_name, numbered_name, qr_beside, shown_path};
 use crate::terminal::{self, saved};
 
 /// The options of each detail of the person on the cards, by the detail.
@@ -556,17 +556,6 @@ impl PlannedCards {
     }
 }
 
-/// `path` beside the sheet `sheet`, named after it, "cards.pdf" giving "cards-qr.png", with `suffix`
-/// before "-qr".
-fn beside(sheet: &str, suffix: &str) -> PathBuf {
-    let path = Path::new(sheet);
-    let name = path
-        .file_stem()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    path.with_file_name(format!("{name}{suffix}-qr.png"))
-}
-
 /// The image of a QR code that a sheet prints, saved beside the PDF `sheet`, under a free name; the
 /// name used, none when skipped.
 pub(crate) fn save_qr_beside(
@@ -584,7 +573,13 @@ pub(crate) fn save_qr_beside_with(
     suffix: &str,
     contact: Option<&str>,
 ) -> Result<Option<String>, Stop> {
-    save_qr_at(payload, &beside(sheet, suffix), contact)
+    // The QR images of shares that the command line saves with a PDF go into the folder made for
+    // them before the seed phrase, named after the PDF, each named as inside a folder of sheets.
+    if let Some(folder) = os::qr_folder_of(&resolved(sheet)) {
+        let name = suffix.trim_start_matches('-');
+        return save_qr_inside_with(payload, &folder.to_string_lossy(), name, contact);
+    }
+    save_qr_at(payload, &qr_beside(sheet, suffix), contact)
 }
 
 /// Saves a hidden QR in the images folder, using its already selected contact.
@@ -630,7 +625,21 @@ fn normalised(path: &Path) -> PathBuf {
 
 /// Saves the QR image of `payload` at the first free name from `path`, as every result is saved.
 fn save_qr_at(payload: &str, path: &Path, contact: Option<&str>) -> Result<Option<String>, Stop> {
-    let free = first_free_name(&normalised(path).to_string_lossy())?;
+    let base = normalised(path).to_string_lossy().into_owned();
+    // The image reserved for it before the seed phrase, under its name or a numbered one.
+    let reserved = (0..=MAX_COPY_NUMBER)
+        .map(|number| {
+            if number == 0 {
+                base.clone()
+            } else {
+                numbered_name(&base, number, false)
+            }
+        })
+        .find(|name| os::is_reserved(&resolved(name)));
+    let free = match reserved {
+        Some(name) => name,
+        None => first_free_name(&base)?,
+    };
     let image = mnemocode::qr::hidden::png_behind(contact, payload)?;
     let mut output = Parsed::new();
     output.insert("qr".to_owned(), Given::One(free));

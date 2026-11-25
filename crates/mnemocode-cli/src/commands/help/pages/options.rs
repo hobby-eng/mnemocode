@@ -17,9 +17,9 @@ pub(super) const ASK_SECRETS: HelpOption = HelpOption {
 pub(super) const CONFIGURE: HelpOption = HelpOption {
     flag: "--configure",
     value: None,
-    summary: "Choose Seedshift and enter its dates before the other settings on the private screen",
+    summary: "Answer the settings on the private screen, the Seedshift dates last",
     details: &[
-        "Requires --ask-secrets. Encode also accepts --format, or --sskr for share setup; all remaining settings are asked. The start menu uses this order too.",
+        "Requires --ask-secrets. Encode also accepts --format, or --sskr for share setup; all remaining settings are asked. The dates come after where the result is saved, once every other folder is closed to writing. The start menu uses this order too.",
     ],
 };
 
@@ -232,7 +232,7 @@ pub(super) const CARD_QR_PNG: HelpOption = HelpOption {
     value: None,
     summary: "Also save the QR code of the sheets as a PNG image",
     details: &[
-        "Beside the PDF (cards.pdf gives cards-qr.png), or in the folder of the sheets; one image per share for Shamir shares. Decode reads it back with --qr-file, Restore with --share-qr. With encode, --qr names an image of its own instead.",
+        "Beside the PDF (cards.pdf gives cards-qr.png), or in the folder of the sheets. Shamir shares get one image each; beside a PDF named on the command line they go into a new folder named after it, cards-qr-codes. Decode reads it back with --qr-file, Restore with --share-qr. With encode, --qr names an image of its own instead.",
     ],
 };
 

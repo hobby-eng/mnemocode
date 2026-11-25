@@ -483,7 +483,7 @@ fn re_encode_checks_what_is_given_before_its_first_question() {
 }
 
 #[test]
-fn menu_seedshift_dates_are_asked_before_other_settings_and_cancel_privately() {
+fn menu_seedshift_dates_are_asked_after_the_settings_and_cancel_privately() {
     for version in ["1", "2"] {
         let mut session = at_the_menu();
         session.press("1");
@@ -491,23 +491,19 @@ fn menu_seedshift_dates_are_asked_before_other_settings_and_cancel_privately() {
         session.press("3");
         session.wait_for("Use Seedshift?");
         session.press(version);
+        // Either Seedshift can be split: shares come next, and the dates only once every setting
+        // is answered and the folders are closed to writing.
+        shown_on_the_screen_only(&mut session);
         session.wait_for("DD-MM-YYYY, separated by spaces):");
         session.wait_for(" back · ");
-        let before_dates = session.written().to_owned();
-        assert!(
-            !before_dates.contains("Split it into Shamir shares?"),
-            "{before_dates}"
-        );
-        assert!(
-            !before_dates.contains("Where should the result be saved?"),
-            "{before_dates}"
-        );
+        let written = session.written();
+        let (settings, dates) = (written.find("Add a QR code?"), written.find("DD-MM-YYYY"));
+        assert!(settings < dates, "{written}");
         session.press("not-a-date\r");
         session.wait_for("DD-MM-YYYY, separated by spaces):");
         session.wait_for(" back · ");
         session.press("23-09-2026\r");
-        // Either Seedshift can be split: shares come next.
-        session.wait_for("Split it into Shamir shares?");
+        session.wait_for("Enter the seed phrase");
         session.press("\x03");
         session.wait_for("Choose an action");
         session.press("q");
@@ -519,14 +515,14 @@ fn menu_seedshift_dates_are_asked_before_other_settings_and_cancel_privately() {
 }
 
 #[test]
-fn share_creation_asks_its_dates_immediately_after_seedshift() {
+fn share_creation_asks_its_dates_after_its_settings() {
     let mut session = at_the_menu();
     session.press("4");
     session.wait_for("Use Seedshift before splitting?");
     session.press("1");
-    session.wait_for("DD-MM-YYYY, separated by spaces):");
+    session.wait_for("How should each share be written?");
     session.wait_for(" back · ");
-    assert!(!session.written().contains("How many shares, and how many"));
+    assert!(!session.written().contains("DD-MM-YYYY"));
     session.press("\x1b");
     exit_menu(session);
 }
@@ -554,6 +550,20 @@ fn configure_rejects_conflicting_options_and_requires_private_input() {
     }
 }
 
+/// A new backup's settings after Seedshift: no shares, no sheet for heirs, and where it is saved
+/// the screen only (printable cards, ticked by default, unticked), with no QR code.
+fn shown_on_the_screen_only(session: &mut Session) {
+    session.wait_for("Split it into Shamir shares?");
+    session.press("1");
+    session.wait_for("Instructions for your heirs?");
+    session.press("1");
+    session.wait_for("Where should the result be saved?");
+    session.press("2");
+    session.press("\r");
+    session.wait_for("Add a QR code?");
+    session.press("1");
+}
+
 /// `re-encode --ask-secrets` at its second question, a form chosen.
 fn at_the_second_question_of_a_new_backup() -> Session {
     let mut session = Session::start(PROGRAM, &["re-encode", "--ask-secrets"]);
@@ -577,17 +587,7 @@ fn escape_in_a_new_backup_goes_back_to_its_first_question_and_cancels_there() {
 fn the_old_backup_is_not_asked_under_the_heading_of_the_new_one() {
     let mut session = at_the_second_question_of_a_new_backup();
     session.press("3");
-    session.wait_for("Split it into Shamir shares?");
-    session.press("1");
-    session.wait_for("Instructions for your heirs?");
-    session.press("1");
-    // Where it is saved comes last: printable cards, ticked by default, untouched; the screen
-    // only, and no QR code.
-    session.wait_for("Where should the result be saved?");
-    session.press("2");
-    session.press("\r");
-    session.wait_for("Add a QR code?");
-    session.press("1");
+    shown_on_the_screen_only(&mut session);
     session.wait_for("Enter the encoded seed phrase, a record or the path of a text file:");
     let written = session.written();
     let last_page = written.rsplit("\x1b[2J").next().expect("a page");

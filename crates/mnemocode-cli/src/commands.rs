@@ -65,7 +65,13 @@ pub(crate) struct Command {
     pub(crate) run: Run,
     /// Whether the answers on its private screen may name the folders it saves into.
     pub(crate) asks_outputs: Option<fn(&Parsed) -> bool>,
+    /// The checks of its own options that read no secret, run before its outputs are made, so that
+    /// a mistyped option leaves no file behind; none where there are none to run early.
+    pub(crate) check: Option<Check>,
 }
+
+/// A command's early checks of its options.
+pub(crate) type Check = fn(&Parsed) -> Result<(), Stop>;
 
 /// What runs a command.
 #[derive(Clone, Copy)]
@@ -98,6 +104,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: true,
         run: Run::Options(hidden_qr::open),
         asks_outputs: None,
+        check: None,
     },
     Command {
         name: "qr-hide",
@@ -107,6 +114,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: true,
         run: Run::Options(hidden_qr::run),
         asks_outputs: None,
+        check: Some(hidden_qr::check),
     },
     Command {
         name: "encode",
@@ -116,6 +124,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: true,
         run: Run::Ruling(encode::run),
         asks_outputs: Some(configure::asks_options),
+        check: Some(encode::check),
     },
     Command {
         name: "decode",
@@ -125,6 +134,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: true,
         run: Run::Options(decode::run),
         asks_outputs: None,
+        check: None,
     },
     Command {
         name: "re-encode",
@@ -137,6 +147,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: true,
         run: Run::Ruling(re_encode::run),
         asks_outputs: Some(re_encode::asks_new_backup),
+        check: Some(re_encode::check),
     },
     Command {
         name: "recover-date",
@@ -146,6 +157,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: true,
         run: Run::Options(recover_date::run),
         asks_outputs: None,
+        check: None,
     },
     Command {
         name: "recover-word",
@@ -155,6 +167,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: true,
         run: Run::Options(recover_word::run),
         asks_outputs: Some(recover_word::offers_candidate_list),
+        check: None,
     },
     Command {
         name: "sskr-combine",
@@ -164,6 +177,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: true,
         run: Run::Options(sskr_combine::run),
         asks_outputs: None,
+        check: None,
     },
     Command {
         name: "sskr-export",
@@ -178,6 +192,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: true,
         run: Run::Options(sskr_export::run),
         asks_outputs: None,
+        check: Some(sskr_export::check),
     },
     Command {
         name: "sskr-split",
@@ -187,6 +202,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: true,
         run: Run::Options(sskr_split::run),
         asks_outputs: None,
+        check: Some(sskr_split::check),
     },
     Command {
         name: "stitch",
@@ -196,6 +212,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: true,
         run: Run::Ruling(stitch::run),
         asks_outputs: Some(configure::asks_options),
+        check: Some(stitch::check),
     },
     Command {
         name: "preview",
@@ -205,6 +222,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: false,
         run: Run::Options(preview::run),
         asks_outputs: None,
+        check: None,
     },
     Command {
         name: "table",
@@ -214,6 +232,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: false,
         run: Run::Options(table::run),
         asks_outputs: None,
+        check: None,
     },
     Command {
         name: "self-test",
@@ -223,6 +242,7 @@ pub(crate) const COMMANDS: [Command; 14] = [
         secret: false,
         run: Run::SelfTest(self_test::run),
         asks_outputs: None,
+        check: None,
     },
 ];
 

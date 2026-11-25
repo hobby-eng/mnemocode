@@ -385,6 +385,15 @@ impl Refusal for EncodeOptionError {
     }
 }
 
+/// The checks of Encode's own options, which read no secret, before its outputs are made: with
+/// --configure the private screen asks the settings, and checks them there.
+pub(crate) fn check(parsed: &Parsed) -> Result<(), Stop> {
+    if super::configure::asks_options(parsed) {
+        return Ok(());
+    }
+    prepare_encode(parsed).map(drop)
+}
+
 /// Checks every option of Encode, the destinations included, before the phrase is asked or read,
 /// and gives what then encodes: a plain backup, or with --sskr its shares.
 pub(crate) fn prepare_encode(parsed: &Parsed) -> Result<PreparedEncode, Stop> {

@@ -36,6 +36,19 @@ fn check(bytes: &[u8]) -> [u8; CHECK] {
     result
 }
 
+/// Whether a visible text of `visible` bytes and a record of `record` bytes fit in version `v`.
+fn fits_in(v: u8, visible: usize, record: usize) -> bool {
+    let prefix = if v < 10 { 2 } else { 3 };
+    visible + prefix + record + HEADER + CHECK <= blocks::capacity(v) && (v >= 10 || visible < 256)
+}
+
+/// Whether a visible text of `visible` bytes and a record of `record` bytes fit together in one QR
+/// code, as [`matrix`] makes it: a front end tells it from a file's size, without reading it.
+#[must_use]
+pub fn fits(visible: usize, record: usize) -> bool {
+    u16::try_from(record).is_ok() && (1..=40).any(|v| fits_in(v, visible, record))
+}
+
 /// A level-M matrix with a visible UTF-8 byte segment and an exact hidden UTF-8 record.
 /// Both must be nonempty and fit together in version 40. Both layers are verified before return.
 pub fn matrix(visible: &str, record: &str) -> Result<Matrix, QrError> {
@@ -44,11 +57,7 @@ pub fn matrix(visible: &str, record: &str) -> Result<Matrix, QrError> {
     }
     let length = u16::try_from(record.len()).map_err(|_| QrError::TooLarge)?;
     let version = (1..=40)
-        .find(|&v| {
-            let prefix = if v < 10 { 2 } else { 3 };
-            visible.len() + prefix + record.len() + HEADER + CHECK <= blocks::capacity(v)
-                && (v >= 10 || visible.len() < 256)
-        })
+        .find(|&v| fits_in(v, visible.len(), record.len()))
         .ok_or(QrError::TooLarge)?;
     let prefix = if version < 10 { 2 } else { 3 };
     let mut data = SecretBytes::zeroed("hidden QR codewords", blocks::capacity(version));

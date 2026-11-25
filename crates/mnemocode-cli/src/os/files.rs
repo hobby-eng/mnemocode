@@ -66,6 +66,8 @@ pub(crate) enum FileError {
     },
     /// A step of the save that is not the file system's failed, in its own words.
     Step(Box<dyn Refusal + Send + Sync>),
+    /// The file made for a save before the seed phrase was removed or replaced since.
+    ReservationGone,
 }
 
 /// A path for a message: control characters replaced (CAP-CLI-SAFE-DISPLAY-TEXT).
@@ -109,6 +111,9 @@ impl fmt::Display for FileError {
                 shown(reservation)
             ),
             Self::Step(error) => error.fmt(f),
+            Self::ReservationGone => f.write_str(
+                "The empty file made for it before the seed phrase was read was removed or replaced meanwhile.",
+            ),
         }
     }
 }
@@ -138,6 +143,7 @@ impl Refusal for FileError {
             Self::FailedSaveLeftCopy { .. } => "failed-save-left-staging-copy",
             Self::FailedSaveLeftReservation { .. } => "failed-save-left-reservation",
             Self::Step(error) => error.code(),
+            Self::ReservationGone => "cli.file-system.reservation-gone",
         }
     }
 }
@@ -274,9 +280,18 @@ pub(crate) fn may_write(folder: &Path) -> bool {
         .is_ok_and(|staging| remove_staging(&staging, false).is_ok())
 }
 
-/// Makes `folder` with every missing folder above it, as the preflight does for each output's
-/// parent before any secret (ARCHITECTURE.md §5).
+/// Makes `folder` with every missing folder above it, each private like the folders of exports, as
+/// the preflight does for each output's parent before any secret (ARCHITECTURE.md §5).
 pub(crate) fn make_folders(folder: &Path) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(folder)
+    }
+    #[cfg(not(unix))]
     fs::create_dir_all(folder)
 }
 
@@ -462,9 +477,9 @@ static TEMPORARY: Mutex<Vec<(PathBuf, Option<Identity>)>> = Mutex::new(Vec::new(
 /// What tells a folder from another one made at its path since: its device and inode on Unix,
 /// its creation time on Windows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Identity(u64, u64);
+pub(super) struct Identity(u64, u64);
 
-fn identity_of(path: &Path) -> Option<Identity> {
+pub(super) fn identity_of(path: &Path) -> Option<Identity> {
     let metadata = fs::symlink_metadata(path).ok()?;
     #[cfg(unix)]
     {
@@ -574,7 +589,7 @@ pub(crate) fn private_folder(path: &Path) -> io::Result<()> {
 }
 
 /// A new file at `path` that only its owner may read; fails where something is there already.
-fn private_file(path: &Path) -> io::Result<File> {
+pub(super) fn private_file(path: &Path) -> io::Result<File> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
@@ -629,11 +644,25 @@ pub(crate) fn stop_if_signalled() -> Result<(), FileError> {
 }
 
 /// Publishes the new private file at `path` that `write` fills, as a file too large for memory is
-/// written: it fills the staged copy, and nothing is at `path` unless it succeeds.
+/// written: it fills the staged copy, and nothing is at `path` unless it succeeds. A file reserved
+/// at `path` before the seed phrase is filled itself, as no folder may be written then.
 pub(crate) fn publish_written_file(
     path: &Path,
     write: impl FnOnce(File) -> Result<(), FileError>,
 ) -> Result<(), FileError> {
+    if let Some(reserved) = super::prepared::reserved_file(path)? {
+        let written = stop_if_signalled()
+            .and_then(|()| write(reserved))
+            .and_then(|()| {
+                if super::prepared::still_reserved(path) {
+                    Ok(())
+                } else {
+                    Err(FileError::ReservationGone)
+                }
+            });
+        super::prepared::mark_saved(path, written.is_ok());
+        return written;
+    }
     publish_staged_file(path, |temporary| {
         write(private_file(temporary)?)?;
         Ok(true)
@@ -678,6 +707,8 @@ fn publish_staged_file(
     if let Err(failure) = published {
         return Err(after_failed_staging(&staging, failure));
     }
+    // A folder made for files before the seed phrase holds one now.
+    super::prepared::mark_saved(parent, true);
     remove_staging(&staging, false)
         .map(|()| true)
         .map_err(|_| FileError::LeftStagingCopy {
@@ -706,6 +737,10 @@ impl Folder {
             return Err(FileError::BlankPath);
         }
         let target = resolve(path, current);
+        // The new folder that the command made for it before the seed phrase is its own.
+        if super::prepared::is_prepared_folder(&target) {
+            return Ok(Self { target, taken });
+        }
         if entry_at(&target)? != Entry::None {
             return Err(FileError::Taken(taken));
         }
@@ -744,8 +779,11 @@ fn publish_folder_if<T>(
     taken: &str,
     write: impl FnOnce(&Path) -> Result<(T, bool), FileError>,
 ) -> Result<T, FileError> {
+    if super::prepared::is_prepared_folder(target) {
+        return fill_prepared_folder(target, prefix, write);
+    }
     let parent = target.parent().unwrap_or(Path::new("."));
-    fs::create_dir_all(parent)?;
+    make_folders(parent)?;
     let staging = make_staging(&parent.join(prefix))?;
     let mut reservation = None;
     let result = write(&staging).and_then(|(result, proceed)| {
@@ -764,12 +802,7 @@ fn publish_folder_if<T>(
         let made = identity_of(target);
         note(target, made);
         reservation = Some(made);
-        for entry in fs::read_dir(&staging)? {
-            let name = entry?.file_name();
-            fs::rename(staging.join(&name), target.join(&name))?;
-        }
-        // Every file was moved: a staging folder that is not empty fails the export.
-        remove_staging(&staging, true)?;
+        move_staged(&staging, target)?;
         forget(target);
         Ok(result)
     });
@@ -791,9 +824,58 @@ fn publish_folder_if<T>(
     })
 }
 
+/// Moves every file of `staging` into `target`, then removes `staging`: one that is not empty then
+/// fails the export.
+fn move_staged(staging: &Path, target: &Path) -> Result<(), FileError> {
+    for entry in fs::read_dir(staging)? {
+        let name = entry?.file_name();
+        fs::rename(staging.join(&name), target.join(&name))?;
+    }
+    Ok(remove_staging(staging, true)?)
+}
+
+/// Fills `target`, a new folder made before the seed phrase: `write` fills a staging folder inside
+/// it, whose files are then moved up, so that no right beside it is needed. A failed save leaves
+/// the folder for the end of the command, which empties it ([`super::prepared::remove_unused`]).
+fn fill_prepared_folder<T>(
+    target: &Path,
+    prefix: &str,
+    write: impl FnOnce(&Path) -> Result<(T, bool), FileError>,
+) -> Result<T, FileError> {
+    let staging = make_staging(&target.join(prefix))?;
+    let result = write(&staging).and_then(|(result, proceed)| {
+        if !proceed {
+            remove_staging(&staging, false)?;
+            return Ok(result);
+        }
+        stop_if_signalled()?;
+        move_staged(&staging, target)?;
+        super::prepared::mark_saved(target, true);
+        Ok(result)
+    });
+    result.map_err(|failure| after_failed_staging(&staging, failure))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn the_missing_folders_above_an_output_are_made_private() {
+        use std::os::unix::fs::PermissionsExt;
+        in_temporary_folder("mnemocode-parents-", |folder| {
+            let deepest = folder.join("cards/2026");
+            make_folders(&deepest).unwrap();
+            for made in [folder.join("cards"), deepest.clone()] {
+                let mode = fs::metadata(&made).unwrap().permissions().mode() & 0o777;
+                assert_eq!(mode, 0o700, "{}", made.display());
+            }
+            // A folder that is there already is taken as it is.
+            make_folders(&deepest).unwrap();
+        })
+        .unwrap();
+    }
 
     #[test]
     fn paths_resolve_by_their_names() {

@@ -34,11 +34,16 @@ refusal and primary sources, is in `protections.json` (66 measures: 32 required,
    among them, get a free-memory check before allocation and the swap warning.
 4. **Linux sandbox.** seccomp refuses other architectures, x32, `socket`, `socketpair` and the three
    `io_uring` calls; Landlock handles every file-changing right of the kernel's ABI and grants the
-   publication rights beneath the parent folder of each output, opened before the secret; the
+   publication rights only beneath folders that the preflight made new before the secret: a menu
+   task's folder (`design-files` in the folder chosen) or a command line's output folders. A
+   command line's output files are reserved then, empty, private and held open, and written through
+   those descriptors; no existing folder gets a rule (CORE-55: a right beneath the home folder would
+   let a dependency plant a shell start-up file or an autostart entry that runs later outside the
+   sandbox). A process ending before it saves cannot remove what it made, which is named. The
    preflight makes a missing parent, with any missing folders above it, before the secret (owner, 2026-10-27;
    TS makes them at publication, `private-file.ts:271`), and those stay after a cancel, since a
    Landlocked process cannot remove the folder its rule sits on. It applies on the private screen too: re-encode asks its outputs before
-   the old phrase, a second Landlock restriction rules them before that phrase is read, and the save retry keeps to the ruled folders. With `--configure`, Encode and Embroidery ask Seedshift dates before output paths: the socket filter is already active, writes remain open until output preflight, and `rule_writes` then restricts the chosen folders before the seed phrase is read. Shift+Tab from the seed phrase back to these settings keeps that restriction: another folder is refused (`cli.output-questions.folder-locked`). Dates stay in secret owners outside the command arguments. No network namespace: on the release targets it closes no path the socket
+   the old phrase, a second Landlock restriction rules them before that phrase is read, and the save retry keeps to the ruled folders. With `--configure`, Encode, Embroidery and Split ask the output paths before the Seedshift dates: the socket filter is already active, writes remain open until output preflight, and `rule_writes` then restricts them to the new folder of the task's files before the dates and the seed phrase are typed; re-encode's new backup does the same before its dates. Shift+Tab from the dates or the seed phrase back to these settings keeps that restriction: another folder is refused (`cli.output-questions.folder-locked`). Dates stay in secret owners outside the command arguments. No network namespace: on the release targets it closes no path the socket
    filter leaves open (owner, 2026-10-27; RUST-10 amended). No `execve` denial on Linux or in Seatbelt, and no
    limit on child processes in the Windows job: filters, Landlock domains, the Seatbelt profile and the job
    pass to a started program, which gains nothing the process lacks (owner, 2026-10-27; TS 0.1.0 has all three).
@@ -81,7 +86,7 @@ refusal and primary sources, is in `protections.json` (66 measures: 32 required,
 | Linux     | `L-RLIMIT-DATA` the memory cap                                                                                                                                                                 | getrlimit · report                                       |
 | Linux     | `L-NO-NEW-PRIVS`                                                                                                                                                                               | PR_GET_NO_NEW_PRIVS · report, skip seccomp and Landlock  |
 | Linux     | `L-SECCOMP-SOCKETS` filter with TSYNC                                                                                                                                                          | probes: socket and io_uring_setup give EACCES · report   |
-| Linux     | `L-LANDLOCK-WRITES` rights by ABI, a rule on each output's parent folder                                                                                                                       | probe: /dev/null for writing gives EACCES · report       |
+| Linux     | `L-LANDLOCK-WRITES` rights by ABI, rules only on the new folders made before the secret                                                                                                        | probe: /dev/null for writing gives EACCES · report       |
 | macOS     | `M-CORE-LIMIT` setrlimit(RLIMIT_CORE, 0)                                                                                                                                                       | getrlimit · refuse secrets                               |
 | macOS     | `M-DENY-ATTACH` ptrace(PT_DENY_ATTACH)                                                                                                                                                         | none exists; a traced process exits · report "requested" |
 | macOS     | `M-SEATBELT-NETWORK` sandbox_init `(deny network*)`                                                                                                                                            | probe: UDP connect refused · report                      |

@@ -7,6 +7,7 @@ mod child;
 mod console;
 mod env;
 mod files;
+mod prepared;
 mod protect;
 mod random;
 mod signals;
@@ -31,6 +32,10 @@ pub(crate) use files::{
     new_private_file as write_new_private_file, private_folder as make_private_folder,
     publish_new_file, publish_written_file, read_bounded, read_large_secret_file, read_public_file,
     read_secret_file, real_path, remove_left, resolve, stop_if_signalled, temporary_folder,
+};
+pub(crate) use prepared::{
+    Left as LeftPrepared, is_prepared_folder, is_reserved, prepare_folder, qr_folder_of,
+    remove_unused, reserve_file, task_folder, task_folder_in,
 };
 pub(crate) use protect::{Needs, Protection, ruled_folders};
 pub(crate) use random::SystemRandom;

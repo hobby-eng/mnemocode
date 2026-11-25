@@ -40,7 +40,7 @@ Other target names and the canonical build are described in [Releasing](RELEASIN
 
 `mnemocode --help` lists commands. `mnemocode <command> --help` describes the options and examples; `-h` gives a short summary. In a source checkout, replace `mnemocode` with `target/release/mnemocode`.
 
-The Encode menu (including Embroidery) asks for the Seedshift version and immediately asks for its dates, before the remaining settings. Choosing no Seedshift skips dates. Dates stay on the private screen and are never added to the command preview. The equivalent `encode --configure --ask-secrets` (optionally `--format`, or `--sskr` as the menu's Split into shares runs it) or `stitch --configure --ask-secrets` asks the same settings. Plain `--ask-secrets` with explicit settings keeps its existing phrase-then-dates order. On Linux, the socket filter is active while paths are being selected; file writes stay open until output preflight, then are restricted to the selected folders before the seed phrase is read. Available protections differ by platform and are reported on the private screen.
+The Encode menu (including Embroidery) asks for the Seedshift version first and for its dates last, after the remaining settings and just before the seed phrase. Choosing no Seedshift skips dates. Dates stay on the private screen and are never added to the command preview. The equivalent `encode --configure --ask-secrets` (optionally `--format`, or `--sskr` as the menu's Split into shares runs it) or `stitch --configure --ask-secrets` asks the same settings. Plain `--ask-secrets` with explicit settings keeps its existing phrase-then-dates order. On Linux, the socket filter is active while paths are being selected; file writes stay open until output preflight, then are restricted to the new folder of the task's files before the dates and the seed phrase are typed. Available protections differ by platform and are reported on the private screen.
 
 ## Input files and limits
 
@@ -326,22 +326,22 @@ For `decode` and `recover-date`, `--format` is usually optional. MnemoCode picks
 
 ## Card options
 
-| Option                                     | Result                                                                                                |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `--template ID`                            | The design, by name or number                                                                         |
-| `--pdf PATH`                               | The whole collection as one PDF                                                                       |
-| `--cards-dir NEW_FOLDER`                   | [One file per card](../README.md#individual-business-cards); for shares, one file or folder per share |
-| `--images-dir NEW_FOLDER`                  | The collection pages as PNG images                                                                    |
-| `--image-format png\|jpg`                  | The image format for `--images-dir` and `--cards-dir`                                                 |
-| `--page-size`, `--orientation`             | See [Page sizes](../README.md#page-sizes)                                                             |
-| `--card-qr`                                | One QR code on the collection sheet                                                                   |
-| `--card-qr-png`                            | That QR code also as a PNG image beside the PDF or in the image folder                                |
-| `--qr-hidden`                              | The QR code's record hidden behind a contact or `--qr-text`; see [Hidden QR records](HIDDEN_QR.md)    |
-| `--qr-text TEXT`                           | The public text of a separate hidden QR PNG                                                           |
-| `--card-layout qr\|collection\|individual` | For shares: how each share is printed; see [Share cards](SSKR.md#share-cards)                         |
-| `--title TEXT`                             | The collection title; by default it is the studio name                                                |
-| `--cards`                                  | Color cards in the terminal                                                                           |
-| `--qr PATH`                                | A separate QR code as a PNG image                                                                     |
+| Option                                     | Result                                                                                                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `--template ID`                            | The design, by name or number                                                                                                   |
+| `--pdf PATH`                               | The whole collection as one PDF                                                                                                 |
+| `--cards-dir NEW_FOLDER`                   | [One file per card](../README.md#individual-business-cards); for shares, one file or folder per share                           |
+| `--images-dir NEW_FOLDER`                  | The collection pages as PNG images                                                                                              |
+| `--image-format png\|jpg`                  | The image format for `--images-dir` and `--cards-dir`                                                                           |
+| `--page-size`, `--orientation`             | See [Page sizes](../README.md#page-sizes)                                                                                       |
+| `--card-qr`                                | One QR code on the collection sheet                                                                                             |
+| `--card-qr-png`                            | That QR code also as a PNG image beside the PDF or in the image folder; for shares beside a PDF, in a new folder named after it |
+| `--qr-hidden`                              | The QR code's record hidden behind a contact or `--qr-text`; see [Hidden QR records](HIDDEN_QR.md)                              |
+| `--qr-text TEXT`                           | The public text of a separate hidden QR PNG                                                                                     |
+| `--card-layout qr\|collection\|individual` | For shares: how each share is printed; see [Share cards](SSKR.md#share-cards)                                                   |
+| `--title TEXT`                             | The collection title; by default it is the studio name                                                                          |
+| `--cards`                                  | Color cards in the terminal                                                                                                     |
+| `--qr PATH`                                | A separate QR code as a PNG image                                                                                               |
 
 Replace random identity fields with `--card-name`, `--card-role`, `--card-company`, `--card-email`, `--card-phone`, `--card-website` and `--card-location`. Names accept Latin letters, spaces, apostrophes and hyphens. Characters missing from the font and text that does not fit are refused before any secret is asked or read. `--studio-name` names the collection studio; material sheets print `--card-name` as the recipient. [Identity defaults](card-identities.md) describes the generated values.
 
@@ -504,6 +504,28 @@ cards only, on the cards and as a PNG file, or as a PNG file only. With separate
 without cards it offers no QR code, an ordinary QR code or one with hidden data, saved as a PNG file
 (one per share for shares). Explicit `--qr` and `--qr-dir` command-line options remain available
 regardless of the menu choices.
+
+Every file of the task goes into a new folder made inside the folder chosen, `design-files`, or
+`design-files-1` and so on where the name is taken. It is made before the dates and the seed phrase
+are asked, and on Linux every other folder is closed to writing then: nothing that runs in MnemoCode
+can add, change or remove a file anywhere else, such as a shell's start-up file in the home folder.
+Going back from the dates or the seed phrase keeps that folder. A task left before anything is saved may leave the
+folder empty, and MnemoCode names it.
+
+## Files named on the command line
+
+Each output that the options name is made before the seed phrase is read: a file empty, private
+and held open, a folder new and private. On Linux no folder is then open to writing but the new
+ones, and the result is written into what was made for it. The QR images that go with the PDF of
+shares (`--card-qr-png`), whose names come from the shares, go into a new folder named after the
+PDF, such as `shares-qr-codes`, as `4BBF-1-1-qr.png` and so on; the image of one backup's sheet is
+made beside the PDF, as `cards-qr.png`.
+
+A command that ends before it saves, refused or cancelled, leaves those files and folders empty
+where the rules on writes keep them from being removed, and names them: delete them. A failed save
+on the private screen can be tried again or skipped; it cannot take another name, as no folder is
+open to one. A file is written in place, so an interruption while it is written can leave part of
+it at its name: delete it and run the command again.
 
 ## Copying the displayed backup
 
