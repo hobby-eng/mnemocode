@@ -491,13 +491,14 @@
     {
       "id": "AUD-008-FUN004",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
       "evidence": [
-        "Source still clears CHOSEN_WORDS before a replacement source; the exact different-length retry regression remains unexecuted."
+        "Source still clears CHOSEN_WORDS before a replacement source; the exact different-length retry regression remains unexecuted.",
+        "After AUD-010, committed in f371180: crates/mnemocode-cli/src/commands/backup_questions.rs: typed_after_file also drops --words and --find, which told how many of the cards' codes are the phrase's, so codes typed after a file are read whole; crates/mnemocode-cli/tests/menu_guides.rs: test codes_typed_after_cards_are_read_whole (cards of a 24-word phrase read as 12 words, then its 24 codes typed)."
       ],
-      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+      "verificationBasis": "Fix committed in f371180 after AUD-010; not yet verified at that commit."
     },
     {
       "id": "AUD-008-FUN006",
@@ -732,14 +733,15 @@
     },
     {
       "id": "AUD-008-BLD004",
-      "status": "fixed",
-      "fixCommit": null,
-      "verificationCommit": null,
+      "status": "verified",
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
+      "verificationCommit": "02c903c94afa5b5b08731b7300714df4d23784d1",
       "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
       "evidence": [
-        "Generator includes all four notices. Existing dist/release license companion is still identical to THIRD_PARTY_NOTICES.md alone; package must be rebuilt and inspected before release."
+        "Generator includes all four notices. Existing dist/release license companion is still identical to THIRD_PARTY_NOTICES.md alone; package must be rebuilt and inspected before release.",
+        "After AUD-010, committed in f371180: The five -licenses.txt files of the published v0.2.0 release are identical (SHA-256 e45667bc94b9e958a36ce0c0fe2ab687378966d377942f64ba5e9b1ae5f850c9) and hold LICENSE-MIT, LICENSE-APACHE, NOTICE and THIRD_PARTY_NOTICES.md, each under its name."
       ],
-      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+      "verificationBasis": "Inspection of the published v0.2.0 release files, built from 02c903c."
     },
     {
       "id": "AUD-008-FUN007",
@@ -755,13 +757,14 @@
     {
       "id": "AUD-008-API004",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
       "evidence": [
-        "New reader and both heir APIs are invoked in the retained successful wasmi probe of current artifact bytes. It permits Ok(None) for the reader and does not assert exact share restoration/correction metadata or real browser host behavior."
+        "New reader and both heir APIs are invoked in the retained successful wasmi probe of current artifact bytes. It permits Ok(None) for the reader and does not assert exact share restoration/correction metadata or real browser host behavior.",
+        "After AUD-010, committed in f371180: crates/mnemocode-wasm/src/probe/embroidery.rs: the wasmi probe requires member 1 and threshold 2 of the share legend read back; the heir sheets are called as public entries. No browser-host run."
       ],
-      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+      "verificationBasis": "Fix committed in f371180 after AUD-010; not yet verified at that commit."
     },
     {
       "id": "AUD-008-API005",
@@ -831,14 +834,15 @@
     },
     {
       "id": "AUD-009-FUN003",
-      "status": "open",
-      "fixCommit": null,
+      "status": "fixed",
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "sourceFingerprint": "17d9aa1da5efda4c1a3f0e0db356f98e9e81fef72e4dab3413571c450b1587cb",
       "evidence": [
-        "Partial correction: original Colors regression passes, but fresh Unicode probe gives identical document IDs and Different(13). Each export reads correctly alone; the combined discovery fails. Retain the original Low finding ID."
+        "Partial correction: original Colors regression passes, but fresh Unicode probe gives identical document IDs and Different(13). Each export reads correctly alone; the combined discovery fails. Retain the original Low finding ID.",
+        "After AUD-010, committed in f371180: crates/mnemocode-cards/src/content.rs: the export mark hashes the printed codes of the decoys, so Unicode exports with other decoys get other document IDs, as Colors exports do; crates/mnemocode-cards/tests/sets.rs: test one_export_shares_its_document_id_and_another_has_its_own covers Colors and Unicode, and fails on the code this audit reviewed."
       ],
-      "verificationBasis": "AUD-010 current working-tree verification; no commit created."
+      "verificationBasis": "Fix committed in f371180 after AUD-010; not yet verified at that commit."
     },
     {
       "id": "AUD-009-UI001",

@@ -67,7 +67,7 @@ Use the generated glue and its matching `.wasm` from the same build; do not mix 
 | `browser-sskr`       | `sskr`            | Share formats, splitting and restoration             |
 | `browser-recovery`   | `recovery`        | Backup reading, searches, repair and re-encoding     |
 | `browser-candidates` | `candidates`      | Candidate-list admission, encryption and import      |
-| `browser-qr`         | `qr`              | QR images and decoding                               |
+| `browser-qr`         | `qr`              | QR images, hidden records and decoding               |
 | `browser-cards`      | `cards`           | Printable cards and heir sheets                      |
 | `browser-embroidery` | `embroidery`      | Cross-stitch patterns and reading their legends back |
 | `browser-files`      | `files`           | Backups found in the files a page is given           |
@@ -141,8 +141,9 @@ In the browser, `readStitchPdf(bytes)` refuses a document over `stitchPdfMaxByte
 
 `mnemocode::qr::hidden::matrix(visible, record)` and `png(visible, record)` preserve an exact UTF-8
 record in nonstandard filler bytes, using level M. `read_png(bytes)` corrects the codewords and
-verifies its format check before returning a `SecretText`. Ordinary `qr::read_png` still returns
-the public text. See [the format and CLI](HIDDEN_QR.md) for limits and recovery.
+verifies its format check before returning a `SecretText`. `png_behind(contact, record)` draws the record
+behind a contact where one is given, else as an ordinary QR code. Ordinary `qr::read_png` still
+returns the public text. See [the format and CLI](HIDDEN_QR.md) for limits and recovery.
 
 The QR browser module exposes `hiddenQrPng(visible, record)` and `readHiddenQrPng(bytes)`;
 `CardExport.setHiddenQr(true)` selects the same format for PDF sheets. `CardPlan.qrPng()` and

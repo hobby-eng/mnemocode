@@ -10,7 +10,7 @@ MnemoCode helps a person keep a BIP39 seed phrase so that it survives and does n
 
 ## What it does
 
-- Writes the phrase in another form: word numbers, Unicode codes, colours, printable cards, QR codes, a cross-stitch pattern made from a picture.
+- Writes the phrase in another form: word numbers, Unicode codes, colours, printable cards, QR codes (also hidden behind a contact card), a cross-stitch pattern made from a picture.
 - Masks the phrase with dates the person remembers (Seedshift), so that a backup found alone gives another phrase, a decoy.
 - Splits the phrase into standard SSKR Shamir shares, which can be written as cards, QR codes and patterns too.
 - Reads every backup it saves back into the phrase: typed codes, a record, a QR code, a pattern, the files of the cards.

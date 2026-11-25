@@ -2,7 +2,8 @@
 
 The Linux x86-64 run on 2026-11-16 covered **81.07%** of the measured source lines of MnemoCode's
 own crates (40,867 of 50,408). Every test passed: 682 in the workspace run, with 14 marked ignored,
-and 14 in the WebAssembly binding's run with all its modules.
+and 14 in the WebAssembly binding's run with all its modules. The measured commit came before the
+last changes of 0.2.0; the release itself, commit `02c903c`, has not been measured.
 
 ## Measurement
 

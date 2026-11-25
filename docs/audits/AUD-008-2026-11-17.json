@@ -1236,7 +1236,7 @@
     {
       "id": "AUD-008-SEC001",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-cli/src/commands/encode.rs: print_last_word shows the word as a part only on the private screen and otherwise writes sentences to the secret channel; test the_legacy_sentences_name_the_word_to_remember; crates/mnemocode-cli/tests/stitch.rs: test a_pattern_of_the_original_seedshift_keeps_every_word (the word reaches a pipe, not a terminal)"
@@ -1245,7 +1245,7 @@
     {
       "id": "AUD-008-SEC002",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-embroidery/src/found.rs: place_of shows names through safe_display; test a_control_character_in_a_file_name_is_not_passed_on"
@@ -1254,7 +1254,7 @@
     {
       "id": "AUD-008-SEC003",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "Debug of Encoding, ShareUnmasking, LegendEntropy and Admitted is redacted; crates/mnemocode/src/backup.rs: test an_encoding_of_the_original_seedshift_prints_as_redacted (normal and pretty)"
@@ -1263,7 +1263,7 @@
     {
       "id": "AUD-008-FUN001",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "BackupSplit.original_last_word and LegendEntropy::last_words; sskr-split and stitch name the word; crates/mnemocode/src/sskr/split.rs: test a_backup_is_masked_before_it_is_split; crates/mnemocode/tests/ts_shares.rs: original_seedshift_split restores the phrase exactly with the word; crates/mnemocode-cli/tests/stitch.rs: test a_pattern_of_the_original_seedshift_keeps_every_word (decode with --last-word-file gives one phrase)"
@@ -1272,7 +1272,7 @@
     {
       "id": "AUD-008-FUN002",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-embroidery/src/found.rs: shares keyed by group and member; tests shares_of_different_groups_with_one_number_are_each_kept and two_different_shares_with_one_number_are_a_conflict_and_a_copy_counts_once"
@@ -1281,7 +1281,7 @@
     {
       "id": "AUD-008-FUN003",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-embroidery/src/found.rs: damage blocks a set only where too few shares are whole, otherwise it is a warning; test a_damaged_share_beyond_the_threshold_leaves_the_set_readable"
@@ -1290,7 +1290,7 @@
     {
       "id": "AUD-008-FUN004",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-cli/src/commands/backup_questions.rs: each new attempt calls forget_chosen_words(). The PTY regression the audit asks for (12-to-24 and 24-to-12 replacements) is not written."
@@ -1299,7 +1299,7 @@
     {
       "id": "AUD-008-FUN006",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode/src/recovery/shares/unmasking.rs: a last word that does not fit a set, or an invalid phrase, rules out that set and the search goes on. No test permutes candidate order yet."
@@ -1308,7 +1308,7 @@
     {
       "id": "AUD-008-API001",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode/src/backup.rs: original_last_word set for both legacy ways; crates/mnemocode/src/backup/re_encoding.rs uses the word Encode named; crates/mnemocode/tests/ts_shares.rs original_seedshift_split"
@@ -1317,7 +1317,7 @@
     {
       "id": "AUD-008-API002",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode/src/recovery/reading.rs: mode_conflict_of compares Mode::id; record.rs reads seedshift-legacy-valid as seedshift-legacy; crates/mnemocode-cli/tests/ts_transcripts.rs: the 0.1.0 legacy-valid record decodes"
@@ -1326,7 +1326,7 @@
     {
       "id": "AUD-008-BLD001",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "cargo check --workspace --tests: every test target compiles"
@@ -1335,7 +1335,7 @@
     {
       "id": "AUD-008-BLD002",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "Workspace tests updated to the current prompts and outputs; changed TS 0.1.0 parity listed in ts_transcripts.rs CHANGED and the tests' original_seedshift helper; see the run below"
@@ -1344,7 +1344,7 @@
     {
       "id": "AUD-008-BLD003",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "xtask/src/wasm/probe/backup.rs calls encode with (ret, phrase, dates, form, mode); cargo xtask wasm probe"
@@ -1353,7 +1353,7 @@
     {
       "id": "AUD-008-ARC001",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "cargo xtask code-rules and its self-test pass: card_files moved under commands and input takes a FilesReader (no input -> card_files -> input cycle); found, files, printed, sha2 and the new refusal codes registered in module-map.json; pty.rs under 800 lines through an at_the_menu helper"
@@ -1362,7 +1362,7 @@
     {
       "id": "AUD-008-ARC002",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "cargo xtask copies and its self-test pass: one byte search in printed.rs, one started_folder in terminal.rs"
@@ -1371,7 +1371,7 @@
     {
       "id": "AUD-008-UI001",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-cli/src/commands/re_encode.rs and configure.rs: remember_choices keeps the choices of a configured child command on Shift+Tab. No dedicated PTY regression."
@@ -1380,7 +1380,7 @@
     {
       "id": "AUD-008-API003",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "--find validated by choice_option; without a terminal a folder without the kind named is refused (cli.card-files.none-of-kind); crates/mnemocode-cli/tests/cards.rs: test find_names_one_kind_and_takes_no_other_without_asking"
@@ -1389,7 +1389,7 @@
     {
       "id": "AUD-008-DOC001",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "README.md, docs/CLI.md, decode and recover-date help and date_search.rs give the rates per way"
@@ -1398,7 +1398,7 @@
     {
       "id": "AUD-008-DOC002",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "docs/MANUAL_RECOVERY.md and its bundled copy; ts_transcripts.rs test the_bundled_guide_is_the_guide_of_the_documentation"
@@ -1407,7 +1407,7 @@
     {
       "id": "AUD-008-DOC003",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "docs/PRODUCT.md qualifies the platform network restriction and the staging folder a crash or failed cleanup can leave, linking SECURITY.md"
@@ -1416,7 +1416,7 @@
     {
       "id": "AUD-008-DOC004",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "docs/CLI.md, docs/SSKR.md and docs/HIDDEN_QR.md describe the current QR question and that the menu shows no original words"
@@ -1425,7 +1425,7 @@
     {
       "id": "AUD-008-DOC005",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "docs/CLI.md sends standard output of the piped example to /dev/null; encode and formats help save the test phrase to a file first"
@@ -1434,7 +1434,7 @@
     {
       "id": "AUD-008-DOC006",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "docs/releases/v0.2.0.md names the changed output, the removed options and --card-qr-png"
@@ -1443,7 +1443,7 @@
     {
       "id": "AUD-008-DOC007",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "docs/COVERAGE.md names wasmi and the absence of a real-browser run"
@@ -1452,7 +1452,7 @@
     {
       "id": "AUD-008-DOC008",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "docs/design/architect/ARCHITECTURE.md: three public modes and the internal way of the Original Seedshift"
@@ -1461,7 +1461,7 @@
     {
       "id": "AUD-008-DOC009",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "docs/LIBRARY.md names phrase::legend_entropy"
@@ -1470,7 +1470,7 @@
     {
       "id": "AUD-008-DOC010",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "docs/SSKR.md: cards_1.pdf for a file, cards-1 for a folder, as output.rs numbered_name does"
@@ -1479,7 +1479,7 @@
     {
       "id": "AUD-008-DOC011",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-cards/assets/maps/NOTICE labels the TS generation chain as history and records world-land.txt's SHA-256"
@@ -1488,7 +1488,7 @@
     {
       "id": "AUD-008-BLD004",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "xtask/src/release.rs: the -licenses.txt companion holds LICENSE-MIT, LICENSE-APACHE, NOTICE and THIRD_PARTY_NOTICES.md, each under its name; verify_executable checks all four"
@@ -1497,7 +1497,7 @@
     {
       "id": "AUD-008-FUN007",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-cards/src/templates.rs: the document ID hashes the real codes only, so sheets and separate cards agree. No test compares the two IDs."
@@ -1506,7 +1506,7 @@
     {
       "id": "AUD-008-API004",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-wasm: readStitchShareLegend and StitchShareLegend, HeirPage.patternSheet and patternSharesSheet, originalLastWord on SplitShares, StitchPattern and StitchShares; cargo xtask wasm verify and probe"
@@ -1515,7 +1515,7 @@
     {
       "id": "AUD-008-API005",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-embroidery/src/found.rs: form_of and words_of read an MNC1 envelope's codes, never its header"
@@ -1524,7 +1524,7 @@
     {
       "id": "AUD-008-BLD005",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-wasm/Cargo.toml: browser-files enables browser-embroidery, browser-sskr and dep:mnemocode-cards; clippy of the binding with each module alone"
@@ -1533,7 +1533,7 @@
     {
       "id": "AUD-008-DOC012",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "docs/LIBRARY.md: browser-files in the feature table, groups and warning of FoundBackups, readStitchShareLegend, originalLastWord and the pattern heir sheets"

@@ -80,6 +80,7 @@ pub(in super::super) const FORMATS: TopicHelp = TopicHelp {
     ]),
     notes: Some(&[
         "Every format is a representation, not encryption. For decode and recover-date the format is found automatically when exactly one fits; otherwise the terminal asks, and a script must pass --format. Only a record saved by an earlier version, which starts with MNC1, names its format.",
+        "A sixth form, the legend of a cross-stitch pattern, is made by stitch and read by decode without --format; see mnemocode stitch --help.",
     ]),
 };
 

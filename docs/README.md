@@ -4,16 +4,16 @@ Start with the [README](../README.md) to choose a task. Its sections follow the 
 
 ## Using the program
 
-| Guide                                            | What it covers                                                                 |
-| ------------------------------------------------ | ------------------------------------------------------------------------------ |
-| [Command-line reference](CLI.md)                 | Download verification, paired command examples, input/output rules and options |
-| [A guide for heirs](HEIRS.md)                    | Restoring an inherited backup and recognizing common recovery problems         |
-| [QR codes with hidden records](HIDDEN_QR.md)     | A contact QR that also holds backup codes; readers, limits and the format      |
-| [Shamir shares](SSKR.md)                         | Creating, storing, restoring and repairing shares; share transport details     |
-| [Card designs](card-designs.md)                  | What appears on cards and collection sheets                                    |
-| [Card identity defaults](card-identities.md)     | Invented names, contact details and studio text                                |
-| [Recovery without MnemoCode](MANUAL_RECOVERY.md) | Printed dictionaries, manual date reversal and a standalone Python helper      |
-| [Security policy](../SECURITY.md)                | Threats, protections, export precautions and issue reporting                   |
+| Guide                                            | What it covers                                                                                             |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| [Command-line reference](CLI.md)                 | Download verification, paired command examples, input/output rules and options                             |
+| [A guide for heirs](HEIRS.md)                    | Restoring an inherited backup and recognizing common recovery problems                                     |
+| [QR codes with hidden records](HIDDEN_QR.md)     | A contact QR that also holds backup codes; readers, limits and the format                                  |
+| [Shamir shares](SSKR.md)                         | Creating, storing, restoring and repairing shares; share transport details                                 |
+| [Card designs](card-designs.md)                  | What appears on cards and collection sheets                                                                |
+| [Card identity defaults](card-identities.md)     | Invented names, contact details and studio text                                                            |
+| [Recovery without MnemoCode](MANUAL_RECOVERY.md) | Printed dictionaries, cards and cross-stitch legends read by hand, manual date reversal and Python helpers |
+| [Security policy](../SECURITY.md)                | Threats, protections, export precautions and issue reporting                                               |
 
 ## Library and formats
 

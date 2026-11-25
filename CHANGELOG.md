@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.0
 
 MnemoCode is now written in Rust. Each system gets one executable with nothing else to install, and each page of the wallet tools gets a WebAssembly file. It reads every backup, record and share that 0.1.0 made, and writes the same ones but for two changes described below: a saved file holds the codes alone, and the Original Seedshift ends with a last word that passes the checksum. Commands, questions and messages stay as in 0.1.0, apart from the changes below.
 
@@ -12,19 +12,18 @@ MnemoCode is now written in Rust. Each system gets one executable with nothing e
 - A pattern too small or too plain for the legend's usual form uses the order of its rows as well (format 2): fewer threads hold the phrase, so a 24-word phrase fits 60 stitches across. Its legend line names each row's DMC number, as `15:407:38`. MnemoCode uses it only where the usual form cannot hold the phrase.
 - Decode reads a pattern's PDF: the PDF keeps its legend line compressed in the floss key page's private data, which no viewer shows and which holds nothing the page does not print. The menu offers In a cross-stitch pattern among the places of the encoded phrase. A PDF another program saved again may lose it; then the legend is typed from the key.
 - The self-test reads the format's example legend at every start; the full self-test also makes a pattern and reads its legend back.
-- The WebAssembly files of the Deriver pages hold it too, as the `browser-embroidery` module: a pattern with or without Seedshift, the sizes the menu offers for a picture, its PDF for any of the fabrics, and its legend read back, typed or from the PDF.
+- The WebAssembly files of the Deriver pages hold it too, as the `browser-embroidery` module: a pattern with or without Seedshift, the sizes the menu offers for a picture, its PDF for any of the fabrics, and its legend read back, typed or from the PDF; `StitchShares` makes the patterns of Shamir shares.
 
 ### Hidden QR records
 
 - PDF and PNG exports can carry a hidden QR record (`--qr-hidden`): ordinary scanners show the printed contact or a chosen text (`--qr-text`), and MnemoCode reads back the exact backup codes or share. `qr-hide` wraps an existing record, `qr-open` extracts it unchanged, and the browser binding does both. [Hidden QR records](docs/HIDDEN_QR.md) describes the format and its limits.
 - In the menu, a QR code with hidden data shows a QR scanner the business card printed on the cards, or, in a PNG file alone, one that MnemoCode invents.
+- In the WebAssembly files, `CardPlan.qrPng`, `ShareCards.qrPng` and `CardExport.hiddenQrPng` give a sheet's QR code as printed.
 
 ### Wallet checks
 
 - An address names its coin: the question "Which coin is the address for?" is gone, and `--coin-address` needs no `--coin`. An address is read as every coin whose form it has, and the paths of each are searched: `1…` as Bitcoin and Bitcoin Cash, `3…` as Bitcoin and Litecoin, `0x…` as Ethereum and Ethereum Classic. `--coin` only narrows it to one coin. An address of no coin is refused with the reason of a coin whose form it has, such as a wrong EIP-55 checksum.
 - `--bitcoin-profile` is gone. A Bitcoin address's form names its path; a ypub or upub names BIP49 and a zpub or vpub BIP84; any other extended key form, a compressed public key or a WIF is looked for at BIP44, BIP49, BIP84 and BIP86.
-- In the WebAssembly files, `EncodedBackup.encode` takes no `validLastWord`, `originalLastWord()` gives the word to remember in place of `lastWordChanged`, and `legacyLastWords` is gone.
-- The WebAssembly files read backups from the files a page is given (`files` module: `readBackupFile`, `BackupFiles`, `FoundBackups`, `backupFileMaxBytes`, `backupFolderMaxFiles`, `backupFolderMaxDepth`), as Decode reads a folder, with the `--format` name of the codes found (`form`), and make the patterns of Shamir shares (`StitchShares`). `ReadBackup.decode` and `Recovery.restoreShares` take the last word to remember; `CardPlan.qrPng`, `ShareCards.qrPng` and `CardExport.hiddenQrPng` give a sheet's QR code as printed.
 - In the WebAssembly files, `WalletPlace`, `WalletEvidence.wif` and `WalletEvidence.accountKey` take no profiles; `WalletEvidence.coinAddress` with an empty coin reads the address as every coin, and `coins` names them.
 
 ### Install and run
@@ -51,11 +50,13 @@ MnemoCode is now written in Rust. Each system gets one executable with nothing e
 - Encode writes the Original Seedshift with a last word that passes the BIP39 checksum, so the backup is a valid phrase like that of every other mode, and shows the last word the shift gave, to remember. Decode, Re-encode and Restore from shares ask for that word: with it the phrase comes back exactly; without it, one or two phrases remain, each with its fingerprint. 0.1.0 wrote the last word as the shift left it, or replaced it with `--legacy-valid-last-word`, after which Decode listed up to 128 phrases.
 - Codes whose last word fails the checksum, as the original Seedshift program and 0.1.0 wrote them, still decode exactly, and a 0.1.0 record named `seedshift-legacy-valid` reads as `seedshift-legacy`. The mode `seedshift-legacy-valid` and `--legacy-valid-last-word` of `encode`, `sskr-split` and `recover-word` are gone.
 - The Original Seedshift can be split into shares, also as patterns, and gets the sheet for heirs and the check of the written backup. Its date search needs a wallet reference, as MnemoCode Seedshift's does.
+- In the WebAssembly files, `EncodedBackup.encode` takes no `validLastWord`, `originalLastWord()` gives the word to remember in place of `lastWordChanged`, and `legacyLastWords` is gone; `ReadBackup.decode` and `Recovery.restoreShares` take the last word to remember.
 
 ### Reading backups from files
 
 - Decode, Re-encode and Restore from shares read the files of printed cards, a PDF, PNG or JPEG, which keep the codes as named colour swatches in their design metadata (XMP), as design files do. They also read QR images and patterns' PDFs, and a whole folder with the folders inside it: every backup and set of shares found is listed with the kind of codes and the files, and one is chosen (Autodetect in the menu, `--find` on the command line). Cards of one backup in several files and the shares of one set are read together; a single share's file finds the rest of its set beside it.
 - Codes that fail the checksum at the length given offer another seed phrase length on the same screen.
+- The WebAssembly files read backups from the files a page is given (`files` module: `readBackupFile`, `BackupFiles`, `FoundBackups`, `backupFileMaxBytes`, `backupFolderMaxFiles`, `backupFolderMaxDepth`), as Decode reads a folder, with the `--format` name of the codes found (`form`).
 
 ### Limits and refusals
 

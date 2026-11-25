@@ -1,6 +1,6 @@
 # Card identity defaults
 
-The person and the company printed on business cards are invented. When you give no details, MnemoCode picks them once per export from its own lists of 20 employers, 26 roles and 60 names. Every page, individual file and Shamir share of that export shows the same person. The choice does not depend on your phrase.
+The person and the company printed on business cards are invented. When you give no details, MnemoCode picks them once per export from its own lists of 20 employers, 26 roles and 60 names. Every page, individual file and Shamir share of that export shows the same person. The choice does not depend on your phrase. A QR code with hidden data shows ordinary scanners that person as a contact card, without the website; in the menu, a QR image with hidden data saved without cards gets a contact invented the same way.
 
 | Field     | Default                                                                                     |
 | --------- | ------------------------------------------------------------------------------------------- |

@@ -51,6 +51,12 @@ decimal digits stay.
 - A flat picture of a few colours cannot hold a phrase: the front end says so and names what to
   choose instead.
 - The browser binding gets a module of its own (§9), and wallet-tools takes the feature.
+- A pattern can hold a Shamir share instead, under the share domain: one pattern per share, all
+  from the same picture, which a restore reads from their PDFs, legend lines or QR images, or from
+  a folder of them.
+- The PDF keeps the legend line, compressed in the private data of the floss key's page, so that
+  Decode reads a pattern from its PDF; a PDF that another program saves again may lose it, and the
+  legend is then typed from the key.
 
 ## The owner's review of the pattern, 2026-11-04 and 05
 

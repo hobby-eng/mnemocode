@@ -398,7 +398,7 @@ pub(super) const INPUT_FILE: HelpOption = HelpOption {
     details: &[
         "A text file of codes up to 64 KiB; a QR code image in PNG; a cross-stitch pattern's PDF, which keeps its legend; or the cards' PDF, PNG or JPEG, which keep a copy of the codes: up to 64 MiB.",
         "A folder is read with the folders inside it, up to 6 levels down, its files ending in .pdf, .png, .jpg or .jpeg, at most 1,024; links are not followed. Every backup and set of shares found is listed: with --ask-secrets you choose one; without it, a folder of several is refused with that list; one alone is taken at once. Cards of one backup in several files, and shares of one set, are read together; a single file of a share finds the rest of its set in its folder.",
-        "The codes may be in any of the five forms. Only a record saved by an earlier version, which starts with MNC1, names its mode and form.",
+        "The codes may be in any of the five forms, or a cross-stitch pattern's legend line. Only a record saved by an earlier version, which starts with MNC1, names its mode and form.",
     ],
 };
 

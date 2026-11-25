@@ -532,7 +532,7 @@
     {
       "id": "AUD-008-SEC003",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "Original AdmittedPng and encoding owners redact Debug. New BackupSplit.original_last_word (sskr/split.rs:111) and ShareRestoreRequest.last_word (recovery/shares/flow.rs:27) still derive Debug and expose the hint. Same disclosure class, retained original ID.",
@@ -673,7 +673,7 @@
     {
       "id": "AUD-008-API003",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "Unknown --find values and unattended wrong-kind fallback are fixed. Interactive discovery still automatically takes one complete file of another kind at commands/card_files.rs:338,361, without explicit confirmation. --find with stdin is outside the folder-only contract and is not a finding.",
@@ -684,7 +684,7 @@
     {
       "id": "AUD-008-DOC001",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "README and CLI probability explanations now distinguish historical and checksum-corrected legacy formats. Active menu CHECKSUMS at encode_questions.rs:150 still says the original result usually fails checksum, although the current encoder corrects it.",
@@ -715,7 +715,7 @@
     {
       "id": "AUD-008-DOC004",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "docs/CLI.md:304 promises only the chosen form, while new_backup.rs:297 adds shown masked words. Built-in help/topics.rs:102 still says each output filename is asked, but output_questions.rs assigns names in a common folder. Removed QR questions were fixed.",
@@ -806,7 +806,7 @@
     {
       "id": "AUD-008-FUN007",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "Sheet and separate-card metadata now share an ID from the real codes. Source trace confirms the original correction; exact cross-layout discovery was not newly replayed. Repeated exports with distinct decoys are separate AUD-009-FUN003.",
@@ -817,7 +817,7 @@
     {
       "id": "AUD-008-API004",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "readStitchShareLegend, typed metadata and both pattern heir-sheet methods exist and appear in generated declarations. Existing wasm probe does not call these new methods; real binding round-trip/browser acceptance remains unexecuted.",
@@ -868,7 +868,7 @@
     {
       "id": "AUD-009-FUN001",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-embroidery/src/found.rs:269",
@@ -880,7 +880,7 @@
     {
       "id": "AUD-009-FUN002",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-embroidery/src/found.rs:439",
@@ -892,7 +892,7 @@
     {
       "id": "AUD-009-FUN003",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-cards/src/templates.rs:457",
@@ -905,7 +905,7 @@
     {
       "id": "AUD-009-UI001",
       "status": "fixed",
-      "fixCommit": null,
+      "fixCommit": "f371180ed678f774ce8d6cbaa5eba586b64a6139",
       "verificationCommit": null,
       "evidence": [
         "crates/mnemocode-cli/src/commands/new_backup.rs:283",

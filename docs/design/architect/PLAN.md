@@ -87,6 +87,14 @@ owner set on 2026-10-27:
   it starts with q or p, so that another coin's damaged address keeps that coin's reason. The help
   of the commands with a wallet check differs from TS's in those options (`ts_transcripts`,
   WRITTEN_IN).
+- Hidden QR records (ADR 0012): `qr-hide` and `qr-open` are new, so the overview of the help
+  lists them too.
+- The Original Seedshift is written with a last word that passes the checksum, and the shifted
+  one is named to remember: `--legacy-valid-last-word` and the mode `seedshift-legacy-valid` are
+  refused as gone, and a 0.1.0 record of that mode reads as `seedshift-legacy` (`ts_transcripts`,
+  CHANGED).
+- Saved files hold the codes without the MNC1 header, and a taken file name is numbered with an
+  underscore, as `shares_1.pdf`; CHANGELOG.md lists the other changes of 0.2.0.
 
 The 25 defects whose fix changes a TS result are decided in `mapping.json` ("how" beginning
 with "Decided"): 17 are fixed, one in the documents only, and 8 kept, one with a new warning. A fix is made in the TS first, once reproduced, with

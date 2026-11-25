@@ -54,7 +54,7 @@ Long private-screen results are paged before the next question. This includes sh
 
 For `recover-word`, a list that fits one candidate per screen row shows every candidate. A longer result shows wallet matches; without a wallet or candidate-list destination, it offers a wallet check or encrypted list for the Discovery Scanner. The offer also applies to patterns read with `--mnemonic-file`. MnemoCode asks for the destination and encryption method, with the passphrase entered privately.
 
-`--mnemonic-file PATH` reads a phrase; `--input-file PATH` reads codes or a record. The path `-` reads standard input. Decode and date recovery can combine `--input-file` or `--qr-file` with `--ask-secrets`, reading the backup from the file and asking for the remaining private answers.
+`--mnemonic-file PATH` reads a phrase; `--input-file PATH` reads codes or a record: a text file, a QR image, a cross-stitch pattern's PDF, the files of printed cards, or a folder of them, as [Decode](#decode) describes. The path `-` reads standard input. Decode and date recovery can combine `--input-file` or `--qr-file` with `--ask-secrets`, reading the backup from the file and asking for the remaining private answers.
 
 Decode and Re-encode also accept Shamir shares in any supported form, pasted or read from a text file. Separate shares by newlines or `;`, and use `?` for unreadable codes or digits. Both commands keep every share and use Restore's repair questions.
 
@@ -64,7 +64,7 @@ Raw `--mnemonic`, `--input`, `--share`, `--date`/`--dates`, `--old-date`/`--old-
 
 Refusal cannot remove text already entered in shell history or process arguments. Choose a safe input source before entering real material.
 
-For headless operations, `--dates-file PATH` reads whitespace-separated dates; `recover-date` also accepts its `?` patterns there. Re-encode uses `--old-dates-file PATH` for the old backup and `--dates-file PATH` for the new one; an Original Seedshift backup that MnemoCode wrote takes the last word Encode named from `--last-word-file PATH`. These three options also accept `-`. Only one material source may read standard input in a command. Do not combine these date/final-word files with `--ask-secrets`, which asks for those answers itself. Protect and keep date files yourself: dates are not added to encoded records.
+For headless operations, `--dates-file PATH` reads whitespace-separated dates; `recover-date` also accepts its `?` patterns there. Re-encode uses `--old-dates-file PATH` for the old backup and `--dates-file PATH` for the new one; an Original Seedshift backup that MnemoCode wrote takes the last word Encode named from `--last-word-file PATH`, in Decode, Re-encode, `sskr-combine` and `sskr-export` alike. These three options also accept `-`. Only one material source may read standard input in a command. Do not combine these date/final-word files with `--ask-secrets`, which asks for those answers itself. Protect and keep date files yourself: dates are not added to encoded records.
 
 Each text input has its own limit, which `--help` names: 256 bytes for a seed phrase, 128 for dates, 4 KiB for a passphrase or a date pattern, 32 KiB for a `recover-word` pattern, 64 KiB for encoded input or a set of shares, as an answer or a file. A QR image may be up to 16 MiB, 4096 pixels on either side and 2 megapixels (2,097,152 pixels), with up to 8 bits per sample: a screen of 1920 × 1080 fits, and the QR images that MnemoCode saves are 720 px; crop a photograph or a page image to the code. The picture of a cross-stitch pattern may be a PNG, JPEG or WebP file of up to 40 MiB and 60 megapixels, and a pattern's PDF is read up to 64 MiB. A folder is read with the folders inside it, up to 6 levels down: only its files ending in .pdf, .png, .jpg or .jpeg, at most 1,024 of them, each up to 64 MiB; links are not followed. Larger inputs are refused. An image is read whole, and Ctrl+C acts when that reading ends: an image of noise can keep it for seconds. A multiline paste is one answer: words, codes and dates may be on separate lines; separate shares become semicolon-separated.
 
@@ -322,7 +322,7 @@ Formats 1, 2 and 5 already use spaces. Their terminal output wraps between words
 
 The layout follows where the output goes: a terminal gets headings, labelled facts, numbered phrases and marked notices, and a file, a pipe or `TERM=dumb` the plain lines of a script. On a terminal each candidate of `recover-word` and each match of `recover-date` is a part of its own, with the words or dates found, the wallet check and the phrase as labelled facts; a file or a pipe gets one row of tab-separated fields for each. Colour is decided apart from it: `NO_COLOR` or `CLICOLOR=0` takes the colours away and keeps the terminal layout, and `CLICOLOR_FORCE` adds colour without changing the form.
 
-For `decode` and `recover-date`, `--format` is usually optional. MnemoCode picks the form itself when exactly one form fits the whole record. Otherwise it asks in the terminal, and a script must pass `--format`.
+For `decode` and `recover-date`, `--format` is usually optional. MnemoCode picks the form itself when exactly one form fits the whole record. Otherwise it asks in the terminal, and a script must pass `--format`. A cross-stitch legend line needs no `--format`: Decode recognizes its rows.
 
 ## Card options
 
@@ -461,7 +461,7 @@ Before processing data, MnemoCode runs its startup self-test: quick checks witho
 - Date patterns, marked codes and shares, word searches, candidate lists, written-backup checks and wallet evidence.
 - Addresses of all twelve coins, heir-sheet text, share-card and card-set content, word hints and re-encoding.
 - Published SSKR Bytewords and refusals of incomplete quorums, duplicates, mixed sets and corrupt checksums.
-- The SeedStitch example legends of both formats, one misread row corrected and two refused, and the hidden QR record format.
+- The SeedStitch example legend and the hidden QR record format.
 
 If a check fails, the command stops:
 
@@ -480,7 +480,7 @@ For the full self-test, including PDF rendering:
 mnemocode self-test
 ```
 
-The full self-test includes the startup self-test plus every phrase length/format/mode combination, date sorting, the public test file, 24 English BIP39 seed vectors, wallet-assisted searches, the marked-code search, encrypted candidate lists and the candidate list writer, joint share/date repair, share split and restore, every coin vector, actual heir-sheet/card/QR exports, a cross-stitch pattern made from a picture with its legend read back from the PDF, a hidden QR record written and read back, with all artwork and fonts, and card pages read back as drawing steps. Each feature gets a refusal case too. Finished groups show their times, followed by an overall result.
+The full self-test includes the startup self-test plus every phrase length/format/mode combination, date sorting, the public test file, 24 English BIP39 seed vectors, wallet-assisted searches, the marked-code search, encrypted candidate lists and the candidate list writer, joint share/date repair, share split and restore, every coin vector, actual heir-sheet/card/QR exports, the SeedStitch example legends of both formats with one misread row corrected and two refused, a cross-stitch pattern made from a picture with its legend read back from the PDF, a hidden QR record written and read back, with all artwork and fonts, and card pages read back as drawing steps. Each feature gets a refusal case too. Finished groups show their times, followed by an overall result.
 
 The public test data is in [`vectors/mnemocode-v1.json`](../vectors/mnemocode-v1.json). It contains only well-known test phrases.
 
@@ -513,6 +513,9 @@ The data is bold where terminal styling is enabled; the labels remain visible wi
 Seedshift still needs its original dates. Optional original words are for visual checking.
 These display labels are not added to records, QR payloads or redirected data.
 For joined codes, an alternate joined copy follows the end label; use either version, not both.
+A cross-stitch pattern's result has no such labels: it shows the legend line under "Legend line:
+keep it, in this exact order, or the PDF that holds it", or each share's line beside
+"Share 1 of 3" and so on.
 
 ## Automatic QR checks
 
@@ -520,4 +523,4 @@ Every generated PNG QR image is decoded and compared with the exact backup or sh
 
 For Shamir shares, `--qr-dir NEW_FOLDER` saves one complete share per PNG, named `share-1-qr.png`, `share-2-qr.png` and so on. It works in every share format without printable cards. All shares are in that folder: separate them for storage. A taken folder name is numbered instead of replaced. `sskr-combine --share-qr PATH` reads the images.
 
-The separate “Check the backup now?” question checks what you copied by hand: words, word numbers, Unicode codes, colors or shares. Type that copy back; automatic QR verification does not verify your handwriting.
+The separate “Check the backup now?” question, after the result of `encode` and `sskr-split`, checks what you copied by hand: words, word numbers, Unicode codes, colors or shares. Type that copy back; automatic QR verification does not verify your handwriting. `--backup-check yes` starts the check at once and `no` leaves it out.

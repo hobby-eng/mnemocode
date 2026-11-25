@@ -27,7 +27,9 @@ contact. Each share has its own QR; this change never combines shares. A separat
 user-supplied public text. Ordinary export remains the default.
 
 The CLI offers the choice in existing export questions, `--qr-hidden` and `--qr-text` for scripts,
-and `qr-hide` / `qr-open` for existing records. Existing QR recovery sources try the hidden reader
+and `qr-hide` / `qr-open` for existing records. The menu asks one question for the QR code: none, an
+ordinary one or one with hidden data, and where it goes; a PNG made without cards shows a contact
+card that MnemoCode invents, as cards invent their details. Existing QR recovery sources try the hidden reader
 before ordinary text. The WASM QR module and card export expose the same operations; the wallet-tools
 host receives an integration handover with the field names and decoding order.
 

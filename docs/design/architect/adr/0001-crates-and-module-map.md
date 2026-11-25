@@ -18,6 +18,9 @@ modules follow the module map of ARCHITECTURE.md §3, kept in the repository as 
 and compared by the `code-rules` layers check with every `use` path. The same file lists each
 crate's allowed direct dependencies, a second check over `cargo metadata`.
 
+ADR 0010 adds a fifth crate, `mnemocode-embroidery`, for SeedStitch patterns, for the reasons
+above.
+
 ## Rejected alternatives
 
 - A crate per model domain (phrase, wallet, sskr, recovery, cards): cycles between domains

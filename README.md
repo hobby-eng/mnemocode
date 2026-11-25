@@ -52,19 +52,19 @@ The examples below use `mnemocode` for your executable's name or path. In a sour
 
 Run `mnemocode` without arguments in a terminal. The sections below follow the menu in the same order; each task's **More** link opens its own section.
 
-| Menu | Task                                          | What it does                                                        |
-| ---- | --------------------------------------------- | ------------------------------------------------------------------- |
-| 1    | [Encode](#1-encode)                           | Make a backup in another form, with optional dates, shares or cards |
-| 2    | [Re-encode](#2-re-encode)                     | Restore an existing backup and make a replacement                   |
-| 3    | [Decode](#3-decode)                           | Read a backup and recover the original words                        |
-| 4    | [Split into shares](#4-split-into-shares)     | Make standard Shamir shares                                         |
-| 5    | [Restore from shares](#5-restore-from-shares) | Combine enough shares and undo date masking if used                 |
-| 6    | [Recovery](#6-recovery)                       | Find missing words, codes, date digits or share elements            |
-| 7    | [Preview cards](#7-preview-cards)             | Try designs with sample data                                        |
-| 8    | [Word lookup](#8-word-lookup)                 | Look up a word or export dictionaries and a recovery guide          |
-| 0    | [Self-test](#0-self-test)                     | Check the installation                                              |
-| s    | [Help](#s-help)                               | Read commands and options                                           |
-| q    | [Quit](#quit)                                 | Leave the program                                                   |
+| Menu | Task                                          | What it does                                                                                  |
+| ---- | --------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 1    | [Encode](#1-encode)                           | Make a backup in another form or a cross-stitch pattern, with optional dates, shares or cards |
+| 2    | [Re-encode](#2-re-encode)                     | Restore an existing backup and make a replacement                                             |
+| 3    | [Decode](#3-decode)                           | Read a backup and recover the original words                                                  |
+| 4    | [Split into shares](#4-split-into-shares)     | Make standard Shamir shares                                                                   |
+| 5    | [Restore from shares](#5-restore-from-shares) | Combine enough shares and undo date masking if used                                           |
+| 6    | [Recovery](#6-recovery)                       | Find missing words, codes, date digits or share elements                                      |
+| 7    | [Preview cards](#7-preview-cards)             | Try designs with sample data                                                                  |
+| 8    | [Word lookup](#8-word-lookup)                 | Look up a word or export dictionaries and a recovery guide                                    |
+| 0    | [Self-test](#0-self-test)                     | Check the installation                                                                        |
+| s    | [Help](#s-help)                               | Read commands and options                                                                     |
+| q    | [Quit](#quit)                                 | Leave the program                                                                             |
 
 <a id="secret-input-styles"></a>
 
@@ -74,23 +74,24 @@ The private screen clears its contents when you leave it. It needs an interactiv
 
 ## 1. Encode
 
-Choose how to write the backup, whether to mask it with dates, and where to save it. The screen marks the part to keep with **SAVE THIS BACKUP**, or **SAVE THIS SHARE** for each share. Copy the entire marked block in the displayed order. If you use Seedshift, keep the original dates too.
+Choose how to write the backup, whether to mask it with dates, and where to save it. The screen marks the part to keep with **SAVE THIS BACKUP**, or **SAVE THIS SHARE** for each share; a cross-stitch pattern shows its legend line, to keep in its exact order unless you keep the PDF that holds it. Copy the entire marked block in the displayed order. If you use Seedshift, keep the original dates too.
 
 ### Backup formats
 
 <a id="commands"></a>
 
-These are formats selected by `--format`, not separate commands:
+A backup takes one of six forms. The first five are selected by `--format`; the last is made by `stitch`, or Embroidery among the forms of the menu:
 
-| Format                 | What you save                                                              |
-| ---------------------- | -------------------------------------------------------------------------- |
-| `english` / `1`        | English BIP39 words of the masked phrase                                   |
-| `indexes` / `2`        | BIP39 word numbers from **1 to 2048**                                      |
-| `unicode` / `3`        | Four-digit codes of the corresponding Traditional Chinese BIP39 characters |
-| `colors-unicode` / `4` | Two four-digit Unicode codes for each color                                |
-| `colors` / `5`         | `#RRGGBB` codes: 8, 10, 12, 14 or 16 for 12, 15, 18, 21 or 24 words        |
+| Format                 | What you save                                                                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `english` / `1`        | English BIP39 words of the masked phrase                                                                                                             |
+| `indexes` / `2`        | BIP39 word numbers from **1 to 2048**                                                                                                                |
+| `unicode` / `3`        | Four-digit codes of the corresponding Traditional Chinese BIP39 characters                                                                           |
+| `colors-unicode` / `4` | Two four-digit Unicode codes for each color                                                                                                          |
+| `colors` / `5`         | `#RRGGBB` codes: 8, 10, 12, 14 or 16 for 12, 15, 18, 21 or 24 words                                                                                  |
+| Cross-stitch legend    | A pattern made from your picture; its legend holds the phrase: each row's symbol and the last digits of its stitch count ([Embroidery](#embroidery)) |
 
-English words and word numbers require Seedshift in the menu, command line and library. Unicode codes and colors can be used without dates. Colors may be reordered, but every real color code is needed; word codes must keep their order. The 12- and 24-word color forms are compatible with BIP39Colors. Color Unicode is MnemoCode's text format, also accepted as Private Use characters. A cross-stitch pattern keeps the phrase in its legend instead, made by `stitch` or Embroidery in the menu, not by `--format`: see [Embroidery](#embroidery). [Representation details](docs/CLI.md#representation-details) explain separators and copying.
+English words and word numbers require Seedshift in the menu, command line and library. Unicode codes and colors can be used without dates. Colors may be reordered, but every real color code is needed; word codes must keep their order. The 12- and 24-word color forms are compatible with BIP39Colors. Color Unicode is MnemoCode's text format, also accepted as Private Use characters. [Representation details](docs/CLI.md#representation-details) explain separators and copying.
 
 ### Transformation modes
 
@@ -139,11 +140,11 @@ The file holds only the codes, as the screen shows them: Decode asks how they we
 
 ### Check what you saved
 
-Encode offers to check the backup by asking for the written copy and dates again. This checks your transcription. Every generated QR PNG is separately read back and compared with the expected content before saving; a mismatch offers another try.
+Encode offers to check the backup by asking for the written copy and dates again; `--backup-check yes` or `no` answers in advance. This checks your transcription. Embroidery reads each legend back before it writes the PDF. Every generated QR PNG is separately read back and compared with the expected content before saving; a mismatch offers another try.
 
 Encode shows an **original** fingerprint for the wallet with an empty BIP39 passphrase and an **encoded** fingerprint for the stored phrase. They do not reveal the phrase. The encoded fingerprint checks the codes before dates are removed; an original wallet reference checks the recovered phrase. Every backup MnemoCode writes is a valid phrase, so each has an encoded fingerprint; codes of the original Seedshift program, whose last word fails the checksum, have none.
 
-You can also show the masked phrase as English words with `--show-masked-words`, or the original words for visual checking with `--show-original words`. These screen-only choices never add the original phrase to encoded files or share exports. Keep the original words apart from the backup.
+You can also show the masked phrase as English words with `--show-masked-words`, or the original words for visual checking with `--show-original words`. The menu always shows the English words of a masked result and never the original words. These screen-only choices never add the original phrase to encoded files or share exports. Keep the original words apart from the backup.
 
 ### Cards and QR codes
 
@@ -171,9 +172,9 @@ mnemocode decode --mode seedshift-legacy --format unicode \
   --qr-file legacy-unicode.png --ask-secrets
 ```
 
-A QR code contains the real codes, **without a mode, format header or dates**. Keep that information yourself. `--card-qr` puts the QR on a collection sheet; `--card-qr-png` also saves it as a PNG beside the PDF or in the image folder; individual cards never have a QR. `--qr PATH` saves a standalone PNG. In the menu one question covers all of this: no QR code, an ordinary one or one with hidden data, on the cards only, on the cards and as a PNG file, or as a PNG file only.
+A QR code contains the real codes, **without a mode, format header or dates**. Keep that information yourself. `--card-qr` puts the QR on a collection sheet; `--card-qr-png` also saves it as a PNG beside the PDF or in the image folder; individual cards never have a QR. `--qr PATH` saves a standalone PNG. In the menu one question covers all of this: no QR code, an ordinary one or one with hidden data, on the cards only, on the cards and as a PNG file, or as a PNG file only; with separate business cards, or without cards, the QR code can only be a PNG file.
 
-Each file of the cards, a PDF, PNG or JPEG, also keeps the codes as named color swatches in its design metadata (XMP), as files from design programs do. Decode reads them from the file, or from the folder of the cards, without typing; it does not read a photograph or a scan of a sheet.
+Each file of the cards, a PDF, PNG or JPEG, also keeps the codes as named color swatches in its design metadata (XMP), as files from design programs do. Decode, Re-encode and Restore from shares read them from the file, or from the folder of the cards, without typing; it does not read a photograph or a scan of a sheet.
 
 Printed sets also contain extra random codes. When typing codes from cards, give `--words` for the original phrase length and omit those extra codes. The sheet for heirs records the length. Recheck a backup before relying on it.
 
@@ -221,7 +222,7 @@ The menu asks for the fabric: Aida 14 unless you choose 11, 16 or 18, or linen o
 
 Decode needs the legend, not the picture; it asks whether Seedshift was used, and which, and then the dates, since the legend does not say. Give it the pattern's PDF (In a cross-stitch pattern, or `--input-file` with the PDF): the PDF keeps the legend line, compressed where no viewer shows it. Or type the legend. Type each row from the top as the symbol's number, a colon and its stitches: `28:1725 25:2163 57:3275 …`. A small pattern, too small for the phrase otherwise, also uses the order of its rows, and its line names each row's DMC number between them: `15:407:38 23:703:169 …`. The PDF shows the symbols; [the SeedStitch format](docs/SEEDSTITCH.md#the-symbols) numbers them 1 to 70, and `--output` saves the legend already typed out. A single mistyped row is corrected: Decode names the row to check on paper, or asks you to check them all where a change of any of several rows gives the same phrase. A legend of the usual form typed with the DMC numbers that its key prints reads too.
 
-A pattern is a new backup like the others: it also offers the legend line as a text file, a QR code image of it, the phrase after Seedshift on the screen and the sheet for heirs (`--output`, `--qr`, `--show-masked-words`, `--heir-sheet`; `stitch` also takes `--show-original`). In every mode the legend holds a phrase of the same length, so nothing in it tells which mode was used.
+A pattern is a new backup like the others: it also offers the legend line as a text file, a QR code image of it, the phrase after Seedshift on the screen and the sheet for heirs (`--output`, `--qr`, `--show-masked-words`, `--heir-sheet`; `stitch` also takes `--show-original`). In every mode the legend holds a phrase of the same length, so nothing in it tells which mode was used. With the Original Seedshift the legend holds the phrase with a last word that passes the checksum, and MnemoCode shows the word to remember, as Encode does; Decode asks for it.
 
 A pattern can also be split into [Shamir shares](#splitting-a-mnemonic-into-shares): choose a set such as 2 of 3 at "Split it into Shamir shares?", or give `--threshold` and `--shares`. MnemoCode makes one pattern per share from the same picture, numbered `share-1-pattern.pdf`, `share-2-pattern.pdf` and so on in a new folder (`--pdf-dir`). The embroideries look almost the same; their legends differ. Restore from shares reads any threshold of them back: give the folder that holds their PDFs, each pattern's PDF, or its legend line typed. Given a folder, MnemoCode looks through it and the folders inside it: a set found alone is taken and named, and several are listed to choose from. `--output` saves every share's legend line, one per line, and `--qr-dir` a QR code image of each. Decode recognises a share's pattern and sends it to the restore. A share holds 5 bytes more than the phrase, so its pattern needs a few more threads; with too few, MnemoCode asks for another picture or size.
 
@@ -238,7 +239,7 @@ Treat the legend like an encoded backup: with the dates, or alone where the phra
 
 ## 2. Re-encode
 
-Read an existing backup, restore the original phrase and make a replacement with another mode, dates, format, cards or shares. MnemoCode asks you to recognize the original words or check them against your wallet before proceeding. A valid checksum alone is not confirmation. The old backup remains usable.
+Read an existing backup, restore the original phrase and make a replacement with another mode, dates, format, cards or shares. The old backup is read as Decode reads it: typed, from a record file or a QR image, from a cross-stitch pattern or the files of printed cards, or found in a folder. MnemoCode asks you to recognize the original words or check them against your wallet before proceeding. A valid checksum alone is not confirmation. The old backup remains usable.
 
 ```bash
 # Replace the color record from Encode with a new date-masked Unicode record.
@@ -285,7 +286,7 @@ For Original Seedshift codes that MnemoCode wrote, Decode, Re-encode and Restore
 
 ## 4. Split into shares
 
-Make standard Shamir shares of the seed phrase itself. Choose a threshold and a total count, for example any 2 of 3 shares. The threshold is at least 2 and no greater than the count; at most 16 shares can be made. Keep them in separate places.
+Make standard Shamir shares of the seed phrase, or of its mask where you choose MnemoCode or Original Seedshift first. Choose a threshold and a total count, for example any 2 of 3 shares. The threshold is at least 2 and no greater than the count; at most 16 shares can be made. Keep them in separate places.
 
 ```bash
 # Standard SSKR shares, with no date masking; then restore from the saved file.
@@ -313,7 +314,7 @@ mnemocode encode --mode direct --ask-secrets --sskr \
 mnemocode sskr-combine --share-file color-shares.txt
 ```
 
-For the Seedshift restore above, enter `unicode-shares.txt` at the private share prompt, then enter the same dates used for the split. Unicode, word-number and color shares need MnemoCode. Dates and mode are not stored in shares: a Seedshift set needs both to restore the original wallet. Either Seedshift can be used; with the Original Seedshift the restore also asks for the last word Encode named. A PDF or image folder can contain **every share**; separate them before storage.
+For the Seedshift restore above, enter `unicode-shares.txt` at the private share prompt, then enter the same dates used for the split. Unicode, word-number and color shares need MnemoCode. Dates and mode are not stored in shares: a Seedshift set needs both to restore the original wallet. Either Seedshift can be used; with the Original Seedshift the restore also asks for the last word Encode named. A PDF or image folder can contain **every share**; separate them before storage. Shares can also be cross-stitch patterns, one per share from the same picture: see [Embroidery](#embroidery).
 
 Use `sskr-export` to print or change the presentation of existing shares without making a new set:
 
@@ -372,7 +373,7 @@ On a terminal, when unfiltered candidates do not fit on the screen, MnemoCode of
 
 ### Codes that cannot be read
 
-Decode accepts `?` for an unreadable code and known prefixes or suffixes where the format supports them. It can check the encoded fingerprint without dates, check the original wallet after undoing dates, or list a small set. Missing date digits can be searched at the same time. The result includes repaired codes and dates.
+Decode accepts `?` for an unreadable code and known prefixes or suffixes where the format supports them. It can check the encoded fingerprint without dates (`--encoded-fingerprint`), check the original wallet after undoing dates, or list a small set (`--list-candidates`). Missing date digits can be searched at the same time. The result includes repaired codes and dates. A cross-stitch legend takes no `?`: type each row as well as you can read it, and Decode corrects one mistyped row.
 
 ```bash
 mnemocode decode --mode seedshift --format unicode --ask-secrets
@@ -452,13 +453,13 @@ mnemocode table --unicode 5BF6
 mnemocode table --word-lists-dir recovery-pack
 ```
 
-In the menu, Enter after a lookup asks for another value of the same kind; Escape returns to the main menu. **Export word lists and guide** lets you choose one table or the full set. [Dictionary export options](docs/CLI.md#word-lists-and-manual-recovery) describe individual files. The [manual recovery guide](docs/MANUAL_RECOVERY.md) includes a standalone Python helper; combining SSKR shares still requires a compatible implementation.
+In the menu, Enter after a lookup asks for another value of the same kind; Escape returns to the main menu. **Export word lists and guide** lets you choose one table or the full set. [Dictionary export options](docs/CLI.md#word-lists-and-manual-recovery) describe individual files. The [manual recovery guide](docs/MANUAL_RECOVERY.md) includes standalone Python helpers, for the phrase and for a cross-stitch legend; combining SSKR shares still requires a compatible implementation.
 
 <a id="self-tests-and-public-vectors"></a>
 
 ## 0. Self-test
 
-Run the full installation self-test, including PDF and QR rendering:
+Run the full installation self-test, including PDF and QR rendering and a cross-stitch pattern read back from its PDF:
 
 ```bash
 mnemocode self-test
@@ -529,7 +530,7 @@ The `mnemocode` crate provides transformations, recovery, shares and wallet chec
 
 ## Source layout and review
 
-See the [architecture](docs/ARCHITECTURE.md), [audit index](docs/audits/README.md) and [release procedure](docs/RELEASING.md). CI checks source, tests and platform input handling; release workflows build and check the executables. The tests cover 81.07% of the source lines of MnemoCode's own crates on Linux x86-64 (2026-11-16, commit `74b03e9`); [test coverage](docs/COVERAGE.md) gives each crate and what the figure leaves out.
+See the [architecture](docs/ARCHITECTURE.md), [audit index](docs/audits/README.md) and [release procedure](docs/RELEASING.md). CI checks source, tests and platform input handling; release workflows build and check the executables. The tests cover 81.07% of the source lines of MnemoCode's own crates on Linux x86-64 (2026-11-16, commit `74b03e9`, measured before the last changes of 0.2.0); [test coverage](docs/COVERAGE.md) gives each crate and what the figure leaves out.
 
 ## Provenance and license
 

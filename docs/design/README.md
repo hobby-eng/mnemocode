@@ -19,4 +19,4 @@ downloaded sources that stay outside the repository. Paths of other repositories
 
 ## Subsequent decisions
 
-[Hidden QR records](architect/adr/0012-hidden-qr-records.md) describes the optional filler-byte format and its front-end boundaries.
+[SeedStitch](architect/adr/0010-seedstitch.md) describes the cross-stitch format, its crate and the review of its patterns. [Hidden QR records](architect/adr/0012-hidden-qr-records.md) describes the optional filler-byte format and its front-end boundaries.

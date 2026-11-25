@@ -27,6 +27,11 @@ A record saved by an earlier version may start with `MNC1:MODE:FORMAT:`; the tex
 after the third colon is its payload. A file of codes saved now, a QR code or a
 share does not record the mode or the dates. A valid checksum cannot tell you which dates were used.
 
+A QR code with hidden data shows an ordinary scanner only its public text, such
+as a contact card. The backup codes lie in its filler bytes, which MnemoCode, or
+a program that follows MnemoCode's published format, reads; this guide does not.
+Keep the codes in another form too, such as the printed cards or a written copy.
+
 For a backup on printed cards, keep the sheet for heirs, or a note of how many
 words the seed phrase has, with the cards: that number tells where the backup ends
 (see "Printed cards" below).

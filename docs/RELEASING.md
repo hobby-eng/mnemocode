@@ -6,7 +6,8 @@ never enters GitHub Actions.
 ## Release notes
 
 Write `docs/releases/v<version>.md`. It becomes the text of the release; a tag without it stops the
-release workflow before anything is built.
+release workflow before anything is built. In `CHANGELOG.md`, the version's heading loses its
+`(unreleased)`.
 
 ## Version
 
@@ -63,7 +64,7 @@ build of your own, run `cargo xtask reproducible` on the tagged commit with its 
 
 ## Signing
 
-On the owner's computer, with the release key in GnuPG and `gh` logged in:
+On the maintainer's computer, with the release key in GnuPG and `gh` logged in:
 
 ```sh
 cargo xtask sign v<version>

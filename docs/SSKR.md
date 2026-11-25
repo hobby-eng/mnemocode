@@ -52,6 +52,20 @@ The split shows the fingerprint of the original phrase and that of the masked ph
 
 When a digit of a date is forgotten, type `?` in its place on the private screen (`sskr-combine --ask-secrets`, or Restore in the menu), also when share codes hold `?`. MnemoCode then restores the masked phrase from the shares, asks for the wallet's fingerprint or one of its first receiving addresses, and searches the dates as `recover-date` does, for each phrase that the shares can give. Before the search it shows the whole work, share combinations times date combinations, and about how long it takes. `sskr-export --ask-secrets --mode seedshift`, which gives the shares back whole and takes the wallet from its options, searches such dates too. Dates read with `--dates-file` must be complete in the share commands.
 
+### Shares as cross-stitch patterns
+
+`stitch` with `--threshold` and `--shares`, or Embroidery in the menu's Encode with a set such as 2 of 3, makes one cross-stitch pattern per share, all from the same picture. The phrase is masked first, in the mode chosen, as `encode --sskr` does; a share's legend does not name the mode. `--pdf-dir NEW_FOLDER` saves `share-1-pattern.pdf`, `share-2-pattern.pdf` and so on, `--output` every share's legend line, one per line, and `--qr-dir` a QR image of each line.
+
+```bash
+mnemocode stitch --ask-secrets --picture ./photo.jpg --threshold 2 --shares 3 \
+  --pdf-dir ./share-patterns --output ./share-legends.txt
+
+# Restore privately from the folder of the patterns' PDFs.
+mnemocode sskr-combine --share-file ./share-patterns --ask-secrets
+```
+
+`sskr-combine` reads the patterns' PDFs, a folder of them, their legend lines typed or from a file, or their QR images; Decode sends a share's pattern to the restore. A share holds 5 bytes more than the phrase, so its pattern needs a few more threads. [SeedStitch](SEEDSTITCH.md) defines the legend of a share.
+
 ## Share formats
 
 | Format           | Text                                                     | Read by            |
@@ -140,7 +154,7 @@ The [library's restore contracts](LIBRARY.md#share-engine-contracts) distinguish
 
 ### Damaged shares
 
-Replace each unreadable element of a share with `?`, keeping its place: a word number, a four-digit Unicode code, a color code, a color Unicode code or pair, a Bytewords word, or a two-letter pair inside `ur:sskr/...`. In Color Unicode codes run together, each `?` stands for one code or for a whole color, and both kinds may be mixed in one share; marks that fit more than 256 ways are refused, so read more of those codes. `sskr-combine`, `sskr-export` and the backup check fill them in. Spaces are needed around a missing word number; fixed-width codes, Bytewords, which all have four letters, and UR pairs may stay joined. Do not remove the element. Any of the shares may have marks, up to 64 on one share, and a share may be given twice when two damaged copies of it are kept.
+Replace each unreadable element of a share with `?`, keeping its place: a word number, a four-digit Unicode code, a color code, a color Unicode code or pair, a Bytewords word, or a two-letter pair inside `ur:sskr/...`. In Color Unicode codes run together, each `?` stands for one code or for a whole color, and both kinds may be mixed in one share; marks that fit more than 256 ways are refused, so read more of those codes. `sskr-combine`, `sskr-export` and the backup check fill them in. Spaces are needed around a missing word number; fixed-width codes, Bytewords, which all have four letters, and UR pairs may stay joined. Do not remove the element. Any of the shares may have marks, up to 64 on one share, and a share may be given twice when two damaged copies of it are kept. A share's cross-stitch legend takes no `?`: one misread row of it is corrected, as in [any legend](SEEDSTITCH.md#a-row-read-wrong).
 
 In colors, in the four-digit Unicode codes of words and in the four-digit codes of Color Unicode, written apart by spaces, commas, semicolons or `#` (in a list of shares, a semicolon separates the shares), a `?` inside a code stands for one digit, and the digits that can be read are used: `#B5?0??` misses three digits of a color, `4E?0` one digit of a word's code. A lone `?` stands for the whole color or code, and so does a code all of whose digits are `?`, such as `??????` or `????`; a `?` joined to a whole code, as in `?4E00` or `#?#1F9121`, is still one whole element. A code with a `?` keeps all its symbols, six for a color and four for a Unicode code, or the share is refused with the code's place.
 

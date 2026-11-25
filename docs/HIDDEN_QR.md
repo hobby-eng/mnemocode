@@ -42,7 +42,7 @@ checks use its real size and refuse a page where it cannot fit. `--qr-text` appl
 PNG; PDF exports use the contact printed on their cards. A standalone PNG without `--qr-text` uses
 a generic contact. `--qr-hidden` also works with share QR directories.
 
-Decode and share recovery extract a hidden record from their existing QR-file inputs automatically.
+Decode, Re-encode and share recovery extract a hidden record automatically, from a QR image given to them or found in a folder.
 Choose the same representation and masking mode as for the original codes. `qr-open` extracts any
 supported UTF-8 record without interpreting it; its output file contains that record without encryption.
 A SeedStitch record preserves the legend for phrase recovery, not the pattern picture.
@@ -146,7 +146,8 @@ all 40 QR versions with qrcodegen's encoder, including the exact per-block corre
 
 ## Library and browser
 
-Rust: `mnemocode::qr::hidden::{matrix, png, read_png}`. Matrix and image exports verify both layers
+Rust: `mnemocode::qr::hidden::{matrix, png, png_behind, read_png}`; `png_behind` draws a record behind a
+contact, or as an ordinary QR code where none is given. Matrix and image exports verify both layers
 before returning them. `qr::read_png` deliberately keeps its ordinary-scanner behavior.
 
 Browser bindings: `hiddenQrPng(visible, record)`, `readHiddenQrPng(bytes)`,

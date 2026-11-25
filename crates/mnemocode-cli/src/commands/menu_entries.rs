@@ -72,7 +72,7 @@ pub(crate) const ENCODE: MenuEntry = entry(
     '1',
     "Encode your seed phrase",
     "Encode",
-    "Make a backup in another form, with optional date masking, shares or printable cards.",
+    "Make a backup in another form or a cross-stitch pattern, with dates, shares or cards.",
     "1-encode",
 );
 pub(crate) const RE_ENCODE: MenuEntry = entry(

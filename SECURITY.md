@@ -63,7 +63,7 @@ MnemoCode warns for usual Dropbox, OneDrive, Google Drive, iCloud Drive, Yandex 
 
 ### Exported files
 
-Records, QR codes, PDFs, images, shares, dates and printed cards can help recover a wallet. Treat each as secret recovery material even if it is insufficient on its own.
+Records, QR codes, PDFs, images, shares, dates, printed cards, cross-stitch patterns and their legend lines can help recover a wallet. Treat each as secret recovery material even if it is insufficient on its own. A file can hold more than its page shows: the PDF, PNG and JPEG files of cards keep their codes in their design metadata (XMP), and a pattern's PDF keeps its legend line where no viewer shows it.
 
 On Linux and macOS files and folders are created for your account only, where the filesystem supports Unix permissions. Windows uses the destination folder's permissions; FAT and exFAT cannot provide those Unix permissions. Completed files are published without replacing existing names. On filesystems without hard links, an empty file reserves the name while the completed file is moved in; a failed move removes that reservation.
 
@@ -90,7 +90,7 @@ The SSKR engine is compiled into the executable from the sources recorded in `ve
 
 ## Cryptographic and recovery limits
 
-- Another representation or QR code is not encryption.
+- Another representation, a QR code, a hidden QR record or a cross-stitch legend is not encryption: their formats are public.
 - Date masking can be reversed by anyone who knows or guesses the dates. Memorable dates are easy to guess; they do not replace authenticated, memory-hard encryption or a strong BIP39 passphrase.
 - A valid BIP39 checksum does not identify your wallet. Compare recovered material with a known wallet reference, using the original network, address type, account, branch, index and passphrase.
 - An address match checks the selected wallet location. MnemoCode does not discover accounts, read balances or send transactions. Verify recovered addresses in maintained wallet software before using funds.

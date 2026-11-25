@@ -202,7 +202,15 @@
       },
       "devDependencies": [],
       "library": [
-        "foundation"
+        "foundation",
+        "bip39",
+        "dates",
+        "forms",
+        "modes",
+        "backup",
+        "sskr",
+        "qr",
+        "checks"
       ],
       "order": [
         "sample",

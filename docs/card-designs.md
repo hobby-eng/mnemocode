@@ -6,6 +6,8 @@ MnemoCode includes thirteen designs. Run `mnemocode preview --list` to see their
 
 Each card prints one code: an RGB color code for formats 4 and 5, or a four-digit Unicode code for format 3. In color formats, the printed color belongs to the backup. With Unicode codes, colors are decorative; recover from the printed codes, not from the artwork's color.
 
+Each PDF, PNG or JPEG file of the cards also keeps the codes its page prints, decoys included, as named color swatches in its design metadata (XMP), as files from design programs do. Decode reads them from the file and asks the phrase length, as for typed codes; a photograph or a scan of a sheet does not keep them.
+
 Business-card artwork uses the selected color's hue, brightness and part of its saturation to distinguish pale, deep and dark samples.
 
 Collections include random decoy codes. A sheet has at least one and enough to fill every row; separate cards have exactly one. For example, a 24-word Unicode backup has 25 separate cards. The QR contains only real codes, and the sheet for heirs records the information needed to exclude decoys.
@@ -24,7 +26,7 @@ Finish names are decorative. On one sheet, different codes use different materia
 
 ## QR code
 
-A collection QR sits in the upper-right corner beside the heading, outside the samples. Its modules are 0.30 mm wide, the symbol is at least 12 mm wide, and it has a full quiet border. If it cannot fit, the export asks for a larger page.
+A collection QR sits in the upper-right corner beside the heading, outside the samples. Its modules are 0.30 mm wide, the symbol is at least 12 mm wide, and it has a full quiet border. If it cannot fit, the export asks for a larger page. With `--qr-hidden`, ordinary scanners see a contact card built from the printed details, and MnemoCode reads the codes kept behind it ([Hidden QR records](HIDDEN_QR.md)).
 
 Individual code cards never contain a collection QR. See [share layouts](SSKR.md#share-cards) for the separate QR-card option for Shamir shares.
 

@@ -13,5 +13,7 @@ record; the harnesses that made its evidence stay beside it.
 | [AUD-010](AUD-010-2026-11-18.md) | 2026-11-18 | AUD-009 fixes on `19addd5` plus working-tree diff `b181b946` | Seven of eight claimed fixes verified; Unicode export collision remains. Three older acceptance gaps remain. Fresh navigation checks pass; no full release acceptance. [JSON](AUD-010-2026-11-18.json) |
 
 Current dispositions, fix identities and verification evidence are in the
-[AUD-010 remediation register](AUD-010-2026-11-18.md#remediation-and-follow-up).
+[AUD-010 remediation register](AUD-010-2026-11-18.md#remediation-and-follow-up) and the
+[remediation after AUD-010](AUD-010-2026-11-18.md#remediation-after-this-audit): the fixes are in
+`f371180`, which 0.2.0 contains.
 Earlier report verdicts describe their original snapshots.
